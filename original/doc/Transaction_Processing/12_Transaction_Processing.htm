@@ -1,0 +1,1363 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Transaction Processing</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP12.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=5616>
+<meta name=layout-width content=898>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP12.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Transaction Processing</h1>
+
+<p class=Body
+	style="text-indent: 0px;">At times it is necessary to have a group 
+ of actions executed as a unit. In this case, either all actions are completed 
+ or none of the actions are completed.</p>
+
+<p class=Body
+	style="text-indent: 0px;">To illustrate this, consider the everyday 
+ example of transferring funds from one bank account to another. There 
+ are two steps to this process: first one account has the money debited 
+ and then the second account has the sum credited. A failure could occur 
+ after the debit but before the credit, in which case the money would be 
+ removed from the first account but the second account remains unchanged, 
+ resulting in lost funds. In this type of situation, one would like an 
+ all or nothing response, where either both the debit and credit are completed 
+ or nothing happens and the accounts remain unchanged.</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=Transactions>Transactions</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A transaction is one way 
+ of treating&nbsp;a group of actions as a whole. The scope of a transaction 
+ is delimited by a specified &quot;start&quot; and &quot;end&quot; between 
+ which the actions are treated as a unit. A transaction has the all or 
+ nothing property, so that either all the actions within the scope of a 
+ transaction&nbsp;are completed or none are completed. When a transaction 
+ has successfully completed all the operations within its scope, it is 
+ &quot;committed&quot;. A transaction can be aborted and all the changes 
+ that were made up until the failure can be reversed. This constitutes 
+ a &quot;rollback&quot;. After the transaction has terminated, the changes 
+ are permanent and can not be reversed.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramTransferC.gif" v:shapes="_x0000_i1025" x-maintain-ratio="TRUE" style="width: 107px;
+															height: 36px;
+															float: none;
+															border-style: none;
+															border-style: none;" width="107" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following program shows 
+ how a simple bank transfer can be accomplished using a CodeBase transaction.</td></tr>
+</table>
+
+<p class=SourceCode>/*TRANSFER.C*/</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#include &quot;d4all.hpp&quot;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>extern unsigned _stklen = 10000 ; /*for all Borland 
+ Compilers*/</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>CODE4 codeBase ;</p>
+
+<p class=SourceCode>DATA4 *datafile ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>FIELD4 *acctNo, *balance ;</p>
+
+<p class=SourceCode>TAG4&nbsp;*acctTag, *balTag ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void OpenLogFile( void )&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*Opening or creating a log file is&nbsp; */ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*only required for STAND-ALONE mode.*/</p>
+
+<p class=SourceCode>{&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int rc ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*NULL is passed as the log file name */</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*so the default &quot;C4.LOG&quot; is used as&nbsp; */</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*the log file name.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ */</p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc = code4logOpen( &amp;codeBase, 0, &quot;user1&quot;) 
+ ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; if ( rc == r4noOpen )&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; codeBase.errorCode = 
+ 0 ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rc = code4logCreate( 
+ &amp;codeBase, 0, &quot;user1&quot; ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>void OpenDataFile( void )</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; datafile = d4open( &amp;codeBase, &quot;BANK.DBF&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; acctNo = d4field( datafile, &quot;ACCT_NO&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; balance = d4field( datafile, &quot;BALANCE&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; acctTag = d4tag( datafile, &quot;ACCT_TAG&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; balTag = d4tag( datafile, &quot;BAL_TAG&quot; 
+ ) ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>int Credit( long toAcct, double amt )</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; int rc ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; double newBal ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc = d4tagSelect( datafile, acctTag ) 
+ ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc = d4seekDouble( datafile, toAcct ) 
+ ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; if (rc != r4success ) return rc;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; newBal = f4double( balance ) + amt ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4lockFile( datafile ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; f4assignDouble( balance, newBal ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; return r4success;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>int Debit( long fromAcct, double amt )</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; return Credit( fromAcct, -amt ) ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void Transfer( long fromAcct, long toAcct, double amt 
+ )</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; int rc, rc1, rc2 ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4tranStart( &amp;codeBase ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc1 = Debit( fromAcct, amt ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc2 = Credit( toAcct, amt );</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; if (rc1 == r4success &amp;&amp; rc2 == 
+ r4success)</p>
+
+<p class=SourceCode>&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; rc = code4tranCommit( 
+ &amp;codeBase ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; else</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rc = code4tranRollback( 
+ &amp;codeBase ) ;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void PrintRecords( void )</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; int rc ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; for( rc = d4top( datafile ); rc == r4success; 
+ rc = d4skip( datafile, 1L ))</p>
+
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;-----------------------------------\n&quot;) 
+ ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;Account 
+ Number: %ld\n&quot;, f4long( acctNo )) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;Balance&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ : %f\n&quot;, f4double( balance )) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;=========================================\n&quot;) 
+ ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main( void )</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4init( &amp;codeBase ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; codeBase.errOpen = 0 ;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; codeBase.safety = 0 ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; codeBase.lockAttempts = 5 ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; codeBase.lockEnforce = 1 ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; OpenLogFile() ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; OpenDataFile() ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; PrintRecords() ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; /* The account number 56789 doesn't exist 
+ in the database,*/</p>
+
+<p class=SourceCode>&nbsp;&nbsp; /* the transfer is aborted and database 
+ is not changed&nbsp;&nbsp;&nbsp; */</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; Transfer( 12345, 56789, 200.00 ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; PrintRecords() ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; /* Both accounts exist so the transfer 
+ is completed&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */</p>
+
+<p class=SourceCode>&nbsp;&nbsp; /* and the database is updated&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ */</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; Transfer( 12345, 55555, 150.50 ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; PrintRecords() ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4initUndo( &amp;codeBase ) ;</p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the TRANSFER.C program, 
+ a transfer takes place when there is a debit from one account followed 
+ by a credit to another, as shown by the following function calls.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment for TRANSFER.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>rc1 = Debit( fromAcct, amt ) ;</p>
+<p class=SourceCode>rc2 = Credit( toAcct, amt );</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">These two operations must 
+ both be successful in order for the transfer to succeed. Therefore, these 
+ two actions must be contained within a transaction where either both the 
+ debit and the credit succeed or neither will be completed and the database 
+ will not be changed. In CodeBase, a transaction is delimited by the&nbsp;functions 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranStart</span></span>&nbsp;and 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranCommit</span></span>, 
+ which&nbsp;initiate and terminate the transaction respectively.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>code4tranStart( &amp;codeBase ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>...&nbsp;&nbsp; /*code to be treated as a unit*/</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>code4tranCommit( &amp;codeBase) ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Events may occur that cause 
+ failure during a transaction. For example, if there is a power failure 
+ or the hardware crashes during a transaction, one would want to be able 
+ to reverse any changes that had occurred before the failure. Programmers 
+ must anticipate and test for possible failure points within a transaction. 
+ For instance, the example program TRANSFER.C checks to see if both specified 
+ accounts exist in the database and a failure occurs if either account 
+ did not exist. When the program encounters a failure of this sort, it 
+ calls <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranRollback</span></span>&nbsp;to 
+ abort the transaction&nbsp;and restore the database to its original state.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If the transfer succeeds, 
+ the transaction is completed by <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4tranCommit</span></span>, 
+ which commits the changes to the database. After the transaction has been 
+ committed, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranRollback</span></span> 
+ can NOT be used&nbsp;restore the database to the state that existed before 
+ the transaction was started. An error is generated if <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4tranRollback</span></span> 
+ is called after <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranCommit</span></span>.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from TRANSFER.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>if (rc1 == r4success &amp;&amp; rc2 == r4success)</p>
+<p class=SourceCode>&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;&nbsp; code4tranCommit( 
+ &amp;codeBase) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; else</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; code4tranRollback( &amp;codeBase) 
+ ;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>How a Transaction Works</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase has implemented 
+ transactions in the following manner. When a transaction is initiated 
+ with <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranStart</span></span>, 
+ all the changes to the database are recorded in a log file. The log file 
+ stores both the old&nbsp;value and the new value, as well as who made 
+ the change. At every step during a transaction, each change is recorded 
+ in the log file and then the database is modified. After the transaction 
+ has been committed using <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranCommit</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">, 
+ </span></span>the changes to the database are permanent. During a rollback, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranRollback</span></span> 
+ uses the original&nbsp;values from the log file to reverse all the changes 
+ made to the database.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Logging_in_the_Stand_Alone_Case>Logging in the Stand-Alone 
+ Case</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">All modifications that 
+ are made while&nbsp;an application is running, which are outside the scope 
+ of a transaction, can be automatically recorded in the log file. Automatic 
+ logging is useful when a back&nbsp;up copy of all changes is required. 
+ There are times when logging is not necessary; for example, when copying 
+ data files. In the stand-alone configuration, the logging can be turned 
+ off to save time and disk space. The following discussion applies only 
+ to logging in the stand-alone configuration.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt;">CODE4.log</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> member 
+ variable <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.log</span></span>&nbsp;is 
+ used to specify whether changes to the data files are automatically recorded 
+ in a log file. Changing this setting only affects the logging status&nbsp;of 
+ the files that are opened subsequently. The files that were opened before 
+ the setting was changed retain the logging status that was set when the 
+ file was opened. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.log</span></span> 
+ has three possible values:</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LOG4ALWAYS</span></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ The automatic logging takes place&nbsp;for all the data files for as long 
+ as the application is running. The logging can NOT be turned off for the 
+ current data file by calling <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4log</span></span>. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LOG4ON</span></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ The automatic logging takes place&nbsp;for all the data files for as long 
+ as the application is running. In this case, <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4log</span></span> can 
+ be used to turn the logging off and on&nbsp;for the current data file. 
+ CodeBase uses this value as the default.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LOG4TRANS</span></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Only the changes made during a transaction&nbsp;are automatically recorded 
+ in the log file. Logging may be turned on and off for the current data 
+ file by calling <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4log</span></span>.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><b style="font-weight: bold;"><span 
+ style="font-size: 9.0pt; font-family: Arial;">d4log</span></b></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When a file is opened with 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.log</span></span>&nbsp;set 
+ to either&nbsp;<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LOG4ON</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LOG4TRANS, 
+ d4log</span></span> can be used to turn the logging off and on&nbsp;for 
+ the current data file. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4log</span></span> 
+ only has an effect on logging while the data file is open and it has no 
+ effect on the logging that is done during a transaction.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Pass false (zero) to <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4log, 
+ </span></span>to turn the logging off and pass it true (non-zero) to turn 
+ the logging back on. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4log</span></span> 
+ also returns the previous logging setting. If -1 is passed to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4log</span></span> the 
+ current logging status is returned. The possible return values are as 
+ follows:</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">r4logOn</span></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ This return value means that logging&nbsp;is turned on for the data file.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;">&nbsp;</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">r4logOff</span></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ This return value means that either the logging&nbsp;is turned off for 
+ the data file or that logging in general is not enabled.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&lt;0</span></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ An error has occurred.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">turning 
+ logging off</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-bottom: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*Logging of changes takes place&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ */</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*for all data files opened subsequently*/</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>codeBase.log = LOG4ON ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>datafile = d4open( &amp;codeBase, &quot;DATA.DBF&quot; 
+ ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>rc = d4log( datafile, 0 ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*logging is turned off for this */</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*particular data file and the previous*/</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*logging status is returned&nbsp; */</p>
+<p class=SourceCode>rc = d4log( datafile, -1 ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ /*the current logging status is returned*/</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Log files</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the stand-alone configuration, 
+ a log file must exist&nbsp;or be explicitly&nbsp;created<span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;"> </span></span>before<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ </span></span>any automatic logging or transaction logging can take place.<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ </span></span>If a log file does not exist, <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4tranStart</span></span> 
+ will generate&nbsp;an error.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The log file may be manually 
+ opened or created by using <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logOpen</span></span>&nbsp;and 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logCreate</span></span> 
+ respectively. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logOpen</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logCreate</span></span> 
+ both take the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> 
+ pointer, the name of the log file and user identification as parameters. 
+ If null is passed as the file name, then the default file name &quot;C4.LOG&quot; 
+ is used. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logOpen</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logCreate</span></span> 
+ must be called before <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4open 
+ </span></span>or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4create</span></span>.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Generally, one would like 
+ to open a log file if it exists, otherwise create a new log file. This 
+ concept is the same as discussed in the &quot;Opening or Creating&quot; 
+ section of the &quot;Database Access&quot; chapter in this guide.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from TRANSFER.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>void OpenLogFile( void )&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>{&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; int rc ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; rc = code4logOpen( &amp;codeBase, 0, &quot;user1&quot;) 
+ ;</p>
+<p class=SourceCode>&nbsp;&nbsp; if ( rc == r4noOpen )&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; codeBase.errorCode = 
+ 0 ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rc = code4logCreate( 
+ &amp;codeBase, 0, &quot;user1&quot; ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+<p class=SourceCode>}</p>
+<p class=SourceCode>&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If<span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;"> code4logOpen </span></span>or<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;code4logCreate 
+ </span></span>have not been&nbsp;explicitly called,<span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;"> d4open,</span></span> 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4create</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranStart</span></span> 
+ automatically&nbsp;try&nbsp;to open a log file by calling <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4logOpen</span></span>.<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ code4logOpenOff</span></span> can be used&nbsp;to instruct <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4open</span></span>, <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4create</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4tranStart</span></span> 
+ not to automatically open the log file. When <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4logOpenOff</span></span> 
+ is used, no transactions can start unless the log file is opened explicitly 
+ by the application.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">the 
+ log file is not automatically opened</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>rc = code4logOpenOff( &amp;codeBase ) ;</p>
+<p class=SourceCode>datafile = d4open( codeBase, &quot;DATA.DBF&quot; ) 
+ ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border-top: solid #000000 4.5pt;
+			border-left: none;
+			border-bottom: solid #000000 4.5pt;
+			border-right: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Logging_in_the_Client_Server_Case>Logging in the Client-Server 
+ Case</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border-top: solid #000000 .75pt;
+			border-left: none;
+			border-bottom: solid #000000 .75pt;
+			border-right: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the client-server configuration, 
+ the automatic&nbsp;logging and transaction logging are handled by the 
+ server. Calling the functions <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logCreate</span></span>&nbsp;<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logOpen</span></span> 
+ and&nbsp;<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4logOpenOff</span></span> 
+ in a client application&nbsp;will have no effect, since the log file is 
+ controlled by the server. These functions will always return <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">r4success</span></span> 
+ when called by a client application.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Locking>Locking</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Every time a data file 
+ is being modified one must consider which locking procedure is appropriate. 
+ Locking is necessary step in preserving the integrity of the database. 
+ CodeBase has both automatic and explicit locking features, as discussed 
+ in the &quot;Multi-user Applications&quot; chapter in this guide.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-weight: normal;">Automatic 
+ locking during a transaction</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">While a transaction is 
+ in progress, any automatic locking that is required during a transaction 
+ is performed, but CodeBase acts as though the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4unlockAuto</span></span> 
+ is set to <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LOCK4OFF</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">, 
+ </span></span>so no automatic unlocking will occur.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Automatic locking and unlocking 
+ can occur&nbsp;when a transaction is committed or rolled back. In both 
+ cases, record buffer flushing may be required. The locking and unlocking 
+ procedure follows that of <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4flush</span></span>. 
+ If a new lock is needed, everything is unlocked according to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4unlockAuto</span></span>&nbsp;and 
+ then the lock is placed. Otherwise, nothing is unlocked, when no new locks 
+ are required. It may be necessary to explicitly unlock files after the 
+ transaction is committed or rolled back depending on the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4unlockAuto </span></span>setting.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-weight: normal;">Automatic 
+ locking vs. Explicit locking</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Whether using the automatic 
+ or explicit locking one must decide on a value for the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> member 
+ variable <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>. 
+ This member has a default value of <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">WAIT4EVER</span></span>, 
+ which may result in deadlock in a multi-user environment. To prevent deadlock, 
+ set <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span> 
+ to a reasonable finite number.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The example program TRANSFER.C 
+ sets <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>&nbsp;to 
+ a finite value and takes advantage of the automatic locking properties 
+ of CodeBase. When <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4seek</span></span> 
+ is called during the transaction, the current record may need to be flushed 
+ before the new record can be loaded into the recorded buffer. Normally, 
+ if a new lock is required, everything is unlocked according to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4unlockAuto</span></span>&nbsp;and 
+ then the lock is placed, but the seek takes place during a transaction 
+ so no unlocking is performed.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from TRANSFER.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>codeBase.lockAttempts = 5 ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When an application is 
+ running in a multi-user environment, it is strongly recommended that records 
+ be locked before they are modified to prevent more than one user access 
+ to the record at the same time. In this case, it is prudent to set <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockEnforce</span></span>&nbsp;to 
+ true ( non-zero) to ensure that a record is explicitly locked before it 
+ is modified. If it is known before hand that many changes will be made, 
+ use&nbsp;<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAll,</span></span> 
+ or use <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAddAll</span></span> 
+ followed by <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span>&nbsp;to 
+ explicitly lock the files.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If the file is explicitly 
+ locked, it must be explicitly unlocked by calling <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4unlock</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock 
+ </span></span>after the<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ </span></span>transaction is committed&nbsp;or rolled back. If an attempt 
+ is made to unlock files during a transaction, an error is generated.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Whether locking is done 
+ explicitly or implicitly, a lock may not succeed because another application 
+ has that particular file or record locked, in which case <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">r4locked</span></span> 
+ is returned. To circumvent this, build the CodeBase library with the conditional 
+ compilation switch <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">S4LOCK_HOOK</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;</span></span>defined. 
+ This enables CodeBase to automatically execute the function <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4lockHook</span></span> 
+ when a lock fails. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lockHook</span></span> 
+ is a function that is defined by the application programmer, so that it 
+ can allow the end user to retry the lock. Refer to the &quot;Conditional 
+ Compilation Switches&quot; chapter of the CodeBase <i>Reference Guide</i> 
+ for more information on <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">S4LOCK_HOOK</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lockHook</span></span>.</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+</body>
+
+</html>

@@ -1,0 +1,218 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Introduction</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\INTRO.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=971>
+<meta name=layout-width content=755>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="INTRO.css">
+
+
+
+<!--(Style Sheet)===================================================-->
+
+<style>
+<!--
+
+A:visited {
+	color: #800080;
+}
+
+A:link {
+	color: #0000ff;
+}
+
+-->
+</style>
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Introduction</h1>
+
+<p class=Body
+	style="text-indent: 0px;">CodeBase is a high-performance database engine 
+ for C, C++, Delphi and Visual Basic programmers.</p>
+
+<p class=Body
+	style="text-indent: 0px;">CodeBase technology can be used with all 
+ popular operating systems and development environments.</p>
+
+<p class=Body
+	style="text-indent: 0px;">CodeBase is scalable to your needs, which 
+ means that it can be used in a stand-alone, multi-user or client-server 
+ configuration.</p>
+
+<p class=Body
+	style="text-indent: 0px;">CodeBase is compatible with dBASE IV, FoxPro 
+ and Clipper file formats. CodeBase allows you to create, access or change 
+ their data, index or memo files. Applications written in CodeBase can 
+ seamlessly share files with concurrently running dBASE IV, FoxPro and 
+ Clipper applications.</p>
+
+<p class=Body
+	style="text-indent: 0px;">CodeBase has many useful features including 
+ a full set of query and relation functions. These functions use Query 
+ Optimization to greatly reduce the time it takes to perform queries and 
+ generate reports. CodeBase also has logging and transaction capabilities, 
+ which allow you to control the integrity of a database easily.</p>
+
+<p class=Body
+	style="text-indent: 0px;">This <i>User's Guide</i> discusses the CodeBase 
+ C API (Application Program Interface). The CodeBase C API allows the programmer 
+ to write applications using CodeBase in C. It is necessary to have a C 
+ compiler and some knowledge of the C programming language.</p>
+
+<p class=Body
+	style="text-indent: 0px;">Refer to the <i>Getting Started</i> manual 
+ for information on installing CodeBase, running the example programs and 
+ contacting Sequiter Software.</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=How_To_Use_This_Manual>How To Use This Manual</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This manual was designed 
+ for both novice and veteran database programmers. The <i>CodeBase 6.0 
+ Getting Started</i> manual details how to compile and link an example 
+ CodeBase application. This booklet is recommended reading for all users 
+ of CodeBase. The &quot;Database Concepts&quot; chapter of this guide discusses 
+ database terminology. Even if you are an expert database programmer, you 
+ should at least skim this chapter because some of the terms, such as tags 
+ and indexes, may be used differently than you expect. The remaining chapters 
+ deal with the basics of writing database applications with the CodeBase 
+ library. For your convenience, all example programs illustrated in this 
+ manual can be found on disk. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Manual Conventions </td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This manual uses several 
+ conventions to distinguish between the various language constructs. These 
+ conventions are listed below:</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase classes, functions, 
+ structures, constants, and defines are always shown highlighted as follows:</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">e.g. <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4create</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">r4eof</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">E4DEBUG</span></span></p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">dBASE expressions are always 
+ contained by two double quotes ( &quot; &quot; ).</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">e.g. &quot; 'Hello There 
+ ' + FIRST_NAME&quot;</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">You should note that the 
+ containing quotes are part of the C/C++ syntax rather than part of the 
+ dBASE expression.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">dBASE functions are displayed 
+ in upper case and are denoted by a trailing set of parenthesis.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">e.g. UPPER() , STR(), DELETED()</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">C++ language functions 
+ and constructs are shown in bold typeface.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">e.g. <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">main</span></span>, <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">for</span></span>, <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">scanf</span></span>, <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">cout</span></span>, <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">memcpy</span></span></p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">C++ data types are shown 
+ bolded and encapsulated in parenthesis.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">e.g. <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">(int)</span></span>, <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">(char *)</span></span>, <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">(long)</span></span> </td></tr>
+</table>
+
+&nbsp; 
+
+</body>
+
+</html>

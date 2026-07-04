@@ -1,0 +1,2124 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Linked Lists</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP8.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=7231>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP8.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Linked Lists</h1>
+
+<p class=Body
+	style="text-indent: 0px;">The C language has excellent support for 
+ arrays. You can create arrays of predefined types such as integers or 
+ doubles, or you can create arrays of your own types and structures. Although 
+ arrays are highly useful constructs, they have some major limitations: 
+ you cannot insert new elements between existing elements, you cannot remove 
+ existing elements, and you have to allocate all of the array's memory 
+ at once (either at compile time or run time). Although there are ways 
+ around the limitations of arrays, these methods are generally inefficient 
+ and involve shuffling large amounts of memory. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=The_Linked_List>The Linked List</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A more elegant way of providing 
+ this functionality is to use linked lists. A linked list is an group of 
+ connected elements called <i>nodes</i>. Each node contains data and pointers 
+ to other nodes.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The list can be constructed 
+ in the following manner: the pointer of the first node points to the second 
+ node, and the pointer of the second node point to the third node and so 
+ on. The pointer of the last node contains null&nbsp; (in this manual, 
+ a pointer which contains null is called a null pointer). </td></tr>
+</table>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ <img src="../Images/LinkedList.gif" v:shapes="_x0000_i1025" x-maintain-ratio="TRUE" style="width: 492px;
+				height: 168px;
+				float: none;
+				border-style: none;
+				border-style: none;" width="492" height="168" border="0"></p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 8.1&nbsp;&nbsp;&nbsp; A Linked List</span></span></p>
+
+<p class=Body
+	style="text-indent: 0px;">The advantages of linked lists over arrays 
+ are that the nodes can be located anywhere in memory, new nodes can be 
+ added at any time, and nodes can be added and deleted from the list by 
+ simply changing the value of a few pointers. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Double Linked Lists</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The linked lists used by 
+ CodeBase are <i>double linked</i><i>&nbsp;lists</i>. A double linked list 
+ is similar to the type of linked list described above except that each 
+ node has two pointers instead of one. The first pointer points to the 
+ next node, while the second points to the previous node. The following 
+ is a standard double linked list. </td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ <img src="../Images/DoubleLinkedList.gif" v:shapes="_x0000_i1026" x-maintain-ratio="TRUE" style="width: 521px;
+				height: 166px;
+				float: none;
+				border-style: none;
+				border-style: none;" width="521" height="166" border="0">&nbsp; </p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 8.2&nbsp;&nbsp;&nbsp; Double Linked List</span></span></p>
+
+<p class=Body
+	style="text-indent: 0px;">This allows you to traverse the linked list 
+ from both directions starting from pointers to the first and last nodes. 
+ In addition, it allows you to remove a node without traversing the list. 
+ </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="font-size: 12.0pt;"><a name=CodeBase_Linked_Lists>CodeBase Linked 
+ Lists</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">To implement a linked list 
+ using CodeBase, there are two requirements. The first requirment is a 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LIST4</span></span> 
+ structure and the second is a user defined structure for the nodes. Since 
+ the linked list functions are independent of the CodeBase data base management, 
+ a <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> 
+ structure does not need to be created.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramList1C.gif" v:shapes="_x0000_i1027" x-maintain-ratio="TRUE" style="width: 106px;
+															height: 36px;
+															float: none;
+															border-style: none;
+															border-style: none;" width="106" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The program &quot;LIST1.C&quot; 
+ demonstrates how to traverse, add and remove nodes from a linked list. 
+ </td></tr>
+</table>
+
+<p class=SourceCode>#include &quot;D4ALL.H&quot;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#ifdef __TURBOC__&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; extern unsigned _stklen = 10000; </p>
+
+<p class=SourceCode>#endif&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>typedef struct </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; LINK4&nbsp;&nbsp; link;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; age; </p>
+
+<p class=SourceCode>}AGES;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printList(LIST4 *);&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; LIST4&nbsp;&nbsp; ageList;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; AGES&nbsp;&nbsp;&nbsp; firstAge,middleAge,lastAge;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; memset(&amp;ageList,0,sizeof(ageList));&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; firstAge.age = 3;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; middleAge.age = 5;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; lastAge.age = 7;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; l4add(&amp;ageList,&amp;middleAge);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; l4addBefore(&amp;ageList,&amp;middleAge,&amp;firstAge);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; l4addAfter(&amp;ageList,&amp;middleAge,&amp;lastAge);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printList(&amp;ageList);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; l4remove(&amp;ageList,(void *) &amp;middleAge);</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; printList(&amp;ageList);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; l4pop(&amp;ageList);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printList(&amp;ageList); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printList(LIST4 *list) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; AGES&nbsp;&nbsp;&nbsp; *agePtr;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\nThere are %d links\n&quot;,l4numNodes(list));&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; agePtr = (AGES *) l4first(list);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; while(agePtr != NULL)&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;%d\n&quot;,agePtr-&gt;age);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; agePtr = (AGES *) l4next(list,agePtr);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; } </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; agePtr = (AGES *) list-&gt;selected; </p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}&nbsp; </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>The LIST4 Structure</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">LIST4</span></span><b> 
+ </b>structure contains&nbsp;the control information for the linked list. 
+ It has a counter containing the number of nodes&nbsp;in the linked list 
+ and a pointer to the selected node. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Initializing 
+ a <b>LIST4</b> structure&nbsp; </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Each linked list that your 
+ application contains will have its own <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">LIST4</span></span><b> 
+ </b>structure. Before you can use a linked list, the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">LIST4</span></span> structure 
+ must be initialized by setting its contents to zeros. This is accomplished 
+ by the following segment of code:</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Segment From &quot;LIST1.C&quot; </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>LIST4 ageList ; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">memset(&amp;age, 0, sizeof(ageList));</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>The Node Structure</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The node of a CodeBase 
+ linked list&nbsp;is a data structure that you define. This may be structure, 
+ as long as the first member is a <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">LINK4</span></span> structure.</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Example 
+ Node Structure </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>typedef struct </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; LINK4&nbsp;&nbsp; link;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; age; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} AGES ; </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">The 
+ <b>LINK4</b> Structure</span></span><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;</span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">LINK4</span></span><b> 
+ </b>structure contains pointers to the next and previous nodes in the 
+ list. The <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LINK4</span></span> 
+ structure also maintains pointers to the first and last nodes of the list. 
+ These pointers are maintained by CodeBase functions so there is no need 
+ for you to access them. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Adding Nodes to Linked Lists</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">There are three functions 
+ that add new nodes to CodeBase&nbsp;linked lists. They are <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4add</span></span>, <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4addBefore</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4addAfter</span></span>. 
+ </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4add</span></span><b> 
+ </b>function adds&nbsp;the new node to the end of the list. This function 
+ requires two parameters: first, a pointer to the linked list's <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">LIST4</span></span> structure 
+ and second, a pointer to the node to be added.</td>
+<td_null></tr>
+
+<tr>
+<td style="width: 7px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/Note.gif" v:shapes="_x0000_i1028" x-maintain-ratio="TRUE" style="width: 47px;
+															height: 40px;
+															float: none;
+															border-style: none;
+															border-style: none;" width="47" height="40" border="0">&nbsp;<b><sup><span 
+ style="font-size: 16.0pt; font-family: Arial;">Note</span></sup></b></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 346.8pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=346.8pt>
+<p class=NoteText0>Pointers to node structures are passed to CodeBase linked 
+ list functions as void pointers. Any time you see parameters that are 
+ of type (void *), you can assume that CodeBase expects a pointer to a 
+ node structure.</td></tr>
+
+<tr style="height: 0px;">
+<td style="width: 7px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p>&nbsp;</td>
+<td style="width: 114px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=114px>
+<p>&nbsp;</td>
+<td style="width: 6px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=6px>
+<p>&nbsp;</td>
+<td style="width: 462px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=462px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Here is a code fragment 
+ that assigns some values to the example node structures and adds one of 
+ them to the linked list. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Segment from&nbsp; &quot;LIST1.C&quot; </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>&nbsp;&nbsp; AGES&nbsp;&nbsp;&nbsp; firstAge, middleAge, 
+ lastAge;</p>
+<p class=SourceCode>&nbsp;&nbsp; . </p>
+<p class=SourceCode>&nbsp;&nbsp; . </p>
+<p class=SourceCode>&nbsp;&nbsp; . </p>
+<p class=SourceCode>&nbsp;&nbsp; /* assign values to the nodes */&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; firstAge.age = 3;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; middleAge.age = 5;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; lastAge.age = 7;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; /* add a node to the linked list */&nbsp;&nbsp;&nbsp; 
+ &nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; l4add( &amp;ageList, &amp;middleAge ) 
+ ;&nbsp; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Inserting 
+ Nodes&nbsp; </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4addBefore</span></span> 
+ inserts a node&nbsp;into the linked list directly before the given node. 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4addAfter</span></span> 
+ inserts a node&nbsp;directly after the given node. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the example program 
+ LIST1.C, the new nodes are added before and after a node in the linked 
+ list. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Segment From &quot;LIST1.C&quot; </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>&nbsp;&nbsp; l4addBefore( &amp;ageList, &amp;middleAge, 
+ &amp;firstAge) ;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; l4addAfter( &amp;ageList, &amp;middleAge, 
+ &amp;lastAge ) ; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">At this point, the <i>ageList</i> 
+ linked list would look as follows: </td></tr>
+</table>
+
+<p class=Body
+	style="margin-bottom: 3.0pt;">&nbsp;</p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ <img src="../Images/LinkedListAfterAdditions.gif" v:shapes="_x0000_i1029" x-maintain-ratio="TRUE" style="width: 457px;
+				height: 122px;
+				float: none;
+				border-style: none;
+				border-style: none;" width="457" height="122" border="0"></p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 8.3&nbsp;&nbsp;&nbsp; Linked List after several additions</span></span></p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3 style="margin-bottom: 6.0pt;">Traversing The Linked List</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Once items have been added 
+ to the linked list, you can then traverse the list from either direction. 
+ </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Retrieving 
+ the First and Last Nodes </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The linked list module 
+ lets you retrieve the first&nbsp;and last&nbsp;nodes in the list by calling 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4first</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4last</span></span>, 
+ respectively. Both of these functions will return a null pointer if there 
+ are no nodes in the linked list. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Obtaining 
+ the Next Node</span></span><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;</span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4next</span></span><b> 
+ </b>returns a pointer to the next&nbsp;node in the linked list. For example, 
+ if you passed <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4next</span></span><b> 
+ </b>a pointer to <i>middleAge</i>, it would return a pointer to <i>lastAge</i>. 
+ You can also use <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4next</span></span><b> 
+ </b>to obtain a pointer to the first node by passing it a null pointer. 
+ You can combine these functions to iterate through the list. This is illustrated 
+ by the following code fragment that prints out all the nodes in a linked 
+ list:&nbsp;&nbsp; </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Segment From &quot;LIST1.C&quot; </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>agePtr = (AGES *) l4first(list);</p>
+<p class=SourceCode>while (agePtr != NULL)</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%d\n&quot;, agePtr-&gt;age);</p>
+<p class=SourceCode>&nbsp;&nbsp; agePtr = (AGES *) l4next(list, agePtr);</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The first node is located 
+ by <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4first</span></span>. 
+ To avoid compiler errors, the return value from <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4first</span></span><b> 
+ </b>is cast as <span class=InlineLanguageType><span style="font-size: 10.0pt;">(AGES 
+ *).</span></span> </td>
+<td_null></tr>
+
+<tr>
+<td style="width: 7px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/Note.gif" v:shapes="_x0000_i1030" x-maintain-ratio="TRUE" style="width: 47px;
+															height: 40px;
+															float: none;
+															border-style: none;
+															border-style: none;" width="47" height="40" border="0">&nbsp;<b><sup><span 
+ style="font-size: 16.0pt; font-family: Arial;">Note</span></sup></b></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 346.8pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=346.8pt>
+<p class=NoteText0><span class=InlineFunctionNames><span style="font-size: 10.0pt;">l4first</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt;">l4last</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt;">l4next</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt;">l4prev</span></span>, 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt;">l4pop</span></span><b> 
+ </b>all return <span class=InlineLanguageType><span style="font-size: 10.0pt;">(void 
+ *)</span></span> pointers that actually point to node. To avoid compiler 
+ errors you must cast the return values of these functions as node pointers.</td></tr>
+
+<tr style="height: 0px;">
+<td style="width: 7px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p>&nbsp;</td>
+<td style="width: 114px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=114px>
+<p>&nbsp;</td>
+<td style="width: 6px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=6px>
+<p>&nbsp;</td>
+<td style="width: 462px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=462px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Next, a <b>while </b>loop 
+ is entered and the contents of the node are printed out. Before the loop 
+ terminates, the next node of the linked list is located by a call to <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4next</span></span>. 
+ After this call, <i>agePtr</i> is either a pointer to the next node, or 
+ null if there are no more items in the list. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Traversing 
+ The List in Reverse Order</span></span><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">&nbsp;</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If you want to move through 
+ the list from the end to the beginning, you would use <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4last</span></span><b> 
+ </b>and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4prev</span></span>. 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4prev</span></span><b> 
+ </b>behaves the same&nbsp;as <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4next</span></span><b> 
+ </b>except it returns a pointer to the node before the specified node. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>The Node Count</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If you need to know how 
+ many nodes there are in a linked list,&nbsp; <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4numNodes</span></span> 
+ may be used. This returns the number of nodes currently in the list. Since 
+ this value is automatically updated each time the list is modified, it 
+ is always current. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Removing Items From A Linked List</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">There are two functions 
+ that remove items from a linked list. The first is <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4pop</span></span>. This 
+ function removes the last node from the linked list. <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4pop</span></span> returns 
+ a pointer to the node&nbsp;being removed, so that you can free the memory 
+ associated with the node. If you want to remove a specific node from anywhere 
+ in the linked list, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4remove</span></span> 
+ is used. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Dynamic_Allocation>Dynamic Allocation</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The most powerful feature 
+ of linked lists is the ability to dynamically allocate nodes&nbsp;(i.e. 
+ allocate nodes at run-time). This section will show how you can dynamically 
+ add and remove nodes from linked lists. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramList2C.gif" v:shapes="_x0000_i1031" x-maintain-ratio="TRUE" style="width: 106px;
+															height: 36px;
+															float: none;
+															border-style: none;
+															border-style: none;" width="106" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The &quot;LIST2.C&quot; 
+ is a modification of &quot;LIST1.C&quot;. In this program the nodes are 
+ dynamically allocated and freed. </td></tr>
+</table>
+
+<p class=SourceCode>#include &quot;D4ALL.H&quot;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#ifdef __TURBOC__&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; extern unsigned _stklen = 10000; </p>
+
+<p class=SourceCode>#endif&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>typedef struct </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; LINK4&nbsp;&nbsp; link;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; age; </p>
+
+<p class=SourceCode>} AGES;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printList(LIST4 *); </p>
+
+<p class=SourceCode>AGES *addAge(LIST4 *,int); </p>
+
+<p class=SourceCode>void removeAge(LIST4 *,AGES *); </p>
+
+<p class=SourceCode>void freeAges(LIST4 *);&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; LIST4&nbsp;&nbsp; ageList;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; AGES&nbsp;&nbsp;&nbsp; *agePtr;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; memset(&amp;ageList,0,sizeof(ageList));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; addAge(&amp;ageList,3);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; agePtr = addAge(&amp;ageList,5);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; addAge(&amp;ageList,7);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; addAge(&amp;ageList,6);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; addAge(&amp;ageList,2);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; ageList.selected = (LINK4 *)agePtr;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printList(&amp;ageList);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; removeAge(&amp;ageList,agePtr);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printList(&amp;ageList);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; freeAges(&amp;ageList);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printList(&amp;ageList); </p>
+
+<p class=SourceCode>}&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printList(LIST4 *list) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; AGES&nbsp;&nbsp;&nbsp; *agePtr;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\nThere are %d links\n&quot;,l4numNodes(list));</p>
+
+<p class=SourceCode>&nbsp;&nbsp; if (list-&gt;selected != NULL )</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;The selected 
+ node contains the age %d\n&quot;,((AGES *)(list-&gt;selected))-&gt;age);</p>
+
+<p class=SourceCode>&nbsp;&nbsp; agePtr = (AGES *) l4first(list);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; while(agePtr != NULL)&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;%d\n&quot;,agePtr-&gt;age);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; agePtr = (AGES *) l4next(list,agePtr);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; }&nbsp; </p>
+
+<p class=SourceCode>}&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>AGES *addAge(LIST4 *list,int age) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; AGES* agePtr;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; agePtr = (AGES *) u4alloc(sizeof(AGES));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; agePtr-&gt;age = age;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; l4add(list,agePtr);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; return(agePtr); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void removeAge(LIST4 *list,AGES *agePtr) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; l4remove(list,agePtr);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; u4free(agePtr); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void freeAges(LIST4 *list) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; AGES *agePtr;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; while(agePtr = (AGES *) l4pop(list))&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; u4free(agePtr);&nbsp; 
+ </p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Adding Nodes</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The process of dynamically 
+ adding&nbsp; a node to a linked&nbsp;list involves two steps. First you 
+ must allocate the memory for the node and then add that node to the linked 
+ list using a <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">LIST4</span></span> 
+ member function. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Allocating 
+ Memory </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Allocating memory can be 
+ performed using the C operator <span class=InlineLanguageType><span style="font-size: 10.0pt;">new</span></span>. 
+ This operator allocates global memory for the object and calls its constructor. 
+ Since this operator is part of the C language, it is extremely portable 
+ between all operating systems. Alternatively, the CodeBase utility function 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">u4alloc</span></span>&nbsp;may 
+ be used to perform portable memory allocation. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The &quot;LIST2.C&quot; 
+ the <i>addAge</i> function is uses <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">u4alloc</span></span> to 
+ dynamically allocate a node structure and then adds the node to the linked 
+ list.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Segment From &quot;LIST2.C&quot; </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>AGES *addAge(LIST4 *list,int age) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; AGES* agePtr;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; agePtr = (AGES *) u4alloc(sizeof(AGES));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; agePtr-&gt;age = age;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; l4add(list,agePtr);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; return(agePtr); </p>
+<p class=SourceCode>}&nbsp; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Removing Nodes</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When you dynamically allocate 
+ nodes in a linked list, it is important that you deallocate them when 
+ you are finished with them. If you do not, the memory is not returned 
+ to the system until your application terminates. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Freeing 
+ Memory </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Deallocation is performed 
+ with the C <span class=InlineLanguageType><span style="font-size: 10.0pt;">delete</span></span> 
+ operator. You provide it a pointer to memory that was previously allocated 
+ with the <span class=InlineLanguageType><span style="font-size: 10.0pt;">new</span></span><b> 
+ </b>operator, and it is freed and returned to the system. If the memory 
+ was allocated with CodeBase function <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">u4alloc</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">u4free</span></span> 
+ should be called&nbsp;to free the memory to the system. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Segment From &quot;LIST2.C&quot; </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In &quot;LIST2.C&quot; 
+ the <i>removeAge </i>member function removes a node from the linked list 
+ and then frees its memory. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>void removeAge(LIST4 *list,AGES *agePtr) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; l4remove(list,agePtr);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; u4free(agePtr); </p>
+<p class=SourceCode>}&nbsp; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Cleaning Up The List</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">It is always good programming 
+ practice to free up any memory that is allocated by your application. 
+ When you are finished using your linked list, you should deallocate all 
+ of its nodes.This can be accomplished efficiently using the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4pop</span></span> function 
+ in a <span class=InlineLanguageType><span style="font-size: 10.0pt;">while</span></span> 
+ loop.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The<i> freeAges</i> function 
+ in &quot;LIST2.C&quot; removes and deallocates all of the nodes from the 
+ linked list.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Segment From &quot;LIST2.C&quot; </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>void freeAges(LIST4 *list) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; AGES *agePtr;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; while(agePtr = (AGES *) l4pop(list))&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; u4free(agePtr);&nbsp; 
+ </p>
+<p class=SourceCode>} </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="margin-bottom: 6.0pt;"><a name=Stacks_And_Queues>Stacks And 
+ Queues</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In addition to the standard 
+ type of linked list functions, you can also use the linked list functions 
+ to implement <i>stacks </i>and <i>queues</i>. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Stacks</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A stack is a list of&nbsp; 
+ nodes&nbsp;that can only be added or removed from one end. A deck of playing 
+ cards can be an example of a stack. Cards are added by placing them on 
+ top of the deck (traditionally called <i>pushing </i>a node onto the stack), 
+ and&nbsp; removed by taking the top card from the deck (traditionally 
+ called <i>popping </i>an node from the stack). CodeBase provides two functions, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4add</span></span><b>&nbsp;</b>and 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4pop</span></span><b>, 
+ </b>that provide these behaviours. </td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ <img src="../Images/PoppingNodeOnStack.gif" v:shapes="_x0000_i1032" x-maintain-ratio="TRUE" style="width: 396px;
+				height: 310px;
+				float: none;
+				border-style: none;
+				border-style: none;" width="396" height="310" border="0"></p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 8.4&nbsp;&nbsp;&nbsp; Popping and Pushing node on a Stack</span></span></p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Queues </td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A queue is similar to stack&nbsp;except 
+ that nodes are added at one end and removed from the other. A line at 
+ the movie box office is an example of a queue. People line up at the back 
+ and leave from the front once they have purchased their tickets. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Queues can also be easily 
+ implemented using CodeBase linked lists. To remove a node from the queue, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4pop</span></span><b> 
+ </b>is used. To add a&nbsp; node to the list <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">l4first</span></span><b> 
+ </b>and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">l4addBefore</span></span> 
+ are used. </td></tr>
+</table>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td></tr>
+</table>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineCommentText><img src="../Images/AddingRemovingItemsFromQueue.gif" v:shapes="_x0000_i1033" x-maintain-ratio="TRUE" style="width: 515px;
+			height: 396px;
+			float: none;
+			border-style: none;
+			border-style: none;" width="515" height="396" border="0">&nbsp;</span></p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 8.5&nbsp;&nbsp;&nbsp; Adding and Removing Items from a Queue.</span></span></p>
+
+<p class=Body>&nbsp;</p>
+
+</body>
+
+</html>

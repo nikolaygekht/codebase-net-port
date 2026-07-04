@@ -1,0 +1,356 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Database Concepts</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP1.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=1543>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP1.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Database Concepts</h1>
+
+<p class=Body
+	style="text-indent: 0px;">If you are not familiar with the concept 
+ of a <i>database</i>, simply think of it as a collection of information 
+ which has been organized in a logical manner. The most common example 
+ of a database is a telephone directory. It contains the names, phone numbers, 
+ and addresses of thousands of people. Each listing in the phone book corresponds 
+ to one <i>record</i>, and each piece of information in the record corresponds 
+ to one <i>field</i>. The phone book excerpt below illustrates this concept. 
+ <span class=InlineCommentText><img src="../Images/Datafile.gif" v:shapes="_x0000_i1025" x-maintain-ratio="TRUE" style="width: 480px;
+											height: 230px;
+											float: none;
+											border-style: none;
+											border-style: none;" width="480" height="230" border="0">&nbsp;</span></p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ &nbsp;Figure 1.1&nbsp;&nbsp;&nbsp; Phone Book Example</span></span></p>
+
+<p class=Body
+	style="text-indent: 0px;">As shown in this example, each <i>data file</i> 
+ (also known as a table)&nbsp;is a collection of&nbsp; one or more fields 
+ (also known as a tuple). Each of these fields has a set of characteristics 
+ that determine the size and type of data to be stored. Collectively, these 
+ field descriptions make up the structure of your data file. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h2 style="margin-bottom: 6.0pt;"><a name=CodeBase_File_Format>CodeBase 
+ File Format</a></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase uses the industry 
+ standard .DBF data files. This standard allows for several types of fixed 
+ width fields and one type of variable length field. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h3>Fields</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <b>.DBF</b> standard 
+ uses four attributes to describe&nbsp;each field. These attributes are 
+ Name, Type, Length, and Decimal. They are listed below. For detailed information 
+ on field attributes, please refer to the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">FIELD4INFO</span></span><b> 
+ </b>structure as described in the CodeBase <i>Reference Guide</i> under 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4create</span></span>. 
+ </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Name</b>:&nbsp;&nbsp; This simply refers to the name 
+ that will be used to identify the field. Each field name can be a maximum 
+ of 10 characters, and each field name must be unique within a data file 
+ and must consist of alphanumeric or underscore characters. The first letter 
+ of the name must be a letter.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Type</b>:&nbsp; The type of the field determines what 
+ kind of information should be stored in the field. There are eight different 
+ types that can be specified for any given field. They are Character, Numeric, 
+ Floating Point, Date, Logical, Memo, Binary and General. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Length</b>:&nbsp; This attribute refers to the number 
+ of characters or digits that can be stored in the field. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Decimal</b>:&nbsp; This attribute applies only to Numeric 
+ and Floating Point fields. It specifies the number of digits after the 
+ decimal point. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h3>Records </td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A record consists of one 
+ instance&nbsp;of every field, and has a unique <i>record number</i>&nbsp;&nbsp;and 
+ a <i>deletion flag</i> associated with&nbsp;it. The record number indicates 
+ the physical position in the data file while the deletion flag is used 
+ during the deletion process. The deletion flag is set to true (non-zero) 
+ to indicate that the record should be removed from the data file when 
+ the data file is packed.<span style="font-size: 12.0pt;"> </span></td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h3>Tags</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A <i>tag </i>determines 
+ the ordering in which the records in a data file are presented. The tag 
+ ordering does not affect the physical ordering of the records in the data 
+ file, only the order in which they can be accessed. The information that 
+ this ordering is based upon is called the <i>index key</i>. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the phone book example, 
+ the index key is based on the Name field and the actual index keys for 
+ records 1 to 3 are &quot;Smith John&quot;, &quot;Stevens Dave&quot;, and 
+ &quot;Trumble Al&quot;. If you wanted to display the phone information 
+ sorted by the phone number, you would create a tag based on the phone 
+ number field. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h3>Indexes </td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">An <i>index </i>is a file 
+ containing the sorted index keys for one or more tags. There are several 
+ formats of index files which CodeBase supports. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>&quot;<b>.MDX</b>&quot; (dBASE IV) </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>&quot;<b>.NTX</b>&quot; (Clipper) </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>&quot;<b>.CDX</b>&quot; (FoxPro)&nbsp; </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The &quot;<b>.CDX</b>&quot; 
+ and &quot;<b>.MDX</b>&quot; allow you to have multiple tags in each index 
+ file, and to have <i>production indexes</i>. A production index is an 
+ index file that is opened automatically when the associated data file 
+ is opened. The &quot;<b>.NTX</b>&quot; format limits you to one tag per 
+ index file, and does not allow for production indexes. CodeBase does, 
+ however, provide this functionality through the use of group files. Refer 
+ to the &quot;Indexing&quot; chapter for more details on index file formats. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h3>Filters </td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Filters are used to obtain 
+ a subset of the available data file records. The subset is based on true/false 
+ conditions calculated from data file field information. Only records that 
+ pass through the filter have entries in the tag. This allows for fast 
+ access to a data subset. Refer to the &quot;Indexing&quot; chapter for 
+ details on using filters. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h3>Relations </td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A relation is a connection 
+ between two or more data files. A relation determines how records in related 
+ data files can be found from a record in the current data file. Refer 
+ to the &quot;Queries And Relations&quot; chapter for details on relations. 
+ </td></tr>
+</table>
+
+&nbsp; 
+
+</body>
+
+</html>

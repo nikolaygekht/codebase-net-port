@@ -1,0 +1,627 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Performance Tips</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP11.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=2197>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP11.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Performance Tips</h1>
+
+<p class=Body
+	style="text-indent: 0px;">Programmers are always looking for ways to 
+ improve the performance of their applications. This chapter provides the 
+ programmer with tips on how to achieve the highest performance when building 
+ applications with CodeBase.</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=Memory_Optimization>Memory Optimization</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The prudent use memory 
+ optimization&nbsp;can enhance the performance of an application. For details 
+ on when to use memory optimization refer the &quot;Memory Optimizations&quot; 
+ chapter of this guide. Write optimization is most useful when making multiple 
+ updates on files, such as appending many records at once. In general, 
+ when memory optimization is used, <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4skip</span></span> is 
+ faster than <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4go</span></span>.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=InlineComment><span class=InlineCommentText>Memory Requirements</span><span 
+ class=InlineCommentText>&nbsp;</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> member 
+ variable <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartMax</span></span>&nbsp;specifies 
+ the maximum amount of memory allocated&nbsp;for memory optimization. Theoretically, 
+ the more memory that CodeBase can use for memory optimization the greater 
+ the improvement in performance. In practise, if <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartMax</span></span> 
+ is too large, CodeBase may not be able to allocate all of the requested 
+ memory causing the memory optimization to work less efficiently. In some 
+ operating systems all requested memory is allocated; but as virtual memory, 
+ which is counter-productive to memory optimization. On the other hand, 
+ if <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartMax</span></span> 
+ too small, the potential benefits of memory optimization will not warrant 
+ the overhead.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=InlineComment><span class=InlineCommentText>Observing the performance 
+ improvement</span><span class=InlineCommentText>&nbsp;</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The improvement in performance 
+ can be observed by using <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4optAll</span></span>. 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4optAll</span></span> 
+ ensures that memory optimization is fully implemented by locking and fully 
+ read and write optimizing all opened data, index and memo files. A comparison 
+ of the performance can then be made between the application that employs 
+ memory optimization with one that does not.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=InlineComment><span class=InlineCommentText>Functions that can 
+ reduce performance</span><span class=InlineCommentText>&nbsp;</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Memory optimization acts 
+ by buffering portions of files in memory&nbsp;and thus decreases the number 
+ of disk accesses and improves performance. Therefore, frequent calls to 
+ CodeBase functions that read data from disk will negate the effects of 
+ read optimization. For this reason, functions such as <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4refresh</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4refreshRecord</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">file4refresh</span></span> 
+ should not be called repeatedly while&nbsp;memory optimization&nbsp;is 
+ invoked. Frequent flushing also reduces the benefits of write optimization.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=Locking>Locking</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Locking can take as long 
+ a disk access, so repeated record locks are inefficient. It is more efficient 
+ to lock&nbsp;an entire file when multiple updates are necessary. The best 
+ way to lock a file that requires many&nbsp;modifications is to use <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAddAll</span></span> 
+ with <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">, 
+ </span></span>or call<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ d4lockAll.</span></span></td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> setting 
+ that can influence performance is <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.readLock</span></span>. 
+ When <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.readLock</span></span> 
+ is set to true (non-zero), each record is locked before it is read, which 
+ can reduce performance. It is useful to set <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.readLock</span></span> 
+ to true when the records are to be modified. </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Another important <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> 
+ variable that can affect performance in a network environment is <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockDelay</span></span>,<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ </span></span>which determines<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ </span></span>how long to wait between lock attempts. Consider this variable 
+ carefully because if the value is too small, it can cause an increase 
+ in network traffic and possibly a decrease network performance.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=Appending>Appending</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Whenever possible, it is 
+ more efficient to append many records at once rather than one at a time. 
+ When appending many records, it is sometimes faster to close the index 
+ files first, append the records and then reindex. The files must be locked 
+ before the records may be appended and the most efficient method is to 
+ call&nbsp;<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAddAll</span></span>&nbsp;with 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">,</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAll, 
+ </span></span>as discussed above. Batch appending can also take advantage 
+ of write optimization, which will improve performance. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border-top: solid #000000 4.5pt;
+			border-left: none;
+			border-bottom: solid #000000 4.5pt;
+			border-right: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=Time_Consuming_Functions>Time Consuming 
+ Functions</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Certain CodeBase functions 
+ are inherently time consuming&nbsp;and this aspect should be considered 
+ when incorporating them into an application. Avoid calling time consuming 
+ functions repeatedly, since this can reduce performance. Some functions 
+ are meant to be used for debugging purposes and should not be used in 
+ the final user application.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following functions 
+ reindex index files, which is a time consuming procedure, so they should 
+ be used with care. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4reindex</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">i4reindex</span></span> 
+ can be called to explicitly reindex files. Both <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4pack</span></span> and 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4zap</span></span> 
+ automatically reindex the associated&nbsp;index files when they are called.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4pack</span></span> and 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4zap</span></span> 
+ are time consuming functions even when there are no tags to reindex. These 
+ functions physically remove records from a data file and then reorganize 
+ the remaining records, which is a time consuming process.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4check</span></span> is 
+ a function that determines whether an index file has been corrupted, which 
+ is useful for debugging. This function can take as long as reindexing 
+ and therefore application performance can be hindered.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=Queries_and_Relations>Queries and 
+ Relations</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase uses Query Optimization 
+ to greatly increase the performance of queries in relation sets. To ensure 
+ that the Query Optimization can be used by CodeBase, the query expression 
+ must have a corresponding tag expression. See the &quot;Query Optimization&quot; 
+ chapter in this guide for more details on how to ensure that the query 
+ optimization will be invoked.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Another important issue 
+ to consider when manipulating relations is how to specify the sort order 
+ of the query set. The most efficient manner will depend on the size of 
+ the database. There are three ways in which a sorted order may be specified 
+ for the query set.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;">1.<span style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span>The sorted order can be determined by the selected tag in the master 
+ data file.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;">2.<span style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span>If there is no selected tag for the master data file, then the 
+ natural order of query set is used.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;">3.<span style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span>The function<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ relate4sortSet </span></span>can be used to specify the sorted order.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If there is a tag that 
+ specifies the same sort order as the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4sortSet</span></span> 
+ expression, then use the tag sorted order when the query set is almost 
+ the same size as the database. If the query set is almost the same size 
+ as the database, then <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4sortSet</span></span> 
+ is inefficient when compared with the tag sorted order or the natural 
+ order. Use <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4sortSet</span></span> 
+ when the query set is small compared to the size of the database. This 
+ will result in better performance when compared with the selected tag 
+ ordering.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If there is no tag that 
+ specifies a desired sort order, then use <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4sortSet</span></span> 
+ to sort the query set. Using <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4sortSet</span></span> 
+ will be faster than creating a new tag to specify the sort order, regardless 
+ of the size of the query set.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=General_Tips>General Tips</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following section discusses 
+ miscellaneous&nbsp;issues that may influence the performance of an application.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>Be sure to use the field functions to manipulate fields 
+ for the best results. Avoid using the expression module to perform calculations 
+ on fields, otherwise the application will execute at a slower rate.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>It is recommended that all necessary tags be constructed 
+ when the index file is created with either <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4create</span></span>&nbsp;or 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">i4create</span></span>. 
+ This method is more efficient than adding new tags by calling <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">i4tagAdd</span></span> 
+ later in the application.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>The memory functions specialize in the repeated allocation 
+ and freeing of fixed length memory. As a result, it is better than some 
+ operating systems at memory management. Therefore, it is advantageous 
+ to use this module whenever possible.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>File access is quicker when the file is opened exclusively, 
+ since no future record or file locks will be necessary.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span>The <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> 
+ member variables that determine how many memory blocks are allocated should 
+ be defined at the beginning of the program and should not be changed during 
+ the program. This allows CodeBase to share memory pools efficiently. Set 
+ the following <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> 
+ settings at the beginning of the application.</p>
+<p class=Body
+	style="margin-top: 0in;
+			margin-right: 0in;
+			margin-bottom: .0001pt;
+			margin-left: 17.1pt;
+			text-indent: 0in;"><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartData</span></span></p>
+<p class=Body
+	style="margin-top: 0in;
+			margin-right: 0in;
+			margin-bottom: .0001pt;
+			margin-left: 17.1pt;
+			text-indent: 0in;"><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartIndex</span></span></p>
+<p class=Body
+	style="margin-top: 0in;
+			margin-right: 0in;
+			margin-bottom: .0001pt;
+			margin-left: 17.1pt;
+			text-indent: 0in;"><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartBlock</span></span></p>
+<p class=Body
+	style="margin-top: 0in;
+			margin-right: 0in;
+			margin-bottom: .0001pt;
+			margin-left: 17.1pt;
+			text-indent: 0in;"><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartLock</span></span></p>
+<p class=Body
+	style="margin-top: 0in;
+			margin-right: 0in;
+			margin-bottom: .0001pt;
+			margin-left: 17.1pt;
+			text-indent: 0in;"><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartMax</span></span></p>
+<p class=Body
+	style="margin-left: 17.1pt; text-indent: 0in;"><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartTag</span></span></td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+</body>
+
+</html>

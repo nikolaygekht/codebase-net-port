@@ -1,0 +1,4071 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Queries And Relations</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP5.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=16554>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP5.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Queries And Relations</h1>
+
+<p class=Body
+	style="text-indent: 0px;">One of the most powerful features of CodeBase 
+ is its relation and query capabilities. By using relations, you can turn 
+ a collection of separate data files into a fully relational database. 
+ Relations are used for two tasks: lookups and queries. </p>
+
+<p class=Body
+	style="text-indent: 0px;">Lookups are used to automatically locate 
+ records between related data files. Essentially, this makes several related 
+ data files act like a single large data file. </p>
+
+<p class=Body
+	style="text-indent: 0px;">Queries retrieve groupings of records&nbsp;from 
+ the database that meet conditions that you can specify at run-time. Queries 
+ use CodeBase's Query Optimization which greatly reduces the time it takes 
+ to perform queries. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Relations>Relations</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In its simplest form, a 
+ relation is a connection&nbsp;between two data files that specifies how 
+ the records from the first data file are used to locate one or more records 
+ from the second. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Master 
+ &amp; Slave Data File </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The data file which controls 
+ the others is called the master<i>. </i>The controlled data files are 
+ called slaves. A master can have any number of slaves which in turn can 
+ be masters of other slaves. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Master 
+ Expression &amp; Slave Tag </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">To create a relation, you 
+ usually provide two pieces of information. The first is the <i>master 
+ expression</i><i>,</i> and the second is a tag based on the slave data 
+ file called the <i>slave tag</i>. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The purpose of the master 
+ expression is to generate an index key called the<i> lookup key</i>. The 
+ master expression is evaluated for each record in the master data file 
+ and the resulting value is that record's lookup key. A record in the slave 
+ is then found by performing a seek using the lookup key on the slave tag. 
+ </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The most common type of 
+ master expressions are ones which only contain the name of a field from 
+ the master data file. The slave tag ordering is usually based on an identical 
+ field in the slave data file. Figure 5.1 shows a relation of this type. 
+ </td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<p class=Normal><span class=InlineCommentText><img src="../Images/RelationOnTwoDataFiles.gif" v:shapes="_x0000_i1025" x-maintain-ratio="TRUE" style="width: 527px;
+															height: 412px;
+															float: none;
+															border-style: none;" width="527" height="412" border="0">&nbsp;</span></p>
+
+<p class=Normal
+	style="margin-top: 6.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;"><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.1&nbsp;&nbsp;&nbsp; Relation on two data files</span></span></p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In this example, the master 
+ expression is &quot;ID&quot; and the slave tag is the tag STU_ID_TAG. 
+ The index expression for the slave tag is &quot;STU_ID&quot;. If, for 
+ example, the current record for the master data file is set to record 
+ number 4, the master expression would then evaluate to &quot;423232&quot;. 
+ The lookup on the slave data is then performed, locating record number 
+ 3. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Composite Records</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Related records from the 
+ master and&nbsp;slaves data files are collectively referred to as a <i>composite 
+ record</i>. The composite record consists of the fields from the master 
+ along with the fields from the slave data files. The following is a composite 
+ record from the previous relation example: </td></tr>
+</table>
+
+<p class=Normal><img src="../Images/CompositeRecord.gif" v:shapes="_x0000_i1026" x-maintain-ratio="TRUE" style="width: 576px;
+							height: 356px;
+							float: none;
+							border-style: none;" width="576" height="356" border="0"></p>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body
+	style="text-indent: 0px;"><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Figure 
+ 5.2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; A Composite Record</span></span></p>
+
+<p class=Body
+	style="text-indent: 0px;">When using fields from the composite record 
+ in a dBASE expression, you must precede any field names from slave data 
+ files with the field name qualifier. The field name qualifier is the name 
+ of the data file followed by the &quot;-&gt;&quot; characters. This avoids 
+ any potential naming conflicts caused by data files with field names in 
+ common. </p>
+
+<p class=Body
+	style="text-indent: 0px;">For example, &quot; ENROLL-&gt;STU_ID = 876987&quot; 
+ is a dBASE expression containing fields from the slave data file. This 
+ expression could be used as part of a query (discussed later in this chapter). 
+ </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Composite Data Files</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The composite data file 
+ is the set&nbsp;of composite records that are produced by the relation. 
+ Figure 5.3 lists the composite data file for the example relation. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The composite data file 
+ does not physically exist on disk. It is merely a way of viewing the information 
+ in the data files of the relation. </td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<p class=Normal>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ <img src="../Images/CompositeDataFile.gif" v:shapes="_x0000_i1027" x-maintain-ratio="TRUE" style="width: 396px;
+				height: 703px;
+				float: none;
+				border-style: none;" width="396" height="703" border="0"></p>
+
+<p class=Normal
+	style="margin-top: 6.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;"><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.3&nbsp;&nbsp;&nbsp; The Composite Data File</span></span></p>
+
+<p class=Normal>&nbsp;</p>
+
+<p class=Normal
+	style="margin-top: 0in;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 1.25in;">For example, when the relation is applied 
+ to record number 3 of the&nbsp; master data file the following composite 
+ record is generated:</p>
+
+<p class=Normal><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Composite 
+ Data File Record # 3</span></span></p>
+
+<p class=Normal>&nbsp;</p>
+
+<p class=Normal><span class=InlineCommentText><img src="../Images/CompositeRecord3.gif" v:shapes="_x0000_i1028" x-maintain-ratio="TRUE" style="width: 420px;
+															height: 52px;
+															float: none;
+															border-style: none;" width="420" height="52" border="0">&nbsp;</span></p>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">By default, if the relation 
+ does not find a match in the slave data file, the slave's fields in the 
+ composite record are left as blanks. For example record number 1 in the 
+ master data file does not have a corresponding slave record, so the generated 
+ composite record is: </td></tr>
+</table>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Composite 
+ Data File Record # 1</span></span></p>
+
+<p class=Body><span class=InlineCommentText><img src="../Images/CompositeRecord1.gif" v:shapes="_x0000_i1029" x-maintain-ratio="TRUE" style="width: 413px;
+														height: 49px;
+														float: none;
+														border-style: none;" width="413" height="49" border="0">&nbsp;</span><span 
+ style="font-size: 9.0pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Complex_Relations>Complex Relations</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Although having a relation 
+ between two data files is quite useful, it is often necessary to set relations 
+ between one master and several slaves, or to set relations between the 
+ slaves and other data files. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3><span style="font-size: 11.0pt;">Single Master, Multiple Slave Relations</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Relations with one master 
+ and several slaves are very similar to the single master, single slave 
+ relations. In this case there is a master expression and slave tag for 
+ each slave, and the composite record consists of fields from all the data 
+ files. CodeBase permits any number of slaves for a single master. The 
+ only limitations are the resources of your system. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3><span style="font-size: 11.0pt;">Multi-Layered Relations</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">There are many situations 
+ that require a master with a relation to a slave, which in turn has a 
+ relation to other data files. CodeBase supports an unlimited number of 
+ these multi-layered relations and will automatically perform lookups in 
+ any associated slave data files. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">The 
+ Top Master </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A master data file is a 
+ master only in the context of a specific relation. The data file can also 
+ be slave in a different relation. If the data file is not a slave in any 
+ other relation, it is called a <i>top master</i>. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">The 
+ Relation Set </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A relation set consists&nbsp;of 
+ a top master and all other connected relations. There must be exactly 
+ one top master in a relation set. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Figure 5.4 describes a 
+ new relation between the ENROLL.DBF data file and the new data file COURSE.DBF. 
+ It shows the entire relation set and points out the various relations 
+ between the data files. </td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/RelationSet1.gif" v:shapes="_x0000_i1030" x-maintain-ratio="TRUE" style="width: 528px;
+															height: 254px;
+															float: none;
+															border-style: none;" width="528" height="254" border="0"><img src="../Images/RelationSet2.gif" v:shapes="_x0000_i1031" x-maintain-ratio="TRUE" style="width: 528px;
+			height: 380px;
+			float: none;
+			border-style: none;" width="528" height="380" border="0"></p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.4&nbsp;&nbsp;&nbsp; A Relation Set</span></span></p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Relation_Types>Relation Types</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">There are three basic types 
+ of relations. They are&nbsp; <i>exact match</i>, <i>scan </i>and <i>approximate 
+ match</i> relations. The type of relation determines what record or records 
+ are located during a lookup. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3><span style="font-size: 11.0pt;">Exact Match Relations</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">An <i>exact match</i> relation 
+ permits only a single match between the master and slave data files. Both 
+ one to one and many to one relations are exact match relations. In a one 
+ to one relation, there is only one record in the master that matches a 
+ single record in the slave. In a many to one relation, there are one or 
+ more records in the master that match a single slave record. </td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body><img src="../Images/ExactMatchRelation.gif" v:shapes="_x0000_i1032" x-maintain-ratio="TRUE" style="width: 528px;
+							height: 411px;
+							float: none;
+							border-style: none;" width="528" height="411" border="0"></p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.5&nbsp;&nbsp;&nbsp; An Exact Match Relation</span></span></p>
+
+<p class=Body
+	style="text-indent: 0px;">If there are multiple slave records that 
+ match a single master record, then a composite record is only generated 
+ for the first slave record, as illustrated above. There are three records 
+ in the slave data file that match record number 4 of the master. Since 
+ this is an exact relation, a composite record is made from only the first 
+ matching record of the slave data file. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border: none;
+				x-border-left: 1px table-solid;
+				x-border-top: 1px table-solid;
+				x-border-right: 1px table-solid;
+				x-border-bottom: 1px table-solid;
+				border-collapse: separate;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3><span style="font-size: 11.0pt;">Scan Relations</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In a <i>scan </i>relation, 
+ if there are multiple slave records for a master record, there is one 
+ composite record in the extended data file for each of the matching slave 
+ records. Both one to many and many to many relations are scan relations. 
+ In a one to many relation, each record in the master may have multiple 
+ matching slave records. A many to many relation is the same as one to 
+ many except that different master records may match the same slave record. 
+ </td></tr>
+</table>
+
+<p class=Body
+	style="font-size: 12.0pt;"><img src="../Images/ScanRelation.gif" v:shapes="_x0000_i1033" x-maintain-ratio="TRUE" style="width: 528px;
+											height: 375px;
+											float: none;
+											border-style: none;" width="528" height="375" border="0"></p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.6&nbsp;&nbsp;&nbsp; A Scan Relation</span></span><span style="font-size: 12.0pt;"> 
+ </span></p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border: none;
+				x-border-left: 1px table-solid;
+				x-border-top: 1px table-solid;
+				x-border-right: 1px table-solid;
+				x-border-bottom: 1px table-solid;
+				border-collapse: separate;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 81.35pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=81.3pt>
+<h3 style="margin-right: -5.95pt;"><span style="font-size: 11.0pt;">Approximate 
+ Match Relations </span></td>
+<td style="x-cell-content-align: top;
+			width: 356.05pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=356pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The final type of relation 
+ is the approximate match relation. This is similar to the exact match 
+ relation in that it permits only one match for a master record. The only 
+ difference is the way it behaves when an exact match is not found in the 
+ slave data file. If the match fails, the slave record whose index key 
+ appears next in the slave tag is used instead. Approximate match relations 
+ are generally quite rare and are usually used only when a range of records 
+ are represented by a single high value. </td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body><span class=InlineCommentText><img src="../Images/ApproxMatchRelation.gif" v:shapes="_x0000_i1034" x-maintain-ratio="TRUE" style="width: 501px;
+														height: 237px;
+														float: none;
+														border-style: none;" width="501" height="237" border="0">&nbsp;</span></p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.7&nbsp;&nbsp;&nbsp; Approximate Match Relations</span></span></p>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body
+	style="text-indent: 0px;">An approximate match relation is shown in 
+ Figure 5.7. In this case, the employees' retirement benefits are determined 
+ by the number of years that they put into the company. Instead of making 
+ an entry for each possible year served, the BENEFIT.DBF only lists the 
+ upper limit for each pay out level. The first pay out level is&nbsp; from 
+ zero to five years, the second is six to ten, et cetera until the maximum 
+ entry of twenty-one years and above pays out 100000. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Creating_Relations>Creating Relations</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Relations are created during 
+ the execution of your application. Before you can create a relation, you 
+ must have opened all the data files and any index files that are used 
+ in the relation set. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body><img src="../Images/ProgramRelate1C.gif" v:shapes="_x0000_i1035" x-maintain-ratio="TRUE" style="width: 107px;
+							height: 36px;
+							float: none;
+							border-style: none;" width="107" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Program RELATE1.C sets 
+ up a scan type relation between the STUDENT.DBF and ENROLL.DBF data files 
+ that were illustrated in Figure 5.1. This program lists all of the records 
+ in composite data file. </td></tr>
+</table>
+
+<p class=SourceCode>/* RELATE1.C */&nbsp; </p>
+
+<p class=SourceCode>#include &quot;D4ALL.h&quot;</p>
+
+<p class=SourceCode>&nbsp; </p>
+
+<p class=SourceCode>CODE4&nbsp;&nbsp; codeBase; </p>
+
+<p class=SourceCode>DATA4&nbsp;&nbsp; *student = NULL,*enrollment = NULL; 
+ </p>
+
+<p class=SourceCode>RELATE4 *master = NULL,*slave = NULL; </p>
+
+<p class=SourceCode>TAG4&nbsp;&nbsp;&nbsp;&nbsp;*idTag,*nameTag;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void openDataFiles() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4init(&amp;codeBase);&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; student = d4open(&amp;codeBase,&quot;STUDENT&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; enrollment = d4open(&amp;codeBase,&quot;ENROLL&quot;);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; nameTag = d4tag(student,&quot;NAME&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; idTag = d4tag(enrollment,&quot;STU_ID_TAG&quot;);&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; error4exitTest(&amp;codeBase);&nbsp; </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void setRelation() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; master = relate4init(student);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; if(master == NULL) exit(1);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; slave = relate4createSlave(master,enrollment,&quot;ID&quot;,idTag);&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4type(slave,relate4scan);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4top(master); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printRecord() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; RELATE4 *relation;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; DATA4&nbsp;&nbsp; *data;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; FIELD4&nbsp; *field;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; j;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; for(relation = master; relation != NULL; 
+ relate4next(&amp;relation))&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; data = relate4data(relation);</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for(j = 1; j &lt;= d4numFields(data); 
+ j++)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;%s 
+ &quot;,f4memoStr(d4fieldJ(data,j)));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; }&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n&quot;); </p>
+
+<p class=SourceCode>} </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void listRecords( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int rc;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; for(rc = relate4top(master); rc != r4eof; 
+ rc = relate4skip(master,1L))&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printRecord();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n&quot;);</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4unlock(&amp;codeBase);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; openDataFiles();&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; setRelation();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; listRecords();&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4free(master,0);&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4close(&amp;codeBase); </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4initUndo(&amp;codeBase);</p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}&nbsp; </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>The RELATE4 Structure</h3>
+<h3>&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> structure 
+ contains the control&nbsp;information about a single data file in a relation. 
+ Every data file that is in the relation set must have its own <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> structure.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A data file's <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> structure 
+ contains information such as what data file (if any) is the master of 
+ this data file and what type of relation exists between the data file 
+ and its master.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In a single relation set, 
+ a data file can only have one <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ structure associated with it.</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Specifying The Top Master</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The first step for creating 
+ a relation entails specifying which data file will be the top master of 
+ the relation set. This step is accomplished by a call to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4init</span></span>, 
+ which creates and returns a pointer to the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> structure 
+ for that data file.</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from RELATE1.C </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=SourceCode>master = relate4init(student);</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">At this point, you have 
+ a complete relation set consisting of one data file -- the top master. 
+ Why would you want a relation set with just a single data file in it?&nbsp; 
+ A single data file relation set may be used when a query involves only 
+ the one data file. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Adding Slave Data Files</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Adding slave data files 
+ to a relation is accomplished by a call to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4createSlave</span></span>. 
+ To do this, there are four pieces of information that you must specify. 
+ </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;<span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">The 
+ master's <b>RELATE4</b> pointer</span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">First, the master data 
+ file's&nbsp;<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span><b> 
+ </b>structure must be provided. This can either be the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> pointer 
+ returned from <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4init</span></span> 
+ or from a previous call to <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4createSlave</span></span>.</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">The 
+ slave's <b>DATA4</b> pointer</span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The second piece of information 
+ is a pointer to the slave's <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">DATA4</span></span> 
+ structure. </td>
+<td_null></tr>
+
+<tr>
+<td style="width: 7px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-indent: 0in;
+			font-size: 9.0pt;
+			font-family: Arial;"><img src="../Images/Warning.gif" v:shapes="_x0000_i1036" x-maintain-ratio="TRUE" style="width: 91px;
+												height: 57px;
+												float: none;
+												border-style: none;" width="91" height="57" border="0"></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 342.3pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=342.3pt>
+<p class=NoteText0>A data file should only be used once in a relation set. 
+ The result of using a data file more than once in a relation set is undefined 
+ and unpredictable.</td></tr>
+
+<tr style="height: 0px;">
+<td style="width: 7px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p>&nbsp;</td>
+<td style="width: 114px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=114px>
+<p>&nbsp;</td>
+<td style="width: 6px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=6px>
+<p>&nbsp;</td>
+<td style="width: 456px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=456px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;The 
+ master expression</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The master expression is 
+ the third&nbsp;piece&nbsp;of information needed when adding a slave. This 
+ dBASE expression is evaluated using the current record of the master data 
+ file to produce a lookup key. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span style="font-size: 9.0pt;">&nbsp;</span><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">A <b>TAG4</b></span></span><span 
+ class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;pointer 
+ from the slave data file</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The final piece of information 
+ is a <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">TAG4</span></span><b>&nbsp;</b>pointer&nbsp;to 
+ one of the slave's tags. During a lookup, a search for the lookup key 
+ (generated by the master expression) is made using this tag. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">After the slave has been 
+ added to the relation set <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4createSlave</span></span> 
+ returns a pointer to the slave's <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> structure. 
+ You should save this pointer in a variable if you plan on changing the 
+ default relation type or on adding slaves to the slave data file.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from RELATE1.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=SourceCode>slave = relate4createSlave(master, enrollment, &quot;ID&quot;, 
+ idTag);</p>
+<p class=SourceCode>&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the above code fragment, 
+ <i>master</i> is the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span><b> 
+ </b>pointer returned from the call to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4init</span></span> 
+ and <i>enrollment</i> is the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">DATA4</span></span> 
+ pointer of the slave data&nbsp;file. The master expression is &quot;ID&quot;. 
+ As a result, the lookup key is the contents of the ID field from the master 
+ data file. The lookups are performed using a tag from the slave data file. 
+ This tag is identified by <i>idTag</i>. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Creating Slaves Without Tags</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase allows an alternative 
+ method of performing lookups that does not use tags from the slave data 
+ file. Instead of having the master expression evaluate to a lookup key, 
+ it evaluates to a record number. This record number specifies the physical 
+ record number of the slave record retrieved from the slave data file. 
+ </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">To use this method, simply 
+ pass null for the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">TAG4</span></span>&nbsp;parameter 
+ of <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4createSlave</span></span>. 
+ This method is mainly useful on static unchanging slave data files that 
+ are never packed. This method has the advantage of being faster and more 
+ efficient than performing seeks on a tag. The following is a example of 
+ this method. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=SourceCode>slave = relate4createSlave(master, enrollment, &quot;RECNO()&quot;, 
+ null);</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Since the master expression 
+ is &quot;RECNO()&quot;, it returns the record number of master data file's 
+ current record. As a result, record <b>n</b> in the master must match 
+ record <b>n</b> in the slave. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If the master expression 
+ contains a reference to a non existent record&nbsp;number ( &lt;= 0 or 
+ &gt; <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4recCount</span></span> 
+ ), CodeBase generates a -70 error (&quot;Reading File&quot;, see &quot;Appendix 
+ A: Error Codes&quot; in the <i>Reference Guide</i>). </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Setting_The_Relation_Type>Setting The Relation Type</a></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The default type of relation 
+ is an exact match relation. You can change a relation's type by calling 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4type</span></span>. 
+ This function takes a <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ pointer and an integer&nbsp;specifying the type of the relation. The valid 
+ integer values are specified by the following defined CodeBase constants: 
+ </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4exact</span></span>&nbsp;&nbsp; 
+ (Default) This specifies&nbsp;an exact match relation. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4approx</span></span>&nbsp;&nbsp; 
+ This&nbsp;specifies an approximate match relation. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4scan</span></span>&nbsp;&nbsp; 
+ This&nbsp;specifies a scan relation. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Since the master data file 
+ may have multiple slaves each using a different type of relation, it is 
+ the slave's <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ pointer that is passed to the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4type</span></span> 
+ function. In RELATE1.C the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ pointer <i>slave</i> is passed to the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4type</span></span> 
+ function.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-bottom: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-weight: normal;">Code 
+ fragment from RELATE1.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-bottom: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=SourceCode>relate4type(slave, relate4scan);</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Setting The Error Action</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-bottom: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Sometimes a record in the 
+ slave data file cannot be located from a master data file record. This 
+ occurs when you are using an exact type relation and there is no match 
+ for the lookup key, or when the relation is using direct record lookup 
+ and the generated record number does not exist in the slave data file. 
+ Under either of these circumstances, there are several ways in which CodeBase 
+ can react. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4errorAction 
+ </span></span>specifies which method&nbsp;is used and it accepts a pointer 
+ to the slave's <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ structure and an integer that specifies the type error action. The valid 
+ error action codes are as follows: </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4blank</span></span><b>&nbsp;&nbsp; 
+ </b>(Default)&nbsp;&nbsp;This means that when a slave record cannot be 
+ located, it becomes a blank record. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skipRec</span></span>&nbsp;&nbsp; 
+ This&nbsp;code means that the entire composite record is skipped as if 
+ it did not exist. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4terminate</span></span><b>&nbsp;&nbsp; 
+ </b>This&nbsp;means that a CodeBase error is generated and the CodeBase 
+ relate function, usually <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skip</span></span>, 
+ returns an error code. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="margin-bottom: 6.0pt; font-size: 12.0pt;"><a name=Moving_Through_The_Composite_Data_File>Moving 
+ Through The Composite Data File</a></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase provides three 
+ functions for moving through the records&nbsp;in the&nbsp;composite data 
+ file. They are <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span><b> 
+ </b>and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skip</span></span>. 
+ These functions are used mainly for obtaining composite records when a 
+ query is performed. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt;">Listing The Composite Data File</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When used together, these 
+ three functions allow you iterate through all of the composite data file. 
+ The following code segment demonstrates this process: </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from RELATE1.C</span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=SourceCode>void listRecords( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; int rc;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; for(rc = relate4top(master); rc != r4eof; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ rc = relate4skip(master, 1L) )&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printRecord( ) ;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n&quot;);</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} <span class=InlineFunctionNames><span 
+ style="font-family: Arial;">&nbsp; &nbsp;</span></span></td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span style="font-size: 9.0pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Finding 
+ the first record in the Composite data file </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span><b> 
+ </b>sets the current record of the master data file to the first record 
+ in the composite data file. If there are slaves in the masters slave family, 
+ lookups are automatically performed. If there are no composite records 
+ in the composite data file, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">r4eof</span></span><b> 
+ </b>is returned. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Skipping 
+ through records</span></span><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;</span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">For each iteration of the 
+ <b>for </b>loop, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skip</span></span><b> 
+ </b>is used to move to the next record in the composite data file. Just 
+ as in the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4skip</span></span><b> 
+ </b>function,&nbsp; <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skip's</span></span> 
+ second parameter specifies the number of records to be skipped. When there 
+ are no more records in the composite data file, <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">r4eof</span></span><b> 
+ </b>is returned. </td>
+<td_null></tr>
+
+<tr>
+<td style="width: 7px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/Note.gif" v:shapes="_x0000_i1037" x-maintain-ratio="TRUE" style="width: 47px;
+															height: 40px;
+															float: none;
+															border-style: none;" width="47" height="40" border="0">&nbsp;<b><sup><span 
+ style="font-size: 16.0pt; font-family: Arial;">Note</span></sup></b></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 342.3pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=342.3pt>
+<p class=NoteText0>Before <span class=InlineFunctionNames><span style="font-size: 10.0pt;">relate4skip</span></span><b> 
+ </b>is used, a call to <span class=InlineFunctionNames><span style="font-size: 10.0pt;">relate4top</span></span><b> 
+ </b>or <span class=InlineFunctionNames><span style="font-size: 10.0pt;">relate4bottom</span></span><b> 
+ </b>must be made.</td></tr>
+
+<tr style="height: 0px;">
+<td style="width: 7px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p>&nbsp;</td>
+<td style="width: 114px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=114px>
+<p>&nbsp;</td>
+<td style="width: 6px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=6px>
+<p>&nbsp;</td>
+<td style="width: 456px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=456px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Skipping backwards through 
+ the composite&nbsp;data file is also permitted. Since skipping backwards 
+ requires extra internal overhead, you must either call <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span><b> 
+ </b>or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skipEnable</span></span> 
+ to initialize the backwards&nbsp;skipping abilities. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">An example of this is given 
+ in&nbsp; the following code segment: </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>void listRecords( void )</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; int rc;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; for(rc = relate4bottom(master); rc != 
+ bof; </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ rc = relate4skip(master, -1L))</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printRecord();</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Queries_And_Sorting>Queries And Sorting</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Once a relation has been 
+ set up, you can then perform queries upon the composite data file. A <i>query 
+ </i>allows you to retrieve selected records from the composite data file 
+ by specifying a query expression. Essentially the query specifies a subset 
+ of the composite data file, which is called the <i>query set</i>, by filtering 
+ out any composite records that do not meet the search criterion. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In addition to performing 
+ queries, you can also specify the order in which the composite records 
+ are presented. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When a query is specified, 
+ CodeBase uses its Query Optimization, whenever possible, to minimize the 
+ number of necessary disk accesses. This greatly improves performance when 
+ retrieving composite records from the query set. </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramRelate2C.gif" v:shapes="_x0000_i1038" x-maintain-ratio="TRUE" style="width: 107px;
+															height: 36px;
+															float: none;
+															border-style: none;" width="107" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Program RELATE2.C demonstrates 
+ how queries can be performed on a single data file. </td></tr>
+</table>
+
+<p class=SourceCode>/* RELATE2.C */&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#include &quot;D4ALL.h&quot;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>CODE4&nbsp;&nbsp; codeBase; </p>
+
+<p class=SourceCode>DATA4&nbsp;&nbsp; *student = NULL;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void openDataFiles() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; student = d4open(&amp;codeBase,&quot;STUDENT&quot;);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; error4exitTest(&amp;codeBase); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printRecord(DATA4 *dataFile) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int j;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; for(j=1;j&lt;=d4numFields(dataFile);j++)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;%s &quot;,f4memoStr(d4fieldJ(dataFile,j)));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n&quot;); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void query(DATA4 *dataFile,char *expr,char *order) 
+ </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; RELATE4 *relation = NULL;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; rc;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relation = relate4init(dataFile);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; if(relation == NULL) exit(1);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4querySet(relation,expr);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4sortSet(relation,order); </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; for(rc = relate4top(relation);rc != r4eof;rc 
+ = relate4skip(relation,1L))&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printRecord(dataFile);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n&quot;); </p>
+
+<p class=SourceCode>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4unlock(&amp;codeBase);</p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4free(relation,0);&nbsp; </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; rc,numFields,j;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4init(&amp;codeBase);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; openDataFiles();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; query(student,&quot;AGE &gt; 30&quot;,&quot;&quot;);&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; query(student,&quot;UPPER(L_NAME) = 'MILLER'&quot;,&quot;L_NAME 
+ + F_NAME&quot;);</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4close(&amp;codeBase); </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4initUndo(&amp;codeBase);</p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}&nbsp; </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>The Query Expression</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Normal
+	style="margin-bottom: 6.0pt;">To generate a query, all you need to 
+ provide is a dBASE expression, called the <i>query expression</i>, which 
+ evaluates to a Logical value. This expression is used to determine whether 
+ a composite record should be included in the query. If&nbsp; the query 
+ expression evaluates to .TRUE. then the record is kept, otherwise it is 
+ discarded from the query. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Setting 
+ the query expression</span></span><span class=InlineCommentText><span 
+ style="font-size: 9.0pt; font-family: Arial;">&nbsp;</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The query expression is 
+ specified for a relation set by the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4querySet</span></span> 
+ function. This function takes a pointer to the top master's&nbsp;<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ structure and specifies the query expression for the entire relation set.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The query expression can 
+ reference fields from different files in the relation set. When a query 
+ is made, the default data base used is the master. This means that the 
+ field will automatically be associated with the master data base. To refer 
+ fields of different data files use the file's alias followed by an arrow 
+ (-&gt;) and the field name.</p>
+<p class=Normal
+	style="margin-bottom: 6.0pt;">For example, suppose a relation consists 
+ of a master data file called FATHER.DBF and a slave data file called SON.DBF. 
+ Assume that each file has a field called NAME. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">For these data files, the 
+ following queries are equivalent:</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>relate4querySet( relation, &quot;FATHER-&gt;NAME = 
+ 'Ben Nyland'&quot;) ;</p>
+<p class=SourceCode>relate4querySet( relation, &quot;NAME = 'Ben Nyland'&quot;) 
+ ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Normal
+	style="margin-bottom: 6.0pt;">These queries compare a field called 
+ NAME in FATHER.DBF with the string &quot;Ben Nyland&quot;. The file name 
+ FATHER does not need to be specified in the query because the FATHER.DBF 
+ file is a master.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In order to check for the 
+ composite record that has Ben Nyland and his son Eric Nyland, the query 
+ can be specified by either of the following: </td></tr>
+</table>
+
+<p class=SourceCode>relate4querySet( relation, &quot;FATHER-&gt;NAME = 
+ 'Ben Nyland'.AND. SON-&gt;NAME = 'Eric Nyland'&quot;);</p>
+
+<p class=SourceCode>relate4querySet( relation, &quot;NAME = 'Ben Nyland' 
+ .AND. SON-&gt;NAME = 'Eric Nyland'&quot;);</p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The query expression can 
+ be changed at any time, although<b> </b><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span><b> 
+ </b>or<b> </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span><b> 
+ </b>must then be called before <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skip</span></span><b> 
+ </b>can be called. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>The Sort Expression</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <i>sort expression</i> 
+ of a relation&nbsp;is very similar&nbsp;to an index expression. They are 
+ both dBASE expressions, and are both used to determine the sort ordering. 
+ </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The difference is that 
+ the sort expression determines the sort order of the query set and you 
+ are allowed to use fields from any data file in the relation set. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Setting 
+ the sort expression </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The sort expression is 
+ specified for a relation set by <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4sortSet</span></span>. 
+ This function takes a pointer to the top master's&nbsp;<span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> structure 
+ and specifies the sort ordering for the entire query set. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The sort expression can 
+ contain field names from any data file in the relation set. It is required 
+ that any fields, except those from the top master, are qualified by the 
+ data file's alias. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>relate4sortSet( relation, &quot;L_NAME + F_NAME + CLASSES-&gt;C_CODE&quot;); 
+ </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Like the query expression, 
+ the sort expression can be changed at any time, although<b> </b><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span><b> 
+ </b>or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span><b> 
+ </b>must then be called before <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skip</span></span><b> 
+ </b>can be called. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt;">Performing Queries on Relation Sets</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Queries can be performed 
+ on relation sets of any size, including those consisting of a single data 
+ file. The following figures illustrate two queries. They are on the composite 
+ data file shown in Figure 5.3. </td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body><span class=InlineCommentText><img src="../Images/QueryExample1.gif" v:shapes="_x0000_i1039" x-maintain-ratio="TRUE" style="width: 528px;
+														height: 214px;
+														float: none;
+														border-style: none;" width="528" height="214" border="0">&nbsp;</span></p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.8&nbsp;&nbsp;&nbsp; Query Example One</span></span></p>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body>&nbsp;</p>
+
+<p class=Body><img src="../Images/QueryExample2.gif" v:shapes="_x0000_i1040" x-maintain-ratio="TRUE" style="width: 528px;
+							height: 183px;
+							float: none;
+							border-style: none;" width="528" height="183" border="0"></p>
+
+<p class=Body><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Figure 5.9&nbsp;&nbsp;&nbsp; Query Example Two</span></span></p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="margin-bottom: 6.0pt;"><a name=Accessing_The_Query_Set>Accessing 
+ The Query Set</a></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The query set is accessed 
+ by <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span><b> 
+ </b>, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span><b> 
+ </b>and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4skip</span></span>. 
+ When a query has been specified, these three functions then access a query 
+ set instead of the entire composite data file. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Generating The Query Set&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The query set is initially 
+ formed&nbsp;by the first call to either <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span><b> 
+ </b>or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span>. 
+ These functions analyze the query expression for the most efficient way 
+ of performing the query. They then locate all of records that are in the 
+ query set. If a sort expression has been specified, the composite records 
+ are sorted. And finally, lookups are performed on the data files in the 
+ relation to locate the first or last composite record in the query set. 
+ </td>
+<td_null></tr>
+
+<tr>
+<td style="width: 7px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-indent: 0in;
+			font-size: 9.0pt;
+			font-family: Arial;"><img src="../Images/Warning.gif" v:shapes="_x0000_i1041" x-maintain-ratio="TRUE" style="width: 91px;
+												height: 57px;
+												float: none;
+												border-style: none;" width="91" height="57" border="0"></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 342.3pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=342.3pt>
+<p class=NoteText0>When complex relations and sort expressions are used 
+ on a relation set consisting of large data files, <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">relate4top</span></span> and <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">relate4bottom</span></span> can take considerable 
+ time to execute.</td></tr>
+
+<tr style="height: 0px;">
+<td style="width: 7px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p>&nbsp;</td>
+<td style="width: 114px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=114px>
+<p>&nbsp;</td>
+<td style="width: 6px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=6px>
+<p>&nbsp;</td>
+<td style="width: 456px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=456px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 4.75in;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.75in>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">As long as the query and 
+ sort expressions are not changed, further calls to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span><b> 
+ </b>and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span><b> 
+ </b>do not cause the query set to be regenerated. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h3>Regenerating the Query Set</td>
+<td style="x-cell-content-align: top;
+			width: 4.75in;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.75in>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">You can force CodeBase 
+ to completely regenerate the query set by calling <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4changed</span></span>. 
+ This forces CodeBase to discard any buffered information and regenerate 
+ the query set based on the current state of the relation set's data files. 
+ After <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4changed</span></span> 
+ is called, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4top</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4bottom</span></span> 
+ must be called before any further calls to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4skip</span></span> 
+ may be made. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<h2 style="font-size: 12.0pt;"><a name=Queries_On_Multi_Layered_Relation_Sets>Queries 
+ On Multi-Layered Relation Sets</a></td>
+<td style="x-cell-content-align: top;
+			width: 4.75in;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.75in>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The steps involved in performing 
+ queries on multi-layered relation sets are the same as on a relation set 
+ containing a single data file. You create your relations, set the types 
+ of the relations, specify query and sort expressions and retrieve the 
+ composite records from the query set. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 95.4pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=95.4pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramRelate3C.gif" v:shapes="_x0000_i1042" x-maintain-ratio="TRUE" style="width: 107px;
+															height: 36px;
+															float: none;
+															border-style: none;" width="107" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 4.75in;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.75in>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Program RELATE3.C creates 
+ a multi-layered relation between the STUDENT, ENROLL and CLASSES data 
+ files and then performs queries on it. </td></tr>
+</table>
+
+<p class=SourceCode>/* RELATE3.C */&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#include &quot;D4ALL.H&quot;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>CODE4&nbsp;&nbsp; codeBase; </p>
+
+<p class=SourceCode>DATA4&nbsp;&nbsp; *student,*enrollment,*classes; </p>
+
+<p class=SourceCode>FIELD4&nbsp; *studentId,*firstName,*lastName,*age,*classCode,*classTitle; 
+ </p>
+
+<p class=SourceCode>TAG4&nbsp;&nbsp;&nbsp;&nbsp;*codeTag,*idTag; </p>
+
+<p class=SourceCode>RELATE4 *classRel,*studentRel,*enrollRel;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void openDataFiles() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4init(&amp;codeBase);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; student = d4open(&amp;codeBase,&quot;STUDENT&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; enrollment = d4open(&amp;codeBase,&quot;ENROLL&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; classes = d4open(&amp;codeBase,&quot;CLASSES&quot;); 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; studentId = d4field(student,&quot;ID&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; firstName = d4field(student,&quot;F_NAME&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; lastName&nbsp; = d4field(student,&quot;L_NAME&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; age = d4field(student,&quot;AGE&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; classCode = d4field(classes,&quot;CODE&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; classTitle = d4field(classes,&quot;TITLE&quot;);&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; idTag = d4tag(student,&quot;ID_TAG&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; codeTag = d4tag(enrollment,&quot;C_CODE_TAG&quot;);&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; error4exitTest(&amp;codeBase);&nbsp; </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printStudents() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ %s &quot;,f4str(firstName));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%s &quot;,f4str(lastName));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%s &quot;,f4str(studentId));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%s &quot;,f4str(age)); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void setRelation( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; classRel = relate4init(classes); </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; enrollRel = relate4createSlave(classRel,enrollment,&quot;CODE&quot;,codeTag); 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; studentRel = relate4createSlave(enrollRel,student,&quot;STU_ID&quot;,idTag); 
+ </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printStudentList(char *expr,long direction) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; rc,endValue;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4querySet(classRel,expr);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4sortSet(classRel,&quot;STUDENT-&gt;L_NAME 
+ + STUDENT-&gt;F_NAME&quot;);&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4type(enrollRel,relate4scan);&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; if(direction &gt; 0)&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rc = relate4top(classRel);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; endValue = r4eof;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; }&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; else&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; rc = relate4bottom(classRel);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; endValue = r4bof;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; }&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n%s&quot;,f4str(classCode));&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;&nbsp; %s\n&quot;,f4str(classTitle));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; for(;rc != endValue;rc = relate4skip(classRel,direction))&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printStudents(); </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; openDataFiles();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; setRelation();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printStudentList(&quot;CODE = 'MATH114 
+ '&quot;,1L);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printStudentList(&quot;CODE = 'CMPT411 
+ '&quot;,-1L);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4free(classRel,0);&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4close(&amp;codeBase); </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4initUndo(&amp;codeBase);</p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Lookups_On_Relations>Lookups On Relations</a></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-top: 0in;
+			margin-right: .05in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-indent: 0in;">The method illustrated above for retrieving 
+ composite records from the composite data file is well suited for performing 
+ queries and generating reports, but has unnecessary overhead if all you 
+ want to do is perform lookups to slave data files. As a result CodeBase 
+ provides an alternative method for performing lookups that is independent 
+ of the query set and sort orderings. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramRelate4C.gif" v:shapes="_x0000_i1043" x-maintain-ratio="TRUE" style="width: 107px;
+															height: 36px;
+															float: none;
+															border-style: none;" width="107" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-top: 0in;
+			margin-right: .05in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-indent: 0in;">Program RELATE4.C sets up an exact match 
+ type relation between the STUDENT.DBF and ENROLL.DBF that were illustrated 
+ in Figure 5.1. This program performs some seeks and lookups. </td></tr>
+</table>
+
+<p class=SourceCode>/* RELATE4.C */ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#include &quot;D4ALL.h&quot;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#ifdef __TURBOC__&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; extern unsigned _stklen = 10000; </p>
+
+<p class=SourceCode>#endif&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>CODE4&nbsp;&nbsp; codeBase; </p>
+
+<p class=SourceCode>DATA4&nbsp;&nbsp; *student = NULL,*enrolment = NULL; 
+ </p>
+
+<p class=SourceCode>FIELD4&nbsp; *id,*fName,*lName,*age,*cCode; </p>
+
+<p class=SourceCode>RELATE4 *master = NULL,*slave = NULL; TAG4&nbsp;*idTag,*nameTag;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void openDataFiles() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; coder4init(&amp;codeBase);&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; student = d4open(&amp;codeBase,&quot;STUDENT&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; enrolment = d4open(&amp;codeBase,&quot;ENROLL&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; id = d4field(student,&quot;ID&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; fName = d4field(student,&quot;F_NAME&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; lName = d4field(student,&quot;L_NAME&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; age = d4field(student,&quot;AGE&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; cCode = d4field(enrolment,&quot;C_CODE&quot;);&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; nameTag = d4tag(student,&quot;NAME&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; idTag = d4tag(enrolment,&quot;STU_ID_TAG&quot;);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; error4exitTest(&amp;codeBase);&nbsp; </p>
+
+<p class=SourceCode>}&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void setRelation() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; master = relate4init(student);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; slave = relate4createSlave(master,enrolment,&quot;ID&quot;,idTag); 
+ </p>
+
+<p class=SourceCode>}&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void seek(DATA4 *dataFile,TAG4&nbsp;*tag,RELATE4 *relation,char 
+ *key) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; TAG4&nbsp;*oldTag;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; oldTag = d4tagSelected(dataFile);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect(dataFile,tag);&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4seek(dataFile,key);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4doAll(relation);&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect(dataFile,oldTag); </p>
+
+<p class=SourceCode>}&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void printRecord() </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%15s &quot;,f4str(fName));&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%15s &quot;,f4str(lName));&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%6s &quot;,f4str(id));&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%2s &quot;,f4str(age));&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;%7s\n&quot;,f4str(cCode));&nbsp; 
+ </p>
+
+<p class=SourceCode>}&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main( void ) </p>
+
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; openDataFiles();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; setRelation();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; seek(student,nameTag,master,&quot;Tyler&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Harvey&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; &quot;);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printRecord();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; seek(student,nameTag,master,&quot;Miller&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ Albert&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &quot;);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;&nbsp; printRecord();&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4unlock(&amp;codeBase);</p>
+
+<p class=SourceCode>&nbsp;&nbsp; relate4free(master,0);&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4close(&amp;codeBase); </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4initUndo(&amp;codeBase);</p>
+
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Performing A Lookup&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Performing lookups is quite 
+ simple. First you locate the record in the master data file that you wish 
+ to perform the lookup from, using the normal&nbsp;<span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4top</span></span>, <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4bottom</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4go</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4seek, 
+ d4seekDouble, d4seekN, d4seekNext, d4seekNextDouble, d4seekNextN</span></span><b> 
+ </b>and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4skip</span></span><b> 
+ </b>functions. The lookup is then accomplished by a call to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4doAll</span></span>. 
+ This function is passed a <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ pointer of a master data file and it performs lookups on the slave data 
+ files of that master. In addition, it travels down the relation set performing 
+ lookups on the slave's slaves. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following function 
+ performs a seek on a data file and then performs the lookups on it's slaves. 
+ </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from RELATE4.C </span></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=SourceCode>void seek( DATA4 *dataFile, TAG4&nbsp;*tag, RELATE4 
+ *relation, </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ char *key) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; TAG4&nbsp;*oldTag;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; &nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; oldTag = d4tagSelect( dataFile ) ;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect( dataFile, tag ) ;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; &nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; d4seek( dataFile,key ) ;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; relate4doAll( relation ) ; </p>
+<p class=SourceCode>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect( dataFile, oldTag ) ; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><b style="font-weight: bold;"><span 
+ style="font-size: 9.0pt; font-family: Arial;">relate4doOne</span></b></span></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A similar function to <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4doAll</span></span>&nbsp;is 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4doOne</span></span>. 
+ This function accepts the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ pointer to a slave and performs a lookup on that slave.</td>
+<td_null></tr>
+
+<tr>
+<td style="width: 7px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/Note.gif" v:shapes="_x0000_i1044" x-maintain-ratio="TRUE" style="width: 47px;
+															height: 40px;
+															float: none;
+															border-style: none;" width="47" height="40" border="0">&nbsp;<b><sup><span 
+ style="font-size: 16.0pt; font-family: Arial;">Note</span></sup></b></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 342.3pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=342.3pt>
+<p class=NoteText0>Any query and sort expressions are ignored by functions 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt;">relate4doAll</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt;">relate4doOne</span></span>. 
+ Consequently, these functions provide somewhat independent functionality. 
+ Using them in conjunction with relate functions such as <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">relate4top</span></span><b>, </b><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">relate4bottom</span></span><b>, </b>and&nbsp; 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt;">relate4skip</span></span><b> 
+ </b>is not particularly useful.</td></tr>
+
+<tr style="height: 0px;">
+<td style="width: 7px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p>&nbsp;</td>
+<td style="width: 114px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=114px>
+<p>&nbsp;</td>
+<td style="width: 6px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=6px>
+<p>&nbsp;</td>
+<td style="width: 456px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=456px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Iterating_Through_The_Relations>Iterating Through The Relations</a></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 346.5pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">As an aid in writing generic 
+ reusable code, CodeBase provides the function <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4next</span></span>, 
+ which allows you to iterate through the relations in a relation set.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This function takes the 
+ address of a <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> 
+ pointer and changes it to a pointer to the next <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">RELATE4</span></span> structure 
+ in the relation set.</td>
+<td_null></tr>
+
+<tr>
+<td style="width: 7px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-indent: 0in;
+			font-size: 9.0pt;
+			font-family: Arial;"><img src="../Images/Warning.gif" v:shapes="_x0000_i1045" x-maintain-ratio="TRUE" style="width: 91px;
+												height: 57px;
+												float: none;
+												border-style: none;" width="91" height="57" border="0"></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 342.3pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=342.3pt>
+<p class=NoteText0>The <span class=InlineFunctionNames><span style="font-size: 10.0pt;">relate4next</span></span> 
+ function changes the value of the pointer that is passed in as a parameter. 
+ Consequently, you should make a copy of this pointer if you need it later.</td></tr>
+
+<tr style="height: 0px;">
+<td style="width: 7px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=7px>
+<p>&nbsp;</td>
+<td style="width: 114px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=114px>
+<p>&nbsp;</td>
+<td style="width: 6px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=6px>
+<p>&nbsp;</td>
+<td style="width: 456px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=456px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following code segment 
+ displays all of the records from all of the relations in the relation 
+ set. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ Fragment from RELATE1.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 346.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=346.5pt>
+<p class=SourceCode>void printRecord() </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; RELATE4 *relation;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; DATA4&nbsp;&nbsp; *data;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; FIELD4&nbsp; *field;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; int&nbsp;&nbsp;&nbsp;&nbsp; j;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; for(relation = master; relation != NULL; 
+ relate4next(&amp;relation))&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; data = relation-&gt;data;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; for(j = 1; j &lt;= d4numFields(data); 
+ j++)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;%s 
+ &quot;,f4memoStr(d4fieldJ(data,j)));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; }&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; printf(&quot;\n&quot;); </p>
+<p class=SourceCode>} </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+</body>
+
+</html>

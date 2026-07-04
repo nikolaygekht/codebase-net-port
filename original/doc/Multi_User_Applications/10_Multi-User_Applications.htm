@@ -1,0 +1,2672 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Multi-User Applications</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP10.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=11202>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP10.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Multi-User Applications</h1>
+
+<p class=Body
+	style="text-indent: 0px;">A multi-user application can take many forms. 
+ For example, several people could be entering data, over a local area 
+ network, into the same data file at the same time. Another possibility 
+ is one person entering data while several others look at the data file 
+ - all using terminals attached to a powerful computer running UNIX. A 
+ third case is a single user accessing data in a multi-tasking or multi-threading 
+ environment, such as Microsoft Windows, OS/2, or UNIX.</p>
+
+<p class=Body
+	style="text-indent: 0px;">When using CodeBase, you have many options 
+ in how you design the multi-user aspects of your application. For example, 
+ you can lock data areas before you read them or you can read them without 
+ locking. You can choose memory optimizations to improve performance or 
+ you can write/read directly to/from disk in order to ensure information 
+ is current. The exact options you choose depend on the requirements of 
+ the application and hardware resources available. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Locking>Locking</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">At the heart of multi-user 
+ applications is locking. Locking is a way in which multi-user database 
+ applications communicate with each other. When an application locks some 
+ data, it is telling other applications &quot;you cannot modify this data&quot;. 
+ When data is locked, other applications can still read the data. However, 
+ no other application can lock or modify the data. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Operations 
+ that require locking</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Locking is automatically 
+ performed by CodeBase before data is written to disk. It is necessary 
+ to lock data before it is written, to keep two applications from updating 
+ the same data at the same time. This avoids the corruption due to several 
+ applications updating the same index or memo file at the same time.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When a field is to be modified, 
+ the record should be locked to prevent multiple users from changing the 
+ same record at the same time. This principle is enforced when <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.lockEnforce</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;</span></span>is 
+ true (non-zero) and the field is modified with a field function&nbsp;or 
+ the following data functions: <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4blank</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4changed</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4delete</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4recall</span></span>.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Sometimes it is appropriate 
+ for an application to lock data before reading it. This is done to keep 
+ other applications from updating the data while the lock is present.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Supported Locking Protocols</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase supports a variety 
+ of locking protocols that allow applications to be multi-user compatible 
+ with applications built using other products. When you build a CodeBase 
+ library that uses a specific type of index file compatibility, you also 
+ automatically get the multi-user compatibility. The supported locking 
+ protocols are as follows: </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>FoxPro </b>(This is the default locking protocol). This 
+ locking protocol is used when the CodeBase library is built with the <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">S4FOX</span></span><b>&nbsp;</b>conditional 
+ compile switch. This provides multi-user compatibility with FoxPro 2.x 
+ and FoxPro 3.0. For more information on conditional compile switches please 
+ refer to the <i>Getting Started</i> manual.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>dBASE IV</b> An application is multi-user compatible 
+ with dBASE IV 1.5 when it is built using the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">S4MDX</span></span><b>&nbsp;</b>conditional 
+ compile switch.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Clipper </b>Clipper 5.2 multi-user compatibility is provided 
+ by building the CodeBase library with the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">S4CLIPPER</span></span>&nbsp;conditional 
+ compile switch.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The product versions listed 
+ above were the versions which were multi-user compatible with CodeBase 
+ when this document was written. CodeBase may be updated to support additional 
+ product versions. Check the &quot;README.TXT&quot; file on your CodeBase 
+ disk to determine exactly which versions are currently supported. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Types Of Locking</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">CodeBase performs several 
+ types of locking, although the only locks that you need to be concerned 
+ with are record and file locks. The types of locks are listed as follows:</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Record Locking </b>When a record is locked, that data 
+ file record cannot be updated by other applications. This is the lowest 
+ level of locking (ie. you cannot lock fields). </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Data File Locking</b> When a data file is&nbsp;locked, 
+ no records in the data file may be updated by other applications. In addition, 
+ a data file lock means that no other application may append records while 
+ the data file lock is in place.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><b>Index and Memo Locking</b> CodeBase often&nbsp;locks 
+ and unlocks index and memo files when they are updated. However, you do 
+ not need to be concerned about this since it is automatic.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="font-size: 12.0pt;"><a name=Creating_Multi_User_Applications>Creating 
+ Multi-User Applications</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Creating well behaved&nbsp;multi-user 
+ applications, that is applications that do not lock portions of files 
+ for long lengths of time, is relatively easy using CodeBase. If you use 
+ the default <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> 
+ flag settings, there are only a few things you must consider when writing 
+ multi-user applications. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3><span style="font-size: 10.0pt;">Recommended</span><span style="font-size: 11.0pt;"> 
+ CODE4 Flag Settings</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span><b> 
+ </b>flag settings are often appropriate when you are writing multi-user 
+ applications. Unless otherwise specified, the discussions in the following 
+ sections assume that these settings are being used. For details on the 
+ effects of changing these settings, please refer to last sections of this 
+ chapter.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.accessMode</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;= 
+ OPEN4DENY_NONE</span></span> (default) Files are opened in non-exclusive 
+ mode. This means that other applications can share the files with your 
+ application and have read and write access.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.readOnly</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;= 
+ 0</span></span> (default) Opens&nbsp;files in read/write mode. This allows 
+ you to read and write records to and from the data file.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.readLock</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;= 
+ 0&nbsp; </span></span>&nbsp;(default)<span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;"> </span></span>There is 
+ no automatic record locking when a record is read.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span class=InlineFunctionNames><span 
+ style="font-family: Symbol; font-weight: normal;">·<span style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;= 
+ WAIT4EVER</span></span> (default) If a lock fails, CodeBase will keep 
+ retrying the lock until it succeeds.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockEnforce</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">&nbsp;= 
+ 1&nbsp; </span></span>An error&nbsp;is generated if an attempt is made 
+ to modify an unlocked record with a field&nbsp;function or&nbsp;<span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4blank</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4changed</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4delete</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4recall</span></span>. 
+ This member variable must be set explicitly set to true (non-zero), since 
+ the default setting is false (zero).</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Automatic Record Locking</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Since locking and unlocking 
+ are time consuming operations (in the same order of magnitude as a write 
+ to disk), CodeBase functions that write a record to disk lock that record 
+ without unlocking it afterwards. This prevents redundant unlocking calls 
+ and allows you the option of leaving the record locked.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The only functions that 
+ modify records&nbsp;and perform&nbsp;automatic locking&nbsp;are: <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4append</span></span><b>, 
+ </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4appendBlank</span></span><b>, 
+ </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4flush</span></span><b>, 
+ </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4flushRecord</span></span><b> 
+ </b>and<b> </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4write</span></span>.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Normally, you do not want 
+ to leave the record locked after these operations. To unlock the record, 
+ a call can be made to <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span>: 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>d4append(dataFile) ;</p>
+<p class=SourceCode>d4unlock(dataFile) ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Automatic Data File Locking</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In addition to functions 
+ that automatically lock a data file record, there are CodeBase functions 
+ that automatically lock the entire data file. These are <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4memoCompress, d4pack, 
+ d4reindex, d4zap</span></span><b> </b>and <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">i4reindex</span></span>. 
+ It is strongly recommended that not only that the data file be locked, 
+ but that the file be opened exclusively before performing these operations. 
+ Please refer to the section on <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.accessMode</span></span>&nbsp;in 
+ the CodeBase <i>Reference Guide</i>.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">These functions leave the 
+ data file locked after they finish executing. As a result, if the data 
+ file was opened non-exclusively, these functions should be immediately 
+ followed by a call to <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span>. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Automatic Unlocking&nbsp;Of Records</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">As a rule, CodeBase functions 
+ that move from an old record to a new record automatically remove any 
+ locks on the&nbsp;old record&nbsp;according&nbsp;to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4unlockAuto</span></span>. 
+ These functions are <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4bottom, 
+ d4go, d4goEof, d4positionSet, d4seek, d4seekDouble, d4seekN, d4seekNext, 
+ d4seekNextDouble, d4seekNextN, d4skip,</span></span> and <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4top</span></span>. Refer 
+ to <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4unlockAuto</span></span> 
+ in the <i>Reference Guide</i> for more information on how the automatic 
+ unlocking works.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The only exception to this 
+ rule is when the new record is already locked. In that case, no unlocking 
+ is performed. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Common_Multi_User_Tasks>Common Multi-User Tasks</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If you follow the advice&nbsp;about 
+ calling <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span><b>&nbsp;</b>after 
+ calling functions that automatically lock records and data files and are 
+ aware of functions that perform automatic unlocking, you should have little 
+ difficulty when writing multi-user applications.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">To help you write multi-user 
+ applications, examples of common tasks performed by multi-user applications 
+ are provided below. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramMultiC.gif" v:shapes="_x0000_i1025" x-maintain-ratio="TRUE" style="width: 106px;
+															height: 36px;
+															float: none;
+															border-style: none;
+															border-style: none;" width="106" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Application &quot;MULTI.C&quot;, 
+ which is perhaps simplistic, illustrates some basic operations which are 
+ present in almost any multi-user application: adding a record, modifying 
+ a record, finding a record, and reporting. It handles its multi-user aspects 
+ in a manner which is appropriate for many applications.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&quot;MULTI.C&quot; assumes 
+ that a data file &quot;NAMES.DBF&quot; is present along with a production 
+ index file containing a tag named &quot;NAME&quot;. Data file &quot;NAMES.DBF&quot; 
+ also contains a field named &quot;NAME&quot;. </td></tr>
+</table>
+
+<p class=SourceCode>/*MULTI.C&nbsp;&nbsp; A multi-user data application. 
+ */</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>#include &quot;d4all.h&quot;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>CODE4 cb ;</p>
+
+<p class=SourceCode>FIELD4 *fieldName ;</p>
+
+<p class=SourceCode>DATA4 *dataNames ;</p>
+
+<p class=SourceCode>TAG4&nbsp;*tagName ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void addRecord(),findRecord(), modifyRecord(), listData() 
+ ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main()</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4init( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.accessMode = OPEN4DENY_NONE ; /* allows 
+ access to all applications */</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.readOnly = 0 ; /* Set to FALSE */</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.readLock = 0 ; /* Set to FALSE */</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.lockAttempts = WAIT4EVER ; /* Retry 
+ forever. */</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.lockEnforce = 1 ; /*must explicitly 
+ lock record before modifying*/</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; dataNames = d4open( &amp;cb, &quot;NAMES&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; error4exitTest( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; fieldName = d4field( dataNames, &quot;NAME&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; tagName = d4tag( dataNames, &quot;NAME&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4top( dataNames ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; for(;;)</p>
+
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; error4set( &amp;cb, 
+ 0 ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;\n\nRecord 
+ #: %ld&nbsp;&nbsp; Name: %s\n&quot;,d4recNo( dataNames ),f4str(fieldName)) 
+ ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;Enter 
+ Command ('a','f','l','m' or 'x')\n&quot; ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int command =&nbsp; 
+ getchar() ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; &nbsp; switch( command )</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 
+ 'a':</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ addRecord() ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ break ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 
+ 'f':</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ findRecord() ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ break ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 
+ 'l':</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ listData() ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ break ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 
+ 'm':</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ modifyRecord() ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ break ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case 
+ 'x':</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ code4close( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ code4initUndo( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ exit(0) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void addRecord()</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; char buf[100] ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf( &quot;Enter New Record\n&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; scanf( &quot;%s&quot;, buf ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4appendStart( dataNames, 0 ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; f4assign( fieldName, buf ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4append( dataNames ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4unlock( dataNames ) ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void findRecord()</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; char buf[100] ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; printf( &quot;Enter Name to Find\n&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; scanf( &quot;%s&quot;, buf ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect( dataNames, tagName ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4seek( dataNames, buf ) ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void modifyRecord()</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; char buf[100] ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; int oldLockAttempts, rc ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; oldLockAttempts = cb.lockAttempts ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.lockAttempts = 1 /*Only make one lock 
+ attempt*/</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc = d4lock(dataNames, d4recNo(dataNames)) 
+ ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; if(rc == r4locked)</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;Record 
+ locked. Unable to Edit\n&quot;)</p>
+
+<p class=SourceCode>&nbsp;&nbsp; else</p>
+
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;Enter Replacement 
+ Record\n&quot;) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; scanf(&quot;%s&quot;, 
+ buf) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; f4assign(fieldName, 
+ buf);</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4flush(dataNames) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4unlock(dataNames) 
+ ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.lockAttempts = oldLockAttempts ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void listData()</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4optStart( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4optimize( dataNames, OPT4ALL ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect( dataNames, tagName ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; for( d4top(dataNames); ! d4eof(dataNames); 
+ d4skip(dataNames,1) )</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;%ld %s\n&quot;, 
+ d4recNo(dataNames), f4str(fieldName) ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4optimize( dataNames, OPT4OFF ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4optSuspend( &amp;cb ) ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=Body>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Opening Files</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">It is especially important 
+ to check for any file open errors&nbsp;in multi-user applications because 
+ there is a chance that the file might be opened exclusively by another 
+ application. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from MULTI.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>dataNames = d4open( &amp;cb, &quot;NAMES&quot; ) ;</p>
+<p class=SourceCode>error4exitTest( &amp;cb ) ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Control Loops</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Most data file editing 
+ software has some kind of loop where the end user can enter various editing 
+ and possibly reporting commands. The MULTI.C application is no exception. 
+ It allows you to 'add', 'find', 'list', 'modify' or 'exit'.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The start of the loop sets 
+ the CodeBase error code to zero. An error can occur if the user tries 
+ to modify a record before any have been added. </td></tr>
+</table>
+
+<p class=SourceCode>&nbsp;&nbsp; d4top( dataNames ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; for(;;)</p>
+
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; error4set( &amp;cb, 
+ 0 ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;\n\nRecord 
+ #: %ld&nbsp;&nbsp; Name: %s\n&quot;,d4recNo( dataNames ),f4str(fieldName) 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;Enter 
+ Command ('a','f','l','m' or 'x')\n&quot; ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int command =&nbsp; 
+ getchar() ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp; &nbsp; switch( command )</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; . 
+ . .</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=Body>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Adding Records</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In a single user situation, 
+ new records may simply be appended with a call to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4append</span></span>. 
+ The multi-user situation is exactly the same, except that after appending 
+ the record <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span> 
+ should be called&nbsp;(as in the <i>addRecord</i> function above). This 
+ call is necessary because the newly appended record remains locked after 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4append</span></span> 
+ completes. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-bottom: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-bottom: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>void addRecord()</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; char buf[100] ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; printf( &quot;Enter New Record\n&quot; 
+ ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; scanf( &quot;%s&quot;, buf ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4appendStart( dataNames, 0 ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; f4assign( fieldName, buf ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4append( dataNames ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4unlock( dataNames ) ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}&nbsp; </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Finding Records</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The <i>findRecord</i> function 
+ is significant, from a multi-user perspective, more for what it does not 
+ do rather than what it does. Specifically, there is no multi-user logic 
+ necessary in this function. When <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.readLock</span></span>&nbsp;is 
+ false (zero), the data file functions do not perform any automatic locking 
+ as the data file is being read. Accordingly, you can search using index 
+ files and read data file records without having any extra multi-user logic 
+ present. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from MULTI.C</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>void findRecord()</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; char buf[100] ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; printf( &quot;Enter Name to Find\n&quot; 
+ ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; scanf( &quot;%s&quot;, buf ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect( dataNames, tagName ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4seek( dataNames, buf ) ;</p>
+<p class=SourceCode>}</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Modifying Records</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The field functions are 
+ used to assign values&nbsp;to the fields, and when appropriate, the changes 
+ are flushed to disk. Explicit flushing can be accomplished by calling 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4flush</span></span><b>.</b></p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">After flushing a modified 
+ record in a multi-user situation, an application should call <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span><b>.</b> 
+ When <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4flush</span></span><b> 
+ </b>is called, the changed record gets written to disk. In order to accomplish 
+ this, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4flush</span></span> 
+ locks the record and leaves it locked. Consequently, the call to <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span><b> 
+ </b>is suggested once the modified record is no longer required, in order 
+ to give other users an opportunity to modify the record.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The call to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4flush</span></span><b> 
+ </b>is not strictly necessary. This is because <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span><b> 
+ </b>is smart enough to recognize when the record buffer has changed. In 
+ this case, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span> 
+ will lock the record, flush the record, and then unlock the record. However, 
+ if the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">S4OFF_MULTI</span></span><b>&nbsp;</b>conditional 
+ compilation switch is used, it is necessary to call <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4flush</span></span><b> 
+ </b>in order to immediately flush the record. This is because <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span><b> 
+ </b>does nothing when compiled with <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">S4OFF_MULTI</span></span><b> 
+ </b>defined.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from MULTI.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>void modifyRecord()</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; char buf[100] ;</p>
+<p class=SourceCode>&nbsp;&nbsp; int oldLockAttempts, rc ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; oldLockAttempts = cb.lockAttempts ;</p>
+<p class=SourceCode>&nbsp;&nbsp; cb.lockAttempts = 1 /*Only make one lock 
+ attempt*/</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; rc = d4lock(dataNames, d4recNo(dataNames)) 
+ ;</p>
+<p class=SourceCode>&nbsp;&nbsp; if(rc == r4locked)</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;Record 
+ locked. Unable to Edit\n&quot;)</p>
+<p class=SourceCode>&nbsp;&nbsp; else</p>
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf(&quot;Enter Replacement 
+ Record\n&quot;) ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; scanf(&quot;%s&quot;, 
+ buf) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; f4assign(fieldName, 
+ buf);</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4flush(dataNames) ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4unlock(dataNames) 
+ ;</p>
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+<p class=SourceCode>&nbsp;&nbsp; cb.lockAttempts = oldLockAttempts ;</p>
+<p class=SourceCode>}</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;&nbsp; </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Locking 
+ the Record before modifying</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the MULTI.C example, 
+ the record must be explicitly locked before it is modified by a field 
+ function, since the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockEnforce</span></span>&nbsp;member&nbsp;is 
+ set to true (non-zero). This serves to ensure that only one application 
+ can edit a record at a time. The example sets the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>&nbsp;to 
+ <span class=InlineLanguageType><span style="font-size: 10.0pt;">(int) 
+ 1</span></span>, to cause <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lock</span></span><b> 
+ </b>to immediately return <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">r4locked</span></span><b> 
+ </b>if the record is already locked by another user, in which case the 
+ <i>modifyRecord</i> function is aborted. Adhering to this locking procedure 
+ will prevent the following undesirable scenerio from occurring.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Consider the case where 
+ two users of the application decide to modify the same record at the same 
+ time. When this happens, one application may write out its changes to 
+ disk before the second. The second application then writes to the disk, 
+ overwriting the first application's changes. Neither application knows 
+ that this has happened. User two makes changes based on an out of date 
+ version of the record, and user one loses all changes. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="margin-right: -5.6pt; font-size: 12.0pt;"><a name=Multi_User_Optimizations>Multi-User 
+ Optimizations</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This next section deals 
+ with using the memory&nbsp;optimization functions in a multi-user application. 
+ The optimizations can be used for both appending large quantities of records 
+ and for efficiently generating lists of records. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Listing Records</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Function <i>listData</i> 
+ from the program&nbsp;MULTI.C is an example of reporting. Notice that 
+ memory optimization is turned on at the start of the function and turned 
+ off at the end of the function. This speeds up the report. In addition, 
+ when a network is being used it minimizes requests to the server.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In a multi-user application, 
+ the use of memory optimization is recommended when reporting but is strongly 
+ discouraged when editing. Refer to the &quot;Memory Optimizations&quot; 
+ chapter for additional information.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Notice that there are no 
+ unlocking function calls. As explained under &quot;Finding Records&quot; 
+ section (above), when a record is read using the data file functions no 
+ automatic locking takes place. Consequently there is no need for any unlocking. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from MULTI.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>void listData()</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; code4optStart( &amp;cb ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4optimize( dataNames, OPT4ALL ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4tagSelect( dataNames, tagName ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; for( d4top(dataNames); ! d4eof(dataNames); 
+ d4skip(dataNames,1) )</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;%ld %s\n&quot;, 
+ d4recNo(dataNames), f4str(fieldName) ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4optimize( dataNames, OPT4OFF ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; code4optSuspend( &amp;cb ) ;</p>
+<p class=SourceCode>}</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Repeated Appending</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The next example multi-user 
+ application demonstrates how to append records from&nbsp;one data file 
+ to another. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/ProgramAppendC.gif" v:shapes="_x0000_i1026" x-maintain-ratio="TRUE" style="width: 106px;
+															height: 36px;
+															float: none;
+															border-style: none;
+															border-style: none;" width="106" height="36" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The program APPEND.C demonstrates 
+ how to append records from&nbsp;one data file to another. It assumes that 
+ data files &quot;TO_DBF.DBF&quot; and &quot;FROM_DBF.DBF&quot; are both 
+ present and that they both have a field named &quot;INFO&quot;. </td></tr>
+</table>
+
+<p class=SourceCode>#include &quot;d4all.h&quot;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>CODE4 cb ;</p>
+
+<p class=SourceCode>DATA4 *dataFrom, *dataTo ;</p>
+
+<p class=SourceCode>FIELD4 *infoFrom, *infoTo ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>void main()</p>
+
+<p class=SourceCode>{</p>
+
+<p class=SourceCode>&nbsp;&nbsp; int rc1, rc2, rc ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; </p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4init( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.optimize = OPT4ALL ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.optimizeWrite = OPT4ALL ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; dataFrom = d4open( &amp;cb, &quot;FROM_DBF.DBF&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; dataTo = d4open( &amp;cb, &quot;TO_DBF.DBF&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; error4exitTest( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4optStart( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; infoFrom =&nbsp; d4field( dataFrom, &quot;INFO&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; infoTo =&nbsp; d4field( dataTo, &quot;INFO&quot; 
+ ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; cb.lockAttempts = 1 ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc1 = d4lockFile( dataFrom ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; rc2 = d4lockFile( dataTo ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; if( rc1 != 0 || rc2 != 0 )</p>
+
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;Locking 
+ Failed\n&quot; ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exit(0) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; for( rc = d4top(dataFrom); rc == 0; rc 
+ = d4skip(dataFrom,1) )</p>
+
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4appendStart( dataTo, 
+ 0 ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; f4assignField( infoTo, 
+ infoFrom ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4append( dataTo ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4unlock( dataFrom ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; d4unlock( dataTo ) ;</p>
+
+<p class=SourceCode>&nbsp;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4close( &amp;cb ) ;</p>
+
+<p class=SourceCode>&nbsp;&nbsp; code4initUndo( &amp;cb ) ;</p>
+
+<p class=SourceCode>}</p>
+
+<p class=Body
+	style="margin-top: 3.0pt; text-indent: 0px;">In this application, both 
+ memory read optimization and memory write optimization are used. In order 
+ to do this, the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.optimize</span></span>&nbsp;and 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.optimizeWrite</span></span> 
+ defaults are changed&nbsp;before the files are opened. Please refer to 
+ the &quot;Memory Optimization&quot; chapter for details. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from APPEND.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>&nbsp;&nbsp; cb.optimize = OPT4ALL ;</p>
+<p class=SourceCode>&nbsp;&nbsp; cb.optimizeWrite = OPT4ALL ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; dataFrom = d4open( &amp;cb, &quot;FROM_DBF.DBF&quot; 
+ ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; dataTo = d4open( &amp;cb, &quot;TO_DBF.DBF&quot; 
+ ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; error4exitTest( &amp;cb ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; code4optStart( &amp;cb ) ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Note that <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4optStart</span></span> 
+ is called <i>after</i>&nbsp;the files are opened. This is because a call 
+ to <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4optStart</span></span> 
+ may use up the available memory. In this case, the calls to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4open</span></span> could 
+ be slowed down&nbsp;as optimization was repeatedly suspended and re-invoked 
+ inside <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4open</span></span>. 
+ Internally, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4open</span></span> 
+ calls <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">u4allocFree</span></span> 
+ when it allocates memory. When memory is not available, <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">u4allocFree</span></span> 
+ temporarily suspends memory optimization in an attempt to allocate the 
+ requested memory.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This example illustrates 
+ the only situation in which write optimization should be considered in 
+ a multi-user application. When writing to a file with write optimizations 
+ enabled, the file should be locked.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">With the file locked and 
+ write optimization enabled, the repeated appending goes considerably faster. 
+ The trade off is that if any other application attempts to read the records 
+ being appended, the other application could, at worst, generate CodeBase 
+ errors or could read garbage information. To avoid this, you can open 
+ the files exclusively or not use write optimization.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In this specific case, 
+ the read optimization is a very good idea. This is because there is no 
+ chance that information being returned could be out of date because the 
+ file is locked. As a result of the read optimization, the speed improvements 
+ in this example are considerable. </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This application skips 
+ sequentially through data file &quot;FROM_DBF&quot; using memory optimization. 
+ Consequently, it is important to use function <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">d4skip</span></span>&nbsp;rather 
+ than <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4go</span></span> 
+ because function <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4skip</span></span> 
+ detects the sequential reading and does special performance optimizations.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Since the data files are 
+ locked going into the loop, they stay locked throughout the entire loop 
+ with no automatic unlocking occurring. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from APPEND.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>&nbsp;&nbsp; for(rc = d4top(dataFrom); rc == 0; rc 
+ = d4skip(dataFrom,1))</p>
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4appendStart( dataTo, 
+ 0 ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; f4assignField( infoTo, 
+ infoFrom ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; d4append( dataTo ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Once the records have been 
+ appended, the files are unlocked and closed. When data file &quot;TO_DBF.DBF&quot; 
+ is unlocked its changes are automatically flushed to disk. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from APPEND.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>&nbsp;&nbsp; d4unlock( dataFrom ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4unlock( dataTo ) ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; code4close( &amp;cb ) ;</p>
+<p class=SourceCode>}</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The calls to<b> </b><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4unlock</span></span> 
+ are not strictly necessary in&nbsp;this example because <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4close</span></span> 
+ does flushing and unlocking&nbsp;automatically. Alternatively, <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4unlock</span></span> 
+ could have been called to unlock both files at once. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Avoiding_Deadlock>Avoiding Deadlock</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When locking multiple data 
+ files at once, you need to be careful to avoid deadlock. Deadlock happens 
+ when one application waits for a second application to unlock something 
+ and the second application waits for the first application to unlock something 
+ else. Since they are both waiting for each other, they both wait forever. 
+ This program avoids deadlock by changing <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>&nbsp;from 
+ the default of unlimited retries to one try. If the lock attempt fails, 
+ the program exits. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from APPEND.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>&nbsp;&nbsp; cb.lockAttempts = 1 ;</p>
+<p class=SourceCode>&nbsp;&nbsp; rc1 = d4lockFile( dataFrom ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; rc2 = d4lockFile( dataTo ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; if( rc1 != 0 || rc2 != 0 )</p>
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf( &quot;Locking 
+ Failed\n&quot; ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exit(0) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Another way to avoid deadlock 
+ is to be careful to always lock data files in the same order. If one application 
+ locks data file &quot;FROM_DBF&quot; before &quot;TO_DBF&quot; using unlimited 
+ retries, then all applications using unlimited retries should do the same.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If applications always 
+ lock data files in the same order, deadlock is not possible. This is because 
+ once the first application succeeds in locking the first data file, other 
+ applications will wait for the first application to finish its locking, 
+ do what it needs to do and then unlock all of the data files. The best 
+ way to ensure you are always locking data files in the same order is to 
+ lock and unlock all data files together.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><b style="font-weight: bold;"><span 
+ style="font-size: 12.0pt; font-family: Arial;">Group Locks</span></b></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Sometimes it is desirable 
+ to lock many items as a group. In this case, either all items are locked 
+ or no items are locked. This functionality will help minimize the chance 
+ of deadlock. CodeBase supplies functions that will put an item on a queue 
+ so that the whole queue can be locked as a group. The functions <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAdd</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAddAppend</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAddFile</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4lockAddAll</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4lockAdd</span></span> 
+ put their respective&nbsp;items on a queue to be locked. These functions 
+ do NOT lock any items. The items are locked by a call to <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span>. 
+ If any item in the queue fails to be locked, the successful locks are 
+ removed, <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span> 
+ returns <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">r4locked</span></span> 
+ and the queue remains intact for a future lock attempt by a subsequent 
+ call to <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span>. 
+ When <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span> 
+ succeeds, all the locks are in place and the queue is emptied. Refer to 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4lock</span></span> 
+ in the <i>Reference Guide</i> for more details.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Exclusive_Access>Exclusive Access</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The simplest type of multi-user 
+ applications are those that open all of their files in exclusive access 
+ mode. If any other application tries to open a file which has been opened 
+ exclusively by another user, the application gets a file open error.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The big disadvantage of 
+ this method is that no other applications can use files that you are using. 
+ This is not a recommended method of creating multi-user applications.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The main use of opening 
+ files exclusively is when you are performing packing, zapping, indexing 
+ or reindexing. This prevents other applications from generating errors 
+ or garbage output if they use the file while one of these activities is 
+ occurring. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Opening Files Exclusively</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Whether a file is opened 
+ exclusively is determined by the current status of&nbsp;the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.accessMode</span></span>&nbsp;flag. 
+ This flag specifies what access OTHER users have to the current file. 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.accessMode</span></span> 
+ has three possible values:</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPEN4DENY_NONE</span></span> 
+ Open the database files in shared mode. Other users have read and write 
+ access. This is the default value.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPEN4DENY_WRITE</span></span> 
+ Open the database files in shared mode. The application may read and write 
+ to the files, but other users may only open the file in read only mode&nbsp;and 
+ may not change the files.</p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPEN4DENY_RW</span></span> 
+ Open the database files exclusively. Other users may not open the files.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This flag can be changed 
+ any time after the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span><b> 
+ </b>structure has been initialized with <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4init</span></span>. 
+ Changes to the flag only affect those files that are opened thereafter. 
+ Therefore if the access mode must be altered for an open file, the file 
+ must be closed and then reopened.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>cb.accessMode = OPEN4DENY_RW;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">dataFile = d4open( &amp;cb, &quot;DATAFILE&quot; 
+ ) ; /* open exclusively*/</td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If a file cannot be opened 
+ exclusively due to the fact that some other application already has it 
+ open, the file open fails. When this happens, and the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.errOpen</span></span>&nbsp;flag 
+ is set to true , an error message is generated. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Read_Only_Mode>Read Only Mode</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If your application reads 
+ information from a file and never modifies it, you can open the file in 
+ read only mode. This mode must be used when you only have read access 
+ to a file. This is a common situation on a network where a database is 
+ shared among many users, but only a few users have the authority to make 
+ changes to it. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Opening Files In Read Only Mode</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Whether a file is opened 
+ in read only mode is determined by the current status of&nbsp;the <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.readOnly</span></span>&nbsp;flag. 
+ If the flag is set to its default value of false (zero), files are opened 
+ in read / write mode. If this flag is set to true (non zero), files are 
+ opened in read only mode. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=InlineComment><span class=InlineCommentText>Code fragment from 
+ MULTI.C</span><span class=InlineCommentText>&nbsp;</span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>cb.readOnly = 0; /* set to FALSE */</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Lock_Attempts>Lock Attempts</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When a lock is performed&nbsp;on 
+ a file, the possibility exists that some other application has already 
+ locked that file or a portion of the file. When this occurs, what CodeBase 
+ does next is determined by the status of the<b> </b><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>&nbsp;flag.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The default value of <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>&nbsp;is 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">WAIT4EVER</span></span>. 
+ This indicates that CodeBase will keep trying to establish a lock until 
+ it succeeds. The advantage of this method is that it simplifies programming 
+ because the application can assume that all lock attempts succeed. Unfortunately, 
+ this can increase the chances of deadlock bugs being present in an application. 
+ In addition, if applications attempt locking for long periods of time, 
+ users can be left waiting. One potential solution is to use the <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">S4LOCK_HOOK</span></span>&nbsp;conditional 
+ compilation switch and put the number of retries directly under the control 
+ of the end user. Refer to the CodeBase <i>Reference Guide</i> &quot;Conditional 
+ Compilation Switches&quot; chapter for more information on this technique. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Code 
+ fragment from MULTI.C </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>&nbsp;cb.lockAttempts = WAIT4EVER; // Retry forever</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>&nbsp;is 
+ set to any value greater than one, CodeBase keeps trying the lock at approximately 
+ one second intervals until either a lock is established or the number 
+ of attempts equals <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>. 
+ If the lock fails, a value of <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">r4locked</span></span><b>&nbsp;</b>is 
+ returned from the function attempting the lock.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If you wish to perform 
+ a special operation if the lock fails, such as displaying a message to 
+ the user, you should set <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockAttempts</span></span>&nbsp;to 
+ one and test for return values. Valid settings for CODE4.lockAttempts 
+ are WAIT4EVER (-1) or any value greater than or equal to 1. Any other 
+ value is undefined. </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Automatic_Record_Locking>Automatic Record Locking</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.readLock</span></span>&nbsp;is 
+ true, several CodeBase functions automatically lock records before reading 
+ them. This ensures that no other application can modify a record that 
+ your application has in its record buffer.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Unfortunately, locking 
+ data file records when they are only being read can create unnecessary 
+ locking contention. Simply put, this would increase the chance of a record 
+ being locked when an end user just wants to look at it. Consequently, 
+ the default of no automatic read locking is appropriate for most multi-user 
+ applications. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following list of functions 
+ perform record locking&nbsp;when the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.readLock</span></span>&nbsp;flag 
+ is set to true: <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4bottom</span></span><b>, 
+ </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4go</span></span><b>, 
+ </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4position</span></span><b>, 
+ </b><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4seek, 
+ d4seekDouble, d4seekN, d4seekNext, d4seekNextDouble, d4seekNextN, d4skip</span></span><b>, 
+ </b>and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4top</span></span>. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><a name=Enforced_Locking>Enforced Locking</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Locking a record before 
+ it is modified&nbsp;is very important in the multi-user configuration, 
+ since it ensures that only one application can edit a record at a time. 
+ The <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> 
+ member variable <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockEnforce</span></span>&nbsp;can 
+ be used to ensure that an application has explicitly locked a record before 
+ it is modified with a field function or the following data file functions: 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4blank</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4changed</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4delete</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4recall</span></span>. 
+ When <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.lockEnforce</span></span> 
+ is set to true (non-zero), an <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">e4lock</span></span> 
+ error is generated when a attempt is made to modify an unlocked record.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">An alternative method of 
+ ensuring that only one appliction can modify a record at a time is to 
+ deny all other applications write access to a data file. Write access 
+ can be denied to other applications by setting <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.accessMode</span></span>&nbsp;to 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPEN4DENY_WRITE</span></span> 
+ or <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPEN4DENY_RW</span></span> 
+ before opening the file. Thus, it is unnecessary to explicitly lock the 
+ record before&nbsp;editing it, even when <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.lockEnforce</span></span>&nbsp;is 
+ true (non-zero), since no other application can write to the data file. 
+ This method suffers from the same disadvantage as discussed in &quot;Exclusive 
+ Access&quot; section of this chapter. The restricted access to the files 
+ prevents the creation of practical multi-user applications. </td></tr>
+</table>
+
+&nbsp; 
+
+</body>
+
+</html>

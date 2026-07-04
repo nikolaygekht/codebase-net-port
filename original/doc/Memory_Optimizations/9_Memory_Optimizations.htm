@@ -1,0 +1,1093 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Memory Optimizations</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP9.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=3215>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP9.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Memory Optimizations</h1>
+
+<p class=Body
+	style="text-indent: 0px;">Memory optimization is accomplished&nbsp;by 
+ buffering portions of data, index and memo files in memory. This improves 
+ performance because physically accessing the disk takes longer than accessing 
+ memory. In addition, reading and writing several records at once is considerably 
+ quicker than reading and writing individual records separately. </p>
+
+<p class=Body
+	style="text-indent: 0px;">Memory optimization is more effective in 
+ some operating environments than others. This is because some operating 
+ systems already do some memory optimizations at the operating system level 
+ and some hard disks do memory optimizations at the hardware level. </p>
+
+<p class=Body
+	style="text-indent: 0px;">Regardless, when memory is available, proper 
+ use of CodeBase memory optimizations will always improve performance. 
+ This is because CodeBase memory optimizations are designed specifically 
+ to optimize database operations. In addition, in network applications, 
+ they can reduce requests to the network server. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="margin-left: -.05in;
+				border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="width: 5px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=5px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2><span style="font-size: 12.0pt;"><a name=Using_Memory_Optimizations>Using 
+ Memory </span><span style="font-size: 11.0pt;">Optimizations</span></a></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Using memory optimization 
+ is quite easy. All you have to do is turn it on. CodeBase has defaults 
+ for determining which files should be optimized and whether the files 
+ should be optimized for reading and/or writing. If you wish, you can override 
+ the defaults for any particular file(s). </td></tr>
+
+<tr>
+<td style="width: 5px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=5px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Specifying Files To Optimize</td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Any file that you can open 
+ with a CodeBase function can be optimized. This includes data files, index 
+ files and memo files, along with files that are opened with <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">file4open</span></span>. 
+ Each file opened by CodeBase has two flags associated with it. The first 
+ specifies whether the file is optimized. When a file is optimized, the 
+ second flag specifies whether the file is optimized for both reading and 
+ writing or just reading. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">There are two ways of setting 
+ a file's optimization flags. You can use the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> default 
+ settings when the file is opened or you can explicitly set them. </td></tr>
+
+<tr>
+<td style="width: 5px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=5px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Changing The Default Settings</td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When the file is opened, 
+ its optimization flags are set from the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.optimize</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.optimizeWrite</span></span> 
+ flag settings. Valid settings for <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4.optimize</span></span> 
+ are: </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4EXCLUSIVE</span></span><span 
+ style="font-size: 12.0pt;">&nbsp; </span>(Default) Read optimize files 
+ when the files are opened exclusively, when the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">S4OFF_MULTI</span></span>&nbsp;compilation 
+ switch is defined or when the DOS read-only attribute is set. Otherwise 
+ do not read-optimize the file. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4OFF 
+ </span></span>&nbsp;&nbsp;Do not read optimize the file. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4ALL</span></span>&nbsp;&nbsp; 
+ Same as <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4EXCLUSIVE</span></span> 
+ except that shared files are also optimized. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Valid settings for <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.optimizeWrite</span></span> 
+ are: </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4EXCLUSIVE</span></span> 
+ (Default)&nbsp; Write optimize files when they are opened exclusively 
+ or when the<span style="font-size: 12.0pt;"> </span><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">S4OFF_MULTI</span></span>&nbsp;compilation 
+ switch is defined. Otherwise do not write optimize. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4OFF</span></span> 
+ Do not write optimize. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;"><span style="font-family: Symbol;">·<span 
+ style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span></span><span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4ALL</span></span> 
+ Same as <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPT4EXCLUSIVE</span></span> 
+ except that shared files which are locked are also write optimized. </td></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 91.55pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=91.6pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/Note.gif" v:shapes="_x0000_i1025" x-maintain-ratio="TRUE" style="width: 47px;
+															height: 40px;
+															float: none;
+															border-style: none;" width="47" height="40" border="0">&nbsp;<b><sup><span 
+ style="font-size: 16.0pt; font-family: Arial;">Note</span></sup></b></td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 353.95pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=354pt>
+<p class=NoteText0>If read optimization is disabled, then write optimization 
+ is also disabled.</td>
+<td_null></tr>
+
+<tr style="height: 0px;">
+<td style="width: 5px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=5px>
+<p>&nbsp;</td>
+<td style="width: 117px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=117px>
+<p>&nbsp;</td>
+<td style="width: 4px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=4px>
+<p>&nbsp;</td>
+<td style="width: 468px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=468px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following code segment 
+ opens three data files and changes their optimization flag settings. When 
+ memory optimization is activated, the first data file is read optimized, 
+ the second is read/write optimized, and the third has no optimization 
+ at all. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>CODE4&nbsp; codeBase; </p>
+<p class=SourceCode>DATA4&nbsp; *d1,*d2,*d3;&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>code4init(&amp;codeBase); </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>codeBase.optimize = OPT4ALL; </p>
+<p class=SourceCode>codeBase.optimizeWrite = OPT4OFF; </p>
+<p class=SourceCode>d1 = d4open(&amp;codeBase,&quot;DATA1&quot;);&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>codeBase.optimizeWrite = OPT4ALL </p>
+<p class=SourceCode>d2 = d4open(&amp;codeBase,&quot;DATA2&quot;);&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>codeBase.optimize = OPT4OFF </p>
+<p class=SourceCode>codeBase.optimizeWrite = OPT4OFF; </p>
+<p class=SourceCode>d3 = d4open(&amp;codeBase,&quot;DATA3&quot;);</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Overriding The Default Settings</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">A file's optimization flags 
+ can be changed&nbsp;at any time&nbsp;by calling one of the following functions: 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4optimize, 
+ file4optimize, d4optimizeWrite,</span></span> or <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">file4optimizeWrite</span></span><span 
+ style="font-size: 12.0pt;">. Both the </span><span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">file4optimize</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">file4optimizeWrite</span></span> 
+ functions change the optimization flags of a single file while the <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4optimize</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4optimizeWrite</span></span> 
+ change the optimization flags of a data file and all of its open index 
+ and memo files. Following is the above example converted to use the <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4optimize</span></span> 
+ and <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4optimizeWrite</span></span> 
+ functions. </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>CODE4&nbsp; codeBase; </p>
+<p class=SourceCode>DATA4&nbsp; *d1,*d2,*d3;&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>code4init(&amp;codeBase); </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>d1 = d4open(&amp;codeBase, &quot;DATA1&quot;); </p>
+<p class=SourceCode>d4optimize(d1,OPT4ALL); </p>
+<p class=SourceCode>d4optimizeWrite(d1,OPT4OFF);&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>d2 = d4open(&amp;codeBase, &quot;DATA2&quot;); </p>
+<p class=SourceCode>d4optimize(d2,OPT4ALL); </p>
+<p class=SourceCode>d4optimizeWrite(d2,OPT4ALL);&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>d3 = d4open(&amp;codeBase, &quot;DATA3&quot;); </p>
+<p class=SourceCode>d4optimize(d3,OPT4OFF); </p>
+<p class=SourceCode>d4optimizeWrite(d3,OPT4OFF);</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3 style="margin-right: -5.6pt;">Activating The Optimizations</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4optStart</span></span> 
+ function&nbsp;is called, the files whose optimization flags are set are 
+ memory optimized. Memory optimization is disabled by <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4optSuspend</span></span>. 
+ </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=SourceCode>code4optStart( &amp;codeBase ) ; </p>
+<p class=SourceCode>&nbsp;. . . </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">code4optSuspend( &amp;codeBase ) ; </td>
+<td_null></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Refreshing The Buffers</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">You can also force a refresh 
+ of the optimization buffers. <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">file4refresh</span></span> 
+ causes any buffered portion of a file&nbsp;to be discarded. The <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4refresh</span></span> 
+ performs the same function for a data file and its index and memo files. 
+ Finally, the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4refreshRecord</span></span> 
+ rereads the current record from the disk. </td>
+<td_null></tr>
+
+<tr>
+<td style="width: 1px;
+			border: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=1px>
+<p class=Normal>&nbsp;</td>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 4.3pt 0in 4.3pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="margin-right: -3.4pt; font-size: 12.0pt;"><a name=Memory_Requirements>Memory 
+ Requirements</a></td>
+<td_null>
+<td style="x-cell-content-align: top;
+			width: 350.1pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 4.3pt 0in 4.3pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=350.1pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When using memory optimization, 
+ you can limit&nbsp;the amount of memory which CodeBase uses for this purpose 
+ by setting <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartMax</span></span>. 
+ The natural question is what is an appropriate maximum?&nbsp; In general,&nbsp; 
+ the best maximum is the amount of memory which is likely to be available. 
+ For more information please refer to the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> section 
+ of the <i>Reference Guide</i>. </td></tr>
+
+<tr>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2>&nbsp;</td>
+<td_null>
+<td colspan=2
+	style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Since most applications 
+ run under a number of hardware environments where varying amounts of memory 
+ are available, the application should assume that all extra available 
+ memory was used by CodeBase memory optimization. Therefore, the application 
+ should allocate its own memory before calling <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">code4optStart</span></span>,&nbsp;or 
+ after calling <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">code4optSuspend</span></span>. 
+ If you must allocate memory when the optimization is active, use <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">u4allocFree</span></span>. 
+ If this function fails to allocate memory, it will free memory from the 
+ CodeBase memory buffers and try again. These techniques make CodeBase 
+ memory optimization a lower priority. </td>
+<td_null></tr>
+
+<tr style="height: 0px;">
+<td style="width: 1px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=1px>
+<p>&nbsp;</td>
+<td style="width: 119px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=119px>
+<p>&nbsp;</td>
+<td style="width: 1px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=1px>
+<p>&nbsp;</td>
+<td style="width: 467px;
+			border: none;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	width=467px>
+<p>&nbsp;</td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">If you expect very little 
+ memory to be available for CodeBase memory optimization, you should probably 
+ just not use it. In this case, you might want to build the CodeBase library 
+ using the conditional compilation switch <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">S4OFF_OPTIMIZE</span></span> 
+ in order&nbsp;to reduce executable size.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="margin-bottom: 6.0pt; font-size: 12.0pt;"><a name=When_To_Use_Memory_Optimization>When 
+ To Use Memory Optimization</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Using memory optimization 
+ is not especially difficult. The most difficult part about memory optimization 
+ is knowing when to use it. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Single User</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The single user case is 
+ the most&nbsp;straight&nbsp;forward. Essentially, a single user application 
+ can safely memory read and write optimize all files. If an application 
+ explicitly flushes to disk by calling CodeBase flushing functions, write 
+ optimizations are ineffective. In all other single user cases write optimization 
+ is useful for improving performance. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When writing single user 
+ applications with memory optimization, it is a good idea to set<span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;"> CODE4.accessMode</span></span>&nbsp;to 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">OPEN4DENY_RW</span></span>. 
+ This way CodeBase performs memory optimizations by default. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Multi-User</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Whether or not to use memory 
+ optimization&nbsp;in a multi-user or multi-tasking environment is a more 
+ difficult decision. This is because memory optimization interferes with 
+ the multi-user sharing of information. On the other hand, the speed improvements 
+ resulting from the use of memory optimization can be even more dramatic 
+ because accessing a network server can be slower than accessing a local 
+ drive. In addition, memory optimization causes the server to be used less 
+ which can improve response time for other users. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Using memory read optimization 
+ in a network&nbsp;environment means that previously read database information 
+ is buffered in memory. The next time the information needs to be read, 
+ it can be quickly fetched from local memory. The disadvantage of this 
+ is that if the information has been changed by another application, the 
+ most recent piece of disk information may not be retrieved. At worst, 
+ one half of a read record could be an up-to-date version and the other 
+ half an older version. If read optimization is being used on memo files 
+ being updated by another user, it is theoretically possible to be returned 
+ an old or garbled memo entry. If the file is locked, using read optimization 
+ is completely safe because it cannot be updated by another user. Consequently, 
+ it is necessary&nbsp; to be careful to only use read optimization under 
+ appropriate circumstances. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Using memory write-optimization 
+ on shared files is potentially even more hazardous than using read-optimization. 
+ This is because information is written to disk only when the memory buffers 
+ are full. Consequently, from the perspective of any user reading the changed 
+ information,&nbsp; the information can appear as corrupt. If other applications 
+ are using index files which appear corrupt, they can generate errors. 
+ It is not quite as bad as it might sound because CodeBase is programmed 
+ with extensive error checking and reacts appropriately to most apparent 
+ corruption. </td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="margin-left: 5.4pt;
+				border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-indent: 0in;
+			font-size: 9.0pt;
+			font-family: Arial;"><img src="../Images/Warning.gif" v:shapes="_x0000_i1026" x-maintain-ratio="TRUE" style="width: 91px;
+												height: 57px;
+												float: none;
+												border-style: none;" width="91" height="57" border="0"></td>
+<td style="x-cell-content-align: top;
+			width: 346.8pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=346.8pt>
+<p class=NoteText0>Allowing one application to write optimize an index 
+ file, while another application may use the same index file, can lead 
+ to unpredictable results in the application reading the index file.</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="margin-left: 5.4pt;
+				border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 89.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=89.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;"><img src="../Images/Note.gif" v:shapes="_x0000_i1027" x-maintain-ratio="TRUE" style="width: 47px;
+															height: 40px;
+															float: none;
+															border-style: none;" width="47" height="40" border="0">&nbsp;<b><sup><span 
+ style="font-size: 16.0pt; font-family: Arial;">Note</span></sup></b></td>
+<td style="x-cell-content-align: top;
+			width: 346.8pt;
+			border: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=346.8pt>
+<p class=NoteText0>CodeBase only allows write optimization when the entire 
+ data file is locked or when it is opened exclusively. This restriction 
+ is necessary in order to guarantee that index and memo files are not corrupt 
+ after they have been flushed.</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>Client-Server</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the client-server configuaration, 
+ the <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">S4CLIENT</span></span> 
+ switch automatically defines <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">S4OFF_OPTIMIZE 
+ </span></span>as the default setting. The <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> members 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.memStartMax</span></span>, 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.optimize</span></span> 
+ and&nbsp;<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">CODE4.optimizeWrite</span></span> 
+ are automatically set&nbsp;according to the corresponding fields in the 
+ server configuration file. Please refer to the CodeBase server reference 
+ manual for more details.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.2pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351.2pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">For more examples of memory 
+ optimization, refer to the &quot;Optimization&quot; section of the &quot;Multi-user 
+ Applications&quot; chapter.</td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+</body>
+
+</html>

@@ -1,0 +1,1228 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>C Programming</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP2.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=4567>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP2.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>C Programming</h1>
+
+<p class=Body
+	style="text-indent: 0px;">The C programming languages are perhaps the 
+ most popular and flexible languages currently in use. While it is not 
+ the purpose of this manual to teach you how to program in C,&nbsp; this 
+ chapter deals with some of the common difficulties encountered by C programmers 
+ when first using the CodeBase library. </p>
+
+<p class=Body
+	style="text-indent: 0px;">Although CodeBase is straight forward and 
+ easy to use, it does require a basic understanding of the C language, 
+ including the use of structures and pointers. The following sections illustrate 
+ some common problems and their remedies. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border: none;
+				x-border-left: 1px table-solid;
+				x-border-top: 1px table-solid;
+				x-border-right: 1px table-solid;
+				x-border-bottom: 1px table-solid;
+				border-collapse: separate;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2><a name=Memory_Corruption>Memory Corruption</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">One of the main features 
+ of C is the flexibility in using memory. Unfortunately this flexibility 
+ also lets you change memory that you shouldn't, causing memory corruption. 
+ Memory corruption, due to programming oversights, causes the most difficult 
+ bugs in C programs. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>The sizeof Operator </td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin: 0in;
+			margin-bottom: .0001pt;
+			text-indent: 0in;">Many situations that cause memory corruption 
+ can be avoided by using the C language's <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">sizeof</span></span><b> </b>operator. One of 
+ the biggest culprits of memory corruption occurs when data is written 
+ beyond the end of a string character array. The following code fragment 
+ illustrates this error: </p>
+<p class=Body
+	style="margin: 0in;
+			margin-bottom: .0001pt;
+			text-indent: 0in;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">INCORRECT</span></span><span 
+ style="font-size: 9.0pt;"> </span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>char temp[8]; </p>
+<p class=SourceCode>strcpy(temp, &quot;This string is longer than 8&quot;);<span 
+ style="font-size: 9.0pt;"> </span></p>
+<p class=SourceCode>&nbsp;</td></tr>
+</table>
+
+<p class=Body
+	style="margin-top: 6.0pt; text-indent: 0px;">This sort of problem can 
+ be avoided by using the <span class=InlineLanguageType><span style="font-size: 10.0pt;">sizeof</span></span><b> 
+ </b>operator and a string copy function that copies a maximum number of 
+ characters. The CodeBase function <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">u4ncpy</span></span> is 
+ an excellent choice because it also ensures that the destination string 
+ is null terminated under all circumstances.</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">CORRECT</span></span><span 
+ style="font-size: 9.0pt;"> </span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>char temp[8];</p>
+<p class=SourceCode>u4ncpy(temp, &quot;This string is longer than 8&quot;, 
+ sizeof(temp)); </p>
+<p class=SourceCode>&nbsp;</td></tr>
+</table>
+
+<p class=Body
+	style="margin-top: 6.0pt; text-indent: 0px;">The <span class=InlineLanguageType><span 
+ style="font-size: 10.0pt;">sizeof</span></span><b> </b>operator may also 
+ be used with functions like <span class=InlineLanguageType><span style="font-size: 10.0pt;">memset</span></span>.</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>char temp[8];</p>
+<p class=SourceCode>memset (temp, 'X', sizeof(temp));</p>
+<p class=SourceCode>&nbsp;</td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Memory Scoping</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Another common mistake 
+ is dealing with memory scoping. In the next example, the programmer wants 
+ to return a string that has been filled with data. </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">INCORRECT 
+ </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.hpp&quot;&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>char *SetString( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; char buf[ 15 ];&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; u4ncpy( buf, &quot;HELLO WORLD!&quot;, 
+ sizeof(buf) ) ;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; return buf ; </p>
+<p class=SourceCode>}&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void main( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; char *Message;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; Message = SetString( ); </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; ... more stuff ... </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This program may appear 
+ to work at first, but the memory for the variable <i>buf </i>is automatically 
+ deallocated after the <i>SetString </i>function is exited. Since the memory 
+ to which <i>Message </i>points is free, it can be reused by the system 
+ at any time. Consequently, using the information pointed to by <i>Message 
+ </i>is an error. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">To avoid this situation, 
+ several correct methods can be used. The first uses static memory. Static 
+ memory is not deallocated while the program is running, and the same memory 
+ is used every time the function is called. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">CORRECT 
+ </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.hpp&quot;&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>char *SetString( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; static char buf[ 15 ] ;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; u4ncpy( buf, &quot;HELLO WORLD!&quot;, 
+ sizeof(buf)) ;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; return buf ; </p>
+<p class=SourceCode>} </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void main( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; char *Message;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; Message = SetString();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; ... more stuff ... </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The next example accomplishes 
+ the same result by allocating the memory in the calling function by declaring 
+ the variable <i>message </i>in <span class=InlineLanguageType><span style="font-size: 10.0pt;">main</span></span>. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">CORRECT 
+ </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.hpp&quot;&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void SetString( char *buf, int size) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; u4ncpy( buf, &quot;HELLO WORLD!&quot;, 
+ size); </p>
+<p class=SourceCode>} </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void main( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; char Message[ 15 ];&nbsp;&nbsp; &nbsp;&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; SetString( Message, sizeof( Message ) 
+ );&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; ... more stuff ... </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}&nbsp; </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Finally you can dynamically 
+ allocate the&nbsp;memory. Remember to deallocate it when you are done. 
+ </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr style="height: 322px;">
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">CORRECT 
+ </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>char *SetString( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; char *buf ;</p>
+<p class=SourceCode>&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; buf = (char *) u4alloc( 15 * sizeof(char)) 
+ ;;&nbsp;&nbsp;&nbsp; &nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; if (buf)</p>
+<p class=SourceCode>&nbsp;&nbsp; {</p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; u4ncpy( buf, &quot;HELLO 
+ WORLD!&quot;, sizeof(buf)) ;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return buf ; </p>
+<p class=SourceCode>&nbsp;&nbsp; }</p>
+<p class=SourceCode>} </p>
+<p class=SourceCode>void main( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; char *Message;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; &nbsp;Message = SetString( ); </p>
+<p class=SourceCode>&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; ... more stuff ... </p>
+<p class=SourceCode>&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; u4free( Message ) ; </p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </td></tr>
+
+<tr style="height: 59px;">
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border-top: solid #000000 4.5pt;
+			border-left: none;
+			border-bottom: solid #000000 .75pt;
+			border-right: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="margin-bottom: 6.0pt;"><a name=Structure_Parameters>Structure 
+ Parameters</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Many of the common problems 
+ encountered by novice C users deal with the passing and returning of structure 
+ parameters. </td></tr>
+
+<tr style="height: 40px;">
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Structure passing</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Consider this example. 
+ The programmer wishes to pass a <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> structure&nbsp;to 
+ a function that initializes several of its flags. </td></tr>
+
+<tr style="height: 306px;">
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">INCORRECT 
+ </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.h&quot;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void InitFlags(CODE4 codeBase) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; /*set some flags */&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; codeBase.errOpen = 0 ;&nbsp; &nbsp;&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; codeBase.safety = 0 ; </p>
+<p class=SourceCode>} </p>
+<p class=SourceCode>&nbsp; </p>
+<p class=SourceCode>void main( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; CODE4 cb;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; code4init( &amp;cb );</p>
+<p class=SourceCode>&nbsp;&nbsp; /* code4init sets cb.errOpen and cb.safety 
+ to 1*/</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; InitFlags( cb ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; /*cb.errOpen and cb.safety are still set 
+ to 1 !!*/</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </td></tr>
+
+<tr style="height: 205px;">
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When you pass a variable 
+ (in this case a structure) as a parameter, the function actually receives 
+ a copy of that variable. Therefore any changes which are made to the structure 
+ members in the function, are lost when the function returns. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This causes several problems. 
+ First of all, memory is wasted by storing a copy of the structure members. 
+ Any changes that are made to the structure members are lost and more importantly, 
+ many CodeBase structures (such as the <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">CODE4</span></span> structure) 
+ maintain several sets of linked lists that can be corrupted by accessing 
+ them through a copy. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The correct way to pass 
+ a structure to a function, is to pass it in as a pointer. This is illustrated 
+ in the corrected version: </td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<p class=Body
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 6.0pt;
+			margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">CORRECT 
+ </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.h&quot;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void InitFlags(CODE4 *codeBase) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; /*set some flags */&nbsp;&nbsp;&nbsp; 
+ </p>
+<p class=SourceCode>&nbsp;&nbsp; codeBase-&gt;errOpen = 0 ;</p>
+<p class=SourceCode>&nbsp;&nbsp; codeBase-&gt;safety = 0 ;</p>
+<p class=SourceCode>}&nbsp; </p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void main( void ) </p>
+<p class=SourceCode>{&nbsp;&nbsp;&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; CODE4 cb ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; code4init ;</p>
+<p class=SourceCode>&nbsp;&nbsp; /* code4init sets cb.errOpen and cb.safety 
+ to 1*/</p>
+<p class=SourceCode>&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; InitFlags( &amp;cb ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; /* cb.errOpen and cb.safety are now set 
+ to 0 */</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">} </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Pointer Initialization</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The next example demonstrates 
+ another common difficulty: pointer initialization.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-weight: normal;">INCORRECT</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.h&quot;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>CODE4 codeBase ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">void OpenDatafile( 
+ DATA4 *Datafile )</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">{</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;&nbsp; Datafile 
+ = d4open( &amp;codeBase, &quot;TEST.DBF&quot;) ;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;&nbsp; /* 
+ a data file is opened and Datafile is assigned a value */</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">}</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">void main( void 
+ )</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">{</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;&nbsp; DATA4 
+ *data = 0 ;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;&nbsp; OpenDatafile( 
+ data ) ;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;&nbsp; d4top( 
+ data ) ;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;&nbsp; /* 
+ Error: data still equals 0 */</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">&nbsp;&nbsp; code4close( 
+ &amp;codeBase ) ;</p>
+<p class=SourceCode
+	style="margin-left: 1.25in; text-indent: -1.25in;">}</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The problem with this program 
+ is similar to the problem in the previous example. As in example 1, a 
+ copy of the parameter ( in this case a pointer) is passed to the function. 
+ The reason this causes problems is that we are changing a copy of the 
+ pointer, not the actual pointer.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When <i>data </i>is passed 
+ the <i>OpenDatafile</i> function, it contains an address of 0. A copy 
+ of this pointer is created and is used inside the function. When the <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">d4open</span></span> 
+ is called, it assigns a new&nbsp;address to the copy. When the function 
+ is exited, the copy is discarded and back in main <i>data </i>still has 
+ a value of 0.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Two examples in which the 
+ above problem is corrected are listed below.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In the first example, a 
+ pointer to variable <i>data</i> is passed to <i>OpenDatafile</i>. Consequently, 
+ <i>OpenDatafile</i> is able to modify the contents of variable <i>data</i> 
+ which avoids the problem of modifying a copy.</td></tr>
+</table>
+
+<p class=style8x11>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3 style="margin-bottom: 6.0pt; text-align: right;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-weight: normal;">CORRECT</span></span></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.h&quot;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>CODE4 codeBase ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void OpenDatafile( DATA4 **Datafile )</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; *Datafile = d4open( *codeBase, &quot;TEST.DBF&quot; 
+ ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; /* a data file is opened and Datafile 
+ is assigned a value */</p>
+<p class=SourceCode>}</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void main ( void )</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; DATA4 *data = 0 ;</p>
+<p class=SourceCode>&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; code4init( &amp;codeBase ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; OpenDatafile( &amp;data ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; /* data now has a valid address */</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4top( data ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; code4close( &amp;codeBase ) ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">In this next example, the 
+ pointer is passed as a return value, which is then assigned directly to 
+ variable <i>data</i>. This also effectively works around the problem of 
+ modifying a copy.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>#include &quot;d4all.h&quot;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>CODE4 codeBase ;</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>DATA4 *OpenDatafile( void )</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; DATA4 *Datafile = 0 ;</p>
+<p class=SourceCode>&nbsp;&nbsp; Datafile = d4open( &amp;codeBase, &quot;TEST.DBF&quot; 
+ ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; /* a data file is opened and Datafile 
+ is assigned a value */</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; return (Datafile) ;</p>
+<p class=SourceCode>}</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>void main( void )</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; DATA4 *data ;</p>
+<p class=SourceCode>&nbsp;&nbsp; </p>
+<p class=SourceCode>&nbsp;&nbsp; code4init( &amp;codeBase ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; data = OpenDatafile( ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; /* data now has a valid address */</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>&nbsp;&nbsp; d4top( data ) ;</p>
+<p class=SourceCode>&nbsp;&nbsp; code4close( &amp;codeBase ) ;</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">}</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">You should note that you 
+ have to take these special precautions only when you are modifying the 
+ actual address that the pointer contains. The following code fragment 
+ is perfectly acceptable because the pointer is not being modified, just 
+ what it points to:</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=SourceCode>void InitFlags( CODE4 *codeBase )</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; /* set some flags */</p>
+<p class=SourceCode>&nbsp;&nbsp; codeBase-&gt;errCreate = 0 ;</p>
+<p class=SourceCode>&nbsp;&nbsp; codeBase-&gt;safety = 0 ;</p>
+<p class=SourceCode>}</td></tr>
+</table>
+
+<p class=Normal
+	style="margin-top: 0in;
+			margin-right: 0in;
+			margin-bottom: 5.65pt;
+			margin-left: .05in;">&nbsp;</p>
+
+</body>
+
+</html>

@@ -1,0 +1,1302 @@
+<!doctype HTML public "-//W3C//DTD HTML 4.0 Frameset//EN">
+
+<html>
+
+<!--(==============================================================)-->
+<!--(Document created with RoboEditor. )============================-->
+<!--(==============================================================)-->
+
+<head>
+
+<title>Query Optimization</title>
+
+<!--(Meta)==========================================================-->
+
+<meta http-equiv=Content-Type content="text/html; charset=windows-1252">
+<meta name=Originator content=ImportDoc>
+<meta name=OriginalFile content="C:\Documentation\C User Guide Word Docs\CHAP6.DOC">
+<meta name=generator content="RoboHELP by eHelp Corporation - www.ehelp.com">
+<meta name=generator-major-version content=0.1>
+<meta name=generator-minor-version content=1>
+<meta name=filetype content=kadov>
+<meta name=filetype-version content=1>
+<meta name=page-count content=1>
+<meta name=layout-height content=2871>
+<meta name=layout-width content=710>
+
+
+<!--(Links)=========================================================-->
+
+<link rel="stylesheet" href="CHAP6.css">
+
+
+
+</head>
+
+<!--(Body)==========================================================-->
+
+
+<body lang=EN-US>
+
+<h1>Query Optimization</h1>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="font-size: 12.0pt;"><a name=What_is_Query_Optimization>What 
+ is Query Optimization</a></td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Query Optimization is an 
+ application&nbsp;invisible method&nbsp;of returning query results at high 
+ speed. The CodeBase Relation/Query module&nbsp;uses Query Optimization 
+ to analyze the query condition and return the matching set of records 
+ with a minimum of disk accesses. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This is accomplished by 
+ comparing the query expression to the tag sort orderings of the top master 
+ tag. If part of the query matches the tag expression, the tag itself is 
+ used to filter out records that do not match the expression. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">This results in lightning 
+ quick performance, even on the largest data files, since very few records 
+ are actually physically read. For example, if there were an index built 
+ on PRODUCT and the query was: </p>
+<p class=Normal
+	style="margin-bottom: 6.0pt;">PRODUCT = 'GIZMO'&nbsp; </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The Query Optimization 
+ would automatically use the index file to quickly seek to the appropriate 
+ record and, using the PRODUCT tag, and skip to retrieve all the records 
+ where PRODUCT is equal to 'GIZMO'. Once this is no longer the case, Query 
+ Optimization ignores the remaining records. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">It makes little difference 
+ whether the data file has 500 records or 500,000 records, since the same 
+ number of disk reads are performed in each case. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in;
+			text-align: right;
+			text-indent: 0in;"
+	align=right><span class=InlineCommentText><span style="font-size: 9.0pt; font-family: Arial;">Complex 
+ expressions </span></span></td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Query Optimization can 
+ also work on more complex expressions involving the .AND. and .OR. operators. 
+ In these cases, Query Optimization breaks down the whole expression into 
+ sub-expressions that can be optimized. For example, the two sub-expressions 
+ in the query: <span style="font-size: 9.0pt;">&nbsp;&nbsp;&nbsp;&nbsp;</span></p>
+<p class=Normal
+	style="margin-bottom: 6.0pt;">&nbsp;L_NAME = &quot;SMITH&quot; .AND. 
+ F_NAME = &quot;JOE&quot;&nbsp; </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">could both be optimized 
+ if there were two tags, one based on the expression L_NAME, the other 
+ on F_NAME. CodeBase could still partially optimize the query if there 
+ was a tag on either of the two sub-expressions. Even a partially optimized 
+ query can lead to very fast performance. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h2 style="margin-bottom: 6.0pt; font-size: 12.0pt;"><a name=When_is_Query_Optimization_Used>When 
+ is Query Optimization Used</a></td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">To start with, the Query 
+ Optimization capabilities are built into the CodeBase relate/query module, 
+ the report module and into CodeReporter. Your applications can use the 
+ Query Optimization provided a few simple conditions are met. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3 style="margin-right: -2.0pt;">Requirements of Query Optimization&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">To ensure that the Query 
+ Optimization is used to return your queries, the following steps must 
+ be taken: </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<h3>&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;">1.<span style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span>Insure that the Master data file's index file(s) are open. In general, 
+ the more tags open on the master data files, the greater the chance that 
+ Query Optimization can take effect. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;">2.<span style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span>Specify a query expression that contains in whole or in part, a 
+ top master tag key compared to a constant. </p>
+<p class=Body
+	style="margin-left: .25in; text-indent: -.25in;">3.<span style="font: 7.0pt 'Times New Roman';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ </span>The query expression is set using <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4querySet</span></span>. 
+ Query optimization is only effective when the query expression involves 
+ the top master data file. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The following tables illustrate 
+ some of the situations where Query Optimization is used automatically, 
+ and where it cannot be used. The information in the tables is based on 
+ a data file that has the following fields and tags: </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=SourceCode>FIELD4INFO fieldInfo [] =</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;L_NAME&quot;, r4str, 10, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;F_NAME&quot;, r4str, 10, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;COMPANY&quot;, r4str, 10, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;AGE&quot;, r4num, 2, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;DT&quot;, r4date, 8, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;AMOUNT&quot;, r4num, 7, 2},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;ADDRESS&quot;, r4str, 15, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;COMMENT&quot;, r4memo, 10, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;PRODUCT&quot;, r4str, 10, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;ID&quot;, r4str, 5, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;PHONE&quot;, r4str, 8, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {0,0,0,0},</p>
+<p class=SourceCode>};</p>
+<p class=SourceCode>&nbsp;</p>
+<p class=SourceCode>TAG4INFO tagInfo [] =</p>
+<p class=SourceCode>{</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;L_NAME_TAG&quot;, &quot;L_NAME&quot;, 
+ 0,0,0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;COMPANY_TAG&quot;, &quot;UPPER(COMPANY)&quot;, 
+ 0,0,0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;AGE_TAG&quot;, &quot;AGE&quot;, 
+ 0,0,0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;DT_TAG&quot;, &quot;DT&quot;, 0,0,0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;AMNT _TAG&quot;, &quot;AMOUNT&quot;, 
+ &quot;.NOT.DELETED()&quot;,0,0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;ADDR_TAG&quot;,&quot;ADDRESS&quot;, 
+ &quot;DELETED().AND..NOT.DELETED(), 0,0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;COMMENT_TAG&quot;, &quot;COMMENT&quot;, 
+ 0,0, r4descending},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;PROD_TAG&quot;, &quot;PRODUCT&quot;, 
+ 0, r4uniqueContinue, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;PRO_ID_TAG&quot;, &quot;PRODUCT+ID&quot;, 
+ 0,0,0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {&quot;PHONE_TAG&quot;, &quot;PHONE&quot;, 
+ 0, r4unique, 0},</p>
+<p class=SourceCode>&nbsp;&nbsp; {0,0,0,0,0},</p>
+<p class=SourceCode>};</p>
+<p class=SourceCode
+	style="margin-bottom: 6.0pt;">&nbsp;</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.7pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.7pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">&nbsp;</td>
+<td style="x-cell-content-align: top;
+			width: 344.9pt;
+			padding: 0in .05in 0in .05in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=344.9pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Query optimization is automatically 
+ used in the following situations. </td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="margin-left: .75pt;
+				border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border: solid #000000 1.5pt;
+			border-bottom: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=126.9pt>
+<p class=TableHeading
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Query Expression </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border-top: solid #000000 1.5pt;
+			border-left: none;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=4.3in>
+<p class=TableHeading
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Explanation </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border: solid #000000 1.5pt;
+			border-bottom: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">L_NAME = &quot;SMITH&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border-top: solid #000000 1.5pt;
+			border-left: none;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">L_NAME is a tag expression which is compared 
+ to a constant. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">L_NAME &gt;= &quot;S&quot; .AND. L_NAME 
+ &lt;= &quot;T&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Each sub expression compares a tag expression 
+ against a constant, and so the entire query can use Query Optimization. 
+ </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">L_NAME = &quot;SMITH&quot; .AND. F_NAME 
+ = &quot;JOE&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Only the first sub expression can use 
+ Query Optimization because there is no tag based on F_NAME. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">UPPER(COMPANY) = &quot;IBM&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Again, this is a tag expression compared 
+ to a constant. Even though the expression contains a function&nbsp;(UPPER), 
+ Query Optimization is still used. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">UPPER(COMPANY) = &quot;IBM&quot;&nbsp; 
+ .AND. L_NAME=&quot;SMITH&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Both parts of the expression use Query 
+ Optimization, since both sides compare a tag expression to a constant 
+ value. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">AGE &gt; 50 </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Even though the tag is Numeric, the expression 
+ can still be optimized. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">AGE &gt; 25*2 </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">25*2 is still a constant even though it 
+ is a complicated constant. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">DTOS(DT) &gt;= &quot;19930101&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">This would return all records where the 
+ date value in the DT field is greater than or equal to January 1,1993. 
+ If the tag expression was DT instead of DTOS(DT),&nbsp; then a query expression 
+ such as DT&gt;=CTOD(&quot;01/01/93&quot;) would also use Query Optimization. 
+ (You have to be careful when using CTOD because the format of its parameter 
+ depends on the data picture set in <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">code4dateFormat</span></span>.) </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #ffffff;"
+	bgcolor=#FFFFFF
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">COMMENT = &quot;SALE&quot;</td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #ffffff;"
+	bgcolor=#FFFFFF
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">In this case the tag was set using <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt;">r4descending</span></span>. 
+ Query Optimization can be used because CodeBase is indifferent to the 
+ ordering of the tag.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 126.9pt;
+			border: solid #000000 1.5pt;
+			border-top: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=126.9pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">PHONE = &quot;555 6031&quot;</td>
+<td style="x-cell-content-align: top;
+			width: 4.3in;
+			border-top: none;
+			border-left: none;
+			border-bottom: solid #000000 1.5pt;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=4.3in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Query Optimization can utilize unique 
+ tags as long the tag has not been specified with <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">r4uniqueContinue. r4unique</span></span> prevents 
+ duplicate records from being added to the data base. Therefore, <span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt;">r4unique</span></span> 
+ does not act as a filter for the tag, unlike <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">r4uniqueContinue</span></span>. </p>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Note that when the index is opened, the 
+ unique code is automatically set to the default value of <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt;">CODE4.errDefaultUnique</span></span>, which 
+ is <span class=InlineFunctionNames><span style="font-size: 10.0pt;">r4uniqueContinue. 
+ </span></span>Use <span class=InlineFunctionNames><span style="font-size: 10.0pt;">t4uniqueSet</span></span> 
+ to set unique code&nbsp;to <span class=InlineFunctionNames><span style="font-size: 10.0pt;">r4unique</span></span> 
+ before making a query. See the &quot;Unique Keys&quot; section of the 
+ &quot;Indexing&quot; chapter of this guide for more information.</td></tr>
+</table>
+
+<p class=Body
+	style="text-indent: 0px;">The following expressions cannot use the 
+ Query Optimization. Queries on these expressions are not optimized and 
+ take a longer time to execute. </p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="margin-left: .75pt;
+				border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border: solid #000000 1.5pt;
+			border-bottom: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=2in>
+<p class=TableHeading
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Query Expression </td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border-top: solid #000000 1.5pt;
+			border-left: none;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=292.5pt>
+<p class=TableHeading
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Explanation </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border: solid #000000 1.5pt;
+			border-bottom: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=2in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">F_NAME = &quot;JOE&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border-top: solid #000000 1.5pt;
+			border-left: none;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=292.5pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">There is no tag based on F_NAME. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=2in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">COMPANY = &quot;IBM&quot; </td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=292.5pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">There is no tag based on COMPANY. The 
+ tag is UPPER(COMPANY). Again, the tag expression must match the expression 
+ being compared to the constant exactly. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=2in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">L_NAME = F_NAME </td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=292.5pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">This expression cannot be optimized because 
+ F_NAME is not a constant. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=2in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">AMOUNT = 1000.00</td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=292.5pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Query Optimization will not be used because 
+ the tag contains a filter. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border-top: none;
+			border-left: solid #000000 1.5pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #ffffff;"
+	bgcolor=#FFFFFF
+	valign=top
+	width=2in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">ADDRESS = &quot;104 ELM ST&quot;</td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #ffffff;"
+	bgcolor=#FFFFFF
+	valign=top
+	width=292.5pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Query Optimization will not be used because 
+ the tag contains a filter, even though the filter is useless. Tags with 
+ filters are useless, regardless of the filter result.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border-top: none;
+			border-left: solid #000000 .75pt;
+			border-bottom: none;
+			border-right: solid #000000 1.5pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=2in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">PRODUCT =&quot;GIZMO&quot;</td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border: none;
+			border-right: solid #000000 .75pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #c0c0c0;"
+	bgcolor=#C0C0C0
+	valign=top
+	width=292.5pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Query Optimization will not be used because 
+ the tag specifies <span class=InlineFunctionNames><span style="font-size: 10.0pt;">r4uniqueContinue</span></span>. 
+ <span class=InlineFunctionNames><span style="font-size: 10.0pt;">r4uniqueContinue</span></span> 
+ acts like a filter, allowing duplicate records in the database but not 
+ in the index.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 2.0in;
+			border: solid #000000 .75pt;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #ffffff;"
+	bgcolor=#FFFFFF
+	valign=top
+	width=2in>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: 0in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">PRODUCT + ID =&quot;GIZMO 13445&quot;</td>
+<td style="x-cell-content-align: top;
+			width: 292.5pt;
+			border: solid #000000 .75pt;
+			border-left: none;
+			padding: 0in 0in 0in 0in;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;
+			background-color: #ffffff;"
+	bgcolor=#FFFFFF
+	valign=top
+	width=292.5pt>
+<p class=TableText0
+	style="margin-top: 3.0pt;
+			margin-right: .05in;
+			margin-bottom: 3.0pt;
+			margin-left: .05in;">Query Optimization will not be used because 
+ the tag consists of two fields.</td></tr>
+</table>
+
+<p class=Body>&nbsp;</p>
+
+<!--(Table)=========================================================-->
+<table x-use-null-cells
+		style="border-collapse: collapse;
+				border-spacing: 0px;
+				border-spacing: 0px;"
+		cellspacing=0>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 4.5pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h2 style="font-size: 12.0pt;"><a name=How_To_Use_Query_Optimization>How 
+ To Use Query Optimization</a></td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Query Optimization is automatically 
+ enabled whenever&nbsp;a relation operation occurs. CodeBase uses Query 
+ Optimization on the top master data file transparently when retrieving 
+ records from the composite data file. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Query Optimization, as 
+ described above, operates only on the top master data file and only when 
+ a tag sort ordering corresponds to a portion of the query expression. 
+ All you need to do is ensure that the top master data file has an appropriate 
+ index file open. </td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>How to tell if Query Optimization can be used</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border-top: solid #000000 .75pt;
+			border-left: none;
+			border-bottom: solid #000000 .75pt;
+			border-right: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">It is possible to determine 
+ whether Query Optimization can be used by calling the function <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4optimizeable</span></span><span 
+ class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">. 
+ </span></span>This function returns true (non-zero) when the relation 
+ is able to use the Query Optimization and it returns false (zero) when 
+ it can not. If there is insufficient memory, the Query Optimization will 
+ not be invoked, even if <span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;">relate4optimizeable</span></span> 
+ returns true (non-zero). </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">Call <span class=InlineFunctionNames><span 
+ style="font-size: 10.0pt; font-family: Arial;">relate4optimizeable </span></span>before 
+ functions that may use Query Optimization. If false (zero) is returned, 
+ it may be possible to<span class=InlineFunctionNames><span style="font-size: 10.0pt; font-family: Arial;"> 
+ </span></span>create a new index file for those queries that can not use 
+ Query Optimization. In the above scenario, the expression &quot;F_NAME 
+ = 'JOE' &quot;, is not able to use Query Optimization. If a new index 
+ were built on &quot;F_NAME&quot;, the execution time of the query would 
+ be improved.</td></tr>
+
+<tr>
+<td style="x-cell-content-align: top;
+			width: 90.9pt;
+			border: none;
+			border-top: solid #000000 .75pt;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=90.9pt>
+<h3>Memory <span style="font-size: 11.0pt;">Requirements</span></h3>
+<h3>of Query Optimization</td>
+<td style="x-cell-content-align: top;
+			width: 351.0pt;
+			border: none;
+			padding: 0in 5.4pt 0in 5.4pt;
+			padding-left: 0px;
+			padding-top: 0px;
+			padding-right: 0px;
+			padding-bottom: 0px;"
+	valign=top
+	width=351pt>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">The activation of the Query 
+ Optimization also depends on the compiler.</p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">When a 16 bit compiler 
+ is used, the Query Optimization will be able to handle 500,000 records. 
+ If the data base has more than half a million records, the query will 
+ be made without using Query Optimization. </p>
+<p class=Body
+	style="margin-left: 0in; text-indent: 0in;">It is recommended that 
+ 32 bit compiler be used when using data bases that have more than&nbsp; 
+ 500,000 records. Query Optimization will be able to handle 32 billion 
+ records when a 32 bit compiler is used. </td></tr>
+</table>
+
+<p class=Normal>&nbsp;</p>
+
+</body>
+
+</html>

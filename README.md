@@ -4,88 +4,66 @@ A modern, fully-managed **C#/.NET port of the CodeBase database engine** — rea
 Visual FoxPro-compatible `DBF` tables, `CDX` compound indexes, and `FPT` memo files
 **byte-for-byte**, with no native dependencies.
 
-> **Status: pre-implementation.** The format specifications and the master porting plan are
-> complete and verified against the original C source and real sample files. The C# code has not
-> been written yet. This repository currently holds the reference material that the implementation
-> will be built from.
+> **Status: pre-implementation.** The format specifications, the porting plan and the golden test
+> corpus exist; the C# code does not yet. Nothing here is usable as a library today.
 
 ## What it is
 
 CodeBase is a mature C library (originally by Sequiter Software, Inc., ~117k lines) implementing the
-xBase / dBASE family of database files with full DBF, CDX index, and FPT memo support. This project re-implements the **stand-alone, Visual FoxPro-compatible**
-subset of that engine as idiomatic C#, so that .NET applications can work with legacy xBase data —
-and so that files written by this library are openable and correctly navigable by Visual FoxPro and
-by the original C library, and vice versa.
+xBase / dBASE family of database files, with full DBF, CDX index and FPT memo support. This project
+re-implements the **stand-alone, Visual FoxPro-compatible** subset of that engine as idiomatic C#, so
+that .NET applications can work with legacy xBase data — and so that files written by this library
+are openable and correctly navigable by Visual FoxPro and by the original C library, and vice versa.
 
 "Byte-for-byte" is the whole point. Index key ordering and CDX leaf compression must reproduce the
 exact stored bytes, not merely an equivalent result. This is a rewrite in the spirit of the
 original — **not** a P/Invoke wrapper and **not** a mechanical transliteration of the C.
 
+## Why it exists
+
+Byte-compatibility is the foundation, not the goal. The library's main value is its **bitmap query
+optimizer**: Rushmore-style filter decomposition that answers a query by seeking index tags and
+combining record-number sets, instead of scanning the table. Everything in the read path exists to
+make that possible.
+
+Its correctness rule outranks its speed — a wrong record set is far worse than a slow one, so any
+filter term that cannot be proven safe to optimize falls back to scanning, and every case is checked
+against a brute-force full scan.
+
 ## Scope
 
 **In scope (v1):**
-- Stand-alone (single-process and multi-user file locking); no client/server.
+- Stand-alone operation, single-process and multi-user file locking; no client/server.
 - Visual FoxPro DBF format (version bytes `0x30`/`0x31`, plus FoxPro 2.x `0x03`/`0xF5`).
-- VFP field types (C, N, F, D, L, M, B, I, Y, T, G, and the `_NullFlags` null bitmap).
-- CDX compound indexes (`S4FOX`), including the bit-packed leaf compression.
+- VFP field types (`C N F D L M B I Y T G`, and the `_NullFlags` null bitmap).
+- CDX compound indexes, including the bit-packed leaf compression.
 - FPT memo files.
-- The xBase expression engine (needed to create and maintain indexes).
-- **The bitmap query optimizer** (Rushmore-style) — the library's headline feature.
-- Byte-range locking and transactions/logging.
+- The xBase expression engine needed to create and maintain indexes.
+- **The bitmap query optimizer.**
+- Byte-range locking, transactions and logging.
 
 **Out of scope:**
-- Client/server (`S4CLIENT`).
+- Client/server.
 - MDX (dBASE IV) and NTX (Clipper) index formats.
-- OLE-DB `r5*` extension types, reporting, encryption, compression, Palm/CE.
+- OLE-DB extension types, reporting, encryption, compression, Palm/CE.
 
-A "later maybe" list (multi-table relations/joins, Unicode keys, additional collations, DBT memo)
-lives in the porting plan.
+Multi-table joins, Unicode collated keys, additional collations and DBT memo are possible later; see
+[the porting plan](claude/PORTING-PLAN.md) for the full scope and the priority of each capability.
 
-## Repository layout
+## Requirements
 
-| Path | Contents |
-|------|----------|
-| `STATE.md` | Current project state: progress, decisions already made, open questions, next steps. **Start here.** |
-| `claude/PORTING-PLAN.md` | The master plan: intent, scope, architecture, milestone roadmap with verification gates, testing strategy, and risk register. |
-| `claude/specs/` | Seven source-cited format specifications — the **authoritative** description of the on-disk formats and engine behavior. |
-| `original/source/` | The original CodeBase C source (reference only — never modified). |
-| `original/examples/` | Original C examples and real sample `DBF`/`CDX`/`FPT` files (supplementary test input — see the plan for why they are not sufficient on their own). |
-| `test-files-generator/` | Windows/MSVC developer tool that drives the original C library to generate the golden test corpus. Not a build or test dependency. |
-| `LICENSE` | GNU General Public License v3. |
+.NET 8 or later. No native dependencies, and nothing platform-specific in the library itself.
 
-### The specifications
+## Documentation
 
-| Spec | Covers |
-|------|--------|
-| `specs/DBF-FORMAT.md` | DBF header, field descriptors, record layout, all field-type encodings, `_NullFlags`, code pages, EOF rules. |
-| `specs/CDX-FORMAT.md` | CDX file structure, tag directory, node layouts, and the bit-packed leaf compression. |
-| `specs/KEY-COLLATION.md` | Expression-result → sortable key bytes, and the verbatim collation tables. |
-| `specs/FPT-MEMO.md` | FPT (and DBT) header/block formats, allocation, and record memo references. |
-| `specs/LOCKING-TRANSACTIONS.md` | Byte-range lock protocol at VFP offsets, transaction/log format, recovery. |
-| `specs/EXPRESSIONS.md` | Lexer/parser/precedence, the built-in function table, and key-affecting semantics. |
-| `specs/API-ERRORS.md` | Public API inventory, `r4*`/`e4*` codes, `CODE4` defaults, and the C → C# mapping. |
+- [`FOR-DEVELOPERS.md`](FOR-DEVELOPERS.md) — building, testing, and contributing.
+- [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) — scope, architecture, and what gets ported at
+  what priority.
+- [`claude/specs/`](claude/specs/) — seven source-cited specifications of the on-disk formats,
+  written from the original C source. Useful in their own right if you work with xBase files.
+- [`STATE.md`](STATE.md) — current progress.
 
-## Planned technology stack
-
-- **.NET 8+** (LTS), C# 12
-- **xUnit v3** for tests
-- **AwesomeAssertions** for fluent assertions
-- **BenchmarkDotNet** for performance work
-- **System.Text.Encoding.CodePages** for legacy code-page support
-
-## Testing approach
-
-Correctness is anchored on **`corpus/`** — golden `DBF`/`CDX`/`FPT` files with expected dumps
-beside them, generated offline by the original C library and checked into the repository. Tests
-read the corpus; **building or testing the library never compiles or runs C**, and needs neither
-Windows nor MSVC. `test-files-generator/` is the developer tool that produces the corpus, and
-building it plus a first corpus is Milestone 0.
-
-The query optimizer additionally has a self-verifying gate: every optimized result set must equal
-the brute-force full scan of the same filter. See the porting plan for the full
-verification-gated roadmap.
-
-## License
+## Licence
 
 Licensed under the **GNU General Public License v3** (see [`LICENSE`](LICENSE)).
 

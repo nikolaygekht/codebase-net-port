@@ -1,10 +1,12 @@
 # CodeBase → C#/.NET Master Porting Plan
 
-**Status:** Authoritative master plan for all planning, scope, architecture, and roadmap
-decisions. (Supersedes an earlier draft analysis, since removed.)
-**Format authority:** the seven source-cited specifications under `claude/specs/` (see
-[§9 Docs Map](#9-docs-map)). This plan governs *how* we build; the specs govern *what the bytes
-are*. Where this plan and a spec disagree on an on-disk fact, the spec wins.
+**Status:** Authoritative master plan for scope, architecture, and priorities.
+(Supersedes an earlier draft analysis, since removed.)
+**Where this sits among the docs** (full map in [§9](#9-docs-map)): this plan governs **what** we
+build and **at what priority**; `claude/specs/` govern **what the bytes are**;
+`claude/DEV_APPROACH.md` governs **how a step is run**; `claude/ARCHITECTURE-DECISIONS.md` records
+**why** each choice was made; `CLAUDE.md` carries the standing rules, the technology stack, and the
+full map of which document owns what. Where this plan and a spec disagree on an on-disk fact, the spec wins.
 **License:** GNU GPL v3 (see `LICENSE`). The original Sequiter release is LGPL v3; this port is a
 GPL-v3 derivative as permitted by the LGPL.
 **Target runtime:** .NET 8+ (LTS), C# 12, Windows-first with a Unix fallback for locking.
@@ -24,7 +26,7 @@ algorithms* exact and modernize *everything else* (memory model, error handling,
 Byte-compatibility is the *foundation*, but it is not the point. **The library's main value is the
 bitmap query optimizer** — Rushmore-style filter decomposition that answers a query by seeking
 index tags and combining record-number sets, instead of scanning the table. Everything in the read
-path exists to make that possible, and M5 delivers it before any write support.
+path exists to make that possible — which is why the optimizer is P1 and write support is P2 (§5).
 
 Non-goals of the rewrite: preserving the C source's memory pools, its global-state expression
 evaluator, its `errorCode`-return calling convention, or its compile-time `S4*` switch matrix.
@@ -51,13 +53,13 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - **FPT memo files** (VFP 4-byte block references, big-endian header/block headers, no free chain,
   monotonic growth + explicit compaction). Governed by `FPT-MEMO.md`.
 - **The xBase expression engine** needed for tag key generation and filters. Governed by
-  `EXPRESSIONS.md`. (Split across milestones — see §5.)
+  `EXPRESSIONS.md`. (Split between `EXPR` and `WRITE` — see §5.)
 - **Single-user and multi-user record/file/append/index/memo locking**, and the transaction/log
   subsystem, at the exact VFP-compatible byte offsets. Governed by `LOCKING-TRANSACTIONS.md`.
 - **The bitmap query optimizer** (Rushmore-style): `BITMAP4` + `CONST4` + `L4LOGICAL`
   (`R4RELATE.H:268-307`, implemented in `C4CONST.C` and `m4map.c`), plus the minimal `RELATE4`
   scaffolding needed to reach it for a single table (`relate4init` / `relate4querySet` and
-  navigation over the result set). **This is the library's headline feature** — see M5.
+  navigation over the result set). **This is the library's headline feature** — see `QUERY` in §5.
 - **Idiomatic public API** with a typed exception hierarchy that preserves the original error code.
   Governed by `API-ERRORS.md`.
 
@@ -80,7 +82,7 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 ### 2.3 LATER maybe
 
 - **Multi-table relations** (`relate4createSlave` and the join/skip machinery in `r4relate.c`).
-  The *optimizer itself* is now IN scope (§2.1, M5); only joins are deferred.
+  The *optimizer itself* is now IN scope (§2.1, `QUERY`); only joins are deferred.
 - Unicode (`r5wstr`/`r5wstrLen`) collated index keys (CodeBase extension; VFP has none).
 - Additional VFP collations beyond GENERAL (DUTCH, NORDAN, croatian/spanish/avaya tables) — the
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
@@ -96,24 +98,27 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 ### 3.1 Solution layout
 
 ```
-Codebase.Net.sln
+net/                               # everything .NET lives here
+├─ CodeBase.Net.sln
 ├─ src/
 │  └─ CodeBase.Net/                 # the library (net8.0)
 ├─ tests/
-│  ├─ CodeBase.Net.Tests/           # xUnit v3 unit tests
-│  ├─ CodeBase.Net.Golden/          # golden-file + round-trip tests against corpus/
+│  ├─ CodeBase.Net.Tests/           # xUnit v3: unit, component, fault-injection layers
+│  ├─ CodeBase.Net.Golden/          # golden-file + round-trip tests against net/corpus/
 │  └─ CodeBase.Net.Benchmarks/      # BenchmarkDotNet
-├─ test-files-generator/            # developer tool: drives the C library to build corpus/ (§6)
-├─ corpus/                          # checked-in golden DBF/CDX/FPT files + expected dumps
-├─ claude/specs/                    # format authority (do not edit casually)
-└─ PORTING-PLAN.md                  # this file
+└─ corpus/                          # checked-in golden DBF/CDX/FPT files + expected dumps
+test-files-generator/               # developer tool: drives the C library to build the corpus (§6)
+claude/specs/                       # format authority (do not edit casually)
+claude/dev/                         # per-step design/plan/state/summary (see DEV_APPROACH.md)
+claude/PORTING-PLAN.md              # this file
 ```
 
 **`test-files-generator/` is not part of the solution and not a test dependency.** It is a
-Windows/MSVC developer tool that produces `corpus/`; its output is checked in. Building or testing
+Windows/MSVC developer tool that produces `net/corpus/`; its output is checked in. Building or testing
 `CodeBase.Net` never compiles or runs C. See §6.
 
-Single assembly `CodeBase.Net`, LGPL v3. `System.Text.Encoding.CodePages` is a dependency (for
+Single assembly `CodeBase.Net` (ADR-14 fixes the casing everywhere), GPL v3 (the licence of this port; the original Sequiter library is
+LGPL v3 — see the front matter). `System.Text.Encoding.CodePages` is a dependency (for
 cp437/cp850/cp1252 *record-text decoding only* — never for index keys, see §3.3).
 
 ### 3.2 Namespace / module layout and which spec governs each
@@ -132,18 +137,13 @@ cp437/cp850/cp1252 *record-text decoding only* — never for index keys, see §3
 
 ### 3.3 Cross-cutting architectural rules
 
-1. **Little-endian by default, explicit big-endian where the spec says so.** The C code writes
-   native x86 structs. We use `BinaryPrimitives.ReadUInt32LittleEndian`/`WriteUInt32BigEndian`
-   explicitly, never `Marshal.StructToPtr`, never `BitConverter` without an endianness decision.
-   The complete list of big-endian islands — everything else in every format is little-endian:
-   CDX tag-**directory** header `version` counter (file offset 8); the two trailing 4-byte fields
-   (record number, child node) of each CDX interior-node entry; FPT header `nextBlock`/`blockSize`
-   and block header `type`/`numChars`. Note in particular that the CDX tag-header `root` and
-   `freeList` pointers, the `B4STD_HEADER` (`nodeAttribute`/`nKeys`/`leftNode`/`rightNode`) and the
-   leaf `B4NODE_HEADER` are **little**-endian — a natural place to guess wrong. Reading rule for the
-   C source: a swap guarded by `#ifdef S4BYTE_SWAP` fires only on big-endian *hosts*, so the field is
-   little-endian on disk; an unguarded swap, or one under `#else`/`#ifndef S4BYTE_SWAP`, means
-   big-endian on disk.
+1. **Endianness is per *field*, not per format.** The C code writes native x86 structs, so most of
+   every format is little-endian with a handful of big-endian islands. Architecturally that means:
+   every multi-byte read/write states its endianness explicitly via
+   `BinaryPrimitives.ReadUInt32LittleEndian` / `WriteUInt32BigEndian` — never `Marshal.StructToPtr`,
+   never `BitConverter` without an endianness decision. **The enumerated list of big-endian islands
+   is in `CLAUDE.md` (gotchas) and, authoritatively, in `CDX-FORMAT.md` §5.1/§10 and `FPT-MEMO.md`;
+   it is not repeated here.**
 2. **Collation is NOT `CultureInfo`/`CompareInfo`.** See §3.4 — this is a hard architectural
    constraint, not a preference.
 3. **`Span<byte>`/`Memory<byte>` for all buffers.** Record buffers, node blocks (512 bytes), and
@@ -265,90 +265,135 @@ type/method names so the code cross-references the specs and the C source unambi
 
 ---
 
-## 5. Milestone roadmap (verification-gated, not calendar-based)
+## 5. What we port, and at what priority
 
-Progression is gated by *tests that must pass*, not by weeks. Each milestone lists its deliverable,
-its verification gate (which golden-file / differential test must pass), and its dependencies. The
-ordering front-loads the two highest-risk items: **CDX leaf bit-packing** and **collation tables**.
+The inventory of v1 capabilities: **what** gets ported and **how much it matters**. This is not a
+schedule and not a sequence. Order emerges from what each step actually needs — steps are governed
+by [`DEV_APPROACH.md`](DEV_APPROACH.md), and the natural order will reveal itself as we go. What
+*is* fixed here is the definition of done: **a capability is complete when its gate passes.**
 
-### M0 — Corpus generator and corpus v1 (BUILD FIRST)
+Priority means **value to the library's purpose** (§1), not urgency:
+
+| Tier | Meaning |
+|---|---|
+| **P0** | Foundation — nothing else can be *verified* without it |
+| **P1** | The headline path: read a table and answer queries through the optimizer |
+| **P2** | Write support |
+| **P3** | Concurrency and durability |
+| **P4** | Hardening and polish |
+
+**Keep the status column current.** When a step closes, its `SUMMARY.md` updates the status of every
+capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answer to *what is done*;
+`STATE.md` carries the narrative of where we are and what is next.
+
+| ID | Capability | Priority | Status | Chief risk |
+|---|---|---|---|---|
+| `CORPUS` | Corpus + generator | **P0** | in progress — 4 DBF cases in, index cases missing | R11 |
+| `DBF-READ` | DBF reading | **P1** | not started | — |
+| `CDX-READ` | CDX reading & navigation | **P1** | not started | **R1** (highest) |
+| `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
+| `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
+| `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |
+| `WRITE` | Single-user write & round-trip | **P2** | not started | R4, R9 |
+| `LOCKING` | Locking & multi-user | **P3** | not started | R3, R10 |
+| `TRANS` | Transactions & recovery | **P3** | not started | — |
+| `HARDENING` | Hardening, benchmarks, API polish | **P4** | not started | — |
+
+Two things the table does not say, deliberately. It does not say what to build next — that is a step
+decision, made from what the current step needs and from `STATE.md`. And **"needs X" below is a
+technical fact, not a queue**: a capability that needs another cannot be *finished* before it, but
+partial work, spikes and design can and often should proceed in parallel.
+
+**Risk is a priority input, not an ordering rule.** `CDX-READ` (R1, bit-packed leaves) and
+`COLLATION` (R2, verbatim tables) carry the two highest silent-corruption risks in the port. Every
+week they stay unproven is a week other work might be built on a wrong assumption, so there is real
+value in attacking them early — but that is a judgement to make per step, not a sequence fixed here.
+
+---
+
+### `CORPUS` — corpus and generator · P0
 
 - **Deliverable:** `test-files-generator/` — a Windows/MSVC tool that links the original C library
   and (a) *generates* golden DBF/CDX/FPT files covering the cases in §6.3 and (b) *dumps* each one
   (field descriptors, every record's raw + decoded fields, every tag walked in key order emitting
   `(rawKeyBytes, recno)`, memo entries, `d4check` result). Files **and** dumps are checked into
-  `corpus/`. A `validate` mode that opens an arbitrary file and runs the same checks is a useful
-  developer aid for M6 but is not wired into any test.
+  `net/corpus/`. A `validate` mode that opens an arbitrary file and runs the same checks is a useful
+  developer aid for `WRITE` but is not wired into any test.
 - **Status:** the build harness is **done and working** — `build-lib.bat` / `build-gen.bat` /
-  `config.bat`, 137 translation units, x86, compiled as C++, zero edits to `original/source`.
-  A first case (`SIMPLE.DBF`) is generated and byte-verified against `DBF-FORMAT.md`. What remains
-  in M0 is corpus breadth (§6.3) and the dump format.
+  `config.bat` / `copy-corpus.bat`, 137 translation units, x86, compiled as C++, zero edits to
+  `original/source`. Four no-index DBF cases are generated, dumped and checked in
+  (`net/corpus/README.md`), and the dump format's DBF/FPT half is settled. What remains is corpus
+  breadth (§6.3) — above all **indexed cases with multi-level trees** — and the index half of the
+  dump format.
 - **Gate:** the generator builds from a clean checkout on a machine with only MSVC; regenerating
-  produces byte-identical files apart from the documented header date stamp (§8); every generated
-  file is `d4check`-clean and round-trips through the generator's own dump.
-- **Depends on:** nothing. Produces the corpus every gate below reads.
+  produces **byte-identical** files (the DBF header date stamp is frozen by the generator, so there
+  is no run-to-run divergence to mask — §8); every generated file is `d4check`-clean and round-trips
+  through the generator's own dump.
+- **Needs:** nothing. Produces the corpus every other gate reads — which is what makes it P0.
 
-Because the specs note their adversarial re-verification did not complete (see §9), **an early M0
-task is a spot-check pass**: confirm a handful of spec claims per format against generated bytes
-before building on them — FPT `numChars` = payload-only, CDX interior-node big-endian recno (needs
-a case with a multi-level tree; the shipped samples have none), the 263-byte VFP reserved area,
-`t4dblToFox` sign rule.
+Because the specs note their adversarial re-verification did not complete (see §9), a standing
+`CORPUS` task is a **spot-check pass**: confirm a handful of spec claims per format against
+generated bytes before building on them — FPT `numChars` = payload-only, CDX interior-node
+big-endian recno (needs a case with a multi-level tree; the shipped samples have none), the 263-byte
+VFP reserved area, the `t4dblToFox` sign rule.
 
-### M1 — DBF reading
+### `DBF-READ` — DBF reading · P1
 
 - **Deliverable:** `CodeBase.Net.Dbf` open + header parse + field descriptors + record navigation
   (`Top/Bottom/Skip/Go/Eof/Bof/RecNo/RecCount`) + per-type field decode for all IN-scope types +
   `_NullFlags` + deleted-flag semantics. Read-only.
-- **Gate:** for every DBF in `corpus/`, C# decodes every field of every record identically to the
+- **Gate:** for every DBF in `net/corpus/`, C# decodes every field of every record identically to the
   checked-in dump (byte/value-exact including blank/`00000000` dates, currency ×10⁴, datetime
   julian+ms, 4-byte memo refs read as ints).
-- **Depends on:** M0.
+- **Needs:** `CORPUS` cases to be gated against.
 
-### M2 — CDX reading & navigation (DE-RISK EARLY)
+### `CDX-READ` — CDX reading & navigation · P1
 
 - **Deliverable:** `CodeBase.Net.Cdx` — parse tag directory, tag headers, interior nodes
   (big-endian recno/child), and **decode bit-packed leaf nodes** (`B4NODE_HEADER`, recNumLen/
   dupCntLen/trailCntLen widths, key reconstruction with dup/trail + pChar). Full-tag seek
   (`tfile4seek`), skip, top/bottom, descending traversal. **No expression engine required** — keys
   are read from disk, not recomputed. Machine collation only for key *comparison* (unsigned memcmp).
-- **Gate:** for every tag in every `corpus/` CDX, walking the C# B-tree in key order yields exactly
+- **Gate:** for every tag in every `net/corpus/` CDX, walking the C# B-tree in key order yields exactly
   the `(key-bytes, recno)` sequence recorded in the checked-in dump; partial seeks land on the same
   entry; leaf blocks decode bit-identically. The corpus **must** include multi-level trees — the
   shipped `original/examples/DATA/` samples are all single-leaf, so interior nodes are unreachable
-  without generated cases. This gate retires the single biggest technical risk.
-- **Depends on:** M1. Independent of M4/M6.
+  without generated cases.
+- **Needs:** `DBF-READ` (a tag entry is only meaningful as a record pointer); `CORPUS` cases with
+  interior nodes, which do not exist yet.
+- **Why it matters beyond its tier:** this gate retires the single biggest technical risk in the
+  port (R1).
 
-### M3 — Collation tables & key transforms
+### `COLLATION` — collation tables & key transforms · P1
 
 - **Deliverable:** `CodeBase.Net.Collation` — verbatim `COLL4ARR.C` tables + `flags4dateTime`;
   transforms `t4dblToFox`, `t4floatToFox`, `t4intToFox`, `t4unsignedIntToFox`, `t4i8ToFox`,
   `t4curToFox`, `t4dateTimeToFox`, GENERAL subSortCompress + simple char transforms, pChar rules,
   null-byte prefix, descending complement.
-- **Gate:** given the *raw stored key bytes* recorded in `corpus/` for each tag, the C# transforms
+- **Gate:** given the *raw stored key bytes* recorded in `net/corpus/` for each tag, the C# transforms
   reproduce them byte-for-byte from the source values (numeric, date, datetime spanning many
   seconds-of-day to exercise the ULP bitset, GENERAL strings with accents/expansions/trailing
-  blanks). This proves keys will match before we generate any. The generator emits a dedicated
-  `value → key-bytes` table for this, so M3 is gated without needing a full index.
-- **Depends on:** M0. Can run in parallel with M2 (shares no code; both feed the write milestone).
+  blanks). This proves keys will match before we generate any.
+- **Needs:** only `CORPUS` — the generator emits a dedicated `value → key-bytes` table, so this is
+  gated **without a working index**. It shares no code with `CDX-READ`; both feed `WRITE`.
 
-### M4 — Expression engine: read/navigate subset
+### `EXPR` — expression engine, read/navigate subset · P1
 
 - **Deliverable:** `CodeBase.Net.Expressions` lexer + precedence parser + typed AST + evaluator for
   the subset needed to *evaluate filters and simple key expressions* on read: field refs, `+ - * /`,
   comparisons, `.AND./.OR./.NOT.`, `$`, `SUBSTR/LEFT/RIGHT/TRIM/UPPER/STR/DTOS/VAL`, `IIF`,
   date/`EMPTY/DELETED` — plus the key-affecting quirks (prefix `=`, divide-by-zero→0, blank-date
-  propagation, `hasTrim` NUL→blank). Bridges to M3 for `expr4key`.
+  propagation, `hasTrim` NUL→blank). Bridges to `COLLATION` for `expr4key`.
 - **Gate:** for the expression set evaluated over corpus records, C# results match the values the
   generator recorded (via `expr4vary`/`expr4str`/`expr4double`); and re-deriving each stored key
-  from its expression matches the on-disk key (ties into M3's transforms and `EXPRESSIONS.md` §7
-  text formats).
-- **Depends on:** M1, M3.
+  from its expression matches the on-disk key (ties into the `COLLATION` transforms and
+  `EXPRESSIONS.md` §7 text formats).
+- **Needs:** `DBF-READ` (field values to evaluate over), `COLLATION` (for the key half of the gate).
 
-### M5 — Query optimizer (bitmap / Rushmore) — **THE HEADLINE FEATURE**
+### `QUERY` — bitmap query optimizer · P1 — **THE HEADLINE FEATURE**
 
-This is the main value of the library and is prioritized accordingly: it lands as early as its
-dependencies allow, **before** any write support. It needs only the read path (M1, M2, M4) — a
-query optimizer never writes.
+The main value of the library (§1). It needs only the read path — a query optimizer never writes —
+which is why it is P1 and write support is P2.
 
 - **Deliverable:** `CodeBase.Net.Query` — port `BITMAP4` (`R4RELATE.H:268-307`, implemented across
   `C4CONST.C` and `m4map.c`): decompose a filter expression into a boolean tree (`BITMAP4LEAF` /
@@ -370,9 +415,10 @@ query optimizer never writes.
 - **Correctness rule:** a wrong record set is far worse than a slow one. If the optimizer cannot
   prove a term is safe to optimize, it must fall back to scanning. The full-scan equivalence gate
   above is non-negotiable and runs on every case, always.
-- **Depends on:** M1, M2, M4. Independent of M6 (write).
+- **Needs:** `DBF-READ`, `CDX-READ`, `EXPR` — and `claude/specs/QUERY-OPTIMIZER.md`, which does not
+  exist yet and is a stated prerequisite (R13, §9).
 
-### M6 — Single-user write & round-trip (DBF+CDX+FPT)
+### `WRITE` — single-user write & round-trip · P2
 
 - **Deliverable:** create table (+production CDX), `Append`/`Write`/`Blank`/`Delete`/`Recall`,
   field assignment, FPT memo read/write (allocation-at-EOF, big-endian headers, no free chain),
@@ -393,9 +439,9 @@ query optimizer never writes.
   is to add a generator case and regenerate — not to hand-write expected bytes. As a belt-and-braces
   step a developer may run the generator's `validate` mode over C#-written files; that is a manual
   confirmation, not part of the suite.
-- **Depends on:** M2, M3, M4.
+- **Needs:** `CDX-READ`, `COLLATION`, `EXPR` (you cannot write a key you cannot compute or verify).
 
-### M7 — Locking & multi-user (shared access)
+### `LOCKING` — locking & multi-user · P3
 
 - **Deliverable:** `CodeBase.Net.Locking` byte-range locks at the exact VFP offsets
   (record `0x7FFFFFFE − n`, append `0x7FFFFFFE`, file `[0x40000000, 0x7FFFFFFE]`, CDX `0x7FFFFFFE`,
@@ -410,9 +456,9 @@ query optimizer never writes.
   reduced to a static corpus — it needs a live second engine. Part (b) is therefore an opt-in test
   category (skipped unless the generator binary is present), not part of the default suite.
   VFP-live interop of the append path remains flagged for external verification.
-- **Depends on:** M6.
+- **Needs:** `WRITE`.
 
-### M8 — Transactions & recovery
+### `TRANS` — transactions & recovery · P3
 
 - **Deliverable:** `code4tranStart/Commit/Rollback` (two-phase commit, mini-transactions,
   write-ahead log), the `.log` file format (`LOG4HEADER` 32-byte packed layout, entry types,
@@ -420,23 +466,23 @@ query optimizer never writes.
   recovery pass (replay/undo unfinished transactions).
 - **Gate:** kill-and-recover test — abort mid-transaction, reopen, recover, and the table matches
   the pre-transaction state; reference `.log` files generated by the C library and checked into
-  `corpus/` are parsed correctly by C#, and C#-written logs match the generator's bytes for the
+  `net/corpus/` are parsed correctly by C#, and C#-written logs match the generator's bytes for the
   same transaction sequence; commit/rollback leave locks in the states `LOCKING-TRANSACTIONS.md`
   §4.11 specifies.
-- **Depends on:** M7.
+- **Needs:** `LOCKING`.
 
-### M9 — Hardening, benchmarks, API polish
+### `HARDENING` — hardening, benchmarks, API polish · P4
 
-- **Deliverable:** fuzz/corruption-handling parity — `corpus/` gains deliberately corrupted files
+- **Deliverable:** fuzz/corruption-handling parity — `net/corpus/` gains deliberately corrupted files
   with the error code the C library returned for each recorded, and C# must reject them the same
   way (`e4data`/`e4index`/`e4memoCorrupt`); BenchmarkDotNet suite vs. representative workloads;
   XML docs; sample programs mirroring `EX1/BANK/EX65`.
 - **Gate:** no golden-file regressions; benchmarks within an agreed factor of the C library on
   read and seek; public API reviewed against `API-ERRORS.md` §9 mapping.
-- **Depends on:** M8.
+- **Needs:** everything above, since it hardens all of it.
 
 **Later (post-v1):** multi-table relations/joins, Unicode collated keys, extra VFP collations, DBT
-memo, VFP9 varchar semantics.
+memo, VFP9 varchar semantics (§2.3).
 
 ---
 
@@ -446,12 +492,12 @@ The C library remains the ground truth, but it is consulted **offline**. It gene
 the corpus is checked in; the tests read the corpus. Building and testing `CodeBase.Net` never
 compiles or runs C, and needs neither Windows nor MSVC.
 
-### 6.1 The corpus generator (`test-files-generator/`, Milestone 0)
+### 6.1 The corpus generator (the `CORPUS` capability, P0)
 
 A Windows/MSVC tool that links the original C library and writes golden files plus a dump of what
 the C library believes is in them: field descriptors; each record's raw and decoded fields; each
 tag walked in key order emitting `(rawKeyBytes, recno)`; memo entries; `d4check` result; and a
-standalone `value → key-bytes` table for the M3 transform gate.
+standalone `value → key-bytes` table for the `COLLATION` transform gate.
 
 Established facts about the build, verified by construction (details in
 `test-files-generator/README.md`):
@@ -486,7 +532,7 @@ such. Facts that only VFP itself can settle are listed in §9 and deferred to ex
   values, key sequences, memo contents.
 - **Write gate:** C# rebuilds each case from its definition and the bytes must match the checked-in
   file; plus read-rewrite round-trips must be byte-identical.
-- **Mutation gate:** the generator checks in before/after pairs (see M6), so operations that create
+- **Mutation gate:** the generator checks in before/after pairs (see `WRITE`), so operations that create
   novel bytes — leaf splits, interior splits, FPT growth, `Pack`/`Reindex` — are gated against real
   reference output rather than self-consistency.
 - Differences that are *known-benign* (§8: header date stamp, CDX version counter, reserved zero
@@ -499,15 +545,17 @@ supplementary real-world input. Measured: 46 DBFs containing only types `C, D, L
 in-scope types absent), 40 of them dBASE III `0x03`, exactly one VFP `0x30` file, no `0x31`, no
 nullable fields; and across 32 CDX files / 56 tags, **zero interior nodes**.
 
-`corpus/` must therefore cover: every IN-scope field type; nullable fields; auto-increment/
+`net/corpus/` must therefore cover: every IN-scope field type; nullable fields; auto-increment/
 timestamp; empty/`00000000` dates; datetimes across many seconds-of-day (ULP bitset); currency
 signs and rounding; GENERAL-collated strings with accents, expansions, trailing blanks; descending
 tags; unique/candidate tags; filtered tags; memos forcing FPT growth and compaction; leaf blocks
 driven to the widening/split boundary; **multi-level index trees** (for interior nodes); and record
-counts crossing `recNumLen` thresholds.
+counts crossing `recNumLen` thresholds; deleted records; a code-page-marked table (ADR-10); and a
+`0x31` CodeBase-extension case, labelled as non-VFP.
 
-Frameworks: **xUnit v3**, **AwesomeAssertions** (Apache-2.0 — *not* FluentAssertions, which is
-commercial since v8), **BenchmarkDotNet**, `System.Text.Encoding.CodePages`.
+Test frameworks and their version constraints are listed once, in `CLAUDE.md` §Technology stack.
+How the tests are layered within a step — unit, component, fault injection, golden — is
+`DEV_APPROACH.md` §4.
 
 ### 6.4 Supplementary cross-check (optional, low value — do not gate on it)
 
@@ -522,24 +570,30 @@ something different. Never use it for keys, indexes, or memos.
 
 | # | Risk | Impact | Likelihood | Mitigation |
 |---|------|--------|-----------|------------|
-| R1 | **CDX leaf-node bit-packed compression** decoded/encoded wrong (recNumLen/dupCnt/trailCnt bit layout, widening loop, split re-encode) | Index unreadable by VFP / wrong navigation; silent | High | De-risk in **M2** before anything depends on it; generated leaf-block corpus decoded bit-identically to the checked-in dumps; port `b4leafInit`/`x4putInfo`/`b4key` faithfully (`CDX-FORMAT.md` §6) |
-| R2 | **Collation tables** transcribed incorrectly, or someone reaches for `CultureInfo` | Keys sort differently → seek misses, corrupt index | High | §3.4 hard rule; verbatim `COLL4ARR.C` + `flags4dateTime`; M3 key-transform differential gate; code review flags any `CompareInfo`/`GetSortKey` in `Collation` |
-| R3 | **VFP byte-range lock interop with live VFP apps** — append-path offset must match VFP exactly | Data corruption under real-world concurrent VFP + C# | Medium | Reproduce exact offsets (`LOCKING-TRANSACTIONS.md` §5.3); M7 two-process interop test; append path flagged for **external live-VFP verification** |
-| R4 | **FPT block reuse / monotonic growth** — S4FOX keeps no free chain; wrong allocation orphans or overwrites blocks | Memo corruption; files grow unbounded | Medium | Port allocation-at-EOF + `nextBlock` header semantics exactly (`FPT-MEMO.md` §3.7); implement `d4memoCompress` equivalent; corruption-guard checks; M6 memo round-trip gate |
-| R5 | **Expression quirks leaking into index keys** — `STR()`/`DTOS()`/`TTOC()` text formatting, rounding, `*`-overflow; prefix `=`; divide-by-zero→0; blank-date propagation | Keys differ by a byte → silent seek failures | Medium | Port §7 of `EXPRESSIONS.md` bit-exactly; `c4dtoa45` behavior recovered empirically from generated output; M4 expression + re-derived-key gate |
+| R1 | **CDX leaf-node bit-packed compression** decoded/encoded wrong (recNumLen/dupCnt/trailCnt bit layout, widening loop, split re-encode) | Index unreadable by VFP / wrong navigation; silent | High | De-risk **`CDX-READ`** before anything depends on it; generated leaf-block corpus decoded bit-identically to the checked-in dumps; port `b4leafInit`/`x4putInfo`/`b4key` faithfully (`CDX-FORMAT.md` §6) |
+| R2 | **Collation tables** transcribed incorrectly, or someone reaches for `CultureInfo` | Keys sort differently → seek misses, corrupt index | High | §3.4 hard rule; verbatim `COLL4ARR.C` + `flags4dateTime`; `COLLATION` key-transform differential gate; code review flags any `CompareInfo`/`GetSortKey` in `Collation` |
+| R3 | **VFP byte-range lock interop with live VFP apps** — append-path offset must match VFP exactly | Data corruption under real-world concurrent VFP + C# | Medium | Reproduce exact offsets (`LOCKING-TRANSACTIONS.md` §5.3); `LOCKING` two-process interop test; append path flagged for **external live-VFP verification** |
+| R4 | **FPT block reuse / monotonic growth** — S4FOX keeps no free chain; wrong allocation orphans or overwrites blocks | Memo corruption; files grow unbounded | Medium | Port allocation-at-EOF + `nextBlock` header semantics exactly (`FPT-MEMO.md` §3.7); implement `d4memoCompress` equivalent; corruption-guard checks; `WRITE` memo round-trip gate |
+| R5 | **Expression quirks leaking into index keys** — `STR()`/`DTOS()`/`TTOC()` text formatting, rounding, `*`-overflow; prefix `=`; divide-by-zero→0; blank-date propagation | Keys differ by a byte → silent seek failures | Medium | Port §7 of `EXPRESSIONS.md` bit-exactly; `c4dtoa45` behavior recovered empirically from generated output; `EXPR` expression + re-derived-key gate |
 | R6 | **Torn reads under I/O optimization** — read caching on unlocked files can mix old/new bytes; write caching unsafe without record lock | Wrong data returned to app | Medium | Preserve flush-before-unlock / invalidate-after-lock ordering (`LOCKING-TRANSACTIONS.md` §3.7); default to no unsafe read-opt on shared files; document the hazard |
-| R7 | **`flags4dateTimeFlags` ULP bitset** transcription error | datetime keys off by 1 ULP → seek equality breaks silently | Medium | Copy the 10 802-byte table verbatim; M3 gate covers many seconds-of-day; unit test the bit-extraction against generated key bytes |
+| R7 | **`flags4dateTimeFlags` ULP bitset** transcription error | datetime keys off by 1 ULP → seek equality breaks silently | Medium | Copy the 10 802-byte table verbatim; `COLLATION` gate covers many seconds-of-day; unit test the bit-extraction against generated key bytes |
 | R8 | **Missing C bodies** (`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4atoCurrency`, `code4initLow` defaults, `code4logOpen`) absent from the source drop | Numeric/currency text + defaults + log format guessed wrong | Medium | Recover behavior empirically from generated output; adopt documented Sequiter defaults; treat as `[UNVERIFIED]` and gate against corpus bytes |
 | R9 | **0x31 → 0x30 version normalization / skip-byte-0 header rewrite** done naively | 0x31 files silently downgraded; extensions lost | Low | Replicate the "never rewrite byte 0" write windows (`DBF-FORMAT.md` §2.5); round-trip test on 0x31 files |
-| R10 | **CDX shared-write root-swap (`tfile4swap`) & version-counter races** | Multi-writer index corruption | Low (v1 can restrict to exclusive) | Implement retry-from-root on inconsistency; consider exclusive-only CDX writes in v1; M7 gate |
-| R11 | **Spec claims not adversarially re-verified** (see §9) | Building on a wrong spec fact | Medium | M0 spot-check pass against generated bytes; every milestone gate is itself a spec check against real bytes |
-| R12 | **Query optimizer returns a wrong record set** — a term optimized that should not have been, a range boundary off by one, `.OR.`/negation mis-combined, or a partially-optimizable filter silently dropping the unoptimizable remainder | Silently wrong query results — the worst possible failure for the library's headline feature, and invisible without a reference | **High** | M5's full-scan equivalence gate runs on *every* case, always (§5 M5); mandatory fall-back-to-scan whenever a term cannot be proven safe; generator records the C library's own result set per case to catch decomposition divergence |
-| R13 | **No written spec for the optimizer** — the seven specs cover formats, not `BITMAP4`; it is the only in-scope subsystem being ported without a source-cited spec | Behavioral guesswork on the highest-value feature | Medium | Write `claude/specs/QUERY-OPTIMIZER.md` from `R4RELATE.H`/`C4CONST.C`/`m4map.c` **before** implementing M5, to the same `FILE.C:line` standard as the others (§9) |
+| R10 | **CDX shared-write root-swap (`tfile4swap`) & version-counter races** | Multi-writer index corruption | Low (v1 can restrict to exclusive) | Implement retry-from-root on inconsistency; consider exclusive-only CDX writes in v1; `LOCKING` gate |
+| R11 | **Spec claims not adversarially re-verified** (see §9) | Building on a wrong spec fact | Medium | `CORPUS` spot-check pass against generated bytes; every capability gate is itself a spec check against real bytes |
+| R12 | **Query optimizer returns a wrong record set** — a term optimized that should not have been, a range boundary off by one, `.OR.`/negation mis-combined, or a partially-optimizable filter silently dropping the unoptimizable remainder | Silently wrong query results — the worst possible failure for the library's headline feature, and invisible without a reference | **High** | `QUERY`'s full-scan equivalence gate runs on *every* case, always (§5); mandatory fall-back-to-scan whenever a term cannot be proven safe; generator records the C library's own result set per case to catch decomposition divergence |
+| R13 | **No written spec for the optimizer** — the seven specs cover formats, not `BITMAP4`; it is the only in-scope subsystem being ported without a source-cited spec | Behavioral guesswork on the highest-value feature | Medium | Write `claude/specs/QUERY-OPTIMIZER.md` from `R4RELATE.H`/`C4CONST.C`/`m4map.c` **before** implementing `QUERY`, to the same `FILE.C:line` standard as the others (§9) |
 
 ---
 
 ## 8. Known-benign divergences to assert (not bugs)
 
+- **DBF header date stamp** (bytes 1-3, `yy mm dd`) is the date the file was last written, so a file
+  the port writes today will not match the corpus byte-for-byte there. The **corpus side is frozen**
+  — the generator overwrites those three bytes with a constant after closing each table, so the
+  checked-in files are byte-stable and regeneration produces no diff. The divergence therefore
+  applies only to the `WRITE` gates: assert those three bytes explicitly (the port must write
+  *today's* date, exactly as the C library does) and compare the rest.
 - CDX tag-directory `version` change-counter (big-endian, file offset 8) and reserved-zero areas
   differ run-to-run — assert-and-mask.
 - The per-tag `version` field of a *regular* tag header is never maintained by CodeBase and is
@@ -554,11 +608,17 @@ something different. Never use it for keys, indexes, or memos.
 
 ## 9. Docs map
 
+Which document owns what is defined once, in `CLAUDE.md` §"Where things live". In short: this plan
+owns **what** we port and **at what priority**; `claude/specs/` own **what the bytes are**;
+`claude/ARCHITECTURE-DECISIONS.md` owns **why** — decisions and rejected alternatives;
+`claude/DEV_APPROACH.md` owns **how a step is run**; `STATE.md` owns **where we are**.
+`DEV_APPROACH.md` does not override this plan on scope or priority, nor the specs on format facts.
+
 The seven files under `claude/specs/` are the **format authority**. They were authored *from the C
 source with `FILE:line` citations*. **Honesty note:** their independent adversarial re-verification
 pass did **not** complete — the citations are believed correct but were not double-checked by a
 second, hostile reviewer. Therefore a **spot-check verification of the specs against generated bytes is
-itself an early M0 task** (see §6.1), and every milestone gate re-checks the relevant spec facts
+itself a standing `CORPUS` task** (see §6.1), and every capability gate re-checks the relevant spec facts
 against real bytes.
 
 | Spec file | Subsystem it governs |
@@ -570,7 +630,7 @@ against real bytes.
 | `claude/specs/LOCKING-TRANSACTIONS.md` | Byte-range lock protocol at VFP offsets, in-memory lock registry, `unlockAuto`, transaction/log format, two-phase commit, mini-transactions, recovery, .NET mapping |
 | `claude/specs/EXPRESSIONS.md` | Lexer/parser/precedence, function table, type system, key-affecting semantics (STR/DTOS/TTOC/TRIM/UPPER, prefix `=`, divide-by-zero), expression↔key bridge |
 | `claude/specs/API-ERRORS.md` | Public API inventory, `r4*`/`e4*` code values, field-type constants, `CODE4` defaults, and the C-group → C# type mapping |
-| `claude/specs/QUERY-OPTIMIZER.md` | **NOT YET WRITTEN** — `BITMAP4` tree structure and flags, `CONST4` range constraints, filter→bitmap decomposition rules, which expression forms are optimizable, leaf evaluation via tag seek, AND/OR/negation set combination, and the fall-back-to-scan boundary. Sources: `R4RELATE.H:268-396`, `C4CONST.C`, `m4map.c`. **Writing this is a prerequisite for M5** (risk R13) |
+| `claude/specs/QUERY-OPTIMIZER.md` | **NOT YET WRITTEN** — `BITMAP4` tree structure and flags, `CONST4` range constraints, filter→bitmap decomposition rules, which expression forms are optimizable, leaf evaluation via tag seek, AND/OR/negation set combination, and the fall-back-to-scan boundary. Sources: `R4RELATE.H:268-396`, `C4CONST.C`, `m4map.c`. **Writing this is a prerequisite for `QUERY`** (risk R13) |
 
 **The optimizer is the one in-scope subsystem without a spec.** The seven format specs were written
 before the optimizer was promoted into v1 scope (§2.1), so it is currently the only headline

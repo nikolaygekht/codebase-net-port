@@ -1,40 +1,81 @@
 # Working in this repository
 
-This is **CodeBase.NET** — a C#/.NET port of the CodeBase xBase database engine (DBF tables, CDX
-indexes, FPT memo files), targeting **byte-for-byte Visual FoxPro compatibility**. Read
-[`README.md`](README.md) for the project overview and [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md)
-for scope, architecture, and the milestone roadmap before starting non-trivial work.
+## Purpose
 
-**Start a session by reading [`STATE.md`](STATE.md)** — current progress, decisions already made
-(don't relitigate them), open questions, and the next steps. Update it when a session ends.
+**CodeBase.NET** is a C#/.NET port of the CodeBase xBase database engine — DBF tables, CDX indexes,
+FPT memo files — targeting **byte-for-byte Visual FoxPro compatibility**.
 
-**The library's main value is the bitmap query optimizer** (Rushmore-style: decompose a filter into
-per-tag range constraints, evaluate each by seeking a CDX tag, combine the record-number sets —
-instead of scanning). Byte-compatibility is the foundation that makes it possible, not the goal.
-It is milestone M5 and lands before any write support. Its one absolute rule: **a wrong record set
-is far worse than a slow one** — if a term can't be proven safe to optimize, fall back to scanning,
-and the full-scan equivalence gate runs on every case, always.
+Byte-compatibility is the foundation, not the goal. **The library's main value is the bitmap query
+optimizer** (Rushmore-style: decompose a filter into per-tag range constraints, evaluate each by
+seeking a CDX tag, combine the record-number sets, instead of scanning).
 
-## The one rule that matters most
+## Where things live
+
+Each document owns its subject; the others link rather than restate it. Put a fact in one place.
+
+| Document | Owns | Does not own |
+|---|---|---|
+| `CLAUDE.md` (this) | Rules to follow without being asked: the ground rules below, the gotcha list, the technology stack, where things live, housekeeping | Scope, priorities, gates, rationale, byte layouts |
+| `claude/specs/*.md` | **What the bytes are.** Authoritative on every on-disk fact | Build order, process |
+| `claude/PORTING-PLAN.md` | **What** we port and **at what priority**: scope, architecture, API principles, the capability inventory with its status and gates, testing strategy, risks, benign divergences | Byte layouts, per-step process |
+| `claude/ARCHITECTURE-DECISIONS.md` | **Why** — decisions, alternatives rejected, and open questions, as dated ADR entries | The architecture as it stands (that is the plan) |
+| `claude/DEV_APPROACH.md` | **How a step is run**: design (ECB + SOLID), test pyramid, seams and mocking, ordered sub-steps, execution | Scope, priorities, format facts |
+| `claude/dev/XXX-step-name/` | The per-step record: `DESIGN.md`, `PLAN.md`, `STATE.md`, `SUMMARY.md` | Anything durable — that gets promoted |
+| `STATE.md` | **Where we are**: what is ready, what changed last session, what is next. Nothing else | Decisions, rules, scope |
+| `README.md` | The library, for a human evaluating it | The development process |
+| `FOR-DEVELOPERS.md` | Building, testing, contributing | Rules that bind you specifically — those are here |
+| `net/corpus/README.md`, `test-files-generator/README.md` | Their own component | Anything outside it |
+
+Code and data: the port lives in `net/` — solution `net/CodeBase.Net.sln`, plus `net/src/`,
+`net/tests/`, `net/corpus/`. The corpus generator is `test-files-generator/` — a Windows/MSVC
+developer tool, not part of the solution. `original/source/` is read-only reference. Quality
+analysis is `sonar.bat` + `SonarQube.Analysis.xml` at the root (Windows only; secrets in the
+gitignored `.sonar.config*`). Agent skills live in `.claude/skills/`.
+
+## Ground rules
 
 **Compatibility means reproducing exact bytes, not equivalent behavior.** Files this library writes
 must be openable by Visual FoxPro and the original C library, and files they write must be read
 correctly here — including index key ordering and CDX leaf compression. When in doubt, match the
-bytes the original produces. Verify against the real sample files in `original/examples/DATA/`.
+bytes the original produces, and verify against `net/corpus/`.
 
-## Source of truth
+**A wrong record set is far worse than a slow one.** If the optimizer cannot prove a term safe to
+optimize, it falls back to scanning; the full-scan equivalence gate runs on every case, always.
 
-- **`claude/specs/*.md` are authoritative for on-disk formats and engine behavior.** They were
-  written from the C source with `FILE.C:line` citations and verified against both the source and
-  real sample files. If code and a spec disagree on a byte layout, the spec wins — or the spec has a
-  bug worth fixing, not working around silently.
-- **`claude/PORTING-PLAN.md` governs *how* we build** — scope, architecture, milestone ordering,
-  and each milestone's verification gate. It does not override the specs on format facts.
-- **`original/source/` is read-only reference.** Never modify it. Filenames are mixed-case; search
-  case-insensitively (`grep -ri`, `find -iname`). Focus on the `S4FOX` build configuration; ignore
-  `S4CLIENT` (client/server) code paths entirely.
+**Source of truth.** `claude/specs/*.md` are authoritative for on-disk formats and engine behavior;
+if code and a spec disagree on a byte layout, the spec wins — or the spec has a bug worth fixing, not
+working around silently. *Caveat:* their adversarial re-verification never completed, so spot-check a
+claim against real bytes before building on it (risk R11).
 
-## Non-obvious gotchas (from the verified specs)
+**`original/source/` is read-only.** Never modify it. Filenames are mixed-case — search
+case-insensitively (`grep -ri`, `find -iname`). Focus on the `S4FOX` build; ignore `S4CLIENT`
+entirely.
+
+**Design and plan before code.** Follow `claude/DEV_APPROACH.md`: small verifiable steps, each
+designed (classes and responsibilities, ECB + SOLID), then its test pyramid and seams planned, then
+broken into ordered sub-steps, and only then executed. **Do not open a `.cs` file for a new step
+before its `DESIGN.md` and `PLAN.md` exist.**
+
+**Testing.** Correctness is anchored on `net/corpus/` — checked-in golden files with expected dumps,
+generated offline by the C library. **Building or testing `CodeBase.Net` never compiles or runs C**,
+and needs neither Windows nor MSVC. **Never hand-write expected bytes**: hand-built bytes are fine as
+test *input*, never as the *expectation* — if a path is untested, add a generator case and
+regenerate. `original/examples/DATA/` is supplementary only, never a gate.
+
+**XML doc comments follow docgen's rules, not MSDN's.** API help is generated by Gehtsoft docgen,
+whose `cs2ds` extractor understands only a subset of the XML-doc tags — and the failure mode is
+silent. **Load the `docgen-skill` skill before writing or editing any `///` comment.** The rules that
+bite: the **first line of `<summary>` is the Brief — one complete plain-text sentence, on one line,
+never wrapped**; use BBCode `[c]`/`[i]`/`[b]` and `[clink=Fully.Qualified.Type]text[/clink]`, never
+`<c>`/`<i>`/`<b>`/`<see cref>`; no angle brackets or `->` in prose; no `<remarks>`. See ADR-15 and
+`FOR-DEVELOPERS.md`.
+
+**Naming.** `CodeBase.Net`, capital B, everywhere — solution, assembly, namespaces, test projects,
+Sonar project key (ADR-14).
+
+**Licence.** GPL v3 (`LICENSE`) — keep license headers consistent with GPL v3 in new source files.
+
+### Non-obvious gotchas (the specs carry the detail)
 
 - **Collation tables must be ported verbatim.** Do **not** use .NET `CultureInfo` / `CompareInfo` /
   `GetSortKey()` to build index keys — they cannot reproduce the exact stored bytes. Port the
@@ -57,48 +98,37 @@ bytes the original produces. Verify against the real sample files in `original/e
 - **`CODE4` defaults are set in `code4initLow`, not by zero-init** — e.g. `compatibility = 25`,
   `limitKeySize = 1`. See `specs/API-ERRORS.md`.
 
-## API design conventions (once implementation starts)
-
-- **Idiomatic C#, not a C transliteration.** Typed exception hierarchy (`CodeBaseException` carrying
-  the original `ErrorCode`/`ExtendedCode` as properties) for errors; `r4*` flow/status values
-  (found/eof/locked/…) stay as return-value enums.
-- `IDisposable` ownership hierarchy, properties over getter/setter methods, `Stream`-based I/O,
-  `Span<byte>` for buffers.
-
 ## Technology stack
 
+Canonical list — other documents point here rather than repeat it.
+
 .NET 8+ / C# 12, **xUnit v3**, **AwesomeAssertions** (not FluentAssertions — commercial since v8),
-BenchmarkDotNet, System.Text.Encoding.CodePages.
+**Moq ≥ 4.20.2** (4.20.0/4.20.1 bundled SponsorLink), BenchmarkDotNet,
+System.Text.Encoding.CodePages.
 
-## Testing
+API shape: idiomatic C#, not a C transliteration — typed exception hierarchy for *errors*, `r4*`
+flow/status values as return-value enums, `IDisposable` ownership, properties, `Stream` I/O,
+`Span<byte>` buffers. Worked examples: `PORTING-PLAN.md` §4.
 
-Correctness is anchored on **`corpus/` — checked-in golden files with the expected dumps beside
-them**, generated offline by the original C library. Tests read the corpus; **building or testing
-`CodeBase.Net` never compiles or runs C**, and needs neither Windows nor MSVC. Prefer golden-file
-and round-trip tests over hand-written expected values for format code. Each milestone in the plan
-has a verification gate; don't consider a milestone done until its gate passes.
+## Housekeeping
 
-`test-files-generator/` is the Windows/MSVC developer tool that produces the corpus (see its
-`README.md` and `PORTING-PLAN.md` §6.1). It is **not** part of the solution and not a test
-dependency. Run it only when the corpus needs new cases, and check in what it produces. If an
-implementation path turns out to be untested, add a generator case and regenerate — never
-hand-write expected bytes.
+**Start a session by reading [`STATE.md`](STATE.md)** — what is ready, what changed last session,
+what is next. It is state only; do not let decisions or rules accumulate there.
 
-Two traps if you touch it: the C library **must be compiled as C++** (`d4declar.h:563-571` uses
-`#ifdef __cplusplus` default arguments that call sites rely on), and it must be built **x86** (the
-x64 `S464BIT` path is broken in the 64-bit file-offset layer). A Linux/gcc build is impossible from
-this drop — `S4UNIX` needs `p4port.h`, which was never shipped.
+Keep the documents true as you work:
 
-Two things the corpus must not be naive about: `original/examples/DATA/` is **supplementary only**
-(mostly dBASE III, missing 7 of 12 in-scope field types, and zero interior nodes across all 56
-tags), and generated files carry **CodeBase** provenance, not VFP — stick to genuine-VFP shape
-(`0x30`, `flags[8]`/`autoIncrementVal` zero) unless a case exists specifically to cover a CodeBase
-extension.
+| When you… | Update |
+|---|---|
+| finish a session | `STATE.md` — all three sections |
+| decide something, or reject an alternative | `claude/ARCHITECTURE-DECISIONS.md` (new entry; supersede, never rewrite) |
+| advance or complete a capability | its status in `PORTING-PLAN.md` §5 |
+| close a step | the step's `SUMMARY.md`, then `claude/dev/README.md` |
+| establish a format fact | the relevant `claude/specs/*.md` — not a note elsewhere |
+| add or change a corpus case | `net/corpus/README.md` and `test-files-generator/README.md` |
+| add a project to the solution | `SonarQube.Analysis.xml` if it needs an exclusion; test projects need the packages in `FOR-DEVELOPERS.md` |
+| change how the build, tests or tooling are run | `FOR-DEVELOPERS.md` |
 
-## License
-
-The project is **GNU GPL v3** (`LICENSE`). The original CodeBase library is LGPL v3; this port is a
-GPL-v3 derivative. Keep license headers consistent with GPL v3 when adding source files.
+Commit and push only when asked. Work directly on `main` — no branches unless requested.
 
 # Ground Rules
 
@@ -144,21 +174,15 @@ The test: Every changed line should trace directly to the user's request.
 
 ## 4. Goal-Driven Execution
 
-**Define success criteria. Loop until verified.**
+**Define success criteria. Loop until verified.** The step process in
+`claude/DEV_APPROACH.md` is how this is done here; the principle:
 
-Transform tasks into verifiable goals:
 - "Add validation" → "Write tests for invalid inputs, then make them pass"
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
 
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant
+clarification.
 
 ---
 

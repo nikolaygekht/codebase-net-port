@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  SonarQube analysis settings for CodeBase.NET.
+
+  Passed to the scanner by sonar.bat via /s:. Everything that is not a secret
+  lives here rather than on the command line, so the settings are reviewable in
+  a diff. The host URL, the token and the project key stay in sonar.bat /
+  .sonar.config.bat (the latter is gitignored).
+
+  Paths are relative to the directory the scanner's `begin` step runs in — the
+  repository root.
+-->
+<SonarQubeAnalysisProperties xmlns="http://www.sonarsource.com/msbuild/integration/2015/1">
+
+  <Property Name="sonar.sourceEncoding">UTF-8</Property>
+
+  <!-- Test execution and coverage.
+       Produced by:  dotnet test --collect "XPlat Code Coverage" --logger trx
+                                 --results-directory TestResults
+                                 -- ...DataCollector.Configuration.Format=opencover
+       Both require packages in every test project — see FOR-DEVELOPERS.md. -->
+  <Property Name="sonar.cs.opencover.reportsPaths">TestResults/**/coverage.opencover.xml</Property>
+  <Property Name="sonar.cs.vstest.reportsPaths">TestResults/**/*.trx</Property>
+
+  <!-- Not our code, or not code at all:
+         original/            the read-only CodeBase C reference (~117k lines)
+         test-files-generator/ Windows/MSVC developer tool, not in the solution
+         net/corpus/          golden binaries and their expected dumps
+         claude/, .claude/    documentation and agent skills                  -->
+  <Property Name="sonar.exclusions">
+    original/**,
+    test-files-generator/**,
+    net/corpus/**,
+    claude/**,
+    .claude/**,
+    **/skill/**,
+    **/SKILL/**,
+    **/bin/**,
+    **/obj/**,
+    **/TestResults/**
+  </Property>
+
+  <!-- Benchmarks are real code but are not meant to be covered by tests. Test
+       projects themselves are detected and excluded by the scanner. -->
+  <Property Name="sonar.coverage.exclusions">
+    **/*.Benchmarks/**
+  </Property>
+
+</SonarQubeAnalysisProperties>

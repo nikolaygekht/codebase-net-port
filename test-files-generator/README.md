@@ -55,14 +55,30 @@ the top of `config.bat`.
 test-files-generator/
 ├─ config.bat          compiler location (the one thing you may need to edit)
 ├─ build-lib.bat       original/source  -> obj\codebase.lib
-├─ build-gen.bat       src\generator.cpp -> bin\testgen.exe
+├─ build-gen.bat       src\*.cpp        -> bin\testgen.exe
 ├─ copy-corpus.bat     bin\out          -> ..\net\corpus
 ├─ src/
 │  ├─ cb-config.h      build switches for the C library (see below)
-│  └─ generator.cpp    the test-file cases
+│  ├─ main.cpp         entry point; runs each case in turn
+│  ├─ cases.h          the case entry points
+│  ├─ case-db3type.cpp one case per file, each owning its own test data
+│  ├─ case-vfptype.cpp
+│  ├─ case-f2xmemo.cpp
+│  ├─ case-vfpmemo.cpp
+│  ├─ util.h/.cpp      shared: error reporting, frozen date stamp, close+dump tail
+│  └─ dump.h/.cpp      shared: the <NAME>.dump.txt writer
 ├─ obj/                intermediates + per-file compile logs   [gitignored]
 └─ bin/                testgen.exe, and bin\out\ default output [gitignored]
 ```
+
+**Utilities are shared; test data is not.** Each `case-*.cpp` keeps its own row
+count, date and name lists, numeric edge cases and memo payload lengths, even
+where two cases currently use the same values. That duplication is deliberate:
+retuning one case's data can never move another case's bytes.
+
+To add a case: write `src/case-<name>.cpp`, declare it in `src/cases.h`, and call
+it from `main.cpp`. `build-gen.bat` compiles every `.cpp` in `src\`, so the build
+needs no edit.
 
 ## Three things that are not obvious
 

@@ -6,8 +6,20 @@ and line where it was verified. S4CLIENT paths are ignored (stand-alone port). S
 divergences are noted only briefly at the end.
 
 All multi-byte integers are **little-endian** unless explicitly stated otherwise. Three fields
-are deliberately stored **big-endian** ("non-Intel"): the tag-header `version` counter, and the
-two 32-bit values (record number, child node) inside interior-node entries — see §5.2 and §7.
+are deliberately stored **big-endian** ("non-Intel"): the tag-**directory** header `version`
+counter (file offset 8; a regular tag's `version` is always zero, §10), and the two 32-bit values
+(record number, child node) inside interior-node entries — see §5.2 and §7.
+
+In particular the tag-header `root` and `freeList` node numbers, `keyLen`, `blockSize` and
+`multiplier`, the 12-byte `B4STD_HEADER` (`nodeAttribute`, `nKeys`, `leftNode`, `rightNode`) and
+the leaf `B4NODE_HEADER` (`freeSpace`, `recNumMask`) are all **little**-endian. The test in the C
+source is the direction of the `S4BYTE_SWAP` guard: a swap under `#ifdef S4BYTE_SWAP` runs only on
+big-endian *hosts* and therefore means the field is little-endian on disk (i4init.c:353-362 for the
+tag header, b4block.c:1776-1818 for the node headers); an unguarded swap, or one under
+`#else`/`#ifndef S4BYTE_SWAP`, means big-endian on disk. Spot-checked against
+`original/examples/DATA/`: in all 33 sample CDX files the offset-0 `root` reads as a block-aligned
+in-file offset little-endian (e.g. `BANK.CDX` = `00 0c 00 00` → 3072, where big-endian would give
+786 432, past EOF), while offset 8 reads as a small counter big-endian (`00 00 00 02` → 2).
 
 ---
 
@@ -558,7 +570,20 @@ tag-directory `freeList` is read/written at runtime, i4index.c:935, 2070-2073).
   Every writer bumps it before modifying the tree: `tagIndex->header.version = versionOld + 1`
   (i4addtag.c:728; i4add.c:1310-1312; r4reinde.c:350-353), and `index4updateHeader` flushes the
   first 16 bytes only when `versionOld != header.version`, then sets
-  `versionOld = versionReadUnlocked = version` (i4index.c:2128-2156).
+  `versionOld = versionReadUnlocked = version` (i4index.c:2128-2156). On little-endian hosts that
+  path byte-reverses `version` as a **long** around the write and again after it
+  (i4index.c:2139, 2152), which is what makes the on-disk field big-endian.
+- **Only the tag-directory's `version` is maintained.** A *regular* tag header's `version` field is
+  written at create/reindex time and never updated; it is always `00 00 00 00`. Verified on all 33
+  sample CDX files in `original/examples/DATA/` — every regular-tag header reads `version = 0` while
+  the tag-directory header of the same file reads a small big-endian counter (0–21).
+  **Port mandate: leave a regular tag's `version` field zero.** The reason is a latent bug in the C:
+  the regular-tag header write path byte-reverses the 4-byte `version` with `x4reverseShort` — a
+  2-byte swap whose `short` result is then assigned back to the `S4UNSIGNED_LONG` field
+  (i4add.c:887-889, the `#else`/little-endian branch of the `LEN4HEADER_WR` write) — while the read
+  path un-reverses it with `x4reverseLong` (i4init.c:365). For `version == 0` the two agree and the
+  bytes are `00 00 00 00`; for any non-zero value they do not, and the port would emit different
+  bytes than the C library. Do not "fix" this by writing a correct big-endian long here.
 - Readers call `index4versionCheck`: re-read the first 16 bytes; if `version == versionOld`
   nothing changed; otherwise all cached blocks of every tag are discarded and the previous
   position re-found by key+recno (`tfile4go`) or EOF (i4index.c:2348-2473; i4versionCheck

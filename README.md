@@ -30,6 +30,7 @@ original — **not** a P/Invoke wrapper and **not** a mechanical transliteration
 - CDX compound indexes (`S4FOX`), including the bit-packed leaf compression.
 - FPT memo files.
 - The xBase expression engine (needed to create and maintain indexes).
+- **The bitmap query optimizer** (Rushmore-style) — the library's headline feature.
 - Byte-range locking and transactions/logging.
 
 **Out of scope:**
@@ -37,7 +38,7 @@ original — **not** a P/Invoke wrapper and **not** a mechanical transliteration
 - MDX (dBASE IV) and NTX (Clipper) index formats.
 - OLE-DB `r5*` extension types, reporting, encryption, compression, Palm/CE.
 
-A "later maybe" list (relations/query optimizer, Unicode keys, additional collations, DBT memo)
+A "later maybe" list (multi-table relations/joins, Unicode keys, additional collations, DBT memo)
 lives in the porting plan.
 
 ## Repository layout
@@ -47,7 +48,8 @@ lives in the porting plan.
 | `claude/PORTING-PLAN.md` | The master plan: intent, scope, architecture, milestone roadmap with verification gates, testing strategy, and risk register. **Start here.** |
 | `claude/specs/` | Seven source-cited format specifications — the **authoritative** description of the on-disk formats and engine behavior. |
 | `original/source/` | The original CodeBase C source (reference only — never modified). |
-| `original/examples/` | Original C examples and **real sample `DBF`/`CDX`/`FPT` files** used as a verification oracle. |
+| `original/examples/` | Original C examples and real sample `DBF`/`CDX`/`FPT` files (supplementary test input — see the plan for why they are not sufficient on their own). |
+| `test-files-generator/` | Windows/MSVC developer tool that drives the original C library to generate the golden test corpus. Not a build or test dependency. |
 | `LICENSE` | GNU General Public License v3. |
 
 ### The specifications
@@ -72,10 +74,15 @@ lives in the porting plan.
 
 ## Testing approach
 
-Correctness is anchored on a **reference oracle**: the original C library, plus the real sample
-files in `original/examples/DATA/`, are used to differential-test the C# implementation
-byte-for-byte in both directions. Building that oracle is Milestone 0. See the porting plan for the
-full verification-gated roadmap.
+Correctness is anchored on **`corpus/`** — golden `DBF`/`CDX`/`FPT` files with expected dumps
+beside them, generated offline by the original C library and checked into the repository. Tests
+read the corpus; **building or testing the library never compiles or runs C**, and needs neither
+Windows nor MSVC. `test-files-generator/` is the developer tool that produces the corpus, and
+building it plus a first corpus is Milestone 0.
+
+The query optimizer additionally has a self-verifying gate: every optimized result set must equal
+the brute-force full scan of the same filter. See the porting plan for the full
+verification-gated roadmap.
 
 ## License
 

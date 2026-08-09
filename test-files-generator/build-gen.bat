@@ -1,0 +1,65 @@
+@echo off
+REM ===========================================================================
+REM  build-gen.bat — compiles the test-file generator and links it against the
+REM  static CodeBase library produced by build-lib.bat.
+REM
+REM    build-gen.bat          build
+REM    build-gen.bat clean    delete generator objects and exe, then rebuild
+REM
+REM  Output:  obj\gen\*.obj    intermediate objects
+REM           bin\testgen.exe  the generator
+REM
+REM  Run build-lib.bat first (or this script will tell you to).
+REM ===========================================================================
+setlocal
+
+set "ROOT=%~dp0"
+set "SRCDIR=%ROOT%..\original\source"
+set "CFGDIR=%ROOT%src"
+set "OBJDIR=%ROOT%obj\gen"
+set "BINDIR=%ROOT%bin"
+set "LIBOUT=%ROOT%obj\codebase.lib"
+
+if /i "%~1"=="clean" (
+   echo [build-gen] cleaning...
+   if exist "%OBJDIR%" rd /s /q "%OBJDIR%"
+   if exist "%BINDIR%\testgen.exe" del /q "%BINDIR%\testgen.exe"
+)
+
+if not exist "%LIBOUT%" (
+   echo [build-gen] ERROR: %LIBOUT% not found.
+   echo [build-gen] Run build-lib.bat first.
+   exit /b 1
+)
+
+call "%ROOT%config.bat" || exit /b 1
+echo [build-gen] toolchain: %CB_VCVARS%
+call "%CB_VCVARS%" >nul 2>&1
+if errorlevel 1 ( echo [build-gen] ERROR: vcvars failed & exit /b 1 )
+
+if not exist "%OBJDIR%" mkdir "%OBJDIR%"
+if not exist "%BINDIR%" mkdir "%BINDIR%"
+
+echo [build-gen] compiling generator...
+cl /c /nologo /W3 /O2 /D_CRT_SECURE_NO_WARNINGS /DWIN32 ^
+   /FI"%CFGDIR%\cb-config.h" /I"%SRCDIR%" /I"%CFGDIR%" ^
+   /Tp"%CFGDIR%\generator.cpp" /Fo"%OBJDIR%\generator.obj" >"%OBJDIR%\generator.log" 2>&1
+if errorlevel 1 (
+   echo [build-gen] ERROR: compile failed
+   findstr /i "error" "%OBJDIR%\generator.log"
+   exit /b 1
+)
+
+echo [build-gen] linking -^> bin\testgen.exe
+link /nologo /OUT:"%BINDIR%\testgen.exe" "%OBJDIR%\generator.obj" "%LIBOUT%" ^
+     user32.lib advapi32.lib >"%OBJDIR%\link.log" 2>&1
+if errorlevel 1 (
+   echo [build-gen] ERROR: link failed
+   findstr /i "error" "%OBJDIR%\link.log"
+   exit /b 1
+)
+
+echo [build-gen] OK
+echo [build-gen] usage: bin\testgen.exe [output-dir]     ^(default: bin\out^)
+endlocal
+exit /b 0

@@ -45,7 +45,8 @@ lives in the porting plan.
 
 | Path | Contents |
 |------|----------|
-| `claude/PORTING-PLAN.md` | The master plan: intent, scope, architecture, milestone roadmap with verification gates, testing strategy, and risk register. **Start here.** |
+| `STATE.md` | Current project state: progress, decisions already made, open questions, next steps. **Start here.** |
+| `claude/PORTING-PLAN.md` | The master plan: intent, scope, architecture, milestone roadmap with verification gates, testing strategy, and risk register. |
 | `claude/specs/` | Seven source-cited format specifications — the **authoritative** description of the on-disk formats and engine behavior. |
 | `original/source/` | The original CodeBase C source (reference only — never modified). |
 | `original/examples/` | Original C examples and real sample `DBF`/`CDX`/`FPT` files (supplementary test input — see the plan for why they are not sufficient on their own). |

@@ -5,6 +5,9 @@ indexes, FPT memo files), targeting **byte-for-byte Visual FoxPro compatibility*
 [`README.md`](README.md) for the project overview and [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md)
 for scope, architecture, and the milestone roadmap before starting non-trivial work.
 
+**Start a session by reading [`STATE.md`](STATE.md)** — current progress, decisions already made
+(don't relitigate them), open questions, and the next steps. Update it when a session ends.
+
 **The library's main value is the bitmap query optimizer** (Rushmore-style: decompose a filter into
 per-tag range constraints, evaluate each by seeking a CDX tag, combine the record-number sets —
 instead of scanning). Byte-compatibility is the foundation that makes it possible, not the goal.

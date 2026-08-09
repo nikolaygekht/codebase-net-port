@@ -1,6 +1,7 @@
 # Project state
 
-**Last updated:** 2026-08-08 · commits `9f4f1b4`, `4804c00` on `main`.
+**Last updated:** 2026-08-09 · last commit `7ed1042` on `main`; the corpus v1 work below is
+uncommitted at the time of writing.
 
 A running handoff document: where the project actually is, what was decided and
 why, and what to do next. Update it at the end of a working session.
@@ -13,13 +14,14 @@ For *what we are building* read [`README.md`](README.md); for *how* read
 
 ## 1. Where we are
 
-**No C# exists yet.** There is no solution, no `src/`, no `tests/`, no `corpus/`.
-The repository is documentation, the read-only C reference, and a working
-test-file generator.
+**No C# exists yet.** There is no solution and no `src/`/`tests/`. The repository
+is documentation, the read-only C reference, a working test-file generator, and
+the first four checked-in corpus tables under `net/corpus/`. The port itself will
+live under `net/`.
 
 | Milestone | State |
 |---|---|
-| **M0** — corpus generator + corpus v1 | **In progress.** Build harness done and working; corpus barely started (one table) |
+| **M0** — corpus generator + corpus v1 | **In progress.** Build harness done; four DBF cases (no indexes) generated, dumped and checked in; index/collation cases still missing |
 | M1 — DBF reading | Not started |
 | M2 — CDX reading | Not started |
 | M3 — Collation | Not started |
@@ -34,14 +36,26 @@ test-file generator.
 ```bat
 build-lib.bat     :: 137 TUs -> obj\codebase.lib   (~2 min; ~1.4 s incremental)
 build-gen.bat     :: -> bin\testgen.exe
-bin\testgen.exe   :: -> bin\out\SIMPLE.DBF
+bin\testgen.exe   :: -> bin\out\
+copy-corpus.bat   :: -> ..\net\corpus\
 ```
 
-It produces exactly **one** case, `SIMPLE.DBF` (3 fields `N`/`C`/`N(2 dec)`, 3
-records, no index, no memo), byte-verified against `DBF-FORMAT.md`: version
-`0x30`, `headerLen` 392 = 32 + 3×32 + 1 + 263, the 263 reserved bytes zero,
-CodeBase `flags[8]` and `autoIncrementVal` zero (genuine-VFP shape), no trailing
-`0x1A`.
+Four DBF cases, no indexes, 32 records each, each with a `<NAME>.dump.txt` of
+expected header/descriptor/record values read back through the C library
+(`net/corpus/README.md` describes the dump format):
+
+| File | Version | Covers |
+|---|---|---|
+| `DB3TYPE.DBF` | `0x03` | dBase III / FoxPro 2.x set `C N D L`, no memo |
+| `VFPTYPE.DBF` | `0x30` | every non-memo VFP type `C N F D L I B Y T` |
+| `F2XMEMO.DBF` + `.fpt` | `0xF5` | FoxPro 2.x memo, 10-byte ASCII memo reference |
+| `VFPMEMO.DBF` + `.fpt` | `0x30` | memo + binary types `M X G Z`, 4-byte binary reference, payloads straddling the 512-byte FPT block boundary |
+
+Byte-verified against the specs: `headerLen` = 32 + n×32 + 1 (+263 for `0x30`);
+263 reserved bytes zero; `flags[8]` and `autoIncrementVal` zero (genuine-VFP
+shape); no trailing `0x1A`; FPT `blockSize` = 512 big-endian; `X`/`Z` stored as
+`M`/`C` with descriptor flag `0x04`. Regeneration is byte-identical (verified by
+generating to a scratch directory and `cmp`-ing all ten files).
 
 ### Documentation state
 
@@ -83,6 +97,23 @@ FPT, missing `Y`/`T`/`H`, and it defines `B` as *binary* where VFP means *double
 **Trunk-based development.** Work directly on `main`. No branches unless
 explicitly requested. Commit/push only when asked.
 
+**The corpus lives in `net/corpus/`, beside the port**, published from
+`bin\out\` by `copy-corpus.bat`. `bin\out\` stays gitignored so the generated
+tree and the reviewed tree never drift silently.
+
+**The DBF date stamp is frozen, not masked** (resolves what was open question 1).
+The generator overwrites header bytes 1-3 with 2026-01-01 after closing each
+table, so the corpus is byte-stable and regeneration produces no diff. It is the
+only deviation from what the C library wrote, and it is documented in both
+READMEs. Rejected: masking those bytes in every comparison — weaker, and it
+dirties the diff on every regeneration.
+
+**dBase III memo (`0x83` + `.DBT`) is out of reach from this build** — it is
+`S4MNDX`-only (`DBF-FORMAT.md` §2.1), and `.DBT` is outside the port's stated
+scope. `F2XMEMO.DBF` (FoxPro 2.x `0xF5` + `.FPT`, 10-byte ASCII memo reference)
+covers the legacy-memo path instead. A second S4MNDX generator plus dBase
+file/index support is wanted eventually — see §5, backlog, **after** M5.
+
 ---
 
 ## 3. Facts established today (evidence-backed, safe to rely on)
@@ -121,10 +152,10 @@ joins are not required.
 
 ## 4. Open questions (need a decision, none blocking today)
 
-1. **Header date-stamp non-determinism.** DBF bytes 1-3 are the generation date,
-   so regenerating on another day changes three bytes per file. Decide *before*
-   checking in a corpus: teach the generator to freeze the stamp, or mask those
-   bytes in comparisons. Freezing is stronger — it preserves true byte-identity.
+1. **Code page is unmarked (`0x00`) in every corpus table**, because that is the
+   CodeBase default. Real VFP tables normally carry an LDID. Add a
+   codepage-marked case before the port has to exercise the LDID→`Encoding` map
+   (`DBF-FORMAT.md` §8) — it also decides the default index collation.
 2. **Toolchain pinning.** `config.bat` currently takes whatever `vcvars32.bat`
    resolves to (this machine has MSVC 14.29 and 14.51; it built clean on 14.51).
    Pin for reproducibility, or keep it loose?
@@ -134,10 +165,12 @@ joins are not required.
    - Should the port also implement VFP's *native* autoincrement (per-field
      descriptor bytes 19-23), which is incompatible with CodeBase's header-based
      scheme? (`DBF-FORMAT.md:359`)
-4. **Corpus dump format.** Not yet designed. Needs to carry: field descriptors,
-   each record's raw + decoded fields, each tag's `(rawKeyBytes, recno)` walk,
-   memo entries, `d4check` result, and a standalone `value → key-bytes` table for
-   the M3 gate. Text and diffable, since it gets reviewed in pull requests.
+4. **Corpus dump format — v1 exists, index half still open.** The DBF/FPT half is
+   designed and implemented (`net/corpus/README.md`): raw header, on-disk field
+   descriptors, API field view, and per-record raw bytes + decoded values, with
+   memo reference and contents. Still to design when CDX cases arrive: each tag's
+   `(rawKeyBytes, recno)` walk, `d4check` result, and the standalone
+   `value → key-bytes` table the M3 gate needs.
 
 ---
 
@@ -156,10 +189,12 @@ This is a stated prerequisite for M5 (risk R13) and the highest-value document
 we do not have.
 
 **2. Finish M0 — grow the corpus.**
-The generator's one case proves the toolchain, nothing more. Add, roughly in
-order of what later milestones need:
-- the 7 missing field types (`B F G H I T Y`), plus nullable fields and `0x31`
-  CodeBase-extension cases (labelled as non-VFP);
+Four no-index DBF cases are in; the field types the shipped samples lacked
+(`B F G I T Y`) are now covered. Remaining, roughly in order of what later
+milestones need:
+- nullable fields (the hidden `_NullFlags` `'0'` field), a codepage-marked table
+  (open question 1), `H` and the other CodeBase-extension types, and a `0x31`
+  extension case labelled as non-VFP;
 - **tagged tables large enough to force multi-level trees** — the single biggest
   corpus gap, since nothing shipped has an interior node;
 - leaf blocks driven to the widening/split boundary; record counts crossing
@@ -168,7 +203,7 @@ order of what later milestones need:
   across many seconds-of-day for the ULP bitset; currency signs and rounding;
 - memos forcing FPT growth and compaction;
 - before/after mutation pairs for the M6 write gate;
-- resolve question (1) above, then design the dump format (question 4).
+- deleted records (nothing in the corpus is marked deleted yet).
 
 **3. M0 spot-check pass.**
 The specs' adversarial re-verification never completed (plan §9). Confirm a few
@@ -177,9 +212,19 @@ claims per format against freshly generated bytes before building on them: FPT
 multi-level tree from step 2 — currently unverifiable), the 263-byte reserved
 area, the `t4dblToFox` sign rule.
 
-**4. Then M1.**
-Create the solution (`src/CodeBase.Net`, `tests/CodeBase.Net.Tests`,
-`tests/CodeBase.Net.Golden`) and start DBF reading against the corpus.
+**4. Then M1 — the immediate next task.**
+Create the solution under `net/` (`net/src/CodeBase.Net`,
+`net/tests/CodeBase.Net.Tests`) and read DBF files without indexes, asserted
+against the four corpus tables and their dumps. Note when opening memo tables on
+Linux: CodeBase writes the companion file as lower-case `.fpt` next to an
+upper-case `.DBF`, so the extension must be resolved case-insensitively.
+
+### Backlog (deliberately after M5)
+
+**A second, S4MNDX generator plus dBase file and index support** — genuine dBase
+III `0x83` + `.DBT` tables and MDX/NDX indexes. Low priority: it widens
+compatibility beyond the VFP target that justifies the port, so it waits until
+the bitmap Rushmore optimizer has landed.
 
 ### Do not
 

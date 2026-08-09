@@ -1,0 +1,4 @@
+# Golden files: never line-ending-converted, never merged.
+*.DBF      binary
+*.fpt      binary
+*.dump.txt -text

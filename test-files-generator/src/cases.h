@@ -21,5 +21,7 @@ int caseVfpType( CODE4 *cb, const char *outDir );   /* VFPTYPE.DBF — 0x30 */
 int caseF2xMemo( CODE4 *cb, const char *outDir );   /* F2XMEMO.DBF — 0xF5 + FPT */
 int caseVfpMemo( CODE4 *cb, const char *outDir );   /* VFPMEMO.DBF — 0x30 + FPT */
 int caseVfpNull( CODE4 *cb, const char *outDir );   /* VFPNULL.DBF — 0x30 + FPT, _NullFlags */
+int caseCp1251( CODE4 *cb, const char *outDir );    /* CP1251.DBF — 0x30 + FPT, codePage 0xC9 */
+int caseCp936 ( CODE4 *cb, const char *outDir );    /* CP936.DBF  — 0x30 + FPT, codePage 0x7A */
 
 #endif /* GEN_CASES_H */

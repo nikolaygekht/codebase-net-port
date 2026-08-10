@@ -331,7 +331,7 @@ OLE-DB support types, stored as the raw Windows structs, little-endian: `1`/`6` 
 
 ## 8. Code page / language driver byte
 
-Header byte 29 is written directly from `CODE4.codePage` (D4CREATE.C:1391) and read back on open (D4OPEN.C:2217). Values used by CodeBase (d4defs.h:1923-1933):
+Header byte 29 is written directly from `CODE4.codePage` (D4CREATE.C:1391) and read back on open (D4OPEN.C:2217). Values **CodeBase** defines (d4defs.h:1923-1933) — for what the *format* defines, which is a wider and partly different set, see §8.1:
 
 | Value | Constant | Meaning |
 |-------|----------|---------|
@@ -342,7 +342,43 @@ Header byte 29 is written directly from `CODE4.codePage` (D4CREATE.C:1391) and r
 | 4 (0x04) | `cp0004` | "unknown codepage 4" back-compat placeholder (d4defs.h:1930-1931) |
 | -56 (0xC8) | `cp1250` | Windows Eastern European (d4defs.h:1932-1933) |
 
-These byte values coincide with the standard xBase language-driver IDs for those code pages. `code4codePage`/`c4set.c` accepts exactly cp437/cp850/cp1252 for setting (c4set.c:734-739). The code page influences collation of index keys and upper-casing (e4functi.c:2888-2889) but the engine performs **no transcoding of record data**.
+Each of those constants agrees with the mark Visual FoxPro documents for the same code page, apart from `cp0004` (§8.1). The code page influences collation of index keys and upper-casing (e4functi.c:2888-2889) but the engine performs **no transcoding of record data** — the bytes assigned to a field are the bytes stored, so the marker says how a reader should interpret a record and never names a transformation the writer applied.
+
+**The setters validate; the file path does not.** `c4setCodePage` accepts cp0, cp0004, cp437, cp850, cp1250, cp1252 and raises `e4parm` ("unsupported CodePage") on anything else (c4set.c:727-745); `code4codePage` accepts the same set minus cp0004 (c4baspas.c:80-112). Neither write nor read enforces that set: `d4create` stores `(char)c4->codePage` whatever it holds (D4CREATE.C:1391) and `d4open` assigns byte 29 to `d4->codePage` with no check at all (D4OPEN.C:2217). Assigning the field directly therefore produces a table marked with any of the 256 values — which is how `net/corpus/CP1251.DBF` (`0xC9`) and `net/corpus/CP936.DBF` (`0x7A`) are made.
+
+### 8.1 The authority for the byte is Visual FoxPro's documentation, not CodeBase's constants
+
+The table above is what **CodeBase** knows; it is not what the **format** allows. `original/source/` contains no enumeration of the code-page mark — five constants in `d4defs.h`, no mention of `0xC9`, `0x7A` or "language driver" anywhere in the C, and the shipped manual (`original/doc/`) does not discuss code pages at all. Since byte-compatibility with Visual FoxPro is the target (ADR-19), the authority is **VFP's own documentation**: byte 29 is the "Code page mark" ([Table File Structure](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/aa975386(v=vs.71))) and its values are ([Code Pages Supported by Visual FoxPro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/aa975345(v=vs.71))):
+
+| Mark | Code page | Platform | Mark | Code page | Platform |
+|---|---|---|---|---|---|
+| `0x01` | 437 | U.S. MS-DOS | `0x7A` | 936 | Chinese (PRC, Singapore) Windows |
+| `0x02` | 850 | International MS-DOS | `0x7B` | 932 | Japanese Windows |
+| `0x03` | 1252 | Windows ANSI | `0x7C` | 874 | Thai Windows |
+| `0x04` | 10000 | Standard Macintosh | `0x7D` | 1255 | Hebrew Windows |
+| `0x64` | 852 | Eastern European MS-DOS | `0x7E` | 1256 | Arabic Windows |
+| `0x65` | 866 | Russian MS-DOS | `0x96` | 10007 \* | Russian Macintosh |
+| `0x66` | 865 | Nordic MS-DOS | `0x97` | 10029 | Macintosh EE |
+| `0x67` | 861 | Icelandic MS-DOS | `0x98` | 10006 | Greek Macintosh |
+| `0x68` | 895 \* | Kamenicky (Czech) MS-DOS | `0xC8` | 1250 | Eastern European Windows |
+| `0x69` | 620 \* | Mazovia (Polish) MS-DOS | `0xC9` | 1251 | Russian Windows |
+| `0x6A` | 737 \* | Greek MS-DOS (437G) | `0xCA` | 1254 | Turkish Windows |
+| `0x6B` | 857 | Turkish MS-DOS | `0xCB` | 1253 | Greek Windows |
+| `0x78` | 950 | Chinese (Hong Kong SAR, Taiwan) Windows | `0x79` | 949 | Korean Windows |
+
+\* VFP does not detect these under `CODEPAGE=AUTO`. Carried here for fidelity; it is a VFP configuration behaviour with no bearing on reading a marked file.
+
+**Twenty-six marks, and the mapping is one-to-one** — no code page has two marks and no mark has two code pages. That is worth knowing because the wider "xBase" table in circulation (a per-language OEM block at `0x08`-`0x37`, `0x4D`-`0x50`, `0x57`-`0x59`, `0x86`-`0x88`, `0xCC`) is *not* VFP's, is many-to-one, and is out of scope: anything outside the 26 above is an **unrecognized mark**.
+
+**`0x04` is the one value where CodeBase and VFP disagree.** CodeBase calls it `cp0004`, "unknown codepage 4, potentially for backwards support for existing data files" (d4defs.h:1930-1931) — it does not claim to know what it means — and refuses it for GENERAL collation (i4init.c:404). VFP documents it as code page 10000, Standard Macintosh. VFP wins (ADR-19).
+
+**Three facts a reader has to act on:**
+
+- **An unrecognized mark is not an error.** The byte is preserved as found and text is read with the caller's fallback; refusing to open a readable table over how its text displays would be the greater harm. Preserving it matters for round-tripping too — a mark outside the 26 must be written back unchanged, never normalized.
+- **Two of the code pages have no .NET encoding at all.** With `System.Text.Encoding.CodePages` registered, 24 of the 26 resolve; **620 (Mazovia) and 895 (Kamenicky)** throw `NotSupportedException` — they are FoxPro-era DOS pages, not Windows ones. "Recognized mark, no encoding available" is therefore a third outcome, distinct from an unrecognized mark and from success.
+- **Four are multi-byte:** 932, 936, 949, 950. A character field's width is a **byte** count, so a character can be cut in half at the field boundary, and the bytes of a character can include values that are ASCII characters in their own right — a trail byte may be `\`, `|` or `A`. See `net/corpus/README.md` on `CP936`, which is generated to do exactly this.
+
+**Decoding is not collation.** Resolving a mark to an encoding says nothing about index keys: for a GENERAL tag CodeBase handles only cp1252/cp0/cp437/cp850, returns `e4index` for cp1250 and cp0004, and for every other code page matches no branch and sets no collating sequence at all (i4init.c:377-404); only `CodePage_1252` and `CodePage_437` translation tables are declared (d4declar.h:3007-3009). So for a 1251 or 936 table the C library cannot produce reference index keys, and no corpus case can gate them. See `KEY-COLLATION.md`.
 
 ---
 

@@ -22,7 +22,7 @@ public sealed class TableMetadataGoldenTests
         // Part of the gate rather than commentary. A data-driven suite that silently discovers
         // nothing reports success having asserted nothing, which is the most likely way this step
         // could pass while proving nothing.
-        AllTables().Should().HaveCount(5);
+        AllTables().Should().HaveCount(7);
     }
 
     [Theory]
@@ -158,15 +158,43 @@ public sealed class TableMetadataGoldenTests
     }
 
     [Theory]
-    [MemberData(nameof(AllTables))]
-    public void Table_ReportsAnUnmarkedCodePageWithoutNeedingAnEncodingProvider(string tableName)
+    [InlineData("DB3TYPE", CodePage.Unmarked)]
+    [InlineData("VFPTYPE", CodePage.Unmarked)]
+    [InlineData("F2XMEMO", CodePage.Unmarked)]
+    [InlineData("VFPMEMO", CodePage.Unmarked)]
+    [InlineData("VFPNULL", CodePage.Unmarked)]
+
+    // The two marked tables, and the reason the marks are resolved from Visual FoxPro's documented
+    // set rather than the six values CodeBase defines (DBF-FORMAT.md §8.1, ADR-19): CodeBase writes
+    // byte 29 verbatim (D4CREATE.C:1391) but interprets neither of these, so a port that followed its
+    // constants would read both tables as cp437 and produce mojibake from correctly marked files.
+    [InlineData("CP1251", CodePage.Cp1251)]
+    [InlineData("CP936", CodePage.Cp936)]
+    public void Table_ReportsItsCodePageWithoutNeedingAnEncodingProvider(string tableName, CodePage expected)
     {
-        // Reading a table's shape must not require the host to have registered anything. See
-        // ADR-17: the encoding is resolved only when text is asked for, and nothing here asks.
+        // Reading a table's shape must not require the host to have registered anything, and no
+        // test in this suite registers a provider. See ADR-17: the encoding is resolved only when
+        // text is asked for, and nothing here asks — not even for a table naming a code page .NET
+        // has no built-in encoding for.
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf(tableName + ".DBF"));
 
-        table.CodePage.Should().Be(CodePage.Unmarked);
+        table.CodePage.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("VFPTYPE", null)]
+    [InlineData("CP1251", 1251)]
+    [InlineData("CP936", 936)]
+    public void Table_ReportsTheCodePageNumberItsMarkNames(string tableName, int? expected)
+    {
+        // The number is what a caller passes on to an encoding, and it is not the stored mark: 1251
+        // is stamped as 0xC9. Null where the header names no code page, which the mark tells apart
+        // from a code page this library does not recognize.
+        using CodeBaseEngine engine = new();
+        using Table table = engine.OpenTable(Corpus.PathOf(tableName + ".DBF"));
+
+        table.CodePageNumber.Should().Be(expected);
     }
 
     [Fact]

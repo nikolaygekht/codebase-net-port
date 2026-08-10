@@ -1,14 +1,17 @@
 # 001-dbf-open-and-header — summary
 
 **Closed:** 2026-08-09. **Gate passed.** Capability advanced: `DBF-READ`, metadata half.
+**Amended 2026-08-10** — the code-page half of this step was wrong, not merely ungated; see the last
+section and `STATE.md` beside this file.
 
 Assume nobody re-reads `DESIGN.md` or `PLAN.md` after this. What matters beyond the step is here.
 
 ## What shipped
 
 Open a DBF file, and the memo file beside it when the header declares one, and report the table's
-shape. `dotnet test net/CodeBase.Net.sln` is green on **224 tests** — 135 unit, component and fault,
-89 golden — with the gate, `TableMetadataGoldenTests`, executing 36 across all five corpus tables.
+shape. `dotnet test net/CodeBase.Net.sln` was green on **224 tests** at close — 135 unit, component and
+fault, 89 golden — with the gate, `TableMetadataGoldenTests`, executing 36 across all five corpus
+tables. After the 2026-08-10 amendment: **341 tests**, 225 unit and 116 golden, over seven tables.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -83,8 +86,17 @@ habit of reading a `T` field's full 8 bytes regardless of a shorter declared len
 
 ## Left open
 
-- **No corpus table has a non-zero `codePage`**, so `CodePageMap`'s real branches are ungated. This
-  blocks nothing here and **should close before step 002** decodes text (ADR-10).
+- ~~**No corpus table has a non-zero `codePage`**, so `CodePageMap`'s real branches are ungated.~~
+  **Closed 2026-08-10, and it was worse than "ungated".** `CP1251.DBF` and `CP936.DBF` joined the
+  corpus (ADR-18), and gating the map showed it was **incorrect**: `EncodingFor` hard-coded four code
+  page numbers, so 22 of the 26 marks Visual FoxPro documents decoded as cp437 without any error.
+  Visual FoxPro's documentation is now the authority for the mark table (ADR-19, `DBF-FORMAT.md`
+  §8.1), all 26 are implemented, and `Table.CodePageNumber` reports the number (ADR-20). **The
+  lesson worth carrying: "ungated" and "correct" are different claims, and this step conflated
+  them** — a fallback that cannot fail will not show up as a bug until something exercises it.
+  What remains for step 002 is only the last rung, bytes to string, plus the two decoding defaults
+  `Encoding` currently chooses for us (a character cut in half becomes U+FFFD silently; an undefined
+  byte passes through as a control character).
 - **Still ungated:** version `0x31` with feature flags, the `H` field type, and the long-field-name
   layout that is currently refused.
 - **No test uses Moq any more.** The package and the `DynamicProxyGenAssembly2` visibility entry are

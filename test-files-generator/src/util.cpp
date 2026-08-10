@@ -22,6 +22,11 @@ int fail( CODE4 *cb, const char *what )
    return 1;
 }
 
+void assignText( FIELD4 *field, const TEXTBYTES *text )
+{
+   f4assignN( field, (const char *)text->bytes, text->len );
+}
+
 /* Overwrite the header date stamp with a constant, so regenerating the corpus
  * on a different day produces identical bytes. This is the only place the
  * generator alters what the C library wrote. */

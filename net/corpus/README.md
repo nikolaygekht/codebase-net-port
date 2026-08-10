@@ -22,6 +22,8 @@ turns out to be untested, add a generator case and regenerate.
 | `F2XMEMO.DBF` + `.fpt` | `0xF5` | FoxPro 2.x table with a memo: the **10-byte ASCII** in-record memo reference. |
 | `VFPMEMO.DBF` + `.fpt` | `0x30` | VFP memo and binary types: `M` text memo, `X` binary memo, `G` general, `Z` binary character — the last three stored as `M`/`M`/`C` with descriptor flag `0x04`. **4-byte binary** memo references. |
 | `VFPNULL.DBF` + `.fpt` | `0x30` | Nullable fields and the hidden `_NullFlags` bitmap. See below. |
+| `CP1251.DBF` + `.fpt` | `0x30` | A marked code page, single-byte: header byte 29 = `0xC9`, Windows Cyrillic. High-byte text in the record and in the memo. See below. |
+| `CP936.DBF` + `.fpt` | `0x30` | A marked code page, multi-byte: header byte 29 = `0x7A`, Simplified Chinese GBK. Trail bytes that look like ASCII, and characters cut in half at a field boundary. See below. |
 
 Every table holds **32 records**. Rows 1-3 carry the edge cases (zero, minimum/maximum,
 blank/empty); the rest vary so the same tables can be reused when index cases arrive.
@@ -49,6 +51,45 @@ Memo payload lengths cycle through `0, 1, 7, 63, 200, 503, 504, 505` bytes: 504 
 512-byte FPT block once the 8-byte block header is added, and 505 is the first length that needs
 two blocks.
 
+### What `CP1251` and `CP936` pin down
+
+Both are version `0x30` with a memo, and both hold `ID` `TEXT` … `MEMO`, so the only thing that
+distinguishes them from `VFPMEMO` is the text they carry and the code page they name. Header byte 29
+is the point: every other table leaves it `0x00`, so a reader that ignored it outright would pass the
+rest of the suite.
+
+**Neither marker is one CodeBase will set.** `c4setCodePage` accepts only cp0/437/850/1252/1250 and
+raises `e4parm` on anything else, but `d4create` writes `CODE4.codePage` into the header verbatim
+with no validation (`D4CREATE.C:1391`) and `d4open` reads it straight back (`D4OPEN.C:2217`). The
+generator assigns the field directly. `0xC9` and `0x7A` are what Visual FoxPro stamps on Cyrillic and
+Simplified Chinese tables, so the files stay realistic — see ADR-18 for why bytes the C library
+refuses to set are the right ones to gate against.
+
+`CP1251` is the single-byte half. Its `SWEEP` field walks `0x80-0xFF` whole across records 1-8,
+sixteen bytes at a time, **including `0x98`** — the one byte cp1251 leaves undefined, so what a
+reader makes of it is a decision and not an accident. `EXACT` is filled to its width and `SHORT`
+never is, so blank padding beside high-byte content is gated in both directions, and the memo carries
+the same high bytes so the FPT path is not left to the ASCII cases.
+
+`CP936` is the multi-byte half, and it is the one that breaks byte-wise reasoning. GBK trail bytes
+are `0x40-0xFE`, overlapping ASCII:
+
+- **`TRAIL` holds characters whose second byte is `\`, `|`, `A`, `~` or `@`.** In the dump they show
+  up as those literal characters inside `"\x81\\\x81|\x81A\x81~\x81@\x82\\"`. Anything scanning a
+  character field byte-wise — for a path separator, a delimiter, a quote — finds them.
+- **`CUT` is seven bytes wide and is assigned eight bytes of text**, so its last byte is always a
+  lead byte with nothing behind it. A field width is a byte count, `f4assignN` truncates
+  (`F4STR.C:155-168`), and Visual FoxPro produces exactly this. `EXACT` is the opposite case: four
+  characters filling eight bytes with no padding at all.
+- **Memo payload lengths 63 and 401 are odd**, so those payloads end mid-character too — the same cut
+  on the FPT path instead of in the record.
+
+Both marks are defined by **Visual FoxPro's** documentation — `0xC9` is 1251 and `0x7A` is 936, in the
+26-mark table recorded in `DBF-FORMAT.md` §8.1, which ADR-19 makes the authority for this byte. The
+port resolves both: these two tables report `CodePage.Cp1251`/`Cp936` and `CodePageNumber` 1251/936,
+gated in `TableMetadataGoldenTests`. What is still missing is the last link — decoding a field's bytes
+to a string — which is step 002, and these two dumps are the gate for it.
+
 ## Three things to know before comparing bytes
 
 **The header date stamp is frozen.** DBF bytes 1-3 are the "last update" date, which would
@@ -62,8 +103,8 @@ companion file case-insensitively.
 
 **These files carry CodeBase provenance, not Visual FoxPro's.** They are written in genuine-VFP
 shape (`flags[8]` and `autoIncrementVal` zero, no trailing `0x1A`, no CodeBase extensions), but
-they were not produced by VFP. `codePage` is `0x00` (unmarked) because that is what CodeBase
-defaults to.
+they were not produced by VFP. `codePage` is `0x00` (unmarked) in every case but `CP1251` and
+`CP936`, because unmarked is what CodeBase defaults to.
 
 ## Dump format
 

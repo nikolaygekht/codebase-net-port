@@ -77,9 +77,26 @@ public sealed class Table : IDisposable
     public CodePage CodePage { get; }
 
     /// <summary>
-    /// Gets the language-driver byte exactly as stored, whether or not it names a known code page.
+    /// Gets the code page mark exactly as stored, whether or not it names a known code page.
     /// </summary>
+    /// <value>
+    /// This is the value that round-trips. A mark this library does not recognize is still a mark the
+    /// file owns, and writing the table back preserves it rather than replacing it with something
+    /// derived.
+    /// </value>
     public byte CodePageByte => opened.Header.CodePage;
+
+    /// <summary>
+    /// Gets the number of the code page the table names, or null where it names none.
+    /// </summary>
+    /// <value>
+    /// The number, such as 1251, rather than the mark stored in the header, which for that code page
+    /// is [c]0xC9[/c]. Null covers both an unmarked table and a mark outside the twenty-six Visual
+    /// FoxPro documents; [clink=CodeBase.Net.CodePage]CodePage[/clink] tells the two apart.
+    /// Reading this needs no encoding provider registered, and answers even for the two marks whose
+    /// code page .NET cannot supply.
+    /// </value>
+    public int? CodePageNumber => CodePageMap.NumberFor(CodePage);
 
     /// <summary>
     /// Gets the encoding record text should be read with.

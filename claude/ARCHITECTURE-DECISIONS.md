@@ -117,7 +117,7 @@ but only after `QUERY` — it widens compatibility beyond the VFP target that ju
 **Decision.** Work directly on `main`. No feature branches unless explicitly requested. Commit and
 push only when asked.
 
-## ADR-10 — Corpus tables carry no code page marker · open
+## ADR-10 — Corpus tables carry no code page marker · superseded by ADR-18
 
 **Context.** Every corpus table has `codePage` `0x00` (unmarked), because that is the CodeBase
 default. Real VFP tables normally carry an LDID, which also decides the default index collation.
@@ -262,3 +262,144 @@ unrecognized — is `CodeBaseEngine.DefaultEncoding`, defaulting to cp437 to mat
 treatment of unmarked files. A recognized marker always wins: the file is authoritative about
 itself. Supersedes the dependency line in `PORTING-PLAN.md` §3.1 and `CLAUDE.md` §Technology stack,
 both updated.
+
+## ADR-18 — Two code-page-marked corpus cases, marked with bytes CodeBase itself will not set · accepted
+
+**Context.** Closes ADR-10. Every corpus table left `codePage` at `0x00`, so `CodePageMap`'s real
+branches had nothing behind them and a reader that ignored header byte 29 outright would have passed
+the whole suite. Step 002 decodes record text, which is where the byte first matters.
+
+**Decision.** Two cases, both version `0x30` with a memo: **`CP1251.DBF`** marked `0xC9` (Windows
+Cyrillic, single-byte) and **`CP936.DBF`** marked `0x7A` (Simplified Chinese GBK, multi-byte). Both
+carry text no ASCII-only reader could invent, in the record *and* in the memo. Neither byte is one
+CodeBase's own setter accepts — `c4setCodePage` takes only cp0/437/850/1252/1250 (`c4set.c:727-745`)
+— so the generator assigns `CODE4.codePage` directly, which `d4create` writes verbatim into the
+header with no validation (`D4CREATE.C:1391`) and `d4open` reads straight back (`D4OPEN.C:2217`).
+
+**Why two, and why these.** The single-byte and multi-byte halves fail differently, and only the
+second is dangerous:
+
+- **A single-byte page** is a pure interpretation question. `CP1251` sweeps `0x80-0xFF` whole across
+  eight rows, including `0x98`, the one byte cp1251 leaves undefined — so what a reader makes of an
+  undefined byte becomes a decision rather than an accident.
+- **A multi-byte page breaks byte-wise reasoning.** GBK trail bytes are `0x40-0xFE`, overlapping
+  ASCII: `CP936`'s `TRAIL` field holds characters whose second byte is `\`, `|`, `A`, `~`, `@`, so
+  anything scanning a character field for a delimiter finds bytes that are not characters. And
+  because a field width is a byte count, a character can be **cut in half at the field boundary**:
+  the `CUT` field is seven bytes wide and is given eight, leaving a dangling lead byte as its last
+  byte. Odd memo payload lengths do the same on the FPT path. This is what VFP itself produces.
+
+**Why a byte the C library refuses to set.** VFP stamps `0xC9` and `0x7A` on real tables, and this
+port has to read real tables. The alternative — using `0xC8`/cp1250, the only non-Western page
+CodeBase blesses — would gate an enum value the port already names while leaving untested the case
+that actually appears in the wild: a language driver the port has never heard of. Writing the byte
+directly is not a divergence; it is the same store CodeBase performs, reached without its setter's
+opinion.
+
+**Rejected — cp1250 (`0xC8`) alone.** Cheapest, and it keeps the corpus inside the set the C library
+understands. But it exercises no multi-byte behaviour at all, and multi-byte is where a decoder that
+counts bytes as characters silently produces wrong text rather than an error.
+
+**Rejected — Shift-JIS (`0x7B`) as the multi-byte case.** Equally sharp (its trail range also
+overlaps ASCII) and a fine alternative. GBK was chosen for breadth of lead-byte range.
+
+**Open — the port names neither byte yet.** `CodePage` holds exactly CodeBase's five values, so both
+tables resolve to `CodePage.Unknown` and fall back to the default encoding. That is asserted, not
+assumed (`TableMetadataGoldenTests`). Whether the enum grows to the standard VFP language-driver set
+— and whether an unrecognized marker should keep falling back silently — belongs to **step 002**,
+where text decoding first depends on the answer. The corpus now makes either choice testable.
+
+## ADR-19 — The Visual FoxPro documentation is the authority for the code-page mark · accepted
+
+**Context.** Closes the open item in ADR-18. Step 002 decodes record text, so it needs header byte 29
+to resolve to an encoding. `original/source/` cannot answer: `d4defs.h:1923-1933` names five constants
+(cp0, cp437, cp850, cp1252, cp0004, cp1250), nothing in the C mentions `0xC9`, `0x7A` or "language
+driver", the shipped manual never discusses code pages, and `original/examples/DATA/` carries only
+`0x00` and `0x03`. Meanwhile `d4create` writes the byte verbatim and `d4open` reads it back unchecked,
+so a file may carry any of 256 values — and real VFP files do.
+
+**Decision.** **Visual FoxPro's documentation is the source of truth for mark → code page**, and it
+is the only fact in `claude/specs/` that is not cited to `FILE.C:line`. The 26 marks it defines are
+reproduced in `DBF-FORMAT.md` §8.1 with both source URLs: [Table File
+Structure](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/aa975386(v=vs.71))
+for the field and [Code Pages Supported by Visual
+FoxPro](https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro/aa975345(v=vs.71))
+for the values. CodeBase's five constants remain documented as *what the engine does with the byte* —
+which collations it can build, which values its setters accept — never as what the format permits.
+
+**Why VFP and not CodeBase.** `CLAUDE.md` states the target: byte-for-byte Visual FoxPro
+compatibility, with CodeBase as the reference implementation we can execute. Where the two disagree
+about **the format**, VFP is the format. CodeBase's list is the subset one C library chose to
+interpret, and treating it as the format's definition would silently misread ordinary Cyrillic and
+CJK tables — the files this port most needs to read correctly.
+
+**`0x04` resolved in VFP's favour.** CodeBase calls it `cp0004`, "unknown codepage 4, potentially for
+backwards support" (`d4defs.h:1930-1931`), and refuses it for GENERAL collation (`i4init.c:404`). VFP
+documents it as 10000, Standard Macintosh. It resolves to 10000. CodeBase's own comment declines to
+claim knowledge, so there is no real conflict of authorities — only a gap and a fact.
+
+**Rejected — CodeBase's five values only.** Self-consistent, fully source-cited, and wrong about the
+world: `0xC9` and `0x7A` would fall back to cp437 and produce mojibake from correctly marked files,
+and `0x04` would stay unnamed.
+
+**Rejected — the wider "xBase" mark table in circulation.** Per-language OEM blocks at `0x08`-`0x37`,
+plus `0x4D`-`0x50`, `0x57`-`0x59`, `0x86`-`0x88`, `0xCC`; roughly fifty marks, many-to-one onto the
+same code pages. It is not VFP's table, no authority we can name defines it, and its many-to-one shape
+would push a lossy normalization into the write path. Anything outside VFP's 26 is an **unrecognized
+mark**, which is a defined outcome, not a failure.
+
+**Consequences for step 002.**
+
+- **Three outcomes, not two.** Unrecognized mark / recognized mark whose code page .NET cannot supply
+  / recognized and available. Verified on .NET 8 with `System.Text.Encoding.CodePages` registered: 24
+  of the 26 resolve, while **620 (Mazovia) and 895 (Kamenicky) throw `NotSupportedException`** — they
+  are not Windows code pages. `CodePageMap` currently collapses the first two together.
+- **The raw byte stays authoritative.** `Table.CodePageByte` is what round-trips; a resolved code page
+  is derived and must never be written back in its place.
+- **`CodePage`'s shape is now a design question, not an open fact.** Its members are marks, its names
+  describe code pages, and it currently mixes CodeBase's `Reserved = 0x04` in with them. Settle it in
+  step 002's `DESIGN.md`.
+- **Decoding is not collation, and collation is not reachable.** For a GENERAL tag CodeBase handles
+  only cp1252/cp0/cp437/cp850, errors on cp1250/cp0004, and silently sets nothing for anything else
+  (`i4init.c:377-404`), with translation tables declared for 1252 and 437 alone
+  (`d4declar.h:3007-3009`). A 1251 or 936 table's index keys therefore have **no reference behaviour
+  to port and no gate available** — a `COLLATION` scope limit to record when that capability opens,
+  and a reason to keep text decoding and key building in different types.
+
+## ADR-20 — `CodePage` names the marks; `Table.CodePageNumber` reports the number · accepted
+
+**Context.** ADR-19 settled *what* the marks mean and left the API shape open; ADR-18's "the port names
+neither byte yet" is closed by this entry. The trigger was finding that `Table.TextEncoding` already
+shipped wrong answers: `CodePageMap.EncodingFor` hard-coded four numbers, so 22 of the 26 documented
+marks silently fell back to cp437. The spec and the code disagreed, so by `CLAUDE.md` the code had the
+bug — this is a correction to step 001's output, not step 002 scope, and needs no `DESIGN.md` gate.
+
+**Decision.** Three rungs, byte → code page → encoding, each usable on its own:
+
+- **`CodePage`** keeps naming the format's closed set, extended from 6 members to all 26 marks plus
+  `Unmarked` and `Unknown`. A member's *value* is the mark, so `Cp1251 = 0xC9`; `Reserved = 0x04`
+  became `Cp10000` (ADR-19). An enum is the right shape because the set is closed and documented, and
+  it survives in generated help as the list of legal marks.
+- **`Table.CodePageNumber`** is new: `int?`, the number a caller passes on to an encoding. Null covers
+  both an unmarked table and an unrecognized mark; `CodePage` tells those two apart. It needs no
+  encoding provider and answers even for the two marks .NET cannot supply an encoding for, because a
+  code page number is *shape*, not text (ADR-17).
+- **`Table.CodePageByte`** stays the value that round-trips. A resolved code page is derived and is
+  never written back in its place.
+
+**Rejected — drop the enum, expose the byte and the number only.** Genuinely simpler, and `Cp1251` does
+duplicate what `1251` already says. Rejected because the mark set is a closed documented vocabulary
+worth naming in the public surface and in generated docs, and because `Unmarked` versus unrecognized
+reads better as two named values than as `byte == 0` versus `number is null`.
+
+**Consequence.** `Lookup`'s failure message now distinguishes the two marks whose code page no provider
+supplies — 620 Mazovia and 895 Kamenicky are FoxPro-era DOS pages Windows never defined, so "register
+a provider" is not the fix and the message says so. `CodePageMapTests` gates all 26 marks, their
+one-to-one-ness, the `0x04` resolution, and that resolving a number never touches an encoding.
+
+**Open — the unmarked default rests on a weaker footing than ADR-17 claims.** ADR-17 justifies
+`UnmarkedCodePage = 437` as matching "the C library's treatment of unmarked files", but the only place
+the C library actually interprets `cp0` treats it as **Windows ANSI**: `i4init.c:387`, "code page 0
+uses windows ansi by default", for GENERAL collation. There is no transcoding path to compare against
+because the engine transcodes nothing, so neither 437 nor 1252 is *witnessed* for text. Settle it in
+step 002, where the default first shows through in a decoded string.

@@ -45,7 +45,10 @@ optimize, it falls back to scanning; the full-scan equivalence gate runs on ever
 **Source of truth.** `claude/specs/*.md` are authoritative for on-disk formats and engine behavior;
 if code and a spec disagree on a byte layout, the spec wins — or the spec has a bug worth fixing, not
 working around silently. *Caveat:* their adversarial re-verification never completed, so spot-check a
-claim against real bytes before building on it (risk R11).
+claim against real bytes before building on it (risk R11). Every spec fact is cited to `FILE.C:line`
+with **one deliberate exception**: the DBF code-page mark table (`DBF-FORMAT.md` §8.1) is sourced to
+Visual FoxPro's documentation, because `original/source/` does not contain it and VFP is the
+compatibility target (ADR-19). Do not "fix" it by narrowing it to CodeBase's five constants.
 
 **`original/source/` is read-only.** Never modify it. Filenames are mixed-case — search
 case-insensitively (`grep -ri`, `find -iname`). Focus on the `S4FOX` build; ignore `S4CLIENT`

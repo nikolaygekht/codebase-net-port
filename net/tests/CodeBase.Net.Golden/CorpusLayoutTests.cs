@@ -17,7 +17,7 @@ public sealed class CorpusLayoutTests
 {
     /// <summary>The cases the corpus is documented to hold (net/corpus/README.md).</summary>
     private static readonly string[] ExpectedTables =
-        ["DB3TYPE", "F2XMEMO", "VFPMEMO", "VFPNULL", "VFPTYPE"];
+        ["CP1251", "CP936", "DB3TYPE", "F2XMEMO", "VFPMEMO", "VFPNULL", "VFPTYPE"];
 
     [Fact]
     public void Corpus_HoldsExactlyTheDocumentedTables()
@@ -33,6 +33,8 @@ public sealed class CorpusLayoutTests
     }
 
     [Theory]
+    [InlineData("CP1251")]
+    [InlineData("CP936")]
     [InlineData("F2XMEMO")]
     [InlineData("VFPMEMO")]
     [InlineData("VFPNULL")]

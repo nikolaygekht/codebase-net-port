@@ -291,7 +291,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 
 | ID | Capability | Priority | Status | Chief risk |
 |---|---|---|---|---|
-| `CORPUS` | Corpus + generator | **P0** | in progress — 5 DBF cases in, index cases missing | R11 |
+| `CORPUS` | Corpus + generator | **P0** | in progress — 7 DBF cases in, index cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | in progress — metadata half done (step 001); records next | — |
 | `CDX-READ` | CDX reading & navigation | **P1** | not started | **R1** (highest) |
 | `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
@@ -324,9 +324,10 @@ value in attacking them early — but that is a judgement to make per step, not 
   developer aid for `WRITE` but is not wired into any test.
 - **Status:** the build harness is **done and working** — `build-lib.bat` / `build-gen.bat` /
   `config.bat` / `copy-corpus.bat`, 137 translation units, x86, compiled as C++, zero edits to
-  `original/source`. Four no-index DBF cases are generated, dumped and checked in
-  (`net/corpus/README.md`), plus a fifth covering nullable fields and the `_NullFlags` bitmap, and
-  the dump format's DBF/FPT half is settled (extended by optional tokens only, ADR-16). What remains
+  `original/source`. Seven no-index DBF cases are generated, dumped and checked in
+  (`net/corpus/README.md`): four covering field types and memo shapes, one covering nullable fields
+  and the `_NullFlags` bitmap, and two carrying a marked code page — single-byte and multi-byte
+  (ADR-18). The dump format's DBF/FPT half is settled (extended by optional tokens only, ADR-16). What remains
   is corpus breadth (§6.3) — above all **indexed cases with multi-level trees** — and the index half
   of the dump format.
 - **Gate:** the generator builds from a clean checkout on a machine with only MSVC; regenerating
@@ -557,8 +558,8 @@ timestamp; empty/`00000000` dates; datetimes across many seconds-of-day (ULP bit
 signs and rounding; GENERAL-collated strings with accents, expansions, trailing blanks; descending
 tags; unique/candidate tags; filtered tags; memos forcing FPT growth and compaction; leaf blocks
 driven to the widening/split boundary; **multi-level index trees** (for interior nodes); and record
-counts crossing `recNumLen` thresholds; deleted records; a code-page-marked table (ADR-10); and a
-`0x31` CodeBase-extension case, labelled as non-VFP.
+counts crossing `recNumLen` thresholds; deleted records; and a `0x31` CodeBase-extension case,
+labelled as non-VFP. **Done since:** code-page-marked tables, single-byte and multi-byte (ADR-18).
 
 Test frameworks and their version constraints are listed once, in `CLAUDE.md` §Technology stack.
 How the tests are layered within a step — unit, component, fault injection, golden — is

@@ -26,8 +26,8 @@ Each document owns its subject; the others link rather than restate it. Put a fa
 | `FOR-DEVELOPERS.md` | Building, testing, contributing | Rules that bind you specifically — those are here |
 | `net/corpus/README.md`, `test-files-generator/README.md` | Their own component | Anything outside it |
 
-Code and data: the port lives in `net/` — solution `net/CodeBase.Net.sln`, plus `net/src/`,
-`net/tests/`, `net/corpus/`. The corpus generator is `test-files-generator/` — a Windows/MSVC
+Code and data: the port lives in `net/` — solution `net/CodeBase.Net.sln`, the library in
+`net/CodeBase.Net/`, plus `net/tests/`, `net/corpus/`. The corpus generator is `test-files-generator/` — a Windows/MSVC
 developer tool, not part of the solution. `original/source/` is read-only reference. Quality
 analysis is `sonar.bat` + `SonarQube.Analysis.xml` at the root (Windows only; secrets in the
 gitignored `.sonar.config*`). Agent skills live in `.claude/skills/`.
@@ -73,7 +73,9 @@ never wrapped**; use BBCode `[c]`/`[i]`/`[b]` and `[clink=Fully.Qualified.Type]t
 **Naming.** `CodeBase.Net`, capital B, everywhere — solution, assembly, namespaces, test projects,
 Sonar project key (ADR-14).
 
-**Licence.** GPL v3 (`LICENSE`) — keep license headers consistent with GPL v3 in new source files.
+**Licence.** GPL v3 (`LICENSE`). **Source files carry no licence header** — `LICENSE` and
+`README.md` state the licence and the attribution to Sequiter's original CodeBase, and repeating
+fifteen lines of boilerplate at the top of every file adds nothing a reader needs. Do not add one.
 
 ### Non-obvious gotchas (the specs carry the detail)
 
@@ -103,8 +105,13 @@ Sonar project key (ADR-14).
 Canonical list — other documents point here rather than repeat it.
 
 .NET 8+ / C# 12, **xUnit v3**, **AwesomeAssertions** (not FluentAssertions — commercial since v8),
-**Moq ≥ 4.20.2** (4.20.0/4.20.1 bundled SponsorLink), BenchmarkDotNet,
-System.Text.Encoding.CodePages.
+**Moq ≥ 4.20.2** (4.20.0/4.20.1 bundled SponsorLink), BenchmarkDotNet.
+
+**The library itself has no NuGet dependencies.** In particular `System.Text.Encoding.CodePages` is a
+**test-project** reference, not a library one: the library never calls `Encoding.RegisterProvider` —
+registering an encoding provider is a process-wide side effect and belongs to the host application —
+so it reads whatever the host registered. Do not add the package to `net/CodeBase.Net`; if a code
+path seems to need it, the fix is in the host's docs (ADR-17).
 
 API shape: idiomatic C#, not a C transliteration — typed exception hierarchy for *errors*, `r4*`
 flow/status values as return-value enums, `IDisposable` ownership, properties, `Stream` I/O,

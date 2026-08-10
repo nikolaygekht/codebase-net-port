@@ -14,4 +14,4 @@ explaining why — that is a record, not clutter.
 
 | Step | Milestone | Status | What it did |
 |---|---|---|---|
-| _(none yet)_ | | | |
+| [`001-dbf-open-and-header`](001-dbf-open-and-header/) | `DBF-READ` | **done** | Open a DBF (+ companion FPT) and expose its metadata: header, stored descriptors, resolved field table. 224 tests; gate green on all five corpus tables |

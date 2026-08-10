@@ -200,3 +200,65 @@ gained by deferring it.
 **Consequence.** The library `.csproj` sets `GenerateDocumentationFile`. The docgen `doc/` project
 itself is not built yet — it can be added whenever the public API stabilises, and the comments will
 already be correct.
+
+## ADR-16 — The dump format grows by optional tokens, never by new columns · accepted
+
+**Context.** Adding the `VFPNULL` case (2026-08-09) meant the dump had to carry three new facts:
+which fields are nullable, which are null in a given record, and the raw `_NullFlags` bitmap. The
+obvious shape — a `nullable=` and `null=` column on every field line — would have rewritten all four
+existing `.dump.txt` files, roughly 1 200 lines of churn, none of it a change in meaning.
+
+**Decision.** New dump facts are emitted **only when they are true**. `nullable=1`, `null=1` and the
+trailing `_NULLFLAGS` line appear on tables that have nullable fields and nowhere else. The four
+pre-existing dumps regenerated **byte-identical**, verified before publishing.
+
+**Why.** The corpus's value is that a diff is meaningful: a changed byte is either a bug or a
+deliberate new fact. A format change that touches every file destroys that property for one commit,
+which is exactly the commit where a real regression would hide. Optional tokens also keep the
+absence informative — `[fields]` says `nullable=1`, so a record line without `null=1` unambiguously
+means "nullable and not null".
+
+**Rejected — always-emit columns.** More regular to parse, and a reader never has to know a token
+can be absent. Not worth resetting the corpus's diffability, and the C# parser has to handle
+optional trailing tokens anyway.
+
+**Consequence.** The reader in `CodeBase.Net.Golden` parses trailing tokens as optional. This
+convention binds the index half of the dump too (ADR-13) when CDX cases arrive.
+
+## ADR-17 — Encoding providers are the host's to register, so the library has no dependencies · accepted
+
+**Context.** DBF record text is stored in a code page named by the header's language-driver byte
+(cp437/cp850/cp1252/cp1250, `DBF-FORMAT.md` §8). On .NET 8 those encodings are unavailable until
+someone calls `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`. The library was
+planned to reference `System.Text.Encoding.CodePages` and do that itself.
+
+**Decision.** **The library never registers an encoding provider.** It calls
+`Encoding.GetEncoding(int)` and uses whatever the host registered. The requirement is documented —
+`README.md`, `FOR-DEVELOPERS.md`, and the XML docs on `Table.TextEncoding` and
+`CodeBaseEngine.DefaultEncoding`. Two consequences:
+
+- **`Table.TextEncoding` is lazy.** Resolving it at open would make a metadata-only read of a
+  cp1252-marked table fail without a provider it never uses. Deferred, the failure comes from the
+  call that actually needs an encoding.
+- **`CodeBase.Net` ships with no NuGet dependencies at all.** `System.Text.Encoding.CodePages`
+  becomes a test-project reference (the tests must register the provider to exercise decoding).
+
+**Why.** Registering an encoding provider is a **process-wide side effect**. A library that performs
+it on load changes `Encoding.GetEncoding` for every other component in the process, including code
+that never touches this library — a decision its author never made and cannot see. Leaving it to
+composition keeps the side effect where the application already owns such choices, and the cost is
+one documented line of setup.
+
+**Rejected — register it in a static constructor.** Convenient, and the failure mode it prevents is
+real (a first `GetEncoding(437)` throwing far from the cause). But convenience does not justify
+mutating global state on someone else's behalf, and the alternative is a documented one-liner.
+
+**Rejected — keep the package reference unused, "just in case".** An unused dependency on the very
+package this decision declines to use is a standing invitation to call `RegisterProvider` from
+inside and quietly undo it.
+
+**Companion.** The *fallback* encoding — for tables whose code-page byte is unmarked (`0x00`) or
+unrecognized — is `CodeBaseEngine.DefaultEncoding`, defaulting to cp437 to match the C library's
+treatment of unmarked files. A recognized marker always wins: the file is authoritative about
+itself. Supersedes the dependency line in `PORTING-PLAN.md` §3.1 and `CLAUDE.md` §Technology stack,
+both updated.

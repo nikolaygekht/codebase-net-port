@@ -100,11 +100,12 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 ```
 net/                               # everything .NET lives here
 ├─ CodeBase.Net.sln
-├─ src/
-│  └─ CodeBase.Net/                 # the library (net8.0)
+├─ Directory.Build.props            # settings shared by every project below
+├─ CodeBase.Net/                    # the library (net8.0), no NuGet dependencies (ADR-17)
 ├─ tests/
 │  ├─ CodeBase.Net.Tests/           # xUnit v3: unit, component, fault-injection layers
 │  ├─ CodeBase.Net.Golden/          # golden-file + round-trip tests against net/corpus/
+│  ├─ CodeBase.Net.TestUtils/       # shared test infrastructure; a library, not a test project
 │  └─ CodeBase.Net.Benchmarks/      # BenchmarkDotNet
 └─ corpus/                          # checked-in golden DBF/CDX/FPT files + expected dumps
 test-files-generator/               # developer tool: drives the C library to build the corpus (§6)
@@ -118,8 +119,10 @@ Windows/MSVC developer tool that produces `net/corpus/`; its output is checked i
 `CodeBase.Net` never compiles or runs C. See §6.
 
 Single assembly `CodeBase.Net` (ADR-14 fixes the casing everywhere), GPL v3 (the licence of this port; the original Sequiter library is
-LGPL v3 — see the front matter). `System.Text.Encoding.CodePages` is a dependency (for
-cp437/cp850/cp1252 *record-text decoding only* — never for index keys, see §3.3).
+LGPL v3 — see the front matter), **with no NuGet dependencies**. Record text is decoded through
+whatever encoding provider the *host* registered — cp437/cp850/cp1252/cp1250, and only for
+record-text decoding, never for index keys (§3.3). `System.Text.Encoding.CodePages` is therefore a
+test-project reference and a documented host requirement, not a library dependency (ADR-17).
 
 ### 3.2 Namespace / module layout and which spec governs each
 
@@ -288,8 +291,8 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 
 | ID | Capability | Priority | Status | Chief risk |
 |---|---|---|---|---|
-| `CORPUS` | Corpus + generator | **P0** | in progress — 4 DBF cases in, index cases missing | R11 |
-| `DBF-READ` | DBF reading | **P1** | not started | — |
+| `CORPUS` | Corpus + generator | **P0** | in progress — 5 DBF cases in, index cases missing | R11 |
+| `DBF-READ` | DBF reading | **P1** | in progress — metadata half done (step 001); records next | — |
 | `CDX-READ` | CDX reading & navigation | **P1** | not started | **R1** (highest) |
 | `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
@@ -322,9 +325,10 @@ value in attacking them early — but that is a judgement to make per step, not 
 - **Status:** the build harness is **done and working** — `build-lib.bat` / `build-gen.bat` /
   `config.bat` / `copy-corpus.bat`, 137 translation units, x86, compiled as C++, zero edits to
   `original/source`. Four no-index DBF cases are generated, dumped and checked in
-  (`net/corpus/README.md`), and the dump format's DBF/FPT half is settled. What remains is corpus
-  breadth (§6.3) — above all **indexed cases with multi-level trees** — and the index half of the
-  dump format.
+  (`net/corpus/README.md`), plus a fifth covering nullable fields and the `_NullFlags` bitmap, and
+  the dump format's DBF/FPT half is settled (extended by optional tokens only, ADR-16). What remains
+  is corpus breadth (§6.3) — above all **indexed cases with multi-level trees** — and the index half
+  of the dump format.
 - **Gate:** the generator builds from a clean checkout on a machine with only MSVC; regenerating
   produces **byte-identical** files (the DBF header date stamp is frozen by the generator, so there
   is no run-to-run divergence to mask — §8); every generated file is `d4check`-clean and round-trips
@@ -342,6 +346,9 @@ VFP reserved area, the `t4dblToFox` sign rule.
 - **Deliverable:** `CodeBase.Net.Dbf` open + header parse + field descriptors + record navigation
   (`Top/Bottom/Skip/Go/Eof/Bof/RecNo/RecCount`) + per-type field decode for all IN-scope types +
   `_NullFlags` + deleted-flag semantics. Read-only.
+- **Done so far:** open, header, stored descriptors and the resolved field table, with the memo
+  companion opened and its header read — `claude/dev/001-dbf-open-and-header/SUMMARY.md`. Gated on
+  the `header`, `[descriptors]` and `[fields]` sections of all five corpus dumps.
 - **Gate:** for every DBF in `net/corpus/`, C# decodes every field of every record identically to the
   checked-in dump (byte/value-exact including blank/`00000000` dates, currency ×10⁴, datetime
   julian+ms, 4-byte memo refs read as ints).
@@ -601,6 +608,12 @@ something different. Never use it for keys, indexes, or memos.
   port must likewise leave it zero — see `CDX-FORMAT.md` §10 for the `x4reverseShort` write quirk
   that makes any non-zero value diverge from the C library's bytes.
 - DBC 263-byte backlink is always zeroed by CodeBase; preserve on modify, never populate.
+- **A short fixed-width field at the end of a record.** The C library sizes a `B`/`H`/`Y`/`T`/`7`
+  read from the type's natural width and ignores the descriptor's length, so a field declared
+  narrower than its type reads into whatever follows. At the *end* of a record that is the C's own
+  allocation slack — undefined, not a behaviour, so there is nothing to reproduce. The port clamps at
+  the record boundary and treats the missing bytes as zero. Everywhere else the accessor widths are
+  copied exactly, including reading a neighbouring field's bytes. (Step 001.)
 - The `W`-field blank byte-order upstream quirk (`0x00,0x20` per char) — decide replicate vs fix and
   test the chosen behavior (`DBF-FORMAT.md` §11.2). Out of scope for v1 creation regardless.
 

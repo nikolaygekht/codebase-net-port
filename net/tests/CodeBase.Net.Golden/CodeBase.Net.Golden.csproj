@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Layer 4: real corpus files and their .dump.txt, through the public API only.
+    No test double ever appears here (DEV_APPROACH.md §5) — hence no Moq reference.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>CodeBase.Net.Golden</RootNamespace>
+    <AssemblyName>CodeBase.Net.Golden</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="AwesomeAssertions" Version="9.5.0" />
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="LiquidTestReports.Markdown" Version="1.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CodeBase.Net\CodeBase.Net.csproj" />
+    <ProjectReference Include="..\CodeBase.Net.TestUtils\CodeBase.Net.TestUtils.csproj" />
+  </ItemGroup>
+
+</Project>

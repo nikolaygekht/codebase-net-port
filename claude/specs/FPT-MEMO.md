@@ -150,6 +150,12 @@ compatibility == 30 (D4CREATE.C:940-945).
 When assigning to a memo field of a 0x30-format table, the field's null bit is cleared
 (`f4assignNotNull`, f4memo.c:670-673).
 
+**A memo field holding a block reference is therefore never null.** The clearing also happens on the
+deferred flush at append time: `memo4fileWrite` returns the new block id and `f4assignLong` writes it
+into the record (f4memo.c:790-807), which clears the bit again. A record assigned a memo *and* then
+marked null comes back **not null**; only an empty memo, whose id stays 0, leaves the bit set.
+Witnessed by `net/corpus/VFPNULL.DBF` record 7, which was generated to do exactly that.
+
 ### 3.5 DBF header linkage
 
 - Create, compatibility 30: DBF `version` byte = **0x30**, or **0x31** if the table uses
@@ -162,6 +168,11 @@ When assigning to a memo field of a 0x30-format table, the field's null bit is c
 - Open: `hasMemo = (version == 0x30) ? (hasMdxMemo & 0x02) : (version & 0x80)`; if set, the
   FPT with the same base name is opened (D4OPEN.C:2350-2362). Missing/unopenable memo file is
   a hard open failure (D4OPEN.C:2359-2360).
+  - The version tested is the **normalized** one, so `0x31` takes the first branch.
+  - **Consequence for VFP9:** `0x32` takes the *else* branch, and `0x32 & 0x80 == 0`, so
+    **CodeBase never opens a VFP9 table's memo file** however `hasMdxMemo` is set. That is a
+    defect in the original rather than a design, but a port that "fixes" it diverges from the
+    reference implementation invisibly. Verified 2026-08-09 against `D4OPEN.C:2351-2361`.
 - CodeBase-proprietary header `flags[8]` at DBF offsets 12-19: `flags[1] == 1` marks "attached
   memo file contains potentially compressed entries" (d4data.h:3073-3081); set at create from
   `c4->compressedMemos` (D4CREATE.C:266-272), read at open into

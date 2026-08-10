@@ -25,7 +25,7 @@ exists in the step folder.
 |---|---|---|---|
 | 1 | **Frame** — one small, verifiable step | `DESIGN.md` §Goal | The goal names its own verification, in one sentence |
 | 2 | **Design** — classes and responsibilities (ECB + SOLID, §3) | `DESIGN.md` | Every class has one sentence of responsibility and an ECB role |
-| 3 | **Test pyramid** — what is proved at which layer (§4) | `PLAN.md` §Tests | Each layer names what only *it* can catch |
+| 3 | **Test pyramid** — what is proved at which layer (§4) | `PLAN.md` §Tests | Each layer names what only *it* can catch, and each test names a promise, not a mechanism (§4) |
 | 4 | **Seams** — what gets faked or mocked, and where (§5) | `DESIGN.md` §Seams | Every boundary the tests need to control is an interface |
 | 5 | **Plan** — ordered sub-steps, each with its own check | `PLAN.md` §Steps | Every sub-step ends in something runnable or assertable |
 | 6 | **Execute** | `STATE.md`, then `SUMMARY.md` | The step's gate passes, `SUMMARY.md` is written, and §5 of the porting plan reflects what the step advanced |
@@ -131,7 +131,7 @@ suite.
 |---|---|---|---|
 | **1. Unit** (most tests) | Entities, pure functions: julian dates, currency scaling, key transforms, descriptor decode | Every branch and edge of the byte layer, exhaustively | µs |
 | **2. Component** | Controllers over an in-memory boundary fake | Sequencing and state-machine bugs — seek/skip/EOF, buffer reuse — without a disk | ms |
-| **3. Fault injection** | Controllers over a **mocked** boundary (§5) | What the corpus physically cannot express: truncation, short reads, `IOException`, contention | ms |
+| **3. Fault injection** | Hostile input, in two families: **corrupt content** fed as hand-built bytes through an in-memory boundary, and **hostile I/O** injected with a **mock** (§5) | What the corpus physically cannot express, because every file in it is valid: a bad field type, an impossible length, a header that contradicts itself — and short reads, `IOException`, contention | ms |
 | **4. Golden / corpus** | Real files in `net/corpus/` + their `.dump.txt` | Whether we actually match the bytes the C library produces | ms–s |
 
 ### The two rules that make this work
@@ -150,6 +150,44 @@ good debugging tool. So:
 - when a code path has no corpus coverage, that is a signal to **add a generator case and
   regenerate** (`test-files-generator/`), not to settle for a unit test;
 - a step whose tests live only at layer 4 has an untestable design — go back to phase 2.
+
+### Tests assert the contract, not the implementation
+
+This binds every layer, and it is the rule most often broken by accident.
+
+**A test states what a unit promises its caller, and asserts only that.** The promise is the input
+it accepts, the value or state it produces, the invariants it maintains, and the errors it is
+documented to raise. Everything else — which helper it calls, in what order, how many times, what it
+stores privately, which branch it took — is *how*, and belongs to nobody but the code.
+
+The check: **if a rewrite that keeps the promise breaks the test, the test was wrong.** Reordering
+two reads, extracting a class, replacing a loop with a lookup table, caching a decode — none of that
+changes what a caller gets, so none of it should turn a suite red.
+
+| Assert this | Not this |
+|---|---|
+| `header.RecordLength` is 87 for these bytes | that `Parse` read offset 10 before offset 8 |
+| a truncated span throws `CodeBaseException` with `ErrorCode.Data` | that it threw before touching the descriptor region |
+| `table.Fields` has 13 entries and excludes `_NullFlags` | that `FieldResolver` was called once per descriptor |
+| the file handle is released after `Dispose` | that `Dispose` called `Close` then `Dispose` on the stream |
+
+Three habits that quietly turn a contract test into an implementation test:
+
+- **Re-deriving the expected value with the code under test's own logic.** If the test computes
+  `1 + fields.Sum(f => f.Length)` to check `RecordLength`, it asserts that the code agrees with
+  itself. Write the number down, or take it from the corpus.
+- **Reaching past the public surface.** `InternalsVisibleTo` exists for *seams* — the boundary
+  interfaces tests must fake — not as a licence to assert on private state. If a fact matters enough
+  to test, it is observable; if it is not observable, it is not a promise.
+- **`Verify` as a substitute for an assertion.** Covered in §5: verify an interaction only when the
+  interaction *is* the requirement.
+
+**Where interaction genuinely is the contract, say so in the test name.** "The lock is released even
+when the read throws" and "a read-only open never writes" are promises about interactions, and a
+mock is the only way to state them. That is a small, named set — not the default.
+
+**Name the promise, not the method.** `Open_MissingMemoFile_ThrowsData` survives a refactor;
+`DbfOpenerTest_Case3` does not even describe one.
 
 ### Expected values: where they may come from
 
@@ -192,6 +230,22 @@ AwesomeAssertions instead of FluentAssertions — check what a test dependency d
 Prefer a **hand-written in-memory fake** when the test needs *data* — an `InMemorySource` over a
 `byte[]` (often loaded straight from a corpus file) is clearer and faster than a mock with fifteen
 `Setup` calls, and it does not break when an unrelated call is added.
+
+**Some boundaries cannot be mocked at all, and it is not a library problem.** A method taking a
+`Span<byte>` — which `PORTING-PLAN.md` §3.3 mandates for every buffer — cannot be mocked by Moq,
+NSubstitute or FakeItEasy. Three reasons stack: `It.IsAny<Span<byte>>()` does not compile because a
+ref struct cannot be a generic argument; a lambda passing one cannot become an expression tree; and
+Castle DynamicProxy packs arguments into an `object[]`, which a ref struct cannot be boxed into, so
+the generated proxy throws `InvalidProgramException` on first call. Every byte-reading boundary in
+this port is therefore faked by hand.
+
+**A hand-written fake needs a contract test; a mock does not.** A fake is a second implementation of
+the interface, written from memory, and nothing makes it agree with the real one — a fake that
+returns a full buffer where a file returns a partial read gives every test above it false
+confidence. So write the promises **once**, in an abstract test class, and run **both** the fake and
+the real implementation through them (`RandomAccessSourceContract` is the worked example). Whenever
+a fake stands in for something with a real implementation, that pair of test classes is what keeps
+it honest.
 
 Reach for **Moq** when the test needs *behaviour that is hard to produce for real*: an `IOException`
 mid-read, a read that returns fewer bytes than asked, a lock that is already taken, a sequence of

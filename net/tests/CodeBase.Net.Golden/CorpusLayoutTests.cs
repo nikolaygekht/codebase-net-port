@@ -1,0 +1,51 @@
+using AwesomeAssertions;
+using CodeBase.Net.TestUtils;
+using Xunit;
+
+namespace CodeBase.Net.Golden;
+
+/// <summary>
+/// Guards the corpus itself, so that a suite driven by it cannot pass while covering nothing.
+///
+/// Every golden test enumerates the corpus. If discovery silently returned an empty set, through a
+/// wrong output path, a rename, or a publish that dropped the files, a data-driven suite would
+/// report success having asserted nothing at all. These tests fail loudly in that case, and they
+/// run before any decoding exists to be tested.
+/// </summary>
+[Trait("Layer", "Golden")]
+public sealed class CorpusLayoutTests
+{
+    /// <summary>The cases the corpus is documented to hold (net/corpus/README.md).</summary>
+    private static readonly string[] ExpectedTables =
+        ["DB3TYPE", "F2XMEMO", "VFPMEMO", "VFPNULL", "VFPTYPE"];
+
+    [Fact]
+    public void Corpus_HoldsExactlyTheDocumentedTables()
+    {
+        Corpus.TableNames.Should().Equal(ExpectedTables);
+    }
+
+    [Fact]
+    public void Corpus_PairsEveryTableWithADump()
+    {
+        foreach (string table in Corpus.TableNames)
+            File.Exists(Path.Combine(Corpus.Root, table + ".dump.txt")).Should().BeTrue($"{table} needs its dump");
+    }
+
+    [Theory]
+    [InlineData("F2XMEMO")]
+    [InlineData("VFPMEMO")]
+    [InlineData("VFPNULL")]
+    public void Corpus_PairsEveryMemoTableWithAnFpt(string table)
+    {
+        // Lower-case .fpt beside an upper-case .DBF is what CodeBase writes (d4defs.h:2589-2598).
+        // Asserted here because it is the reason companion resolution must be case-insensitive.
+        File.Exists(Path.Combine(Corpus.Root, table + ".fpt")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Corpus_FileIsReadable()
+    {
+        Corpus.ReadAllBytes("VFPNULL.DBF").Should().HaveCountGreaterThan(32);
+    }
+}

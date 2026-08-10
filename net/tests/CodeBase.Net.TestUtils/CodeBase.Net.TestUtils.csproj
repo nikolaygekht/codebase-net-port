@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared test infrastructure, referenced by both test projects. It is a plain
+    library, not a test project: it contains no tests and no xUnit types, so it
+    needs none of the test packages.
+
+    It exists because DEV_APPROACH.md §4 requires exactly one helper to resolve the
+    corpus directory, and both test projects need it — the golden layer to read the
+    files, the lower layers to load corpus bytes into in-memory fakes.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>CodeBase.Net.TestUtils</RootNamespace>
+    <AssemblyName>CodeBase.Net.TestUtils</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CodeBase.Net\CodeBase.Net.csproj" />
+  </ItemGroup>
+
+  <!--
+    The boundary fakes implement interfaces that are internal to the library, so they cannot be
+    public here. The test projects reach them the same way they reach the library's own internals.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodeBase.Net.Tests" />
+    <InternalsVisibleTo Include="CodeBase.Net.Golden" />
+  </ItemGroup>
+
+</Project>

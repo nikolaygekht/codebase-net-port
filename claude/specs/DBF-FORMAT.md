@@ -72,6 +72,9 @@ Values **accepted** on open (`dfile4setup`, D4OPEN.C:2144-2224):
   - `0x30` — VFP 3.0+; `compatibility` forced to 30 (D4OPEN.C:2206-2207); memo presence = `hasMdxMemo & 0x02` (D4OPEN.C:2352-2353).
   - `0x32` — VFP 9 tables are recognized read-compatibly: `version >= 0x30` gates VFP-only field types (D4OPEN.C:2565-2612), and the 'V'/'Q' field-length checks are relaxed for `0x32` (D4OPEN.C:2482-2487, 2538-2543).
   - Any other value (`0x03`, `0xF5`, `0x83`, ...) — treated as a FoxPro 2.5-level file; VFP-only field types cause an `e4data` error (`version < 0x30` checks, D4OPEN.C:2588-2611); memo presence = `version & 0x80` (D4OPEN.C:2355).
+
+> **The `version >= 0x30` comparison is SIGNED.** `d4->version` is a plain `char` (d4data.h:3220), signed on the compilers CodeBase is built with (MSVC without `/J`). Every byte from `0x80` up is therefore **negative** and compares *below* `0x30`, so `0xF5` — an ordinary FoxPro 2.x table with a memo — is correctly denied VFP-only types. Reading the comparison as unsigned silently **admits `B`/`H`/`Y`/`T`/`7`/`0` fields to tables the C library refuses them on**. Verified 2026-08-09 by a failing port test; the byte range that compares as "VFP or later" is exactly `0x30`-`0x7F`.
+
   - `0x04` (dBase 7) — explicitly rejected in the MDX build (`e4notSupported`, D4OPEN.C:2221-2223); FOX build has no special handling for it.
 
 ### 2.2 CodeBase `flags[8]` (bytes 12-19, only meaningful when version = 0x31)
@@ -85,7 +88,7 @@ Each is a whole byte, value `0` or `1` (d4data.h:3073-3081, D4CREATE.C:1406-1456
 | `flags[2]` (14) | Data file itself is compressed (compressed-table info stored after the header at `headerLen`, D4OPEN.C:2766-2788) (D4CREATE.C:1443) |
 | `flags[3]` (15) | Table contains an auto-timestamp field (D4CREATE.C:1419) |
 | `flags[4]` (16) | Header uses the long-field-name descriptor layout, §5.4 (D4CREATE.C:1455) |
-| `flags[5..7]` | Must be 0; unknown set flags make the file unopenable by this engine (D4OPEN.C:2186-2187) |
+| `flags[5..7]` | Must be 0; unknown set flags make the file unopenable by this engine (D4OPEN.C:2186-2187). **The real check is a `memcmp` of all 8 bytes** against a mask built only from flags that equal exactly 1, so a *known* flag holding any value other than 0 or 1 also fails |
 
 All five features require `compatibility == 30`; requesting them otherwise returns `e4compatibility` (D4CREATE.C:1395-1456).
 
@@ -147,7 +150,7 @@ Struct `FIELD4IMAGE` (d4data.h:2933-2947), written verbatim per field (D4CREATE.
 
 | Offset | Len | Type | Field | Description |
 |--------|-----|------|-------|-------------|
-| 0 | 11 | char[11] | `name` | Field name, upper-cased, space/NUL-trimmed, zero-padded (image is memset 0 then `u4ncpy`/`c4trimN`/`c4upper`, D4CREATE.C:1488-1491). On open compared case-insensitively; `_NullFlags` is matched by `memcmp` of 10 bytes (D4OPEN.C:2611). |
+| 0 | 11 | char[11] | `name` | Field name, upper-cased **at create**, space/NUL-trimmed, zero-padded. **On open every name is upper-cased again** (`c4upper` on `longName`, D4OPEN.C:316), so `f4name` may differ in case from the stored bytes — `_NullFlags` is stored mixed-case and reported as `_NULLFLAGS`, while the system-field check compares the **stored** bytes case-sensitively (D4OPEN.C:2611) (image is memset 0 then `u4ncpy`/`c4trimN`/`c4upper`, D4CREATE.C:1488-1491). On open compared case-insensitively; `_NullFlags` is matched by `memcmp` of 10 bytes (D4OPEN.C:2611). |
 | 11 | 1 | char | `type` | Field type character, upper-cased (D4CREATE.C:1493-1494). See §6. |
 | 12 | 4 | i32 LE | `offset` | Offset of the field's data within the record (delete flag = offset 0, first field = 1). Written only in the FOX build (D4CREATE.C:1495-1500); **ignored on open** (offsets recomputed, D4OPEN.C:432-433). |
 | 16 | 1 | u8 | `len` | Field length low byte (d4data.h:2938) |
@@ -232,7 +235,15 @@ Constants from d4defs.h:2774-2821. `r4charBin`('Z') and `r4memoBin`('X') are cre
 | `'6'` | `r5ui8` | 8 | (8, 0, 0x04) (D4CREATE.C:1587-1589) — CodeBase extension |
 | `'7'` | `r4dateTimeMilli` | 8 | (8, 0, 0x04) (D4CREATE.C:1572-1574) — CodeBase extension (datetime keeping milliseconds) |
 
-Open-time length validation (D4OPEN.C:2448-2649): `M`/`G` must be 4 or 10 in the FOX build (D4OPEN.C:2454-2457); `V` = 16 unless version 0x32; `5` = 8; `1`/`6` = 8; `I`/`P` = 4; `R` = 2; `Q` = 2 unless version 0x32; VFP-only types (`B` as double, `H`, `Y`, `T`, `7`, `0`) require `version >= 0x30` (D4OPEN.C:2564-2617). Unknown type characters ⇒ `e4fieldType` error (D4OPEN.C:2643-2647).
+Open-time length validation (D4OPEN.C:2448-2649). **Most of it does not fire in a release build** — read the switch case by case before relying on any of it:
+
+| Rule | When it fires |
+|---|---|
+| `I`/`P` = 4, `R` = 2, `Q` = 2 (relaxed at 0x32), `V` = 16 (relaxed at 0x32), `5` = 8, `1`/`6` = 8 | **Always** |
+| `M`/`G` must be 4 or 10 | **`#ifdef E4MISC` only** — debug builds (D4OPEN.C:2453-2463) |
+| `C`, `N`, `F`, `D`, `L`, `B`, `H`, `Y`, `T`, `7`, `0` lengths | **Never checked at all** |
+
+So a release build opens a `D` of 7 bytes, an `L` of 2, a `Y` of 7 and a `M` of 5 without complaint. A reader that rejects them is *less* compatible than the original, not more. What keeps that safe is the unconditional record-width check (§2.6), not the type rules. VFP-only types (`B` as double, `H`, `Y`, `T`, `7`, `0`) require `version >= 0x30`, signed (§2.1) (D4OPEN.C:2564-2617). Unknown type characters ⇒ `e4fieldType` error (D4OPEN.C:2643-2647).
 
 ---
 

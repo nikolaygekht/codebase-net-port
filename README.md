@@ -9,11 +9,14 @@ Visual FoxPro-compatible `DBF` tables, `CDX` compound indexes, and `FPT` memo fi
 
 ## What it is
 
-CodeBase is a mature C library (originally by Sequiter Software, Inc., ~117k lines) implementing the
-xBase / dBASE family of database files, with full DBF, CDX index and FPT memo support. This project
-re-implements the **stand-alone, Visual FoxPro-compatible** subset of that engine as idiomatic C#, so
-that .NET applications can work with legacy xBase data — and so that files written by this library
-are openable and correctly navigable by Visual FoxPro and by the original C library, and vice versa.
+[CodeBase](https://github.com/MPSystemsServices/CodeBase-for-DBF) is a mature C library by Sequiter,
+Inc. (~117k lines) implementing the xBase / dBASE family of database files, with full DBF, CDX index
+and FPT memo support. Formerly proprietary, it was **released as open source under the LGPL v3 in
+2018** and is published at that repository by M-P Systems Services, Inc. under agreement with
+Sequiter. This project re-implements the **stand-alone, Visual FoxPro-compatible** subset of that
+engine as idiomatic C#, so that .NET applications can work with legacy xBase data — and so that files
+written by this library are openable and correctly navigable by Visual FoxPro and by the original C
+library, and vice versa.
 
 "Byte-for-byte" is the whole point. Index key ordering and CDX leaf compression must reproduce the
 exact stored bytes, not merely an equivalent result. This is a rewrite in the spirit of the
@@ -52,7 +55,21 @@ Multi-table joins, Unicode collated keys, additional collations and DBT memo are
 
 ## Requirements
 
-.NET 8 or later. No native dependencies, and nothing platform-specific in the library itself.
+.NET 8 or later. No native dependencies, no NuGet dependencies, and nothing platform-specific in the
+library itself.
+
+One thing the host application must do: DBF record text is stored in a legacy code page
+(cp437/cp850/cp1252/cp1250), and .NET 8 does not provide those encodings until a provider is
+registered. The library reads whatever you registered and never registers one itself, because doing
+so would change `Encoding.GetEncoding` for every other component in your process. So if you read text
+from a table, reference `System.Text.Encoding.CodePages` and call this once at start-up:
+
+```csharp
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+```
+
+Alternatively, set `CodeBaseEngine.DefaultEncoding` to an encoding you already hold — that covers
+tables whose code-page byte is unmarked or unrecognized without any provider at all.
 
 ## Documentation
 
@@ -67,5 +84,6 @@ Multi-table joins, Unicode collated keys, additional collations and DBT memo are
 
 Licensed under the **GNU General Public License v3** (see [`LICENSE`](LICENSE)).
 
-The original CodeBase library by Sequiter, Inc. is distributed under the GNU Lesser General Public
-License v3; this port is a derivative work relicensed under GPL v3 as permitted by the LGPL.
+The original [CodeBase](https://github.com/MPSystemsServices/CodeBase-for-DBF) library by Sequiter,
+Inc. is distributed under the GNU Lesser General Public License v3; this port is a derivative work
+relicensed under GPL v3 as permitted by the LGPL.

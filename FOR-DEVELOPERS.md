@@ -19,7 +19,7 @@ them. **Building or testing CodeBase.NET never compiles or runs C.** See ADR-01 
 
 | Path | Contents |
 |------|----------|
-| `net/` | Everything .NET — `net/src/` (library), `net/tests/`, and `net/corpus/` |
+| `net/` | Everything .NET — `net/CodeBase.Net/` (the library), `net/tests/`, and `net/corpus/` |
 | `net/corpus/` | Checked-in golden `DBF`/`CDX`/`FPT` files with their expected dumps — see its [README](net/corpus/README.md) |
 | `test-files-generator/` | Windows/MSVC tool that drives the original C library to produce the corpus — see its [README](test-files-generator/README.md). Not part of the solution, not a test dependency |
 | `original/source/` | The original CodeBase C source. **Read-only reference — never modified** |
@@ -57,7 +57,18 @@ dotnet build   net/CodeBase.Net.sln
 dotnet test    net/CodeBase.Net.sln
 ```
 
-*(The solution does not exist yet — the port is pre-implementation. See `STATE.md`.)*
+Four projects: `CodeBase.Net` (the library — **no package references**, deliberately, ADR-17),
+`CodeBase.Net.Tests` (layers 1-3), `CodeBase.Net.Golden` (layer 4, against `net/corpus/`), and
+`CodeBase.Net.TestUtils`, a plain library holding the test infrastructure both test projects share
+— the corpus locator and the in-memory boundary fakes. Settings common to all four are in
+`net/Directory.Build.props`, including `TreatWarningsAsErrors`.
+
+Two things that will bite if you change them without knowing why. The solution is the **classic
+`.sln`** format, not `.slnx`: the .NET 10 SDK now defaults to `.slnx`, which the Sonar scanner and
+older tooling do not read — create solutions with `dotnet new sln --format sln`. And the test
+projects are `<OutputType>Exe</OutputType>`, because **xUnit v3 test projects are stand-alone
+executables**, not libraries a runner loads; `dotnet test` still works through
+`xunit.runner.visualstudio`.
 
 The name is **`CodeBase.Net`**, capital B, everywhere — solution, assembly, root namespace, test
 projects, SonarQube project key (ADR-14).
@@ -89,6 +100,12 @@ addition to the usual test SDK, xUnit and AwesomeAssertions references:
 </PackageReference>
 <PackageReference Include="LiquidTestReports.Markdown" Version="1.0.9" />
 ```
+
+Test projects that decode record text also need `System.Text.Encoding.CodePages`, and must call
+`Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)` once per test assembly. **The
+library deliberately does not do this** — registering an encoding provider is a process-wide side
+effect and belongs to the host application (ADR-17). The package must never be added to
+`net/CodeBase.Net`.
 
 | Package | Produces | Consumed by |
 |---|---|---|

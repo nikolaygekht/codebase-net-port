@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Layers 1-3: unit, component and fault injection (DEV_APPROACH.md §4). -->
+
+  <PropertyGroup>
+    <RootNamespace>CodeBase.Net.Tests</RootNamespace>
+    <AssemblyName>CodeBase.Net.Tests</AssemblyName>
+    <!-- xUnit v3 test projects are stand-alone executables, not runner-loaded libraries. -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="AwesomeAssertions" Version="9.5.0" />
+    <!-- 4.20.0/4.20.1 bundled SponsorLink, which read the developer's git email at build time. -->
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- Coverage and test-result files Sonar reads; see FOR-DEVELOPERS.md. -->
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="LiquidTestReports.Markdown" Version="1.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CodeBase.Net\CodeBase.Net.csproj" />
+    <ProjectReference Include="..\CodeBase.Net.TestUtils\CodeBase.Net.TestUtils.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -20,5 +20,6 @@ int caseDb3Type( CODE4 *cb, const char *outDir );   /* DB3TYPE.DBF — 0x03 */
 int caseVfpType( CODE4 *cb, const char *outDir );   /* VFPTYPE.DBF — 0x30 */
 int caseF2xMemo( CODE4 *cb, const char *outDir );   /* F2XMEMO.DBF — 0xF5 + FPT */
 int caseVfpMemo( CODE4 *cb, const char *outDir );   /* VFPMEMO.DBF — 0x30 + FPT */
+int caseVfpNull( CODE4 *cb, const char *outDir );   /* VFPNULL.DBF — 0x30 + FPT, _NullFlags */
 
 #endif /* GEN_CASES_H */

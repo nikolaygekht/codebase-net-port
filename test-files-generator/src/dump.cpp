@@ -145,8 +145,14 @@ int dumpTable( CODE4 *cb, const char *outDir, const char *fileName )
    for ( i = 1; i <= nFields; i++ )
    {
       FIELD4 *f = d4fieldJ( data, (short)i );
-      fprintf( out, "%d %s type=%c len=%d dec=%d\n",
+      fprintf( out, "%d %s type=%c len=%d dec=%d",
                i, f4name( f ), f4type( f ), (int)f4len( f ), (int)f4decimals( f ) );
+      /* Emitted only when true, so tables without nullable fields keep the
+       * dump they had. Note d4numFields excludes the hidden _NullFlags field
+       * (d4declar.h:594), so this list is one shorter than [descriptors]. */
+      if ( f4nullable( f ) )
+         fprintf( out, " nullable=1" );
+      fprintf( out, "\n" );
    }
 
    fprintf( out, "\n[records]\n" );
@@ -199,6 +205,24 @@ int dumpTable( CODE4 *cb, const char *outDir, const char *fileName )
                   break;
             }
          }
+
+         if ( f4null( f ) )
+            fprintf( out, " null=1" );
+
+         fprintf( out, "\n" );
+      }
+
+      /* The _NullFlags bitmap itself, raw. It is not part of the field list
+       * above (d4numFields hides it), so without this the port's null decoding
+       * would only be gated through the null=1 flags and never against the
+       * stored bytes. Absent — hence invisible in the other dumps — when the
+       * table has no nullable fields. */
+      if ( d4fieldNull( data ) != 0 )
+      {
+         FIELD4 *nf = d4fieldNull( data );
+
+         fprintf( out, "  %-10s ", f4name( nf ) );
+         dumpEscaped( out, f4ptr( nf ), (unsigned long)f4len( nf ) );
          fprintf( out, "\n" );
       }
    }

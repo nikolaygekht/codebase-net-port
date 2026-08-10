@@ -49,6 +49,7 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseVfpType( &cb, outDir );
    if ( rc == 0 ) rc = caseF2xMemo( &cb, outDir );
    if ( rc == 0 ) rc = caseVfpMemo( &cb, outDir );
+   if ( rc == 0 ) rc = caseVfpNull( &cb, outDir );
 
    code4close( &cb );
    code4initUndo( &cb );

@@ -136,10 +136,11 @@ Two encodings, selected by the field's descriptor length (`f4len(field)`):
      number; written with `c4ltoa45(value, ptr, 10)` (F4LONG.C:115-116) and parsed with
      `c4atol(ptr, 10)` (F4LONG.C:343). Blank = 10 spaces (`f4blank` space-fills non-binary
      fields, F4FIELD.C:128-131); `c4atol` of spaces yields 0 = no memo.
-   - (`c4ltoa45` body is not present in this source drop — declared d4declar.h:1898; usage
-     comments show negative width = zero-fill, positive = normal, e4functi.c:870-874.
-     [UNVERIFIED detail: space- vs zero-padding of positive widths — verify against a real VFP
-     file: VFP uses leading spaces.])
+   - **Right-aligned and space-padded — witnessed by the corpus, 2026-08-11.** `c4ltoa45`'s body
+     is not in this source drop (declared d4declar.h:1898; usage comments show negative width =
+     zero-fill, positive = normal, e4functi.c:870-874), so this was settled from a real file
+     instead: `net/corpus/F2XMEMO.DBF` stores block 1 as `"         1"`, block 10 as
+     `"        10"`, and an absent memo as ten spaces, which `c4atol` reads back as 0.
 
 Field types that use memo references: `r4memo` = 'M', `r4gen` = 'G' (d4defs.h:2782-2785), and
 `r4memoBin` = 'X' (d4defs.h:2809) which is stored in the DBF descriptor as type 'M' with
@@ -312,10 +313,30 @@ f4memoWrite f4memo.c:783-787).
   (m4file.c:203-204, f4memo.c:853-858), as are `f4memoAssignFile`/`f4memoFile`
   (f4memo.c:1029-1035, 1147-1151).
 - `c4compress`/`c4uncompress` bodies are not in this source drop (declared
-  d4declar.h:2451-2452). Comments identify zlib (m4file.c:746); a QuickLZ build variant also
-  exists (`S4COMPRESS_QUICKLZ`, d4data.h:2820-2823). [UNVERIFIED: exact stream format
-  (raw deflate vs zlib-wrapped) — for the port, treat type-3 as optional/CodeBase-only and
-  verify against a produced file if needed.]
+  d4declar.h:2451-2452; the "moved to c4code.c" comment at c4conlow.c:67 refers to a drop we do
+  not have — C4CODE.C here contains no compression). **The stream is zlib-wrapped (RFC 1950), not
+  raw deflate.** Evidence, added 2026-08-11: `source/zlib.h` is in the drop (v1.1.4), and the
+  sibling compressor that *is* present — `connect4lowCompress`/`connect4lowUncompress`,
+  c4conlow.c:69-152 — uses zlib's high-level `compress2()`/`uncompress()`, which by definition
+  produce and consume the wrapped format. This is strong inference from a sibling call site in the
+  same codebase, not a reading of the memo path itself, so it is evidence rather than proof.
+- **The trailing `Bool5` argument of `c4compress` means "prefix the uncompressed length".** The
+  memo path passes `1` (m4file.c:762); every other caller passes `0` (D4CREATE.C:2790, 2852,
+  f4create.c:1196, f4write.c:412). Corroborated by the buffer sizing — `ptrLen*1.001 + 1 + 12 +
+  sizeof(long)`, "extra bytes required - long for length, extra for zlib" (m4file.c:746) — and by
+  the reader taking a 4-byte native-endian length off the front of the data before inflating
+  (m4file.c:199-212). So the memo entry layout differs from the file-compression layout by that
+  prefix.
+- **A type-3 entry is not self-describing.** `S4COMPRESS_QUICKLZ` is a real build option
+  (D4all.h:126, commented out; no QuickLZ sources shipped) and nothing on disk records which
+  algorithm produced the entry. A file written by a QuickLZ build is indistinguishable from a zlib
+  one.
+- **No compressed entry exists in the corpus**, because the generator compiles with
+  `S4OFF_COMPRESS` (`test-files-generator/src/cb-config.h:55`, set when zlib's sources turned out
+  not to be in the drop). Note what this is and is not: zlib's absence from the drop is not an
+  obstacle to *reading* — .NET supplies RFC 1950 inflate in the base class library — and adding zlib
+  to the generator is ordinary work. The gap is a **corpus** gap: producing a case also needs the
+  `c4compress` wrapper reconstructed, and until a case exists a reader for type 3 is ungatable.
 
 ### 3.10 Memo compaction — d4memoCompress
 
@@ -468,18 +489,27 @@ only (§3.4 option 2; the 4-byte form is FOX-specific, D4CREATE.C:922-930).
 
 ## 7. Open questions / risks for the C# port
 
-1. **`c4ltoa45` exact padding** for 10-byte ASCII memo references is not in this source drop
-   (only the declaration, d4declar.h:1898). VFP writes right-aligned space-padded numbers;
-   verify against a FoxPro 2.x-format file before implementing the 10-byte path. (The primary
-   4-byte VFP path is fully verified.)
+1. ~~**`c4ltoa45` exact padding** for 10-byte ASCII memo references~~ — **closed 2026-08-11.**
+   Right-aligned and space-padded, blank meaning no memo. `c4ltoa45`'s body is still absent
+   (d4declar.h:1898), so this was settled by the corpus rather than by the source: see §3.4. Both
+   reference encodings are now verified end to end against `net/corpus/`.
 2. **Default `memSizeMemo`** (FPT block size when the user does not set one) is initialized in
    `code4init`, whose implementation is not in this drop. [UNVERIFIED — VFP's default is 64;
    CodeBase docs historically say 512. Decide and document a default; any multiple works since
    blockSize is read from the header at open.]
-3. **Compressed memos (type 3)**: `c4compress` body missing; stream format (zlib wrapper vs raw
-   deflate, QuickLZ variant) unverified. Since the feature is explicitly FoxPro-incompatible
-   (m4memo.c:31-33), recommend the port reads type 3 as an error or optional extension, and
-   never writes it by default.
+3. **Compressed memos (type 3)** — *stream format resolved 2026-08-11; the blocker is now the gate,
+   not the format.* It is zlib-wrapped, with a 4-byte native-endian uncompressed-length prefix (see
+   §3.9 for the evidence). What remains missing is the ability to **produce** one: zlib's sources
+   are not in the drop, `c4compress`'s body is not either, and the generator compiles with
+   `S4OFF_COMPRESS`. So a reader for type 3 could not be gated against any file the C library wrote.
+   The port therefore **refuses type 3** and never writes it *for now* — a sequencing decision, not
+   a technical limit, and not a judgement that the feature is out of scope. It is a CodeBase-only
+   extension (`m4memo.c:31-32`: "those memo files are then incompatible with FoxPro"), but this is a
+   port *of CodeBase*, so files the original library writes are primary input; a deployment that
+   ever called `code4memoCompress` has type-3 entries and needs them read. Reading needs no dependency (`System.IO.Compression.ZLibStream`); lifting the
+   refusal is a `CORPUS` task of modest size: add zlib to the generator, reconstruct the
+   `c4compress` wrapper from the reader's layout, and add a case with `code4memoCompress` on and a
+   payload longer than one block (writing is opt-in *and* only above one block, m4file.c:734-743).
 4. **Orphaned-block growth**: faithful porting means FPT files grow monotonically under heavy
    memo churn until `d4memoCompress` is run. Decide whether the port exposes an equivalent
    compaction API (it should, for parity).

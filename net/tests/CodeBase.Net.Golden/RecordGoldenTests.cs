@@ -1,16 +1,20 @@
 using AwesomeAssertions;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.Memo;
 using CodeBase.Net.TestUtils;
 using Xunit;
 
 namespace CodeBase.Net.Golden;
 
 /// <summary>
-/// The gate for step 002: every record of every corpus table, against what the C library read back.
+/// The gate: every field of every record of every corpus table, against what the C library read back.
 ///
 /// Layers below this can pass on a self-consistent misreading — a decoder can be perfect while every
 /// record is fetched one too early, and the whole suite would still be green. This is the only thing
 /// that compares against the reference implementation, so it is what says the port is right.
+///
+/// Nothing is skipped. Step 002 gated the ordinary fields and subtracted the memo ones from its
+/// count; step 003 closed that half, so the assertion count must now reach the field list exactly.
 /// </summary>
 [Trait("Layer", "Golden")]
 public sealed class RecordGoldenTests
@@ -94,7 +98,6 @@ public sealed class RecordGoldenTests
         using Table table = engine.OpenTable(Corpus.PathOf(expected.FileName));
 
         int fieldsAsserted = 0;
-        int memoFieldsSkipped = 0;
 
         foreach (DumpRecord record in expected.Records)
         {
@@ -105,14 +108,6 @@ public sealed class RecordGoldenTests
             {
                 FieldDefinition field = table.Fields[value.Name];
 
-                // Memo payloads and the binary-marked types are step 003. Counted rather than
-                // silently passed over, so the skip cannot grow without the count noticing.
-                if (value.IsMemo || field.Type is 'X' or 'G' or 'Z')
-                {
-                    memoFieldsSkipped++;
-                    continue;
-                }
-
                 AssertField(table, field, value, record.Number);
                 fieldsAsserted++;
             }
@@ -120,7 +115,11 @@ public sealed class RecordGoldenTests
             AssertNullFlags(table, expected, record);
         }
 
-        fieldsAsserted.Should().Be(ExpectedFieldCount(expected) - memoFieldsSkipped);
+        // Step 002 skipped the memo fields and subtracted them here; step 003 closed that half, so
+        // the count must now reach the field list exactly. Nothing is skipped, and this is what says
+        // so — a field quietly dropped from the loop shows up as a shortfall.
+        fieldsAsserted.Should().Be(
+            ExpectedFieldCount(expected), "every field of every record is asserted, none skipped");
         fieldsAsserted.Should().BeGreaterThan(0, "a gate that asserts nothing proves nothing");
     }
 
@@ -133,6 +132,18 @@ public sealed class RecordGoldenTests
 
         table.GetRawBytes(field).Should().Equal(value.Bytes, because);
         table.IsNull(field).Should().Be(value.IsNull, because);
+
+        if (value.IsMemo)
+        {
+            // The in-record reference, then the entry behind it. Both come from the dump, so a
+            // reference that resolved to the wrong block would have to hit an entry whose payload
+            // happens to match — which is what makes this an assertion and not a tautology.
+            table.GetMemoBlock(field).Should()
+                 .Be(MemoReference.Read(value.Bytes), "{0} block number", because);
+            table.GetMemoLength(field).Should().Be((int)value.MemoLength!.Value, "{0} length", because);
+            table.GetMemoBytes(field).Should().Equal(value.MemoBytes!, "{0} payload", because);
+            table.GetMemoType(field).Should().Be(MemoType.Text, "{0} type", because);
+        }
 
         if (value.Number is double number)
         {

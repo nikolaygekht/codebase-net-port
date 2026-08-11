@@ -1,3 +1,5 @@
+using CodeBase.Net.Memo;
+
 namespace CodeBase.Net.Dbf;
 
 /// <summary>
@@ -15,14 +17,21 @@ namespace CodeBase.Net.Dbf;
 internal static class BlankRecord
 {
     /// <summary>
-    /// Types whose blank value is zero bytes rather than spaces.
+    /// Types whose blank value is zero bytes rather than spaces, whatever their width.
+    /// </summary>
+    /// <value>The fixed-width binary types, taken from [c]f4blank[/c]'s own list.</value>
+    private static readonly char[] ZeroBlankTypes = ['I', 'Y', 'T', 'B', 'X', 'Z'];
+
+    /// <summary>
+    /// Types whose blank value depends on which reference encoding the field uses.
     /// </summary>
     /// <value>
-    /// The fixed-width binary types, taken from [c]f4blank[/c]'s own list. Note that a plain memo
-    /// and a general field are not among them and do blank to spaces, while the binary memo and
-    /// binary character variants blank to zero.
+    /// A memo reference blanks to zeros in its four-byte binary form and to spaces in its ten-byte
+    /// text form, because the blank has to parse back as "no memo" in whichever encoding is in use.
+    /// Both are witnessed by the corpus: every empty reference in the Visual FoxPro tables is four
+    /// zero bytes and every one in the FoxPro 2.x table is ten spaces. See FPT-MEMO.md section 3.4.
     /// </value>
-    private static readonly char[] ZeroBlankTypes = ['I', 'Y', 'T', 'B', 'X', 'Z'];
+    private static readonly char[] ReferenceTypes = ['M', 'G', 'X'];
 
     /// <summary>
     /// Builds the blank record for a table's layout.
@@ -40,7 +49,7 @@ internal static class BlankRecord
 
         foreach (FieldDefinition field in fields)
         {
-            if (!ZeroBlankTypes.Contains(field.Type))
+            if (!BlanksToZero(field))
                 continue;
 
             // A descriptor that does not fit the record is the opener's to refuse, not this one's;
@@ -52,4 +61,11 @@ internal static class BlankRecord
 
         return blank;
     }
+
+    /// <summary>
+    /// Returns whether a field's blank value is zero bytes rather than spaces.
+    /// </summary>
+    private static bool BlanksToZero(FieldDefinition field) =>
+        ZeroBlankTypes.Contains(field.Type) ||
+        (ReferenceTypes.Contains(field.Type) && field.Length == MemoReference.BinaryWidth);
 }

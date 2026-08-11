@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using CodeBase.Net.Memo;
 
 namespace CodeBase.Net.Dbf;
 
@@ -32,6 +33,24 @@ internal static class FieldValueDecoder
         ['7'] = FoxDateTime.Length,
         ['H'] = 4,
     };
+
+    /// <summary>
+    /// Types whose value is a reference to a memo entry rather than the value itself.
+    /// </summary>
+    /// <value>
+    /// A plain memo, a binary memo and a general field. The bytes in the record are a block number;
+    /// the content lives in the memo file.
+    /// </value>
+    private static readonly char[] MemoTypes = ['M', 'X', 'G'];
+
+    /// <summary>
+    /// Types that hold bytes rather than text, and so refuse to be decoded through a code page.
+    /// </summary>
+    /// <value>
+    /// The binary memo, the general field and the binary character field. Decoding one always
+    /// produces a string and the string is always meaningless, which the caller cannot see.
+    /// </value>
+    private static readonly char[] BinaryTypes = ['X', 'G', 'Z'];
 
     /// <summary>
     /// Types that refuse to be read as a number, whether whole or not.
@@ -183,6 +202,50 @@ internal static class FieldValueDecoder
 
         return FoxDateTime.ToDateTime(Bytes(record, field));
     }
+
+    /// <summary>
+    /// Returns whether a field's value is a reference to a memo entry.
+    /// </summary>
+    /// <param name="field">The field to test.</param>
+    /// <returns>True for a memo, a binary memo or a general field.</returns>
+    public static bool IsMemo(FieldDefinition field) => MemoTypes.Contains(field.Type);
+
+    /// <summary>
+    /// Returns whether a field holds bytes rather than text.
+    /// </summary>
+    /// <param name="field">The field to test.</param>
+    /// <returns>True where decoding through a code page would be meaningless.</returns>
+    public static bool IsBinary(FieldDefinition field) => BinaryTypes.Contains(field.Type);
+
+    /// <summary>
+    /// Reads the block number a memo field points at.
+    /// </summary>
+    /// <param name="record">The record to read from.</param>
+    /// <param name="field">The field to read.</param>
+    /// <returns>The block number, or zero where the record has no memo in this field.</returns>
+    /// <exception cref="CodeBaseException">The field does not hold a memo reference.</exception>
+    public static int MemoBlock(RecordBuffer record, FieldDefinition field)
+    {
+        Refuse(
+            field,
+            !IsMemo(field),
+            "read as a memo",
+            "only a memo, binary memo or general field refers to one");
+
+        return MemoReference.Read(Bytes(record, field));
+    }
+
+    /// <summary>
+    /// Refuses to decode a field whose bytes are not text.
+    /// </summary>
+    /// <param name="field">The field about to be decoded.</param>
+    /// <exception cref="CodeBaseException">The field holds bytes rather than text.</exception>
+    public static void RefuseIfBinary(FieldDefinition field) =>
+        Refuse(
+            field,
+            IsBinary(field),
+            "read as text",
+            "it is marked binary, so its bytes are not in the table's code page. Read them instead");
 
     /// <summary>
     /// Returns how many bytes of the record a field's value occupies.

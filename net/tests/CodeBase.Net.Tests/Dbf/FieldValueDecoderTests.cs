@@ -151,6 +151,70 @@ public sealed class FieldValueDecoderTests
         FieldValueDecoder.DateTime(buffer, field).Should().Be(new DateTime(1981, 1, 1));
     }
 
+    [Theory]
+    [InlineData('M')]
+    [InlineData('X')]
+    [InlineData('G')]
+    public void IsMemo_IsTrueForTheThreeTypesWhoseValueLivesElsewhere(char type)
+    {
+        FieldValueDecoder.IsMemo(Field(type, 4)).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData('C')]
+    [InlineData('Z')]
+    [InlineData('N')]
+    public void IsMemo_IsFalseForATypeStoredInTheRecord(char type)
+    {
+        // Z especially: a binary character field is stored in the record like any other character
+        // field and shares nothing with the memo path. See Decision 12.
+        FieldValueDecoder.IsMemo(Field(type, 8)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData('C')]
+    [InlineData('N')]
+    [InlineData('D')]
+    public void MemoBlock_OfAFieldThatHoldsNoReference_IsRefused(char type)
+    {
+        Action act = () => Decode(type, 8, d => FieldValueDecoder.MemoBlock(d.Record, d.Field));
+
+        act.Should().Throw<CodeBaseException>().WithMessage("*read as a memo*");
+    }
+
+    [Theory]
+    [InlineData('X')]
+    [InlineData('G')]
+    [InlineData('Z')]
+    public void ABinaryField_RefusesToBeReadAsText(char type)
+    {
+        // Decoding bytes that are not in the table's code page always produces a string and the
+        // string is always meaningless, which the caller has no way to notice. See Decision 11.
+        Action act = () => FieldValueDecoder.RefuseIfBinary(Field(type, 8));
+
+        act.Should().Throw<CodeBaseException>().WithMessage("*marked binary*");
+    }
+
+    [Theory]
+    [InlineData('C')]
+    [InlineData('M')]
+    public void ATextFieldIsNotRefused(char type)
+    {
+        // A plain memo is text: it is the binary variants that are not.
+        Action act = () => FieldValueDecoder.RefuseIfBinary(Field(type, 8));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void MemoBlock_ReadsTheReferenceOutOfTheRecord()
+    {
+        int block = Decode(
+            'M', 4, d => FieldValueDecoder.MemoBlock(d.Record, d.Field), [0x1B, 0x00, 0x00, 0x00]);
+
+        block.Should().Be(27);
+    }
+
     [Fact]
     public void AFixedWidthType_ThatWouldLeaveTheRecord_IsStillRefused()
     {

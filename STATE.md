@@ -1,10 +1,10 @@
 # Project state
 
-**Updated:** 2026-08-11 · step 002 is committed to `main` and the tree is clean; nothing is pushed
-yet.
-**Active step:** none. [`002-dbf-records-and-fields`](claude/dev/002-dbf-records-and-fields/) is
-**closed** — records and ordinary field values, gate green, **630 tests**. Step 003, memo payloads
-and the binary-marked types, is next and is not yet designed.
+**Updated:** 2026-08-11 · step 003 is committed to `main` and the tree is clean. Nothing is pushed
+yet: two commits are waiting, step 002's and this one.
+**Active step:** none. [`003-memo-and-binary-types`](claude/dev/003-memo-and-binary-types/) is
+**closed**, and with it `DBF-READ` is **complete for reading**: **699 tests**, and the gate asserts
+every field of every record with nothing skipped.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -14,10 +14,10 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 
 ## 1. What is ready
 
-**A DBF can be read: its metadata, its records, and every ordinary field value.**
-`net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies** by design,
-ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test`
-is green on **630 tests**, 252 of them golden.
+**A DBF can be read, whole.** Metadata, records, every field value, and the memo behind a memo
+reference. `net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies**
+by design, ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and
+`dotnet test` is green on **699 tests**, 268 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -38,9 +38,12 @@ an encoding provider (ADR-19, ADR-20). Moving the cursor reads one record, and t
 read fields out of it — `GetString`, `GetRawBytes`, `GetBoolean`, `GetInt32`, `GetDouble`,
 `GetDecimal`, `GetDate`, `GetDateTime`, `IsNull`, plus `Deleted`, `Eof` and `Bof`.
 
-Every one of those is gated against the C library's own dump for all seven corpus tables and all 224
-of their records — **`[records]` included**, which was the one dump section nothing read. **What is
-still not readable is a memo payload** and the binary-marked types `X`, `G` and `Z`: step 003.
+Memo fields answer too — `GetMemoBytes`, `GetMemoString`, `GetMemoLength`, `GetMemoBlock`,
+`GetMemoType` — in both reference encodings, four-byte binary and ten-byte ASCII.
+
+**Everything is gated against the C library's own dump, with nothing skipped:** all seven corpus
+tables, all 224 records, every field, and all 224 memo values of which 153 are non-empty. The single
+refusal is a **compressed memo entry**, which no corpus case can gate yet (ADR-23, open).
 
 **`test-files-generator/`** builds and runs end to end (Windows/MSVC):
 
@@ -76,96 +79,63 @@ is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ## 2. Last session (2026-08-11)
 
-**Step 002 was reviewed, then executed end to end**, and both halves landed in one commit.
+**Step 003 was designed, planned and executed.** With it `DBF-READ` is complete for reading:
+**699 tests green**, 268 golden, and `RecordGoldenTests` now asserts **every field of every record
+of all seven tables with nothing skipped** — the counter step 002 used to subtract memo fields is
+gone, because there is nothing left to subtract. Read
+[`SUMMARY.md`](claude/dev/003-memo-and-binary-types/SUMMARY.md). Four things worth carrying forward:
 
-### The design review
+- **Both memo reference encodings are gated end to end.** 224 memo values, 153 of them non-empty,
+  across the five tables with an `.fpt`: block number, length, type and every payload byte. The
+  ten-byte ASCII form closed **`FPT-MEMO.md`'s first open question** — right-aligned, space-padded,
+  blank meaning no memo — settled from `F2XMEMO` because `c4ltoa45`'s body is not in the drop.
+- **A test written for this step found a bug step 002 had shipped.** `BlankRecord` decided a blank
+  memo reference by the type letter, following `f4blank`'s list, which puts `M` and `G` among the
+  space-filled types. The rule is actually the reference *width*: four bytes blank to zeros, ten to
+  spaces, so that the blank reads back as "no memo" in whichever encoding is in use. A four-byte
+  memo field at end of file was reporting block 538976288 — `0x20202020`. `FPT-MEMO.md` §3.4 already
+  said it correctly; the spec was right and the code was wrong.
+- **Compressed entries are refused, and the reason is narrower than it first looked** — **ADR-23**,
+  deliberately left `open`. Three claims were being run together: zlib's absence from the drop
+  (irrelevant — `ZLibStream` is in the base class library, so reading costs no dependency), the
+  stream format (now resolved as zlib-wrapped with a 4-byte length prefix, from `source/zlib.h` plus
+  the sibling `connect4lowUncompress`), and the absence of a corpus case (the actual reason). Also
+  recorded there: "it is CodeBase-only" is an argument *for* supporting it, since this is a port of
+  CodeBase and `CLAUDE.md` requires that files the original library writes are read correctly here.
+- **Mutation-checked four ways**, each against the five memo tables: the payload read from the block
+  start rather than past the header, the header read little-endian, `numChars` treated as including
+  the header, and the ten-byte reference parsed as binary. The first three fail 5 tables, the last
+  fails exactly 1 — `F2XMEMO`, the only ten-byte table. The blast radius matching the tables at risk
+  is itself evidence the tests point at the right thing.
 
-Every `FILE.C:line` citation in `DESIGN.md` was checked against the source. The substantive readings
-all held — `d4goEof`, the backwards-skip branch, the `r4entry` path, `E4PARM_HIGH` being on in the
-shipped build, all three `f4double` outcomes, `d4deleted`. Six findings: two citations were wrong
-(`d4bof`/`d4eof` transposed, one range off by one), the flag-reset rule was missing (`d4go` clears
-both flags, and `d4skip` clears the beginning flag before deciding where to go), the invalid position
-was an unnamed fourth state, `GetString` had no cited counterpart, and Q1 was answerable by citation.
-Decisions 14-16 came out of it, along with **ADR-21** and **ADR-22**.
-
-**Five of the six open questions closed without writing code.** Currency is fixed at four decimals —
-`d4create` hard-codes `(8, 4, 0x04)` (D4CREATE.C:1569-1571) and `f4currency` never reads `field->dec`,
-so the `Y(8,2)` generator case the plan held in reserve was retired. Text was settled by ADR-21: cp437
-for an unmarked table, best-effort decoding that never throws, the gate asserting decoded strings, and
-`GetString` returning the space-padded declared width as `f4str` does.
-
-### The execution
-
-**630 tests green, 252 golden.** The gate asserts every ordinary field of every record of all seven
-tables, and a separate suite walks each table four ways to prove the traversal itself. Read
-[`SUMMARY.md`](claude/dev/002-dbf-records-and-fields/SUMMARY.md) rather than the design or the plan.
-Five things worth carrying forward:
-
-- **`double.Parse` reproduces `c4atod` bit for bit on all 224 numeric values.** The step's chief risk,
-  closed on the first run, compared on the bit pattern. It matters more than it looks: **`c4atod`'s
-  body is not in this source drop** — nor are `c4atoi`, `c4atol`, `c4ltoa45`, `c4currencyToA` or
-  `c4atoCurrency`, all declarations only. The design's fallback of "port it verbatim" was never
-  available, so agreement was the only outcome that did not require reverse-engineering from 224
-  values.
-- **A correction to what the previous session recorded.** The note that a half character "silently
-  becomes U+FFFD" was wrong: .NET's default for the legacy code pages is an internal *best-fit*
-  fallback that yields **`?`**, and `DecoderFallback.ReplacementFallback` is `?` as well. Verified by
-  running it. `CodePageMap` now asks for `new DecoderReplacementFallback("\uFFFD")` explicitly, so a
-  question mark in a decoded field is a question mark the file holds, and the behaviour does not
-  depend on which provider the host registered.
-- **A table is walked four ways and must give the same records in the same order** — by number,
-  forwards, backwards, and backwards from past the end — each record identified by a field the dump
-  shows to be unique. This is what no per-record assertion can catch: a skip that jumps a record or a
-  walk that stops one short passes every field check in the suite.
-- **The gate was mutation-checked, and so was every cursor flag.** Shifting the record offset by one
-  record turns 28 golden tests red across every table. Mutating each flag transition in turn fails
-  between 1 and 5 tests apiece — except two flag-raises the C performs on the empty-table skip path,
-  which failed nothing and turned out to be **provably dead** (the end-of-file position of an empty
-  table is record one, and moving there raises the flag already; a negative record count, the one
-  input that would differ, is refused at open). They were removed. Four injected traversal bugs — a
-  skip that jumps a record, a `Bottom` landing early, a wrong end-of-file position, a walk stopping
-  short — each fail 7 to 14 of the scan tests. The suites also assert their own counts, because a
-  data-driven gate that discovers nothing reports success having proved nothing.
-- **Sub-step 8a concluded no API** (ADR-22). The finding worth keeping is that the obvious call-site
-  fix, `GetString(f).TrimEnd()`, is a data-loss bug: the padding is spaces, but the no-argument form
-  strips tabs and newlines too, and those are data in a fixed-width field. `TrimEnd(' ')` is right,
-  and the XML docs now say so.
-
-**Known ungated paths, named rather than discovered later:** the `H` and `7` field types (no corpus
-case); the deletion flag in its **true** state (all 224 corpus records are `deleted=0`); the blank
-record (no dump shows one); and millisecond rounding in a datetime (all 64 corpus datetimes fall on a
-whole second). Each is covered by unit or component tests against hand-built input, and each is a
-cheap generator case if it turns out to matter.
+**Known ungated paths, named rather than discovered later:** a block size other than 512, including
+zero, which legally means byte granularity; entry types 0, 2 and 3; a payload spanning more than two
+blocks (505 bytes is the longest, crossing one boundary); and `G` fields, of which only four are
+non-empty. Each is covered by component tests over hand-built images.
 
 ---
 
 ## 3. Next
 
-**Design step 003 — memo payloads and the binary-marked types.** Nothing blocks it. Its scope was
-drawn by 002 deliberately: the FPT reader, block chains, payloads spanning blocks, and the types `X`,
-`G` and `Z`, so that everything memo-backed lands in one place. Follow
-[`DEV_APPROACH.md`](claude/DEV_APPROACH.md) — `DESIGN.md` and `PLAN.md` before any `.cs` file.
+**`DBF-READ` is done for reading, so the next milestone needs corpus work before code.** `CDX-READ`
+is the priority (`PORTING-PLAN.md` §5), and **the corpus has no indexed case at all** — every table
+was generated without one. That is the gap to close first: teach the generator to build CDX files,
+and make sure the cases include **multi-level trees**, because the shipped `original/examples/DATA/`
+samples are all single-leaf and interior nodes are otherwise unreachable (`PORTING-PLAN.md` §6.3).
 
-Three things step 002 left set up for it:
-
-1. **`CorpusDump` already parses the memo lines.** `ref=`, `len=` and the payload are read and kept,
-   so 003 adds assertions rather than parsing.
-2. **The gate counts what it skips.** `RecordGoldenTests` asserts that fields asserted plus memo
-   fields skipped equals the field count, so wiring memo decoding in makes the skip count drop and
-   the assertion holds it honest.
-3. **`FieldValueDecoder` is where the type matrix lives**, and its `NaturalWidths` table is what
-   decides how many bytes a memo reference occupies — four or ten, by version.
-
-**Also open — independent of the above.**
+Before or alongside that, two things that do not depend on it:
 
 **Write `claude/specs/QUERY-OPTIMIZER.md`.** Sources: `R4RELATE.H:268-396`, `C4CONST.C`, `m4map.c`,
 to the same `FILE.C:line` standard as the existing seven. Must cover the `BITMAP4` tree and flags,
 `CONST4` range constraints, filter-to-bitmap decomposition, **which expression forms are optimizable
 and which are not**, leaf evaluation via tag seek, AND/OR/negation combination, and the
-fall-back-to-scan boundary. Prerequisite for `QUERY` (risk R13).
+fall-back-to-scan boundary. Prerequisite for `QUERY` (risk R13), and the only in-scope subsystem
+with no source-cited spec.
 
-**Soon after.** Grow the corpus toward the `CDX-READ` and `COLLATION` gates — the corpus still has no
-indexed cases at all, and **multi-level trees are the single biggest gap** (`PORTING-PLAN.md` §6.3
-lists what is missing). Then the `CORPUS` spot-check pass against the specs: FPT `numChars` =
-payload-only, CDX interior-node big-endian recno, the 263-byte reserved area, the `t4dblToFox` sign
-rule.
+**Close ADR-23 if it is wanted.** Its own small step: add zlib to the generator, reconstruct the
+`c4compress` wrapper from the layout the reader pins down, add a case with `code4memoCompress`
+enabled and a payload longer than one block. The reader is then a few lines over `ZLibStream`.
+
+Then the `CORPUS` spot-check pass against the specs: FPT `numChars` = payload-only (**now witnessed
+for all 153 entries**), CDX interior-node big-endian recno, the 263-byte reserved area, the
+`t4dblToFox` sign rule.

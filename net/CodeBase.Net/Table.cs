@@ -1,5 +1,6 @@
 using System.Text;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.Memo;
 
 namespace CodeBase.Net;
 
@@ -26,6 +27,7 @@ public sealed class Table : IDisposable
     private readonly RecordBuffer record;
     private readonly RecordPosition position = new();
     private readonly byte[] blankRecord;
+    private readonly MemoReader? memoReader;
     private Encoding? textEncoding;
     private bool closed;
 
@@ -42,6 +44,14 @@ public sealed class Table : IDisposable
         reader = new RecordReader(opened.Data, opened.Header.HeaderLength, opened.Header.RecordLength);
         record = new RecordBuffer(opened.Header.RecordLength);
         blankRecord = BlankRecord.Build(opened.Fields.Fields, opened.Header.RecordLength);
+
+        if (opened.Memo is not null && opened.MemoHeader is not null)
+        {
+            memoReader = new MemoReader(
+                opened.Memo,
+                opened.MemoHeader.Value.BlockSize,
+                opened.Header.Flags.MayHaveCompressedMemos);
+        }
 
         // A table opens on no record at all, with a blank buffer rather than whatever the array
         // happened to hold. Reading a field before positioning then answers blank, not zeros.
@@ -371,6 +381,7 @@ public sealed class Table : IDisposable
     public string GetString(FieldDefinition field)
     {
         EnsureOpen();
+        FieldValueDecoder.RefuseIfBinary(field);
 
         // Decoding recovers as much as the code page allows and never throws: a character the field
         // boundary cut in half yields its complete characters and a replacement, and a byte the code
@@ -461,6 +472,84 @@ public sealed class Table : IDisposable
     }
 
     /// <summary>
+    /// Gets the memo block a field of the current record refers to.
+    /// </summary>
+    /// <param name="field">The memo field to read.</param>
+    /// <returns>
+    /// The block number, or zero where the record has no memo in this field. For diagnostics: the
+    /// value accessors below take the field, not a block.
+    /// </returns>
+    /// <exception cref="CodeBaseException">The field does not hold a memo reference.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public int GetMemoBlock(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.MemoBlock(record, field);
+    }
+
+    /// <summary>
+    /// Gets the number of bytes in the memo a field of the current record refers to.
+    /// </summary>
+    /// <param name="field">The memo field to read.</param>
+    /// <returns>The payload length, or zero where the record has no memo in this field.</returns>
+    /// <exception cref="CodeBaseException">
+    /// The field does not hold a memo reference, or the entry it names is unreadable.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public int GetMemoLength(FieldDefinition field) => ReadMemo(field).Payload.Length;
+
+    /// <summary>
+    /// Gets the contents of the memo a field of the current record refers to.
+    /// </summary>
+    /// <param name="field">The memo field to read.</param>
+    /// <returns>
+    /// The payload, verbatim, or an empty array where the record has no memo in this field. An
+    /// absent memo and an empty one are the same thing here because the format cannot tell them
+    /// apart.
+    /// </returns>
+    /// <exception cref="CodeBaseException">
+    /// The field does not hold a memo reference, or the entry it names is unreadable.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public byte[] GetMemoBytes(FieldDefinition field) => ReadMemo(field).Payload;
+
+    /// <summary>
+    /// Gets what the memo a field of the current record refers to declares itself to hold.
+    /// </summary>
+    /// <param name="field">The memo field to read.</param>
+    /// <returns>
+    /// The declared type. A record with no memo answers text, which is what an empty memo would also
+    /// answer.
+    /// </returns>
+    /// <exception cref="CodeBaseException">
+    /// The field does not hold a memo reference, or the entry it names is unreadable.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public MemoType GetMemoType(FieldDefinition field) => ReadMemo(field).Type;
+
+    /// <summary>
+    /// Gets the memo a field of the current record refers to, as text.
+    /// </summary>
+    /// <param name="field">The memo field to read.</param>
+    /// <returns>
+    /// The payload decoded through the table's code page. A memo has no declared width and so no
+    /// padding, which is the one way it differs from a character field.
+    /// </returns>
+    /// <exception cref="CodeBaseException">
+    /// The field is a binary memo or a general field, whose bytes are not text; or it holds no memo
+    /// reference; or the entry it names is unreadable; or no encoding provider is registered.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public string GetMemoString(FieldDefinition field)
+    {
+        FieldValueDecoder.RefuseIfBinary(field);
+
+        // Decoded by the same rules as any other text: as much recovered as the code page allows,
+        // and never a throw for a byte it cannot map. See ADR-21.
+        return TextEncoding.GetString(ReadMemo(field).Payload);
+    }
+
+    /// <summary>
     /// Gets whether a field of the current record is marked null.
     /// </summary>
     /// <param name="field">The field to test.</param>
@@ -498,6 +587,29 @@ public sealed class Table : IDisposable
         opened.Memo?.Dispose();
         opened.Data.Dispose();
         onClosed(this);
+    }
+
+    /// <summary>
+    /// Reads the entry a memo field of the current record points at.
+    /// </summary>
+    private MemoEntry ReadMemo(FieldDefinition field)
+    {
+        EnsureOpen();
+
+        int block = FieldValueDecoder.MemoBlock(record, field);
+        if (block <= MemoReference.None)
+            return MemoEntry.Absent;
+
+        if (memoReader is null)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"Field '{field.Name}' of record {position.Number} refers to memo block {block}, " +
+                "but the table declares no memo file. The header and the field descriptors " +
+                "disagree with each other.");
+        }
+
+        return memoReader.Read(block, $"Field '{field.Name}' of record {position.Number}");
     }
 
     /// <summary>

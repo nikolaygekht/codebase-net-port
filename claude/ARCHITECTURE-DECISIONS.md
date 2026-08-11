@@ -508,3 +508,53 @@ bug that no test in this repository would catch, because the corpus pads with sp
 **Consequence.** Closes step 002's sub-step 8a. No public surface changes; the `GetString`
 documentation gains the warning. If a `GetTrimmedString` is added later it must trim `' '` only, and
 this entry is the reason.
+
+## ADR-23 — Compressed memo entries are refused until the corpus can gate them · open
+
+**Context.** An FPT entry declares a type; type 3 means the payload is compressed. It is a CodeBase
+extension — `code4memoCompress`'s own comment says "note that those memo files are then incompatible
+with FoxPro" (m4memo.c:31-32) and `d4data.h:4296` records the type as a 2002 addition. Step 003 had
+to decide what a reader does when it meets one.
+
+**Decision.** **Refuse, with a message that explains rather than merely rejects.** `MemoReader`
+throws on type 3, names the field, the record and the block, and says whether the table was created
+with the extension enabled — `FeatureFlags.MayHaveCompressedMemos` is parsed from DBF `flags[1]` at
+open (D4OPEN.C:2193-2195), so the two cases read differently: "the table was created with compressed
+memos enabled, so others are likely" versus "the table does not declare compressed memos, so this
+entry is unexpected".
+
+**Why — and what the reason is *not*.** Three things were run together in an earlier draft and are
+kept apart here, because the wrong one was doing the work:
+
+- **"zlib is not in the source drop"** — true and irrelevant. Reading needs no dependency at all:
+  `System.IO.Compression.ZLibStream` is in the base class library, so ADR-17's no-dependency rule is
+  untouched. Adding zlib to the generator is ordinary work.
+- **"the stream format is unknown"** — no longer true. `source/zlib.h` is in the drop (v1.1.4) and
+  the sibling compressor that survived, `connect4lowCompress`/`connect4lowUncompress`
+  (c4conlow.c:69-152), uses zlib's high-level `compress2()`/`uncompress()`, which are RFC 1950
+  wrapped rather than raw deflate. The entry layout is 4-byte native-endian uncompressed length then
+  the stream (m4file.c:199-212), and the trailing flag on `c4compress` that produces the prefix is
+  `1` at the memo call site and `0` everywhere else.
+- **"no corpus case exists"** — true, and the actual reason. Every one of the 153 non-empty entries
+  in the corpus is type 1, because the generator compiles with `S4OFF_COMPRESS`. An inflate path
+  with nothing to check it against is a decoder no test can contradict, which `DEV_APPROACH.md` §4
+  rules out.
+
+**Rejected — treating "CodeBase-only" as a reason to skip it.** An earlier draft argued that type 3
+is not worth supporting because no Visual FoxPro file will hold one. That is backwards for this
+project and the argument is recorded so it is not made twice: this is a port *of CodeBase*,
+`CLAUDE.md` requires that files the original C library writes are read correctly here, and the
+likely user is migrating an existing CodeBase application. If that application ever called
+`code4memoCompress`, its memo files hold type-3 entries and refusing them refuses the data the user
+came for. Being CodeBase-only argues *for* support.
+
+**Rejected — inflating now and gating later.** It would very likely work, and "very likely" is not a
+gate. A file from a `S4COMPRESS_QUICKLZ` build (D4all.h:126) would also inflate to nonsense rather
+than to an error, because nothing in the entry records which algorithm wrote it.
+
+**Open — what would close this.** A `CORPUS` step: add zlib to the generator, reconstruct the
+`c4compress` wrapper from the layout the reader pins down, and add a case with `code4memoCompress`
+enabled and a payload longer than one block (writing is opt-in *and* only fires above one block,
+m4file.c:734-743). Once that case exists the reader is a few lines over `ZLibStream`. The
+recommendation is to do it as its own step; it was deliberately kept out of 003 so that step stayed
+one subsystem wide.

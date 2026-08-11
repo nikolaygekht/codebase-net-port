@@ -40,13 +40,26 @@ public sealed class BlankRecordTests
     [Theory]
     [InlineData('M')]
     [InlineData('G')]
-    public void Build_FillsAPlainMemoOrGeneralFieldWithSpacesRatherThanZeros(char type)
+    public void Build_FillsAFourByteMemoReferenceWithZeros(char type)
     {
-        // Not in f4blank's zero list, unlike their binary variants. Faithful rather than tidy: the
-        // reference blanks a memo reference to spaces even though the reference is a block number.
+        // A blank reference has to parse back as "no memo" in whichever encoding the field uses, and
+        // the four-byte binary form reads zeros as none. Witnessed by the corpus: every empty
+        // reference in the Visual FoxPro tables is four zero bytes.
         byte[] blank = BlankRecord.Build([Field("F", type, 4, 1)], 5);
 
-        blank.Should().Equal((byte)' ', (byte)' ', (byte)' ', (byte)' ', (byte)' ');
+        blank.Should().Equal((byte)' ', 0, 0, 0, 0);
+    }
+
+    [Theory]
+    [InlineData('M')]
+    [InlineData('G')]
+    public void Build_FillsATenByteMemoReferenceWithSpaces(char type)
+    {
+        // The other encoding reads blanks as none, so the blank differs by width rather than by
+        // type. Witnessed by F2XMEMO, whose empty references are ten spaces.
+        byte[] blank = BlankRecord.Build([Field("F", type, 10, 1)], 11);
+
+        blank.Should().AllBeEquivalentTo((byte)' ');
     }
 
     [Fact]

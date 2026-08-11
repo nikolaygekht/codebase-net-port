@@ -29,6 +29,15 @@ public enum ErrorCode
     FieldType = -220,
 
     /// <summary>
+    /// An operation was asked for in a state that has no meaning for it.
+    /// </summary>
+    /// <value>
+    /// Raised where the caller has not done something first, such as skipping before positioning on
+    /// any record. The C library's [c]e4info[/c] (d4defs.h:2040).
+    /// </value>
+    Info = -910,
+
+    /// <summary>
     /// The file uses a feature this library does not implement.
     /// </summary>
     NotSupported = -1090,

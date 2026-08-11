@@ -130,6 +130,7 @@ Keep the documents true as you work:
 | When you… | Update |
 |---|---|
 | finish a session | `STATE.md` — all three sections |
+| commit | `STATE.md`'s header line **first**, in the same commit, phrased so it is true *after* the commit lands — and the step's `claude/dev/NNN/STATE.md` when the commit changes a closed step's output |
 | decide something, or reject an alternative | `claude/ARCHITECTURE-DECISIONS.md` (new entry; supersede, never rewrite) |
 | advance or complete a capability | its status in `PORTING-PLAN.md` §5 |
 | close a step | the step's `SUMMARY.md`, then `claude/dev/README.md` |
@@ -139,6 +140,11 @@ Keep the documents true as you work:
 | change how the build, tests or tooling are run | `FOR-DEVELOPERS.md` |
 
 Commit and push only when asked. Work directly on `main` — no branches unless requested.
+
+**`STATE.md`'s header names no commit hash**, deliberately: a file cannot name the commit it is part
+of, so any hash there is either stale or needs an amend. It says the date, whether the tree is clean
+or what is still uncommitted, and nothing that a `git log` would contradict. Hashes belong in §2,
+where they are past-tense claims about work already landed and stay true.
 
 # Ground Rules
 

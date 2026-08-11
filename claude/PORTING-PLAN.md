@@ -292,7 +292,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 | ID | Capability | Priority | Status | Chief risk |
 |---|---|---|---|---|
 | `CORPUS` | Corpus + generator | **P0** | in progress — 7 DBF cases in, index cases missing | R11 |
-| `DBF-READ` | DBF reading | **P1** | in progress — metadata half done (step 001); records next | — |
+| `DBF-READ` | DBF reading | **P1** | in progress — metadata (step 001) and records (step 002) done; memo payloads and `X`/`G`/`Z` remain | — |
 | `CDX-READ` | CDX reading & navigation | **P1** | not started | **R1** (highest) |
 | `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
@@ -348,8 +348,11 @@ VFP reserved area, the `t4dblToFox` sign rule.
   (`Top/Bottom/Skip/Go/Eof/Bof/RecNo/RecCount`) + per-type field decode for all IN-scope types +
   `_NullFlags` + deleted-flag semantics. Read-only.
 - **Done so far:** open, header, stored descriptors and the resolved field table, with the memo
-  companion opened and its header read — `claude/dev/001-dbf-open-and-header/SUMMARY.md`. Gated on
-  the `header`, `[descriptors]` and `[fields]` sections of all five corpus dumps.
+  companion opened and its header read — `claude/dev/001-dbf-open-and-header/SUMMARY.md`; then record
+  navigation and every ordinary field value —
+  `claude/dev/002-dbf-records-and-fields/SUMMARY.md`. Gated on **every** section of all seven corpus
+  dumps, `[records]` included, for all 224 records. What remains is memo payloads and the
+  binary-marked types `X`/`G`/`Z` (step 003).
 - **Gate:** for every DBF in `net/corpus/`, C# decodes every field of every record identically to the
   checked-in dump (byte/value-exact including blank/`00000000` dates, currency ×10⁴, datetime
   julian+ms, 4-byte memo refs read as ints).

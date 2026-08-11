@@ -4,11 +4,15 @@ using CodeBase.Net.Dbf;
 namespace CodeBase.Net;
 
 /// <summary>
-/// An open table, and everything its header says about itself.
+/// An open table: its shape, and a cursor over its records.
 ///
-/// Reading records is not part of this yet. What a table can tell you now is its shape: how many
-/// records it holds and how wide they are, what fields it has and where each sits, whether it has a
-/// memo file, and what code page its text is in.
+/// The shape is what the header says about itself, all of it available without reading a record:
+/// how many records there are and how wide they are, what fields exist and where each sits, whether
+/// a memo file accompanies it, and what code page its text is in.
+///
+/// The cursor is one record deep. Moving it reads that record into a buffer the field accessors
+/// then read out of, so a table holds one record at a time and moving is what changes it. A table
+/// starts on no record: call [c]Top[/c], [c]Bottom[/c] or [c]Go[/c] before reading a field.
 ///
 /// Closing a table closes the files it opened. Closing the engine that opened it does the same, so
 /// a caller that keeps the engine in a using statement cannot leak a handle by forgetting a table.
@@ -18,6 +22,10 @@ public sealed class Table : IDisposable
     private readonly OpenedTable opened;
     private readonly Encoding? defaultEncoding;
     private readonly Action<Table> onClosed;
+    private readonly RecordReader reader;
+    private readonly RecordBuffer record;
+    private readonly RecordPosition position = new();
+    private readonly byte[] blankRecord;
     private Encoding? textEncoding;
     private bool closed;
 
@@ -30,6 +38,14 @@ public sealed class Table : IDisposable
 
         Fields = new FieldCollection(opened.Fields.Fields);
         CodePage = CodePageMap.Resolve(opened.Header.CodePage);
+
+        reader = new RecordReader(opened.Data, opened.Header.HeaderLength, opened.Header.RecordLength);
+        record = new RecordBuffer(opened.Header.RecordLength);
+        blankRecord = BlankRecord.Build(opened.Fields.Fields, opened.Header.RecordLength);
+
+        // A table opens on no record at all, with a blank buffer rather than whatever the array
+        // happened to hold. Reading a field before positioning then answers blank, not zeros.
+        record.Blank(blankRecord);
     }
 
     /// <summary>
@@ -156,6 +172,321 @@ public sealed class Table : IDisposable
     public IReadOnlyList<FieldDescriptor> Descriptors => opened.Descriptors;
 
     /// <summary>
+    /// Gets the record the cursor is on.
+    /// </summary>
+    /// <value>
+    /// One past the record count when the cursor is past the last record, and -1 when it is on no
+    /// record at all, which is where a freshly opened table starts and where a failed positioning
+    /// leaves it.
+    /// </value>
+    public int RecordNumber => position.Number;
+
+    /// <summary>
+    /// Gets a value indicating whether the cursor is past the last record.
+    /// </summary>
+    /// <value>
+    /// An empty table is past its last record and at its beginning at the same time, so this and
+    /// [c]Bof[/c] can both be true.
+    /// </value>
+    public bool Eof => position.Eof;
+
+    /// <summary>
+    /// Gets a value indicating whether the cursor is at the beginning of the table.
+    /// </summary>
+    /// <value>
+    /// True after a backwards skip ran out of records, which leaves the cursor on record one rather
+    /// than before it. So this being true does not mean nothing can be read.
+    /// </value>
+    public bool Bof => position.Bof;
+
+    /// <summary>
+    /// Gets a value indicating whether the current record is flagged as deleted.
+    /// </summary>
+    /// <value>
+    /// True for any first byte other than a space, which is what the C library reports. A blank
+    /// record, which is what the cursor sees when it is on no record, is not deleted.
+    /// </value>
+    public bool Deleted => record.Deleted;
+
+    /// <summary>
+    /// Moves the cursor to a record by number.
+    /// </summary>
+    /// <param name="recordNumber">The record, counting from one.</param>
+    /// <returns>
+    /// Whether the record was there. Past the end is not an error: the record is blanked, the cursor
+    /// is left on nothing, and the answer says so.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The number is zero or negative. The C library accepts zero and reads the bytes before the
+    /// first record, which are the tail of the header; that is a bug to refuse rather than a
+    /// behaviour to reproduce. See Decision 5.
+    /// </exception>
+    /// <exception cref="CodeBaseException">The file is shorter than its header says.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult Go(int recordNumber)
+    {
+        EnsureOpen();
+        ArgumentOutOfRangeException.ThrowIfLessThan(recordNumber, 1);
+
+        if (recordNumber > RecordCount)
+        {
+            record.Blank(blankRecord);
+            position.Invalidate();
+            return GoResult.NoRecord;
+        }
+
+        Fetch(recordNumber);
+        return GoResult.Ok;
+    }
+
+    /// <summary>
+    /// Moves the cursor to the first record.
+    /// </summary>
+    /// <returns>Whether there was one. An empty table has none, and ends up at both of its ends.</returns>
+    /// <exception cref="CodeBaseException">The file is shorter than its header says.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult Top()
+    {
+        EnsureOpen();
+
+        if (RecordCount < 1)
+        {
+            MovePastEnd();
+            return GoResult.NoRecord;
+        }
+
+        Fetch(1);
+        return GoResult.Ok;
+    }
+
+    /// <summary>
+    /// Moves the cursor to the last record.
+    /// </summary>
+    /// <returns>Whether there was one.</returns>
+    /// <exception cref="CodeBaseException">The file is shorter than its header says.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult Bottom()
+    {
+        EnsureOpen();
+
+        if (RecordCount < 1)
+        {
+            MovePastEnd();
+            return GoResult.NoRecord;
+        }
+
+        Fetch(RecordCount);
+        return GoResult.Ok;
+    }
+
+    /// <summary>
+    /// Moves the cursor forwards or backwards by a number of records.
+    /// </summary>
+    /// <param name="count">
+    /// How far to move. Negative moves backwards; zero re-reads the current record, which is what
+    /// the C library does.
+    /// </param>
+    /// <returns>Whether the cursor moved, and which end it stopped at if it did not.</returns>
+    /// <exception cref="CodeBaseException">
+    /// The cursor is on no record, so there is nothing to skip from. The C library reports the same
+    /// condition as an error rather than as a silent no-op (d4skip.c:1115-1122). Also raised when
+    /// the file is shorter than its header says.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public SkipResult Skip(int count)
+    {
+        EnsureOpen();
+
+        if (position.Number < 1)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Info,
+                "Skipping needs a position to skip from, and the cursor is on no record. Call Go, " +
+                "Top or Bottom first.");
+        }
+
+        // Cleared before anything else, exactly as d4skip does it, so a skip that lands on a record
+        // always leaves the flag clear.
+        position.ClearBof();
+
+        long target = (long)position.Number + count;
+
+        if (target >= 1 && target <= RecordCount)
+        {
+            Fetch((int)target);
+            return SkipResult.Moved;
+        }
+
+        if (RecordCount < 1 || target > RecordCount)
+        {
+            // An empty table ends up at both of its ends whichever way the skip was headed, and only
+            // the answer differs. The C raises the beginning flag explicitly here and again below;
+            // both are redundant, because the end-of-file position of an empty table is record one
+            // and moving there raises the flag already. A negative record count, the one input that
+            // would make them differ, is refused when the table is opened.
+            MovePastEnd();
+
+            return count < 0 ? SkipResult.Bof : SkipResult.Eof;
+        }
+
+        // Ran off the front. The cursor stops on record one, which stays readable, and the
+        // end-of-file flag is put back as it was found.
+        bool endOfFileBefore = position.Eof;
+        Fetch(1);
+        position.MovedBeforeStart(endOfFileBefore);
+        return SkipResult.Bof;
+    }
+
+    /// <summary>
+    /// Gets the bytes of a field in the current record, exactly as stored.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>A copy of that field's bytes.</returns>
+    /// <exception cref="CodeBaseException">The field does not lie inside the record.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public byte[] GetRawBytes(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.Bytes(record, field).ToArray();
+    }
+
+    /// <summary>
+    /// Gets a field of the current record as text.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>
+    /// The field decoded through the table's code page, its trailing blanks kept. A character field
+    /// is a fixed width and the padding is part of what the file holds, so a caller who wants it
+    /// gone trims it. See ADR-21.
+    ///
+    /// Trim with [c]TrimEnd(' ')[/c] and not with [c]TrimEnd()[/c]. The padding is spaces, but the
+    /// no-argument form removes every kind of trailing whitespace, and a tab or a newline at the end
+    /// of a character field is data. See ADR-22.
+    /// </returns>
+    /// <exception cref="CodeBaseException">
+    /// The encoding is unavailable because no provider for the legacy code pages is registered, or
+    /// the field does not lie inside the record.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public string GetString(FieldDefinition field)
+    {
+        EnsureOpen();
+
+        // Decoding recovers as much as the code page allows and never throws: a character the field
+        // boundary cut in half yields its complete characters and a replacement, and a byte the code
+        // page leaves undefined yields whatever it maps to. GetRawBytes is how a caller tells data
+        // from damage. See ADR-21.
+        return TextEncoding.GetString(FieldValueDecoder.Bytes(record, field));
+    }
+
+    /// <summary>
+    /// Gets a field of the current record as a truth value.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>True for the four letters the reference accepts as true, false for anything else.</returns>
+    /// <exception cref="CodeBaseException">The field is not a logical one.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public bool GetBoolean(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.Boolean(record, field);
+    }
+
+    /// <summary>
+    /// Gets a field of the current record as a whole number.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>The value, converted as the reference converts it for this type.</returns>
+    /// <exception cref="CodeBaseException">The field's type refuses to be read as a number.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public int GetInt32(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.Int32(record, field);
+    }
+
+    /// <summary>
+    /// Gets a field of the current record as a number.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>
+    /// The value. A date answers with its Julian day number and a currency with its four-decimal
+    /// value, both because the reference implementation converts them that way.
+    /// </returns>
+    /// <exception cref="CodeBaseException">The field's type refuses to be read as a number.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public double GetDouble(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.Double(record, field);
+    }
+
+    /// <summary>
+    /// Gets a currency field of the current record without the rounding a double would introduce.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>The exact value.</returns>
+    /// <exception cref="CodeBaseException">The field is not a currency one.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public decimal GetDecimal(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.Decimal(record, field);
+    }
+
+    /// <summary>
+    /// Gets a date field of the current record.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>The date, or null where the field is blank or holds no date.</returns>
+    /// <exception cref="CodeBaseException">The field is not a date one.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public DateOnly? GetDate(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.Date(record, field);
+    }
+
+    /// <summary>
+    /// Gets a datetime field of the current record.
+    /// </summary>
+    /// <param name="field">The field to read.</param>
+    /// <returns>The moment, with its milliseconds, or null where the field is blank.</returns>
+    /// <exception cref="CodeBaseException">The field is not a datetime one.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public DateTime? GetDateTime(FieldDefinition field)
+    {
+        EnsureOpen();
+        return FieldValueDecoder.DateTime(record, field);
+    }
+
+    /// <summary>
+    /// Gets whether a field of the current record is marked null.
+    /// </summary>
+    /// <param name="field">The field to test.</param>
+    /// <returns>
+    /// Whether the record's bitmap has this field's bit set. Always false for a field the table did
+    /// not declare nullable.
+    /// </returns>
+    /// <value>
+    /// Marking a field null does not undo what was assigned to it, so the value accessors are
+    /// unaffected by this and still report whatever bytes the field holds. See Decision 11.
+    /// </value>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public bool IsNull(FieldDefinition field)
+    {
+        EnsureOpen();
+
+        if (field.NullBit is not int bit || NullFlags is not FieldDefinition flags)
+            return false;
+
+        ReadOnlySpan<byte> bitmap = record.Field(flags);
+        int byteIndex = bit / 8;
+
+        return byteIndex < bitmap.Length && (bitmap[byteIndex] & (1 << (bit % 8))) != 0;
+    }
+
+    /// <summary>
     /// Closes the table and the files opened for it.
     /// </summary>
     public void Dispose()
@@ -168,4 +499,27 @@ public sealed class Table : IDisposable
         opened.Data.Dispose();
         onClosed(this);
     }
+
+    /// <summary>
+    /// Reads a record into the buffer and puts the cursor on it.
+    /// </summary>
+    private void Fetch(int recordNumber)
+    {
+        reader.Read(recordNumber, record);
+        position.MovedTo(recordNumber);
+    }
+
+    /// <summary>
+    /// Puts the cursor past the last record, with a blank record behind it.
+    /// </summary>
+    private void MovePastEnd()
+    {
+        position.MovedPastEnd(RecordCount);
+        record.Blank(blankRecord);
+    }
+
+    /// <summary>
+    /// Refuses to work on a table whose files have been closed.
+    /// </summary>
+    private void EnsureOpen() => ObjectDisposedException.ThrowIf(closed, this);
 }

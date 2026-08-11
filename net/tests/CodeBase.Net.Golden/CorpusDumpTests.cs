@@ -86,13 +86,16 @@ public sealed class CorpusDumpTests
     }
 
     [Fact]
-    public void Parse_ReadsPastTheOneSectionItDeliberatelyDoesNotRead()
+    public void Parse_ReadsEverySectionTheDumpCarries()
     {
-        // Record values belong to the step that decodes them, so the section is declared unread
-        // rather than unknown. Every dump already carries one.
-        Corpus.ReadDump("VFPTYPE").Should().Contain("[records]");
+        // No section is declared unread any more: records were the last one, and step 002 reads
+        // them. The list of deferred sections is empty rather than deleted, because the dump format
+        // will grow an index half and it must arrive noticed.
+        CorpusDump dump = CorpusDump.Load("VFPTYPE");
 
-        CorpusDump.Load("VFPTYPE").Fields.Should().NotBeEmpty();
+        dump.Descriptors.Should().NotBeEmpty();
+        dump.Fields.Should().NotBeEmpty();
+        dump.Records.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -111,9 +114,12 @@ public sealed class CorpusDumpTests
     [Theory]
     [InlineData("[descriptors]")]
     [InlineData("[fields]")]
+    [InlineData("[records]")]
     public void Parse_ADumpMissingASectionItNeeds_IsRefused(string section)
     {
-        string text = Corpus.ReadDump("VFPTYPE").Replace(section, "[records]", StringComparison.Ordinal);
+        // Renaming a section is how a dump loses one: the reader then refuses the unknown name, or
+        // if it were tolerant, would silently produce expectations with a hole in them.
+        string text = Corpus.ReadDump("VFPTYPE").Replace(section, "[gone]", StringComparison.Ordinal);
 
         Action act = () => CorpusDump.Parse(text, "a truncated VFPTYPE");
 

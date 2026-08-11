@@ -31,7 +31,8 @@ internal sealed class CorpusDump
         byte tableFlags,
         byte codePage,
         IReadOnlyList<DumpDescriptor> descriptors,
-        IReadOnlyList<DumpField> fields)
+        IReadOnlyList<DumpField> fields,
+        IReadOnlyList<DumpRecord> records)
     {
         FileName = fileName;
         Version = version;
@@ -43,6 +44,7 @@ internal sealed class CorpusDump
         CodePage = codePage;
         Descriptors = descriptors;
         Fields = fields;
+        Records = records;
     }
 
     /// <summary>Gets the table's file name, as the dump records it.</summary>
@@ -76,6 +78,15 @@ internal sealed class CorpusDump
     public IReadOnlyList<DumpField> Fields { get; }
 
     /// <summary>
+    /// Gets every record of the table, with every field's expected value.
+    /// </summary>
+    /// <value>
+    /// Written by walking the table from top to end of file, so the order is the natural one and the
+    /// count is the whole table rather than a sample.
+    /// </value>
+    public IReadOnlyList<DumpRecord> Records { get; }
+
+    /// <summary>
     /// The section holding the field descriptors as they are stored on disk.
     /// </summary>
     private const string DescriptorsSection = "[descriptors]";
@@ -86,13 +97,18 @@ internal sealed class CorpusDump
     private const string FieldsSection = "[fields]";
 
     /// <summary>
+    /// The section holding every record, field by field, as the C library reads them back.
+    /// </summary>
+    private const string RecordsSection = "[records]";
+
+    /// <summary>
     /// Sections that exist and are deliberately not read here.
     /// </summary>
     /// <value>
-    /// Record values belong to the step that decodes them. Naming the section rather than ignoring
-    /// unknown ones is what keeps the refusal below meaningful.
+    /// Empty now that records are read. Kept because the dump format will grow an index half, and
+    /// naming a section rather than ignoring unknown ones is what keeps the refusal below meaningful.
     /// </value>
-    private static readonly string[] DeferredSections = ["[records]"];
+    private static readonly string[] DeferredSections = [];
 
     /// <summary>
     /// Header keys every dump carries, each of which a golden test compares against.
@@ -122,8 +138,10 @@ internal sealed class CorpusDump
         Dictionary<string, string> header = [];
         List<DumpDescriptor> descriptors = [];
         List<DumpField> fields = [];
+        List<DumpRecord> records = [];
         HashSet<string> seenSections = [];
         string section = string.Empty;
+        DumpRecord? current = null;
 
         foreach (string raw in text.Split('\n'))
         {
@@ -136,7 +154,7 @@ internal sealed class CorpusDump
                 section = line[..(line.IndexOf(']') + 1)];
                 seenSections.Add(section);
 
-                if (section is not (DescriptorsSection or FieldsSection) &&
+                if (section is not (DescriptorsSection or FieldsSection or RecordsSection) &&
                     !DeferredSections.Contains(section))
                 {
                     throw new InvalidDataException(
@@ -166,12 +184,31 @@ internal sealed class CorpusDump
                         fields.Add(DumpField.Parse(line));
                     break;
 
+                case RecordsSection:
+                    if (DumpRecord.TryParseHeader(line, out DumpRecord? opened))
+                    {
+                        current = opened!;
+                        records.Add(current);
+                    }
+                    else if (current is null)
+                    {
+                        throw new InvalidDataException(
+                            $"The dump for {origin} has a line in {RecordsSection} before any " +
+                            $"record begins: {line}");
+                    }
+                    else
+                    {
+                        current.Add(line);
+                    }
+
+                    break;
+
                 default:
                     break;   // a declared section that this reader does not read
             }
         }
 
-        Require(header, descriptors, fields, seenSections, origin);
+        Require(header, descriptors, fields, records, seenSections, origin);
 
         string[] stamp = header["lastUpdate"].Split(' ')[0].Split('-');
 
@@ -187,7 +224,8 @@ internal sealed class CorpusDump
             ParseByte(header["hasMdxMemo"]),
             ParseByte(header["codePage"]),
             descriptors,
-            fields);
+            fields,
+            records);
     }
 
     /// <summary>
@@ -197,6 +235,7 @@ internal sealed class CorpusDump
         Dictionary<string, string> header,
         List<DumpDescriptor> descriptors,
         List<DumpField> fields,
+        List<DumpRecord> records,
         HashSet<string> seenSections,
         string origin)
     {
@@ -207,7 +246,7 @@ internal sealed class CorpusDump
                 $"The dump for {origin} has no {string.Join(", ", missingKeys)} in its header.");
         }
 
-        foreach (string required in new[] { DescriptorsSection, FieldsSection })
+        foreach (string required in new[] { DescriptorsSection, FieldsSection, RecordsSection })
         {
             if (!seenSections.Contains(required))
                 throw new InvalidDataException($"The dump for {origin} has no {required} section.");
@@ -219,6 +258,19 @@ internal sealed class CorpusDump
 
         if (fields.Count == 0)
             throw new InvalidDataException($"The dump for {origin} lists no fields.");
+
+        if (records.Count == 0)
+            throw new InvalidDataException($"The dump for {origin} lists no records.");
+
+        // Every record must carry every field. A short record would otherwise quietly shrink what
+        // the gate compares, which is the one failure a data-driven suite cannot see.
+        DumpRecord? ragged = records.FirstOrDefault(r => r.Values.Count != fields.Count);
+        if (ragged is not null)
+        {
+            throw new InvalidDataException(
+                $"The dump for {origin} lists {fields.Count} fields but record {ragged.Number} has " +
+                $"{ragged.Values.Count} of them.");
+        }
     }
 
     /// <summary>

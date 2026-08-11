@@ -1,10 +1,10 @@
 # Project state
 
-**Updated:** 2026-08-10 · `main` @ `37b4592` — **uncommitted**: the two code-page corpus cases and
-their generator changes, the code-page resolution they exposed as wrong (three library files), the
-tests for both, and the documentation.
-**Active step:** none. [`claude/dev/001-dbf-open-and-header`](claude/dev/001-dbf-open-and-header/)
-closed — the metadata half of `DBF-READ`, 341 tests green.
+**Updated:** 2026-08-11 · step 002 is committed to `main` and the tree is clean; nothing is pushed
+yet.
+**Active step:** none. [`002-dbf-records-and-fields`](claude/dev/002-dbf-records-and-fields/) is
+**closed** — records and ordinary field values, gate green, **630 tests**. Step 003, memo payloads
+and the binary-marked types, is next and is not yet designed.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -14,22 +14,33 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 
 ## 1. What is ready
 
-**A DBF's metadata can be read.** `net/CodeBase.Net.sln` builds four projects — `CodeBase.Net`
-(**no NuGet dependencies** by design, ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and
-`CodeBase.Net.TestUtils` — and `dotnet test` is green on **341 tests**, 116 of them golden.
+**A DBF can be read: its metadata, its records, and every ordinary field value.**
+`net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies** by design,
+ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test`
+is green on **630 tests**, 252 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
 using Table table = engine.OpenTable("customer.dbf");
-foreach (FieldDefinition f in table.Fields) { /* name, type, length, offset, nullability */ }
+
+for (GoResult go = table.Top(); go == GoResult.Ok; )
+{
+    FieldDefinition name = table.Fields["NAME"];
+    string text = table.GetString(name);     // decoded, trailing blanks kept (ADR-21)
+    if (table.Skip(1) != SkipResult.Moved) break;
+}
 ```
 
 Opening a table reads its header, its stored descriptors and its resolved field table, and opens the
-memo file beside it when the header declares one. Every one of those is gated against the C
-library's own dump for all seven corpus tables. It also resolves the code page mark: `CodePage`,
-`CodePageNumber` and `CodePageByte` answer for all 26 marks Visual FoxPro documents, without needing an
-encoding provider (ADR-19, ADR-20). **No record or field value is readable yet** — that is step 002,
-and it is what turns a resolved code page into decoded text.
+memo file beside it when the header declares one. It resolves the code page mark: `CodePage`,
+`CodePageNumber` and `CodePageByte` answer for all 26 marks Visual FoxPro documents, without needing
+an encoding provider (ADR-19, ADR-20). Moving the cursor reads one record, and the typed accessors
+read fields out of it — `GetString`, `GetRawBytes`, `GetBoolean`, `GetInt32`, `GetDouble`,
+`GetDecimal`, `GetDate`, `GetDateTime`, `IsNull`, plus `Deleted`, `Eof` and `Bof`.
+
+Every one of those is gated against the C library's own dump for all seven corpus tables and all 224
+of their records — **`[records]` included**, which was the one dump section nothing read. **What is
+still not readable is a memo payload** and the binary-marked types `X`, `G` and `Z`: step 003.
 
 **`test-files-generator/`** builds and runs end to end (Windows/MSVC):
 
@@ -63,130 +74,95 @@ is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ---
 
-## 2. Last session (2026-08-10)
+## 2. Last session (2026-08-11)
 
-**Two code-page-marked corpus cases**, `CP1251.DBF` (byte 29 = `0xC9`) and `CP936.DBF` (`0x7A`), both
-`0x30` with a memo. This closes the last thing blocking step 002's text decoding: byte 29 was `0x00`
-in every table, so a reader that ignored it entirely would have passed the whole suite. **ADR-18**
-carries the reasoning; `net/corpus/README.md` says what each case pins down. Three facts worth
-knowing before touching them:
+**Step 002 was reviewed, then executed end to end**, and both halves landed in one commit.
 
-- **Neither marker is one CodeBase will set.** `c4setCodePage` accepts only cp0/437/850/1252/1250
-  (`c4set.c:727-745`), but `d4create` writes `CODE4.codePage` into the header verbatim with no
-  validation (`D4CREATE.C:1391`) and `d4open` reads it back unchecked (`D4OPEN.C:2217`). The cases
-  assign the field directly and restore `cp0` straight after the create. `0xC9`/`0x7A` are what VFP
-  stamps on such tables, so the files stay realistic. `DBF-FORMAT.md` §8 now records all of this.
-- **The multi-byte case is the one that matters.** GBK trail bytes overlap ASCII, so `CP936`'s
-  `TRAIL` field holds characters whose second byte is `\`, `|` or `A`; and because a field width is a
-  byte count, its `CUT` field (seven bytes, given eight) always ends on a **dangling lead byte**.
-  Memo lengths 63 and 401 do the same on the FPT path. A decoder that counts bytes as characters
-  produces wrong text here rather than an error.
-- **The port now resolves both marks.** See the code change below.
+### The design review
 
-**The authority for byte 29 is settled: Visual FoxPro's documentation, not CodeBase's constants**
-(**ADR-19**, table in `DBF-FORMAT.md` §8.1). `original/source/` has no enumeration of the mark at all
-— five constants, no mention of `0xC9`/`0x7A`/"language driver" anywhere in the C, nothing in the
-shipped manual, and only `0x00`/`0x03` across the 46 sample tables — so this is the **one spec fact
-with no `FILE.C:line` citation**, sourced instead to two named Microsoft pages. Four consequences:
+Every `FILE.C:line` citation in `DESIGN.md` was checked against the source. The substantive readings
+all held — `d4goEof`, the backwards-skip branch, the `r4entry` path, `E4PARM_HIGH` being on in the
+shipped build, all three `f4double` outcomes, `d4deleted`. Six findings: two citations were wrong
+(`d4bof`/`d4eof` transposed, one range off by one), the flag-reset rule was missing (`d4go` clears
+both flags, and `d4skip` clears the beginning flag before deciding where to go), the invalid position
+was an unnamed fourth state, `GetString` had no cited counterpart, and Q1 was answerable by citation.
+Decisions 14-16 came out of it, along with **ADR-21** and **ADR-22**.
 
-- **26 marks, one-to-one.** The wider "xBase" table in circulation (per-language OEM blocks, ~50
-  marks, many-to-one) is not VFP's and is out of scope; anything outside the 26 is *unrecognized*,
-  which is a defined outcome rather than a failure.
-- **`0x04` goes to VFP:** 10000 Standard Macintosh, not CodeBase's `cp0004` placeholder.
-- **Three outcomes, not two.** Verified on .NET 8 with the provider registered: 24 of the 26 resolve,
-  **620 (Mazovia) and 895 (Kamenický) throw** — they are not Windows code pages, so no provider helps.
-  Both still resolve to a mark and a number; only `TextEncoding` fails, and its message says why.
-- **Collation is out of reach for these pages.** For a GENERAL tag CodeBase handles only
-  cp1252/cp0/437/850, errors on cp1250/cp0004 and silently sets nothing for anything else
-  (`i4init.c:377-404`); translation tables exist for 1252 and 437 alone. A 1251 or 936 table's index
-  keys have **no reference behaviour to port and no gate available** — a `COLLATION` scope limit.
+**Five of the six open questions closed without writing code.** Currency is fixed at four decimals —
+`d4create` hard-codes `(8, 4, 0x04)` (D4CREATE.C:1569-1571) and `f4currency` never reads `field->dec`,
+so the `Y(8,2)` generator case the plan held in reserve was retired. Text was settled by ADR-21: cp437
+for an unmarked table, best-effort decoding that never throws, the gate asserting decoded strings, and
+`GetString` returning the space-padded declared width as `f4str` does.
 
-**All 26 marks are implemented** (**ADR-20**), which was a *bug fix*, not new scope: `TextEncoding`
-hard-coded four code page numbers, so 22 of the 26 marks silently decoded as cp437 — the spec and the
-code disagreed and the code was wrong. `CodePage` now names all 26 (its members are marks, so
-`Cp1251 = 0xC9`, and `Reserved = 0x04` became `Cp10000`), `Table.CodePageNumber` is new (`int?`, null
-for unmarked and unrecognized alike, needing no encoding provider), and `Table.CodePageByte` remains
-the value that round-trips. `CodePageMapTests` gates every mark, the one-to-one property, the `0x04`
-resolution and provider independence. **Left open by ADR-20:** ADR-17 justifies the unmarked default as
-cp437 "matching the C library", but the only place the C library interprets `cp0` treats it as Windows
-ANSI (`i4init.c:387`) — and since the engine transcodes nothing, neither number is actually witnessed
-for text.
+### The execution
 
-The other five cases regenerated **byte-identical**, so the shared generator changes disturbed
-nothing. `util.h` gained `TEXTBYTES`/`assignText`: text outside ASCII is written as byte arrays,
-never as a source literal, because what a literal becomes depends on the compiler's charsets.
+**630 tests green, 252 golden.** The gate asserts every ordinary field of every record of all seven
+tables, and a separate suite walks each table four ways to prove the traversal itself. Read
+[`SUMMARY.md`](claude/dev/002-dbf-records-and-fields/SUMMARY.md) rather than the design or the plan.
+Five things worth carrying forward:
 
-Test wiring: the two tables joined the golden suite by discovery, so only three places needed an edit
-— the documented-name list, the corpus-size gate, and the code-page assertion, which is now explicit
-per table instead of "every table is unmarked". Plus the new `CodePageMapTests` and a golden theory
-over `CodePageNumber`. **341 tests green, 116 of them golden.**
+- **`double.Parse` reproduces `c4atod` bit for bit on all 224 numeric values.** The step's chief risk,
+  closed on the first run, compared on the bit pattern. It matters more than it looks: **`c4atod`'s
+  body is not in this source drop** — nor are `c4atoi`, `c4atol`, `c4ltoa45`, `c4currencyToA` or
+  `c4atoCurrency`, all declarations only. The design's fallback of "port it verbatim" was never
+  available, so agreement was the only outcome that did not require reverse-engineering from 224
+  values.
+- **A correction to what the previous session recorded.** The note that a half character "silently
+  becomes U+FFFD" was wrong: .NET's default for the legacy code pages is an internal *best-fit*
+  fallback that yields **`?`**, and `DecoderFallback.ReplacementFallback` is `?` as well. Verified by
+  running it. `CodePageMap` now asks for `new DecoderReplacementFallback("\uFFFD")` explicitly, so a
+  question mark in a decoded field is a question mark the file holds, and the behaviour does not
+  depend on which provider the host registered.
+- **A table is walked four ways and must give the same records in the same order** — by number,
+  forwards, backwards, and backwards from past the end — each record identified by a field the dump
+  shows to be unique. This is what no per-record assertion can catch: a skip that jumps a record or a
+  walk that stops one short passes every field check in the suite.
+- **The gate was mutation-checked, and so was every cursor flag.** Shifting the record offset by one
+  record turns 28 golden tests red across every table. Mutating each flag transition in turn fails
+  between 1 and 5 tests apiece — except two flag-raises the C performs on the empty-table skip path,
+  which failed nothing and turned out to be **provably dead** (the end-of-file position of an empty
+  table is record one, and moving there raises the flag already; a negative record count, the one
+  input that would differ, is refused at open). They were removed. Four injected traversal bugs — a
+  skip that jumps a record, a `Bottom` landing early, a wrong end-of-file position, a walk stopping
+  short — each fail 7 to 14 of the scan tests. The suites also assert their own counts, because a
+  data-driven gate that discovers nothing reports success having proved nothing.
+- **Sub-step 8a concluded no API** (ADR-22). The finding worth keeping is that the obvious call-site
+  fix, `GetString(f).TrimEnd()`, is a data-loss bug: the padding is spaces, but the no-argument form
+  strips tabs and newlines too, and those are data in a fixed-width field. `TrimEnd(' ')` is right,
+  and the XML docs now say so.
 
-**Checked end to end rather than trusted because the suite is green.** Driving the library over the
-checked-in files: `CP1251` reports `0xC9` / `Cp1251` / `1251` / `windows-1251` and `CP936` reports
-`0x7A` / `Cp936` / `936` / `gb2312`, while unmarked `VFPTYPE` reports `0x00` / `Unmarked` / null and
-falls back to `ibm437`. Slicing record 1 out of the raw bytes by the offsets the table reports and
-decoding with `TextEncoding` gives back the generator's documented input — `Привет, мир`,
-`Компьютеры`, `中文测试` — so mark → code page → encoding → string is right at every rung. **The GBK
-check mattered:** .NET reports cp936's `WebName` as `gb2312`, a narrower standard, but `CP936.TRAIL`
-decodes to `乗亅丄亊丂俓` (U+4E57 U+4E85 U+4E04 U+4E8A U+4E02 U+4FD3), so lead byte `0x81` — a GBK
-extension outside GB2312 — works and the name is a legacy misnomer, not a narrower encoding.
-
-**Two decoding defaults are now inherited by accident, and step 002 must choose them deliberately.**
-Both are `Encoding`'s behaviour, not ours, and both are the "wrong text with no error" failure mode
-this library cares most about:
-
-- **A character cut in half becomes U+FFFD, silently.** `CP936` record 1 `CUT` decodes to
-  `中文测�` — indistinguishable from a genuine replacement character in the data.
-- **A byte the code page leaves undefined passes through.** `CP1251` record 2 `SWEEP` puts `0x98` at
-  U+0098, a C1 control, rather than replacing it. The rest of that row is correct (`0x90` is `ђ`,
-  `0x99` is `™`).
-
-**Still the last code change:** step 001, closed on 2026-08-09 — read its
-[`SUMMARY.md`](claude/dev/001-dbf-open-and-header/SUMMARY.md) rather than its `DESIGN.md` or `PLAN.md`.
-Two constraints from it that will recur: **every byte-reading boundary must be faked by hand** (no
-mocking library can proxy a `Span<byte>` parameter — verified, not assumed), each kept honest by a
-contract test; and **open-time field length validation barely exists in a release build**, so a
-reader that refuses a 7-byte date is *less* compatible than the original.
+**Known ungated paths, named rather than discovered later:** the `H` and `7` field types (no corpus
+case); the deletion flag in its **true** state (all 224 corpus records are `deleted=0`); the blank
+record (no dump shows one); and millisecond rounding in a datetime (all 64 corpus datetimes fall on a
+whole second). Each is covered by unit or component tests against hand-built input, and each is a
+cheap generator case if it turns out to matter.
 
 ---
 
 ## 3. Next
 
-**Step 002 — DBF record reading.** Navigation (`Top/Bottom/Skip/Go/Eof/Bof/RecNo`) and per-type
-field decode, gated on the `[records]` section of all seven dumps, which nothing reads yet. Run
-it through the step process: `cp -r claude/dev/_template claude/dev/002-<name>`, then `DESIGN.md` and
-`PLAN.md` before any `.cs`.
+**Design step 003 — memo payloads and the binary-marked types.** Nothing blocks it. Its scope was
+drawn by 002 deliberately: the FPT reader, block chains, payloads spanning blocks, and the types `X`,
+`G` and `Z`, so that everything memo-backed lands in one place. Follow
+[`DEV_APPROACH.md`](claude/DEV_APPROACH.md) — `DESIGN.md` and `PLAN.md` before any `.cs` file.
 
-Three things to settle as it opens, in this order:
+Three things step 002 left set up for it:
 
-1. **Decode text, which is the only rung of the code-page chain still missing.** Mark → code page →
-   encoding all work (ADR-19, ADR-20); what 002 adds is bytes → string. Two questions it must answer
-   rather than stumble into: what a `C` field yields when a multi-byte character is **cut in half at
-   the field boundary** (`CP936.CUT` is that case in every record) and what `0x98` yields in a cp1251
-   table (`CP1251.SWEEP` carries it; the code page leaves it undefined). Settle the unmarked default
-   too — ADR-20's open item. The end-to-end gate is available and honest: `CP1251` record 1's `TEXT`
-   decodes to `Привет, мир` and `CP936` record 1's to `中文测试`, expectations that come from the
-   generator's documented input rather than from bytes we invented.
-2. **Re-check the per-type accessor widths against `F4FIELD.C`** before writing any decoder. Step
-   001's `DESIGN.md` Decision 18 holds the table, but it is the contract for *decoding* and was
-   written while implementing something else. The C is not uniform: text-shaped types honour the
-   declared length, while `B`/`H`/`Y`/`T`/`7` read their natural width and ignore it, taking bytes
-   from the following field. That is deliberate and must be copied, not corrected.
-3. **The containment guarantee is already in place** — every field lies inside its record, asserted
-   as a property over generated descriptors. Decoders must not undermine it: read through one
-   bounds-checked accessor, and let a decode reach into the *next* field only where the C library
-   does, never past the record.
-
-Still ungated after 001, none of it blocking: version `0x31` with feature flags, the `H` field type,
-and the long-field-name layout that is currently refused outright.
+1. **`CorpusDump` already parses the memo lines.** `ref=`, `len=` and the payload are read and kept,
+   so 003 adds assertions rather than parsing.
+2. **The gate counts what it skips.** `RecordGoldenTests` asserts that fields asserted plus memo
+   fields skipped equals the field count, so wiring memo decoding in makes the skip count drop and
+   the assertion holds it honest.
+3. **`FieldValueDecoder` is where the type matrix lives**, and its `NaturalWidths` table is what
+   decides how many bytes a memo reference occupies — four or ten, by version.
 
 **Also open — independent of the above.**
 
 **Write `claude/specs/QUERY-OPTIMIZER.md`.** Sources: `R4RELATE.H:268-396`, `C4CONST.C`, `m4map.c`,
 to the same `FILE.C:line` standard as the existing seven. Must cover the `BITMAP4` tree and flags,
-`CONST4` range constraints, filter→bitmap decomposition, **which expression forms are optimizable and
-which are not**, leaf evaluation via tag seek, AND/OR/negation combination, and the fall-back-to-scan
-boundary. Prerequisite for `QUERY` (risk R13).
+`CONST4` range constraints, filter-to-bitmap decomposition, **which expression forms are optimizable
+and which are not**, leaf evaluation via tag seek, AND/OR/negation combination, and the
+fall-back-to-scan boundary. Prerequisite for `QUERY` (risk R13).
 
 **Soon after.** Grow the corpus toward the `CDX-READ` and `COLLATION` gates — the corpus still has no
 indexed cases at all, and **multi-level trees are the single biggest gap** (`PORTING-PLAN.md` §6.3

@@ -21,3 +21,4 @@ obj/
 .vs/
 
 .claude/settings.local.json
+audit/

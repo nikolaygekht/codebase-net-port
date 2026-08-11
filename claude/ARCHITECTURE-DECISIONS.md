@@ -403,3 +403,108 @@ the C library actually interprets `cp0` treats it as **Windows ANSI**: `i4init.c
 uses windows ansi by default", for GENERAL collation. There is no transcoding path to compare against
 because the engine transcodes nothing, so neither 437 nor 1252 is *witnessed* for text. Settle it in
 step 002, where the default first shows through in a decoded string.
+
+## ADR-21 — Text decoding recovers what it can, and an unmarked table is cp437 · accepted
+
+**Context.** Step 002 decodes a character field for the first time, and three questions it cannot avoid
+were all standing on defaults nobody chose. ADR-20 left the unmarked default open. The two code-page
+corpus cases (ADR-18) made `Encoding`'s inherited behaviour visible: a GBK character cut in half by a
+field boundary — `CP936.CUT` is `C(7)` given eight bytes, so it ends on a dangling lead byte in every
+one of its 32 records — silently becomes U+FFFD, and a byte the code page leaves undefined (`0x98` in
+`CP1251.SWEEP`) passes through to U+0098. And the dump records a character field's raw bytes with no
+decoded string, so the C library is silent on what the field should *read* as.
+
+**Decision.** Four parts, all settled here rather than by `Encoding`'s defaults.
+
+- **An unmarked or unrecognized table decodes as cp437.** `CodeBaseEngine.DefaultEncoding` keeps the
+  ADR-17 default and ADR-20's open item is closed in its favour. `i4init.c:387`'s "code page 0 uses
+  windows ansi by default" is a **collation** default for a GENERAL tag, not a text default; it decides
+  which translation table builds an index key, and the engine still transcodes nothing. A recognized
+  marker always wins — the file is authoritative about itself (ADR-17).
+- **Decoding recovers as much text as the code page allows, and never throws.** A truncated
+  multi-byte character yields its complete characters plus **U+FFFD** for the dangling byte, and a
+  byte the code page leaves undefined yields whatever that code page maps it to rather than an error.
+  A caller who must tell data from damage reads `GetRawBytes`, which is in the public surface for
+  exactly this. **The replacement character is asked for explicitly** — `Encoding.GetEncoding(n,
+  EncoderFallback.ExceptionFallback, new DecoderReplacementFallback("�"))` — and this is a
+  correction to what an earlier note claimed: .NET's default for the legacy code pages is an
+  *internal best-fit* fallback that yields **`?`**, and `DecoderFallback.ReplacementFallback` is also
+  `?`, not U+FFFD. Verified by running it. A question mark is indistinguishable from one the file
+  holds, which defeats the point of marking damage at all; and taking the provider's default would
+  make the behaviour depend on which provider the host registered, which ADR-17 puts outside our
+  control. The encoder fallback throws because this library only reads.
+- **The gate asserts decoded text, not only bytes.** Character fields are compared as strings decoded
+  through the table's code page, on top of the raw-byte comparison the dump supports. The expected
+  strings come from the generator's own documented input (`DEV_APPROACH.md` §4), because the dump has
+  none — `Привет, мир`, `Компьютеры`, `中文测试`, `乗亅丄亊丂俓`.
+- **`GetString` returns the field's full declared width, trailing blanks included.** This is what
+  `f4str` does — it copies `field->len` bytes and null-terminates, with no trimming anywhere, and there
+  is no `f4trim` in this source drop (`F4STR.C:206-243`). So `CP936.TEXT`, a `C(20)` holding four
+  characters, reads as `中文测试` followed by twelve spaces. **Whether to offer automatic trimming as an
+  opt-in is deferred to an evaluation sub-step** (`002/PLAN.md` step 8a), not decided here.
+
+**Why.** A DBF field width is a **byte** count, not a character count, so `C(8)` in cp936 holds eight
+bytes — at most four characters — and the C library truncates at the byte boundary with no regard for
+where a character ends. Half characters are therefore not a corruption case but an ordinary one, which
+is why the corpus pins them down in every record rather than in one. Refusing such a field would make a
+whole table unreadable over one truncated character the file has held for decades; returning `中文测`
+plus a marker keeps the row usable and loses nothing that `GetRawBytes` cannot recover.
+
+**Rejected — throwing on a malformed sequence** (`DecoderExceptionFallback`). It converts a data
+condition into a control-flow event on the hottest read path, and the caller cannot see the good half
+of the field even though the bytes are right there.
+
+**Rejected — dropping the dangling byte silently.** Same recovered text, no marker, and the loss is
+then undetectable without re-reading the bytes.
+
+**Rejected — cp1252 for unmarked tables.** The only C-side evidence for it is a collation default
+(above), and changing the documented default of `CodeBaseEngine.DefaultEncoding` on that footing would
+trade one unwitnessed number for another while breaking anyone who already set it.
+
+**Rejected — trimming trailing blanks in `GetString`.** It reads better for the `C` field that holds a
+name, and it is what most callers want. Rejected as the *unconditional* behaviour because padding is
+information the file actually holds: trimming is one `TrimEnd()` at the call site, while un-trimming is
+impossible, and a reader that silently discards bytes is the wrong default for a library whose whole
+premise is reproducing what the file says. Deferred, not dismissed — see step 8a.
+
+**Consequence.** Closes ADR-20's open item and `002-dbf-records-and-fields/DESIGN.md` Q3-Q6. The gate
+asserts the padded form regardless of how the trimming evaluation lands, because the padded form is
+what the bytes are.
+
+## ADR-22 — Trimming a character field stays at the call site, but not as `TrimEnd()` · accepted
+
+**Context.** ADR-21 settled that `GetString` returns the field's full declared width, blanks
+included, because that is what `f4str` returns and because un-trimming is impossible. It deferred the
+separate question of whether the library should *offer* trimming, as step 002's sub-step 8a. Almost
+every caller reading a `C` field holding a name or a code wants it trimmed, so the question is not
+whether trimming happens but where.
+
+**Decision.** **No trimming mode, and no trimmed accessor for now.** `GetString` is the only string
+accessor and it returns the padded width. What this evaluation adds is a documented warning rather
+than an API: the obvious call-site fix, `GetString(f).TrimEnd()`, is **subtly wrong**, and the XML
+docs on `GetString` say so. Callers should write `TrimEnd(' ')`.
+
+**Why not a `TrimTrailingBlanks` mode** on the engine or the table. It is the same objection Decision 4
+of step 002 raised against porting `errGo`: a library-wide switch makes every call site ambiguous
+about what it returns, and the ambiguity is worst exactly where it matters, in code that reads a field
+far from wherever the flag was set. Two tables opened by the same engine would answer differently for
+the same bytes, and a helper function taking a `Table` could not know which it had.
+
+**Why not a `GetTrimmedString` accessor**, which has none of the mode's problems and was the leading
+candidate. Rejected **for now**, on the ground rule that speculative API is not added ahead of a
+caller: it is two lines whenever it is wanted, nothing in the port needs it, and adding a second
+string accessor before there is a consumer commits the public surface to a distinction that may want
+different edges later — trailing blanks only, or leading too, or the memo path as well. Revisit when
+the first real caller appears; the cost of adding it then is the same as the cost of adding it now,
+and by then its edges will be known.
+
+**The trap worth documenting.** `string.TrimEnd()` with no argument trims *all* trailing whitespace,
+including tabs, carriage returns and newlines. A DBF character field is padded with spaces
+specifically, and a tab or a newline at the end of one is **data** — a fixed-width field is a
+perfectly ordinary place to store a line of text. So the naive fix silently deletes content for
+exactly the callers most likely to reach for it. `TrimEnd(' ')` is right; `TrimEnd()` is a data-loss
+bug that no test in this repository would catch, because the corpus pads with spaces only.
+
+**Consequence.** Closes step 002's sub-step 8a. No public surface changes; the `GetString`
+documentation gains the warning. If a `GetTrimmedString` is added later it must trim `' '` only, and
+this entry is the reason.

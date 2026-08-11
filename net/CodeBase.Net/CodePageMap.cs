@@ -92,13 +92,29 @@ internal static class CodePageMap
     }
 
     /// <summary>
+    /// What a byte sequence the code page cannot decode is replaced with.
+    /// </summary>
+    /// <value>
+    /// The Unicode replacement character, asked for explicitly rather than taken from the provider.
+    /// The default for the legacy code pages is a best-fit fallback that yields a question mark,
+    /// which is indistinguishable from a question mark the file actually holds; a caller has to be
+    /// able to tell data from damage. A field width is a byte count, so a multi-byte character cut
+    /// in half at a field boundary is an ordinary occurrence rather than a corrupt file, and this is
+    /// what marks the surviving half. See ADR-21.
+    /// </value>
+    private static readonly DecoderFallback ReplaceUndecodable = new DecoderReplacementFallback("�");
+
+    /// <summary>
     /// Finds an encoding, explaining the one setup step that is the usual reason it is missing.
     /// </summary>
     private static Encoding Lookup(int number)
     {
         try
         {
-            return Encoding.GetEncoding(number);
+            // Encoding is never performed here, so the encoder fallback is set to throw rather than
+            // to quietly produce something: this library reads, and a write path will choose for
+            // itself when there is one.
+            return Encoding.GetEncoding(number, EncoderFallback.ExceptionFallback, ReplaceUndecodable);
         }
         catch (Exception failure) when (failure is NotSupportedException or ArgumentException)
         {

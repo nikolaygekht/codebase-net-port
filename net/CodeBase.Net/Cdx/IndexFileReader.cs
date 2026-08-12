@@ -68,7 +68,7 @@ internal sealed class IndexFileReader : IDisposable
     /// </param>
     /// <param name="padByteFor">
     /// Supplies the pad byte for a machine-collated tag, which the file does not record. Called once
-    /// per such tag at open, and not called at all for a collated one.
+    /// per such tag, when that tag is first used, and not called at all for a collated one.
     /// </param>
     /// <returns>The open file and its tags.</returns>
     /// <exception cref="CodeBaseException">
@@ -89,13 +89,14 @@ internal sealed class IndexFileReader : IDisposable
 
             if (!header.IsCompound)
             {
-                CdxTag only = new(name, header, PadByteOf(header, padByteFor), nodes);
+                CdxTag only = new(name, header, padByteFor, nodes);
                 return new IndexFileReader(source, name, header, null, [only]);
             }
 
             // The directory is a tag whose keys are names and whose pad byte is a space, which the
-            // file does not have to say because the C library hard-codes it (i4init.c:520-525).
-            CdxTag directory = new("*directory*", header, KeyPadding.Space, nodes);
+            // file does not have to say because the C library hard-codes it (i4init.c:520-525). Its
+            // header answers for itself, so the resolver is never reached for it.
+            CdxTag directory = new("*directory*", header, padByteFor, nodes);
 
             return new IndexFileReader(
                 source, name, header, directory,
@@ -165,7 +166,7 @@ internal sealed class IndexFileReader : IDisposable
                 nodes.ReadHeader(entry.Record),
                 $"tag {name} of {fileName}");
 
-            tags.Add(new CdxTag(name, tagHeader, PadByteOf(tagHeader, padByteFor), nodes));
+            tags.Add(new CdxTag(name, tagHeader, padByteFor, nodes));
         }
 
         if (tags.Count == 0)
@@ -177,10 +178,4 @@ internal sealed class IndexFileReader : IDisposable
 
         return tags;
     }
-
-    /// <summary>
-    /// Settles the pad byte, asking the caller only where the header cannot answer.
-    /// </summary>
-    private static byte PadByteOf(IndexHeader header, PadByteResolver padByteFor) =>
-        header.PadByte ?? padByteFor(header);
 }

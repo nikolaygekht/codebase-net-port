@@ -40,9 +40,10 @@ internal static class KeyPadding
 /// <summary>
 /// Supplies the pad byte for a tag whose collation does not settle it.
 ///
-/// Called only for a machine-collated tag, and only at open. The implementation this port will
-/// eventually use asks the key expression for its type; a test supplies the value the reference
-/// implementation recorded instead.
+/// Called only for a machine-collated tag, and only when that tag is first used rather than when its
+/// file is opened, so a tag this cannot answer for does not close the table it belongs to. The
+/// implementation this port uses reads the type off the table's field descriptors
+/// ([c]KeyTypeResolver[/c]); a test can supply the value the reference implementation recorded instead.
 /// </summary>
 /// <param name="header">The tag header, which carries the expression text and the key length.</param>
 /// <returns>

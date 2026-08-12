@@ -726,12 +726,13 @@ to** — matched case-insensitively, as the C library upper-cases field names on
 *is* the key's type, and the pad byte follows from the C library's own mapping (i4init.c:557-604):
 `' '` for a character key under machine collation, `'\0'` for a character key under any other collation
 and for every numeric, currency, date and datetime key. Anything else — a name that matches no field, a
-composite expression such as `UPPER(NAME)` or `STR(ID)+CITY` — is **refused when the tag is selected**,
-naming the expression, and waits for `EXPR`.
+composite expression such as `UPPER(NAME)` or `STR(ID)+CITY` — is **refused when the tag is first
+used**, naming the expression, and waits for `EXPR`. In practice that means the pad byte is resolved
+lazily, on the first `SelectTag` or `…Indexed` call naming the tag, and never at open.
 
 **Why this is exact and not a heuristic.** The rule is not "guess the type from the expression"; it is
 "if the expression is a field reference, the type is that field's". That is what `expr4parseLow`
-computes for the same input, by a much longer route. All 17 corpus tags are of this shape, as are the
+computes for the same input, by a much longer route. All 18 corpus tags are of this shape, as are the
 overwhelming majority of the 56 tags in the shipped `original/examples/DATA/` samples — indexes on a
 bare field are what applications write.
 
@@ -753,3 +754,60 @@ that needs this.
 still supply a pad byte directly, which is what the internal 004 and 005 gates do. When `EXPR` lands it
 replaces the refusal branch only, and a test then asserts that the derived type agrees with this rule
 for every corpus tag — the two must never disagree where both apply.
+
+---
+
+## ADR-29 — A selected tag skips like `d4skip`; the four `…Indexed` methods position like `d4top` · accepted
+
+**Context.** Step 006 gives tag-order navigation two surfaces: `Top`/`Bottom`/`Skip` with a tag
+selected, and `GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/`GoPreviousIndexed`, which name the tag
+per call. They share one cursor per tag and visit the same records in the same order. They disagree on
+one thing: what a move that could not be made leaves behind.
+
+**Decision.** `Skip` reproduces `d4skip`'s tag path exactly (CDX-FORMAT.md §7.1): a backward skip that
+runs out of entries **stops on the tag's first record, which stays readable**, and reports only the
+beginning; a forward one ends past the last record; a skip of zero stays put without consulting the tag.
+The four `…Indexed` methods are **positioning calls**: a move that cannot be made reports `NoRecord` and
+leaves the cursor past the end with both flags, the way `Top` and `Bottom` do on an empty table.
+
+**Why the difference is deliberate.** It is the difference the port already has between `Skip` and `Go`,
+and each shape suits its caller. A skip is relative, so ending up against a boundary with the boundary
+record still readable is useful and is what the C library does. `GoNextIndexed` is a positioning call
+used as a loop condition — `for (go = GoFirstIndexed(t); go == Ok; go = GoNextIndexed(t))` — and a
+"failed" move that left a readable record on the boundary would either loop forever or need the caller
+to compare record numbers to notice. Reporting no record ends the loop and cannot be misread.
+
+**Rejected — one shape for both.** Making the four skip-shaped costs the loop termination above.
+Making `Skip` position-shaped would diverge from `d4skip` on a behaviour a caller can see, for symmetry
+that no caller asked for.
+
+**Consequence.** The gate walks the whole corpus through *both* surfaces and requires the record
+sequences to be identical, which is the part that must never drift. The flag difference at the ends is
+tested per surface, and stated in the XML docs of the methods that have it.
+
+---
+
+## ADR-30 — Stepping in a tag's order from a record the tag does not list is refused, not answered · accepted
+
+**Context.** `d4skip` re-derives the current record's key through the tag's expression and seeks with it
+before stepping (d4skip.c:1245-1275), so it can carry on from the nearest key even when the record has
+no entry of its own — which happens on a filtered tag, on a unique tag, and whenever another process
+removed the key. Without `EXPR` this port cannot derive that key; it can only look for the record
+itself, by walking the tag.
+
+**Decision.** When the record the cursor is on has no entry in the selected tag, tag-order stepping
+**throws** `ErrorCode.NotSupported`, naming the record, the tag and the expression that would have to be
+evaluated. It does not report end of file.
+
+**Rejected — answering end of file.** It is a plausible-looking wrong answer: the caller gets a record
+set that silently omits everything after the gap, with nothing saying why. "A wrong record set is far
+worse than a slow one" cuts the same way for navigation as for the optimizer.
+
+**Rejected — walking the tag for the *nearest* key instead of the exact record.** Landing "near" a
+record needs the record's key, which is the thing that is missing; comparing records by number would
+give an order the tag does not have.
+
+**Consequence.** A filtered or unique tag is fully walkable — every record it lists is reachable from
+`Top` or `GoFirstIndexed` — and only mixing `Go(n)` to a record *outside* the tag with a tag-order step
+is refused. `EXPR` removes the restriction by supplying the key, and the refusal branch is the only
+thing it replaces.

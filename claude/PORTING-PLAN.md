@@ -300,7 +300,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 |---|---|---|---|---|
 | `CORPUS` | Corpus + generator | **P0** | in progress — 11 cases in, 4 of them indexed; mutation and write cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
-| `CDX-READ` | CDX reading & navigation | **P1** | **decode, traversal and seek done** (004, 005); the `Table` wiring (006) is designed | **R1** retired |
+| `CDX-READ` | CDX reading & navigation | **P1** | **done for reading** — decode and traversal (004), seek (005), tags on a `Table` (006). Only a non-field key expression waits on `EXPR` | **R1** retired |
 | `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |
@@ -410,6 +410,18 @@ VFP reserved area, the `t4dblToFox` sign rule.
   does not store (ADR-26) — but once a tag has a table, a bare field-name expression types the key from
   the field descriptors exactly (ADR-28), which covers every corpus tag and the great majority of real
   ones. Only a composite expression such as `UPPER(NAME)` waits for `EXPR`.
+- **Done so far (a table's tags):** step [`006-tags-on-a-table`](dev/006-tags-on-a-table/) opened the
+  production index with the table it belongs to and made a tag an order the cursor can follow:
+  `Table.Tags`, `SelectTag`, and the four `GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/
+  `GoPreviousIndexed` calls that name a tag per call. The pad byte is now **derived** from the field
+  descriptors (ADR-28) rather than supplied, and the two surfaces are gated against each other on all
+  3364 corpus keys — **with every field of every record visited checked against the table's own record
+  dump**, so the index has to deliver records and not merely record numbers. The failure shapes at the
+  ends follow `d4skip` (ADR-29, `CDX-FORMAT.md` §7.1).
+- **Still waiting on `EXPR`:** a tag whose key expression is not a bare field name (refused when the tag
+  is first used, ADR-28), and stepping in a tag's order *from a record the tag does not list* — a
+  filtered or unique tag is fully walkable, but mixing `Go(n)` to an unlisted record with a tag-order
+  step is refused rather than answered (ADR-30).
 - **Why it matters beyond its tier:** this gate retires the single biggest technical risk in the
   port (R1).
 

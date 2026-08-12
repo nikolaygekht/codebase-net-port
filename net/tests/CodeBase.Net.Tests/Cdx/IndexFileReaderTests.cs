@@ -95,8 +95,10 @@ public sealed class IndexFileReaderTests
     }
 
     [Fact]
-    public void Open_TheResolverIsAskedOncePerMachineCollatedTag()
+    public void Open_TheResolverIsAskedOncePerMachineCollatedTagAndNotUntilTheTagIsUsed()
     {
+        // Deferred deliberately: the resolver can refuse a tag whose key expression cannot be typed, and
+        // refusing while the file is being opened would make one such tag close the whole file (ADR-28).
         byte[] image = Compound(("FIRST", [("ALPHA", 1)]), ("SECOND", [("BRAVO", 2)]));
         int asked = 0;
 
@@ -109,8 +111,15 @@ public sealed class IndexFileReaderTests
                 return KeyPadding.Space;
             });
 
-        // Two tags, and not the directory: its pad byte is a fact the C library hard-codes.
-        asked.Should().Be(2);
+        // Not the directory either: reading it is what opening the file does, and its pad byte is a fact
+        // the C library hard-codes rather than one the resolver is asked for.
+        asked.Should().Be(0, "no tag has been used yet");
+
+        _ = index.Tags[0].PadByte;
+        _ = index.Tags[0].PadByte;
+        _ = index.Tags[1].PadByte;
+
+        asked.Should().Be(2, "once for each tag, however often it is asked for");
     }
 
     [Fact]

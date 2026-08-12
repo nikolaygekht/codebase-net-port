@@ -12,20 +12,24 @@ namespace CodeBase.Net.Cdx;
 internal sealed class CdxTag
 {
     private readonly NodeReader nodes;
+    private readonly PadByteResolver padByteFor;
+    private byte? padByte;
 
     /// <summary>
     /// Initializes a new instance.
     /// </summary>
     /// <param name="name">The tag's name, upper-cased and trimmed as the file stores it.</param>
     /// <param name="header">The tag's header.</param>
-    /// <param name="padByte">The byte a trailing-pad count stands for in this tag's keys.</param>
+    /// <param name="padByteFor">
+    /// Supplies the pad byte where the header cannot, which is asked on first use rather than here.
+    /// </param>
     /// <param name="nodes">Reads the blocks of the file this tag lives in.</param>
-    public CdxTag(string name, IndexHeader header, byte padByte, NodeReader nodes)
+    public CdxTag(string name, IndexHeader header, PadByteResolver padByteFor, NodeReader nodes)
     {
         this.nodes = nodes;
+        this.padByteFor = padByteFor;
         Name = name;
         Header = header;
-        PadByte = padByte;
     }
 
     /// <summary>Gets the tag's name.</summary>
@@ -40,7 +44,15 @@ internal sealed class CdxTag
     public IndexHeader Header { get; }
 
     /// <summary>Gets the byte a trailing-pad count stands for in this tag's keys.</summary>
-    public byte PadByte { get; }
+    /// <value>
+    /// Settled on first use rather than at open. A machine-collated tag whose key expression this
+    /// library cannot type has to be refused, and refusing at open would make one such tag enough to
+    /// close the whole table it belongs to (ADR-28).
+    /// </value>
+    /// <exception cref="CodeBaseException">
+    /// The tag's key expression is not one whose type this library can work out.
+    /// </exception>
+    public byte PadByte => padByte ??= Header.PadByte ?? padByteFor(Header);
 
     /// <summary>Gets the number of bytes in each of the tag's keys.</summary>
     public int KeyLength => Header.KeyLength;

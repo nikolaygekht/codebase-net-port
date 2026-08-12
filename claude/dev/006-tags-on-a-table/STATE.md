@@ -4,41 +4,30 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** designed, not started
-**Current sub-step:** PLAN.md step 1 — `KeyTypeResolver`
+**Status:** closed — gate passed, see [`SUMMARY.md`](SUMMARY.md)
+**Current sub-step:** none
 
 ## Done so far
 
 - [x] phases 1-5 — `DESIGN.md` and `PLAN.md` written; ADR-28 recorded
-- [ ] step 1 — `KeyTypeResolver`
-- [ ] step 2 — opening the production index with the table
-- [ ] step 3 — `Tag` and `TagCollection`
-- [ ] step 4 — `SelectTag` and tag-order `Top`/`Bottom`
-- [ ] step 5 — the explicit `GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/`GoPreviousIndexed` four
-- [ ] step 6 — tag-order `Skip` and the two ends
-- [ ] step 7 — the gate
-- [ ] step 8 — documents
+- [x] step 1 — `KeyTypeResolver`
+- [x] step 2 — opening the production index with the table
+- [x] step 3 — `Tag` and `TagCollection`
+- [x] step 4 — `SelectTag` and tag-order `Top`/`Bottom`
+- [x] step 5 — the explicit `GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/`GoPreviousIndexed` four
+- [x] step 6 — tag-order `Skip` and the two ends
+- [x] step 7 — the gate, and four mutation checks
+- [x] step 8 — documents: ADR-29, ADR-30, `CDX-FORMAT.md` §7.1, `PORTING-PLAN.md` §5, `README.md`
 
 ## Notes for the next session
 
-**No generator work and no Windows needed**: the corpus already holds everything this step is
-gated against, and the gate joins two existing dumps by record number.
+**007 is next** — seek by value on a `Table`, which needs `COLLATION`'s machine-half transforms.
+`KeySearch` is the seam it plugs into.
 
-This step is independent of 005 — navigating in tag order needs traversal, not seek — so the two can be
-done in either order. Doing 005 first means the public surface arrives complete in 007 rather than
-growing a `Seek` afterwards.
-
-Two surfaces onto one implementation (Decision 9): the C library's `Top`/`Bottom`/`Skip` with a selected
-tag, and the explicit `…Indexed` four that name the tag per call. They must never drift, so the corpus
-walk in the gate runs through both.
-
-The risk that matters is a **regression in record-order navigation**, which 900 existing tests cover:
-keep the tag path a branch rather than a rewrite, and the seven un-indexed tables honest.
+Two things `EXPR` still owes this step, both refusals rather than gaps: typing a key expression that is
+not a bare field name (ADR-28), and positioning a tag on a record it does not list (ADR-30).
 
 ## Deviations from the plan
 
-None yet.
-
-## Blockers
-
-None.
+Recorded in [`SUMMARY.md`](SUMMARY.md) — five, of which two produced ADRs (29 and 30) and one a new
+specification subsection (`CDX-FORMAT.md` §7.1).

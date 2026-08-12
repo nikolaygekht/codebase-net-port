@@ -4,8 +4,9 @@ A modern, fully-managed **C#/.NET port of the CodeBase database engine** — rea
 Visual FoxPro-compatible `DBF` tables, `CDX` compound indexes, and `FPT` memo files
 **byte-for-byte**, with no native dependencies.
 
-> **Status: pre-implementation.** The format specifications, the porting plan and the golden test
-> corpus exist; the C# code does not yet. Nothing here is usable as a library today.
+> **Status: reading works, writing does not.** Tables, memo files and CDX indexes can be opened and
+> read, and a table can be navigated in an index tag's order. Nothing writes yet, and the query
+> optimizer — the reason the project exists — is still ahead. See [`STATE.md`](STATE.md).
 
 ## What it is
 
@@ -70,6 +71,37 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 Alternatively, set `CodeBaseEngine.DefaultEncoding` to an encoding you already hold — that covers
 tables whose code-page byte is unmarked or unrecognized without any provider at all.
+
+## Reading a table in index order
+
+```csharp
+using CodeBase.Net;
+using CodeBase.Net.Dbf;
+
+using CodeBaseEngine engine = new();
+using Table table = engine.OpenTable("customers.dbf");
+
+FieldDefinition name = table.Fields["NAME"];
+
+// The production index opens with the table when its header declares one.
+Tag byName = table.Tags["NAME"];
+
+table.SelectTag(byName);
+
+for (GoResult go = table.Top(); go == GoResult.Ok; )
+{
+    Console.WriteLine(table.GetString(name));
+
+    if (table.Skip(1) != SkipResult.Moved)
+        break;
+}
+```
+
+`SelectTag` makes the tag the cursor's order: `Top`, `Bottom` and `Skip` then move through the index
+instead of through record numbers, exactly as `d4tagSelect` does in the C library, and `Go` still means
+a record number. Where a caller would rather not change the table's mode, the same walk is available
+per call — `GoFirstIndexed(tag)`, `GoNextIndexed(tag)`, `GoLastIndexed(tag)`, `GoPreviousIndexed(tag)` —
+and both forms share one cursor per tag, so a walk started with either continues with the other.
 
 ## Documentation
 

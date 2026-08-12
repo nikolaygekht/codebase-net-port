@@ -28,7 +28,9 @@ public sealed class Table : IDisposable
     private readonly RecordPosition position = new();
     private readonly byte[] blankRecord;
     private readonly MemoReader? memoReader;
+    private readonly Dictionary<Tag, TableTagCursor> tagCursors = [];
     private Encoding? textEncoding;
+    private TableTagCursor? selected;
     private bool closed;
 
     internal Table(string path, OpenedTable opened, Encoding? defaultEncoding, Action<Table> onClosed)
@@ -39,6 +41,8 @@ public sealed class Table : IDisposable
         this.onClosed = onClosed;
 
         Fields = new FieldCollection(opened.Fields.Fields);
+        Tags = new TagCollection(
+            opened.Index is null ? [] : [.. opened.Index.Tags.Select(t => new Tag(t))]);
         CodePage = CodePageMap.Resolve(opened.Header.CodePage);
 
         reader = new RecordReader(opened.Data, opened.Header.HeaderLength, opened.Header.RecordLength);
@@ -98,6 +102,25 @@ public sealed class Table : IDisposable
     public int HeaderLength => opened.Header.HeaderLength;
 
     /// <summary>
+    /// Gets the table's index tags, empty when it declares no production index.
+    /// </summary>
+    public TagCollection Tags { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the table has a production index open.
+    /// </summary>
+    /// <value>
+    /// True when the header declared one and it was opened with the table. A declared index whose file is
+    /// missing is an error at open rather than a table that quietly navigates in record order.
+    /// </value>
+    public bool HasIndex => opened.Index is not null;
+
+    /// <summary>
+    /// Gets the tag whose order the cursor follows, or null when it follows record order.
+    /// </summary>
+    public Tag? SelectedTag => selected?.Tag;
+
+    /// <summary>
     /// Gets the code page the table names for its text.
     /// </summary>
     public CodePage CodePage { get; }
@@ -149,12 +172,6 @@ public sealed class Table : IDisposable
     /// is not the same answer as no memo at all.
     /// </value>
     public int? MemoBlockSize => opened.MemoHeader?.BlockSize;
-
-    /// <summary>
-    /// Gets a value indicating whether the table declares a production index.
-    /// </summary>
-    /// <value>Reading that index is not implemented yet; this only reports the claim.</value>
-    public bool HasProductionIndex => (opened.Header.TableFlags & 0x01) != 0;
 
     /// <summary>
     /// Gets the table's fields, in file order.
@@ -251,6 +268,8 @@ public sealed class Table : IDisposable
 
     /// <summary>
     /// Moves the cursor to the first record.
+    ///
+    /// With a tag selected this is the first record in that tag's order, which is not record one.
     /// </summary>
     /// <returns>Whether there was one. An empty table has none, and ends up at both of its ends.</returns>
     /// <exception cref="CodeBaseException">The file is shorter than its header says.</exception>
@@ -258,6 +277,9 @@ public sealed class Table : IDisposable
     public GoResult Top()
     {
         EnsureOpen();
+
+        if (selected is not null)
+            return Reached(selected.First(RecordCount, out int first), first);
 
         if (RecordCount < 1)
         {
@@ -271,6 +293,8 @@ public sealed class Table : IDisposable
 
     /// <summary>
     /// Moves the cursor to the last record.
+    ///
+    /// With a tag selected this is the last record in that tag's order.
     /// </summary>
     /// <returns>Whether there was one.</returns>
     /// <exception cref="CodeBaseException">The file is shorter than its header says.</exception>
@@ -278,6 +302,9 @@ public sealed class Table : IDisposable
     public GoResult Bottom()
     {
         EnsureOpen();
+
+        if (selected is not null)
+            return Reached(selected.Last(RecordCount, out int last), last);
 
         if (RecordCount < 1)
         {
@@ -291,6 +318,9 @@ public sealed class Table : IDisposable
 
     /// <summary>
     /// Moves the cursor forwards or backwards by a number of records.
+    ///
+    /// With a tag selected the step is a step in that tag's order, taken from wherever the record cursor
+    /// is — so a caller may move by record number and carry on stepping in the tag.
     /// </summary>
     /// <param name="count">
     /// How far to move. Negative moves backwards; zero re-reads the current record, which is what
@@ -319,6 +349,9 @@ public sealed class Table : IDisposable
         // always leaves the flag clear.
         position.ClearBof();
 
+        if (selected is not null)
+            return SkipInTagOrder(selected, count);
+
         long target = (long)position.Number + count;
 
         if (target >= 1 && target <= RecordCount)
@@ -345,6 +378,230 @@ public sealed class Table : IDisposable
         Fetch(1);
         position.MovedBeforeStart(endOfFileBefore);
         return SkipResult.Bof;
+    }
+
+    /// <summary>
+    /// Makes the cursor follow a tag's order instead of record order.
+    ///
+    /// Selecting a tag does not move the cursor: the next [c]Top[/c], [c]Bottom[/c] or [c]Skip[/c] is what
+    /// re-positions, exactly as in the C library. A caller that selects a tag and then reads a field gets
+    /// the record it already had.
+    /// </summary>
+    /// <param name="tag">The tag to follow, or null to go back to record order.</param>
+    /// <exception cref="CodeBaseException">
+    /// The tag belongs to another table, or its key expression is not a plain field name of this one — in
+    /// which case its keys cannot be padded correctly and reading them would be wrong rather than slow.
+    /// The table's other tags are unaffected (ADR-28).
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public void SelectTag(Tag? tag)
+    {
+        EnsureOpen();
+
+        selected = tag is null ? null : CursorFor(tag);
+    }
+
+    /// <summary>
+    /// Moves to the first record in a tag's order, without changing the selection.
+    ///
+    /// The same navigation the selected-tag form performs, said at the call site instead. Neither is a
+    /// wrapper around the other: both drive one cursor per tag, so a walk started here can be continued
+    /// with [c]GoNextIndexed[/c] and the selection is left alone. A move that cannot be made reports no
+    /// record and leaves the cursor past the end, which a selected-tag [c]Skip[/c] does not (ADR-29).
+    /// </summary>
+    /// <param name="tag">The tag whose order to follow for this call.</param>
+    /// <returns>Whether the tag reached a record.</returns>
+    /// <exception cref="CodeBaseException">The tag is not usable on this table.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult GoFirstIndexed(Tag tag)
+    {
+        EnsureOpen();
+        return Reached(CursorFor(tag).First(RecordCount, out int record), record);
+    }
+
+    /// <summary>
+    /// Moves to the last record in a tag's order, without changing the selection.
+    /// </summary>
+    /// <param name="tag">The tag whose order to follow for this call.</param>
+    /// <returns>Whether the tag reached a record.</returns>
+    /// <exception cref="CodeBaseException">The tag is not usable on this table.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult GoLastIndexed(Tag tag)
+    {
+        EnsureOpen();
+        return Reached(CursorFor(tag).Last(RecordCount, out int record), record);
+    }
+
+    /// <summary>
+    /// Moves to the next record in a tag's order, whatever its key.
+    ///
+    /// Steps unconditionally, stopping only at the end of the tag. Stepping that stops where a key stops
+    /// matching a value is a different operation and belongs with seeking.
+    /// </summary>
+    /// <param name="tag">The tag whose order to follow for this call.</param>
+    /// <returns>Whether there was one.</returns>
+    /// <exception cref="CodeBaseException">The tag is not usable on this table.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult GoNextIndexed(Tag tag) => StepIndexed(tag, 1);
+
+    /// <summary>
+    /// Moves to the previous record in a tag's order, whatever its key.
+    /// </summary>
+    /// <param name="tag">The tag whose order to follow for this call.</param>
+    /// <returns>Whether there was one.</returns>
+    /// <exception cref="CodeBaseException">The tag is not usable on this table.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult GoPreviousIndexed(Tag tag) => StepIndexed(tag, -1);
+
+    /// <summary>
+    /// Skips in a selected tag's order, following d4skip's tag path step for step.
+    /// </summary>
+    private SkipResult SkipInTagOrder(TableTagCursor cursor, int count)
+    {
+        // Past the end of the table, a forward skip stays there and a backward one comes back in through
+        // the tag's last record, which then counts as one of the steps (d4skip.c:1208-1225).
+        if (position.Eof)
+        {
+            if (count >= 0)
+            {
+                MovePastEnd();
+                return SkipResult.Eof;
+            }
+
+            if (Bottom() != GoResult.Ok)
+                return SkipResult.Bof;
+
+            count++;
+        }
+
+        // A skip of zero stays where it is without consulting the tag at all (d4skip.c:1240). Unlike the
+        // record path it does not even re-read the record, which is the C library's own asymmetry.
+        if (count == 0)
+            return SkipResult.Moved;
+
+        if (!cursor.Synchronize((uint)position.Number))
+            throw NotInTag(cursor.Tag, position.Number);
+
+        bool endOfFileBefore = position.Eof;
+
+        switch (cursor.Step(count, RecordCount, out int record))
+        {
+            case TagLanding.Moved:
+                Fetch(record);
+                return SkipResult.Moved;
+
+            case TagLanding.Stopped:
+                // Ran off the front of the tag. The record it stopped on stays readable and only the flag
+                // says what happened, exactly as a backwards skip in record order does.
+                Fetch(record);
+                position.MovedBeforeStart(endOfFileBefore);
+                return SkipResult.Bof;
+
+            case TagLanding.AtEnd:
+                // Ran out of entries going forward, which is the end of the table and nothing more
+                // (d4skip.c:1277-1279).
+                MovePastEnd();
+                return SkipResult.Eof;
+
+            default:
+                // The tag got where it was going and every entry there names a record the table does not
+                // have. The C library reports that as the end of the file whichever way the skip was
+                // headed, and raises the beginning flag as well (d4skip.c:1303-1307).
+                MovePastEnd();
+                position.MovedBeforeStart(endOfFileBefore: true);
+                return SkipResult.Eof;
+        }
+    }
+
+    /// <summary>
+    /// Refuses to move in a tag's order from a record the tag does not list.
+    ///
+    /// The C library re-derives the record's key through the tag's expression and seeks with it, so it can
+    /// carry on from the nearest key (d4seekSynchToCurrentPos, D4SEEK.C:1141). Without the expression
+    /// engine this port can only look for the record itself, and a record a filtered or unique tag leaves
+    /// out is not there to be found. Answering end of file instead would be a plausible-looking wrong
+    /// answer, so it says so (ADR-28).
+    /// </summary>
+    private static CodeBaseException NotInTag(Tag tag, int record) =>
+        new(
+            ErrorCode.NotSupported,
+            $"Record {record} has no entry in tag '{tag.Name}', so this version cannot tell where in " +
+            $"that tag's order to carry on from. Reaching it needs the key expression '{tag.Expression}' " +
+            "to be evaluated, which waits on the expression engine.");
+
+    /// <summary>
+    /// Moves one step in a tag's order, synchronizing the tag with the record cursor first.
+    /// </summary>
+    private GoResult StepIndexed(Tag tag, int count)
+    {
+        EnsureOpen();
+
+        TableTagCursor cursor = CursorFor(tag);
+
+        if (position.Number < 1)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Info,
+                $"Stepping in tag '{tag.Name}' needs a position to step from, and the cursor is on no " +
+                "record. Call GoFirstIndexed, GoLastIndexed or Go first.");
+        }
+
+        // Past the end of the table there is nothing to step forward from, and stepping back re-enters
+        // through the tag's last record — the same asymmetry the selected-tag path has.
+        if (position.Eof)
+            return count < 0 ? Reached(cursor.Last(RecordCount, out int last), last) : Reached(false, 0);
+
+        // A caller may have moved by record number since the last indexed move, which would leave the tag
+        // pointing somewhere else. Stepping from where the *record* cursor is, rather than from where the
+        // tag was left, is what makes the two surfaces interchangeable.
+        if (!cursor.Synchronize((uint)position.Number))
+            throw NotInTag(tag, position.Number);
+
+        // Unlike the selected-tag Skip, these four are positioning calls: a move that could not be made
+        // reports no record and leaves the cursor past the end, the way Top and Bottom do on an empty
+        // table. The records they visit are the same ones; only the shape of the failure differs.
+        return Reached(cursor.Step(count, RecordCount, out int record) == TagLanding.Moved, record);
+    }
+
+    /// <summary>
+    /// Gives the cursor that follows a tag, refusing a tag this table cannot use.
+    /// </summary>
+    private TableTagCursor CursorFor(Tag tag)
+    {
+        if (!ReferenceEquals(Tags.TryGet(tag.Name, out Tag? mine) ? mine : null, tag))
+        {
+            throw new CodeBaseException(
+                ErrorCode.Info,
+                $"Tag '{tag.Name}' does not belong to the table at '{Path}'.");
+        }
+
+        if (!tagCursors.TryGetValue(tag, out TableTagCursor? cursor))
+        {
+            // Constructing it is what asks for the pad byte, so a tag whose expression cannot be typed
+            // fails here — at the first attempt to use it, and not when the table was opened.
+            cursor = new TableTagCursor(tag);
+            tagCursors[tag] = cursor;
+        }
+
+        return cursor;
+    }
+
+    /// <summary>
+    /// Reads the record an indexed move reached, or reports that it reached none.
+    /// </summary>
+    private GoResult Reached(bool moved, int record)
+    {
+        if (!moved)
+        {
+            // Running out of entries puts the cursor at both ends, which is the shape d4skip's tag path
+            // produces (d4skip.c:1281-1285) and the shape an empty table already has.
+            MovePastEnd();
+            position.MovedBeforeStart(endOfFileBefore: true);
+            return GoResult.NoRecord;
+        }
+
+        Fetch(record);
+        return GoResult.Ok;
     }
 
     /// <summary>
@@ -584,6 +841,7 @@ public sealed class Table : IDisposable
             return;
 
         closed = true;
+        opened.Index?.Dispose();
         opened.Memo?.Dispose();
         opened.Data.Dispose();
         onClosed(this);

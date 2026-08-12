@@ -507,6 +507,35 @@ which moves nowhere (I4TAG.C:1000-1019). Witnessed on `CDXBASE.cdx`'s `T_TEXTD`,
 and is counted as 1. A port must not reproduce this; counting by walking with the direction-aware skip
 is correct, and the corpus generator does that instead.
 
+### 7.1 Driving a table's cursor from a tag (`d4top`, `d4skip`)
+
+Tag order *is* record order once a tag is selected: `d4top` calls `tfile4top` and then `d4go` on the
+record the entry names (D4TOP.C:186-208), and `d4skip` calls `tfile4dskip` and then `d4go`
+(d4skip.c:1277-1310). The record buffer is filled by an ordinary read; nothing about reading a record
+changes. Six behaviours of that path are not guessable from either half:
+
+1. **An entry naming a record past `recCount` is skipped, not refused**, in the direction of travel; the
+   C library's own comment says why — another process may have added a key before the record. Exhausting
+   that loop raises `bofFlag` and returns `d4goEof` (d4skip.c:1296-1308). `d4top` loops the same way
+   (D4TOP.C:200-215).
+2. **A skip of zero returns success without consulting the tag at all** (d4skip.c:1245), and so without
+   re-reading the record — the opposite of the record-order path, which reaches it through `d4go`.
+3. **At end of file the two directions differ**: forward stays at end of file, backward calls `d4bottom`
+   and counts reaching it as one of the steps (d4skip.c:1212-1225).
+4. **A forward skip that runs short is plain end of file** — `d4goEof`, with `bofFlag` left as the skip
+   cleared it (d4skip.c:1277-1279).
+5. **A backward skip that runs short stops on the tag's first entry and leaves that record readable**,
+   raising only `bofFlag` and returning `r4bof` (d4skip.c:1343-1354). The repositioning is inside
+   `tfile4skip`, which re-tops the tag when it runs out of leaf blocks in that direction
+   (I4TAG.C:2538-2552). This is the same shape a backward skip in record order has.
+6. **A tag with no usable position raises both flags** — `bofFlag` and `d4goEof` (d4skip.c:1281-1285),
+   which is also the shape an empty table has.
+
+Before skipping, `d4skip` re-derives the current record's key through the tag's expression and calls
+`tfile4go` on the (key, record) pair to put the tag where the record is (d4skip.c:1245-1275, and
+`d4seekSynchToCurrentPos`, D4SEEK.C:1141). That is why moving by record number and then skipping in tag
+order works at all — and why doing it for a record the tag does not list needs the expression engine.
+
 ---
 
 ## 8. Update algorithms

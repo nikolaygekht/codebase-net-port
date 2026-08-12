@@ -1,10 +1,10 @@
 # Project state
 
-**Updated:** 2026-08-12 · step 005 is **committed to `main`** and the tree is clean. Nothing is pushed
-yet: five commits are waiting, steps 002's, 003's, 004's, the design one and 005's.
-**Active step:** none. [`005-cdx-seek`](claude/dev/005-cdx-seek/) is **closed**: **972 tests**, and
-`CDX-READ` is done for decode, traversal and seek. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)
-is **designed and not started**.
+**Updated:** 2026-08-12 · step 006 is **committed to `main`** and the tree is clean. Nothing is pushed
+yet: six commits are waiting, steps 002's, 003's, 004's, the design one, 005's and 006's.
+**Active step:** none. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/) is **closed**:
+**1039 tests**, and `CDX-READ` is **done for reading** — what is left of it waits on `EXPR`.
+[`007`](claude/dev/) — seek by value — is next and not yet designed.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -14,10 +14,10 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 
 ## 1. What is ready
 
-**A DBF can be read, whole, and a CDX or IDX can be read and walked.** `net/CodeBase.Net.sln` builds
-four projects — `CodeBase.Net` (**no NuGet dependencies** by design, ADR-17), `CodeBase.Net.Tests`,
-`CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is green on **972 tests**, 421
-of them golden.
+**A DBF can be read whole, and its records can be read in an index tag's order.**
+`net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies** by design,
+ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is
+green on **1039 tests**, 453 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -40,17 +40,27 @@ read fields out of it — `GetString`, `GetRawBytes`, `GetBoolean`, `GetInt32`, 
 too — `GetMemoBytes`, `GetMemoString`, `GetMemoLength`, `GetMemoBlock`, `GetMemoType` — in both
 reference encodings.
 
-**The index side is `internal` and not yet wired to a table**, which was steps 004 and 005' scope call:
+**The production index opens with the table, and a tag is an order the cursor can follow:**
 
 ```csharp
-using IndexFileReader index = IndexFileReader.Open(source, "CUSTOMER.cdx", padByteFor);
+FieldDefinition name = table.Fields["NAME"];
+Tag byName = table.Tags["NAME"];          // Table.Tags is empty when the header declares no index
 
-TagCursor cursor = index.Tag("NAME").OpenCursor();
-for (bool any = cursor.Top(); any; any = cursor.Next())
+table.SelectTag(byName);                  // Top, Bottom and Skip now move through the tag
+for (GoResult go = table.Top(); go == GoResult.Ok; )
 {
-    IndexEntry entry = cursor.Current;   // key bytes, rebuilt and padded, plus the record number
+    string text = table.GetString(name);
+    if (table.Skip(1) != SkipResult.Moved) break;
 }
+
+// or per call, leaving the table's mode alone:
+for (GoResult go = table.GoFirstIndexed(byName); go == GoResult.Ok; go = table.GoNextIndexed(byName))
+    Read(table.GetString(name));
 ```
+
+Both forms share one cursor per tag, so a walk started with either continues with the other. A tag's pad
+byte is **derived** from the table's field descriptors when its expression is a bare field name (ADR-28);
+the reader below stays `internal`.
 
 `CodeBase.Net.Cdx` reads both file shapes — a compound file through its tag directory, and a
 single-tag `.IDX` whose tag is named after the file — then tag headers, interior nodes with their
@@ -71,17 +81,18 @@ cursor.SeekExact(search, 42);   // that key *and* that record number
 ```
 
 `Seek(low)` to `SeekAtOrBefore(high)`, walked with the cursor's own steps, is a closed range — the shape
-the optimizer's per-tag constraints will ask for. **What is missing is the wiring to a `Table`**
-(step 006, which is also what resolves the pad byte for a bare-field tag — ADR-28) and turning a *value*
-into key bytes, which is `COLLATION`'s half and step 007's.
+the optimizer's per-tag constraints will ask for. **What is missing is turning a *value* into key bytes**,
+which is `COLLATION`'s half and step 007's; seeking is still `internal` for that reason.
 
 **Everything is gated against the C library's own view, with nothing skipped.** On the table side: all
 eleven corpus tables, every record, every field, and every memo value. On the index side: **22 tags,
 3364 keys, 155 blocks and 3425 block entries** — including each leaf entry's stored duplicate and trail
 counts, so the bit-packing is checked as an encoding and not only through the keys it rebuilds. Seeking
 adds **206 recorded search cases, 104 seek-next runs and 3364 exact-pair assertions**, plus properties for
-the three operations the C library does not have. The one refusal is a **compressed memo entry**, which no
-corpus case can gate yet (ADR-23, open).
+the three operations the C library does not have. Navigating a table by index adds **3364 records reached
+through 18 tags, with every field of every one checked against that record's own dump** — through both
+surfaces, in both directions. The one refusal is a **compressed memo entry**, which no corpus case can gate
+yet (ADR-23, open).
 
 **`test-files-generator/`** builds and runs end to end (Windows/MSVC):
 
@@ -119,59 +130,50 @@ is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ## 2. Last session (2026-08-12)
 
-**Step 005 was designed, planned and executed, and is closed.** `CDX-READ` now does decode, traversal
-*and* seek. Read [`SUMMARY.md`](claude/dev/005-cdx-seek/SUMMARY.md). Five things worth carrying forward:
+**Step 006 was designed, planned and executed, and is closed.** A table now opens its production index
+and can be navigated in a tag's order, which makes this the first index feature a caller can see. Read
+[`SUMMARY.md`](claude/dev/006-tags-on-a-table/SUMMARY.md). Five things worth carrying forward:
 
-- **The corpus overturned the specification's partial-seek pseudocode, and this is the finding that
-  matters.** A search value means one of two things: with **no trailing pad** it is a prefix, compared
-  over its own length; with **trailing pad** it stands for the whole key and its pad bytes take part. So
-  `"AB      "` does *not* match the stored key `"AB\x00\x00\x00\x00\x00\x00"` — a NUL is below a
-  space, so that key sorts before the value — while `"CUSTOMER-A"` does match
-  `"CUSTOMER-ACCT-0599  "`. A pure-prefix reading passes every exact-length case and fails these, which
-  is why it took 206 recorded cases to catch. `CDX-FORMAT.md` §7 now carries the rule, witnessed.
-- **Three consequences, all in the spec now.** The increment of a padded value lands on its last *pad*
-  byte, so the successor of `"MIDDLE      "` is `"MIDDLE     !"` and not `"MIDDLF"` (which would step over
-  `"MIDDLE-EARTH"`). A value that cannot be incremented takes a different branch entirely — an all-`0xFF`
-  search on a descending tag reports end of file, not the greatest key. And `tfile4seek` can return
-  `r4after` with the cursor already past the end, while `d4seek` normalises that to `r4eof`, so a status
-  has to be decided from the pair rather than the code.
-- **`SeekAtOrBefore` became the primitive rather than an extra.** All three backwards operations are
-  "increment, seek, step back one", so the increment is written once; `SeekLast` is one comparison on top
-  of it. Two of the five operations are ports and three are additions, and the tests say which is which:
-  the additions are gated as properties over the recorded key sequence, tied to the reference-gated `Seek`
-  by an adjacency check.
-- **A mutation exposed one of my own tests as vacuous.** The adjacency check compared two expectations
-  computed from the dump rather than the two cursor landings, so making `SeekAtOrBefore` identical to
-  `Seek` left it green. It now compares where the cursors land, and that mutation fails it. Decision 9's
-  prediction about which assertions the step-back mutation would break was also wrong, and is corrected in
-  the summary: the step-back is shared with the descending seek, which *is* reference-gated.
-- **A latent bug from step 004 surfaced**: stepping back from an end-of-file landing moved *past* the last
-  entry instead of onto it. A walk that merely stops at the end never notices; a seek that lands at the end
-  and then steps back does. Both ends now re-enter the tag, as the record cursor already does.
+- **The pad byte is settled for real tags, and derived rather than supplied.** ADR-28's rule — a tag whose
+  expression is a bare field name takes that field's type — is implemented in `KeyTypeResolver` and checked
+  against the `pChar` the C library recorded for **all 18 corpus tags**. Resolution is lazy, per tag, on
+  first use, so a tag whose expression this port cannot type refuses when it is selected and the table's
+  other tags keep working. That was a change to 004's reader, which resolved every tag at open.
+- **The gate verifies records, not record numbers.** Every one of the 3364 positions a tag-order walk
+  reaches is compared field by field against that record's entry in the table's own dump. The mutation that
+  justifies it: reading a *neighbouring* record while reporting the right number fails exactly those four
+  golden walks and nothing else — every record-number assertion in the suite stays green.
+- **Reading `d4skip`'s tag path closely changed four behaviours the design had guessed at.** A skip of zero
+  does not consult the tag at all; at end of file a backwards skip re-enters through the tag's bottom and
+  counts that as a step; a backwards skip that runs out stops on the tag's *first* record and leaves it
+  readable, raising only the beginning flag; and running out is *not* always both flags. The facts are now
+  `CDX-FORMAT.md` §7.1, and the difference they create between `Skip` and the four `…Indexed` methods is
+  **ADR-29**: a skip is relative and boundary-readable, a positioning call reports no record.
+- **One case is refused rather than answered** (**ADR-30**): stepping in a tag's order from a record the tag
+  does not list. The C library re-derives the record's key through the expression; this port cannot, and
+  answering "end of file" would hand back a record set that silently stops early. A filtered or unique tag
+  is still fully walkable — only mixing `Go(n)` to an unlisted record with a tag-order step is refused.
+- **`Table.HasProductionIndex` was removed.** It reported the header's claim; `HasIndex` reports the open
+  file, and since a declared index that is missing is an error at open the two could never disagree.
 
-**Known ungated paths, named rather than discovered later:** `SeekNext` against the reference on a
-numeric, date or currency tag (needs 007's transforms); the three added operations against reference
-bytes, which cannot exist; a range walk as an operation, left as a composition until `QUERY` calls it; a
-partial seek on a `GENERAL`-collated tag by *value*, where the C library's own `considerPartialSeek` flag
-exists because tail weights interfere; and a seek racing a writer, which is `LOCKING`.
+**Known ungated paths, named rather than discovered later:** a composite key expression such as
+`UPPER(NAME)`, refused until `EXPR`; a tag over a `Y`, `T`, `Z` or `F` field, which the resolver handles and
+no corpus tag exercises; an index entry naming a record past the end of the table, which every generated
+index precludes and a hand-built pair covers instead; a table whose every tag is refused; and two index
+files on one table.
 
 ## 3. Next
 
-**[`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)** is designed and ready, and needs no generator
-run: the gate joins the index dumps' key sequences to the table dumps' field values by record number, so
-navigating by index has to deliver the same *records* that reading by number does. It opens the production
-`.cdx` when DBF byte 28 declares one, exposes `Table.Tags`, and navigates records in a tag's order two ways
-over one implementation — the C library's `Top`/`Bottom`/`Skip` with a selected tag, and an explicit
-`GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/`GoPreviousIndexed` four that name the tag at the call site
-and step unconditionally. It also settles ADR-26 for real tags: a bare field-name expression types the key
-from the field descriptors exactly (**ADR-28**, verified against all 18 corpus tags before any code), so
-`EXPR` is needed only for composite expressions.
-
-**Then 007: seek by value.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and its
+**Step 007: seek by value.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and its
 siblings — which is `COLLATION`'s machine half and is **gateable from the corpus already committed**, since
-every tag's stored keys sit beside the field values they were computed from. It inherits three named
-questions from 005: the `.NULL.` convention for an empty public seek, whether `SeekNext`'s
-degrade-to-seek should survive into a public API, and `considerPartialSeek` for collated partial seeks.
+every tag's stored keys sit beside the field values they were computed from. It is the last piece before a
+caller can ask a table a question rather than walk it, and it inherits three named questions from 005: the
+`.NULL.` convention for an empty public seek, whether `SeekNext`'s degrade-to-seek should survive into a
+public API, and `considerPartialSeek` for collated partial seeks. Nothing is designed yet.
+
+**`EXPR` is what `CDX-READ` still owes**, in exactly two places, both refusals rather than gaps: typing a
+key expression that is not a bare field name (ADR-28) and positioning a tag on a record it does not list
+(ADR-30).
 
 Two things that do not depend on any of it:
 

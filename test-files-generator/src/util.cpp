@@ -27,6 +27,24 @@ void assignText( FIELD4 *field, const TEXTBYTES *text )
    f4assignN( field, (const char *)text->bytes, text->len );
 }
 
+void dumpEscapedBytes( FILE *fp, const char *p, unsigned long len )
+{
+   unsigned long k;
+
+   fputc( '"', fp );
+   for ( k = 0; k < len; k++ )
+   {
+      unsigned char c = (unsigned char)p[k];
+      if ( c == '"' || c == '\\' )
+         fprintf( fp, "\\%c", c );
+      else if ( c >= 0x20 && c <= 0x7E )
+         fputc( c, fp );
+      else
+         fprintf( fp, "\\x%02X", c );
+   }
+   fputc( '"', fp );
+}
+
 /* Overwrite the header date stamp with a constant, so regenerating the corpus
  * on a different day produces identical bytes. This is the only place the
  * generator alters what the C library wrote. */

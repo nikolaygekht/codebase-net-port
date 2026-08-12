@@ -374,8 +374,24 @@ compression (§6). Confirmed against real bytes: `CLASSES.CDX` (codepage 0, empt
 "ECON101"…) with trailing blanks trail-count-compressed away — the tag-of-tags leaf likewise
 holds `"CODE"` padded with `0x20` spaces (CLASSES.CDX block 3, offset 1536). No head/tail
 transform is applied under machine collation. (All shipped sample CDX in `examples/DATA` use
-machine order — none carry a `"GENERAL"`/`"CBnnnnn"` `sortSeq` — so the head+tail GENERAL layout
-of §3.4 is verified from source only, not from these sample bytes.)
+machine order — none carry a `"GENERAL"`/`"CBnnnnn"` `sortSeq`.)
+
+**The GENERAL layout of §3.4 is now witnessed against real bytes** — `net/corpus/CDXCOLL.cdx`, which
+indexes one cp1252 `C(20)` field twice, machine (`C_MACH`) and GENERAL (`C_GEN`). What its keys show,
+beyond confirming the head-block-then-tail-block shape:
+
+- **`keyLen` is 40, twice the field width** (`keySizeCharPerCharAdd`, i4create.c:1040), and `pChar` is
+  `'\0'` on a *character* tag. A blank value therefore keys to 40 NUL bytes and compresses to
+  `dup=0 trail=40`.
+- **Case is a primary equality with no tail at all**: `"ALPHA"`, `"alpha"` and `"Alpha"` produce the
+  *same* 40 bytes (`60 6D 73 69 60` then NULs), so they are ordered only by record number.
+- **Accents are a tail weight**: `"cafe"` and `"CAFE"` both key to `62 60 67 66 …`; `"café"` and
+  `"CAFÉ"` key to the same heads with `01` in the tail block, and sort after the unaccented pair.
+- **Expansions produce two heads from one character**: `"æon"` and `"aeon"` key identically
+  (`60 66 72 70`), as do `"Æther"` and `"AEther"`. Likewise `ß`→`ss` and `þ`→`th`.
+
+§2.1's `-0.0` claim is witnessed too, in `CDXBASE.cdx`'s `T_DBL`: the key is
+`00 00 00 00 00 00 00 00` and it is the tag's *first* key, ahead of `-1e300`.
 
 ---
 

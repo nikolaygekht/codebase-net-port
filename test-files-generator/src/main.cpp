@@ -52,6 +52,10 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseVfpNull( &cb, outDir );
    if ( rc == 0 ) rc = caseCp1251( &cb, outDir );
    if ( rc == 0 ) rc = caseCp936 ( &cb, outDir );
+   if ( rc == 0 ) rc = caseCdxBase( &cb, outDir );
+   if ( rc == 0 ) rc = caseCdxDeep( &cb, outDir );
+   if ( rc == 0 ) rc = caseIdxOne ( &cb, outDir );
+   if ( rc == 0 ) rc = caseCdxColl( &cb, outDir );
 
    code4close( &cb );
    code4initUndo( &cb );

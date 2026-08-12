@@ -1,10 +1,12 @@
 # Project state
 
-**Updated:** 2026-08-11 · step 003 is committed to `main` and the tree is clean. Nothing is pushed
-yet: two commits are waiting, step 002's and this one.
-**Active step:** none. [`003-memo-and-binary-types`](claude/dev/003-memo-and-binary-types/) is
-**closed**, and with it `DBF-READ` is **complete for reading**: **699 tests**, and the gate asserts
-every field of every record with nothing skipped.
+**Updated:** 2026-08-12 · step 004 is **committed to `main`**; the only thing left in the working tree is
+the pair of design folders for steps 005 and 006, which land next. Nothing is pushed yet: three commits
+are waiting, steps 002's, 003's and 004's.
+**Active step:** none. [`004-cdx-tags-and-traversal`](claude/dev/004-cdx-tags-and-traversal/) is
+**closed**: **900 tests**, and `CDX-READ` is done for decoding and traversal. Steps
+[`005-cdx-seek`](claude/dev/005-cdx-seek/) and [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)
+are **designed and not started**.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -14,10 +16,10 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 
 ## 1. What is ready
 
-**A DBF can be read, whole.** Metadata, records, every field value, and the memo behind a memo
-reference. `net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies**
-by design, ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and
-`dotnet test` is green on **699 tests**, 268 of them golden.
+**A DBF can be read, whole, and a CDX or IDX can be read and walked.** `net/CodeBase.Net.sln` builds
+four projects — `CodeBase.Net` (**no NuGet dependencies** by design, ADR-17), `CodeBase.Net.Tests`,
+`CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is green on **900 tests**, 385
+of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -36,13 +38,33 @@ memo file beside it when the header declares one. It resolves the code page mark
 `CodePageNumber` and `CodePageByte` answer for all 26 marks Visual FoxPro documents, without needing
 an encoding provider (ADR-19, ADR-20). Moving the cursor reads one record, and the typed accessors
 read fields out of it — `GetString`, `GetRawBytes`, `GetBoolean`, `GetInt32`, `GetDouble`,
-`GetDecimal`, `GetDate`, `GetDateTime`, `IsNull`, plus `Deleted`, `Eof` and `Bof`.
+`GetDecimal`, `GetDate`, `GetDateTime`, `IsNull`, plus `Deleted`, `Eof` and `Bof`. Memo fields answer
+too — `GetMemoBytes`, `GetMemoString`, `GetMemoLength`, `GetMemoBlock`, `GetMemoType` — in both
+reference encodings.
 
-Memo fields answer too — `GetMemoBytes`, `GetMemoString`, `GetMemoLength`, `GetMemoBlock`,
-`GetMemoType` — in both reference encodings, four-byte binary and ten-byte ASCII.
+**The index side is `internal` and not yet wired to a table**, which was step 004's scope call:
 
-**Everything is gated against the C library's own dump, with nothing skipped:** all seven corpus
-tables, all 224 records, every field, and all 224 memo values of which 153 are non-empty. The single
+```csharp
+using IndexFileReader index = IndexFileReader.Open(source, "CUSTOMER.cdx", padByteFor);
+
+TagCursor cursor = index.Tag("NAME").OpenCursor();
+for (bool any = cursor.Top(); any; any = cursor.Next())
+{
+    IndexEntry entry = cursor.Current;   // key bytes, rebuilt and padded, plus the record number
+}
+```
+
+`CodeBase.Net.Cdx` reads both file shapes — a compound file through its tag directory, and a
+single-tag `.IDX` whose tag is named after the file — then tag headers, interior nodes with their
+big-endian pointers, and **bit-packed leaves**. Walking follows the leaf chain in either direction and
+inverts for a descending tag. Machine and `GENERAL` collation both read; a `GENERAL` tag needs no
+weight table, because reading a key never computes one. **What is missing is seek** (step 005) and the
+wiring to a `Table` (step 006, which is also what resolves the pad byte for a bare-field tag — ADR-28).
+
+**Everything is gated against the C library's own view, with nothing skipped.** On the table side: all
+eleven corpus tables, every record, every field, and every memo value. On the index side: **22 tags,
+3364 keys, 155 blocks and 3425 block entries** — including each leaf entry's stored duplicate and trail
+counts, so the bit-packing is checked as an encoding and not only through the keys it rebuilds. The one
 refusal is a **compressed memo entry**, which no corpus case can gate yet (ADR-23, open).
 
 **`test-files-generator/`** builds and runs end to end (Windows/MSVC):
@@ -54,22 +76,24 @@ bin\testgen.exe   :: -> bin\out\
 copy-corpus.bat   :: -> ..\net\corpus\
 ```
 
-**`net/corpus/`** — seven DBF cases, no indexes, 32 records each, each with a `<NAME>.dump.txt` of
-expected header/descriptor/record values read back through the C library:
+**`net/corpus/`** — eleven cases, four of them indexed. Each table has a `<NAME>.dump.txt` and each
+index file a `<NAME>.cdx.dump.txt`, both written by the C library:
 
 | File | Version | Covers |
 |---|---|---|
 | `DB3TYPE.DBF` | `0x03` | dBase III / FoxPro 2.x set `C N D L`, no memo |
 | `VFPTYPE.DBF` | `0x30` | every non-memo VFP type `C N F D L I B Y T` |
 | `F2XMEMO.DBF` + `.fpt` | `0xF5` | FoxPro 2.x memo, 10-byte ASCII memo reference |
-| `VFPMEMO.DBF` + `.fpt` | `0x30` | memo + binary types `M X G Z`, 4-byte binary reference, payloads straddling the 512-byte FPT block boundary |
-| `VFPNULL.DBF` + `.fpt` | `0x30` | nullable fields: the hidden `_NullFlags` descriptor, null-bit ordinals that are not field indexes, a two-byte bitmap, and the memo/null interaction |
-| `CP1251.DBF` + `.fpt` | `0x30` | a marked code page, single-byte (byte 29 = `0xC9`): `0x80`-`0xFF` swept whole across records 1-8, high-byte text in record and memo |
-| `CP936.DBF` + `.fpt` | `0x30` | a marked code page, multi-byte (byte 29 = `0x7A`): GBK trail bytes that are ASCII (`\`, `|`, `A`), and characters cut in half at a field boundary and at a memo length |
+| `VFPMEMO.DBF` + `.fpt` | `0x30` | memo + binary types `M X G Z`, 4-byte reference, payloads straddling an FPT block boundary |
+| `VFPNULL.DBF` + `.fpt` | `0x30` | nullable fields, the hidden `_NullFlags` descriptor, and the memo/null interaction |
+| `CP1251.DBF` + `.fpt` | `0x30` | a marked code page, single-byte (byte 29 = `0xC9`) |
+| `CP936.DBF` + `.fpt` | `0x30` | a marked code page, multi-byte (byte 29 = `0x7A`), characters cut in half |
+| `CDXBASE.DBF` + `.cdx` | `0x30` | **ten tags, one block each** — one per key shape: prefixes, blanks, descending, duplicates, unique, sub-`0x20` bytes, numeric, `-0.0`, date, integer, filtered |
+| `CDXDEEP.DBF` + `.cdx` | `0x30` | **three levels deep** — 600 records, 55 leaves under two levels of branch, full leaves, equal keys across block boundaries |
+| `CDXCOLL.DBF` + `.cdx` | `0x30` | **machine beside `GENERAL`** over one cp1252 field: `keyLen` 20 and 40, pad `0x20` and `0x00`, accents and the `œ`/`ß`/`þ` expansions |
+| `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **one tree in both file shapes**, the `.IDX` derived and verified by walking both (ADR-25) |
 
-Verified against the specs: `headerLen` = 32 + n×32 + 1 (+263 for `0x30`); 263 reserved bytes zero;
-`flags[8]` and `autoIncrementVal` zero (genuine-VFP shape); no trailing `0x1A`; FPT `blockSize` = 512
-big-endian; `X`/`Z` stored as `M`/`C` with descriptor flag `0x04`. Regeneration is byte-identical.
+Regeneration is byte-identical, index files included.
 
 **Documentation:** seven format specs, the porting plan, the development approach and the decision
 log. `claude/specs/QUERY-OPTIMIZER.md` **does not exist** and is the gap that matters — the optimizer
@@ -77,53 +101,96 @@ is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ---
 
-## 2. Last session (2026-08-11)
+## 2. Last session (2026-08-12)
 
-**Step 003 was designed, planned and executed.** With it `DBF-READ` is complete for reading:
-**699 tests green**, 268 golden, and `RecordGoldenTests` now asserts **every field of every record
-of all seven tables with nothing skipped** — the counter step 002 used to subtract memo fields is
-gone, because there is nothing left to subtract. Read
-[`SUMMARY.md`](claude/dev/003-memo-and-binary-types/SUMMARY.md). Four things worth carrying forward:
+**Step 004 was designed, planned and executed, and is closed.** `CDX-READ` is done for decoding and
+traversal; seek is step 005. Read
+[`SUMMARY.md`](claude/dev/004-cdx-tags-and-traversal/SUMMARY.md). Six things worth carrying forward:
 
-- **Both memo reference encodings are gated end to end.** 224 memo values, 153 of them non-empty,
-  across the five tables with an `.fpt`: block number, length, type and every payload byte. The
-  ten-byte ASCII form closed **`FPT-MEMO.md`'s first open question** — right-aligned, space-padded,
-  blank meaning no memo — settled from `F2XMEMO` because `c4ltoa45`'s body is not in the drop.
-- **A test written for this step found a bug step 002 had shipped.** `BlankRecord` decided a blank
-  memo reference by the type letter, following `f4blank`'s list, which puts `M` and `G` among the
-  space-filled types. The rule is actually the reference *width*: four bytes blank to zeros, ten to
-  spaces, so that the blank reads back as "no memo" in whichever encoding is in use. A four-byte
-  memo field at end of file was reporting block 538976288 — `0x20202020`. `FPT-MEMO.md` §3.4 already
-  said it correctly; the spec was right and the code was wrong.
-- **Compressed entries are refused, and the reason is narrower than it first looked** — **ADR-23**,
-  deliberately left `open`. Three claims were being run together: zlib's absence from the drop
-  (irrelevant — `ZLibStream` is in the base class library, so reading costs no dependency), the
-  stream format (now resolved as zlib-wrapped with a 4-byte length prefix, from `source/zlib.h` plus
-  the sibling `connect4lowUncompress`), and the absence of a corpus case (the actual reason). Also
-  recorded there: "it is CodeBase-only" is an argument *for* supporting it, since this is a port of
-  CodeBase and `CLAUDE.md` requires that files the original library writes are read correctly here.
-- **Mutation-checked four ways**, each against the five memo tables: the payload read from the block
-  start rather than past the header, the header read little-endian, `numChars` treated as including
-  the header, and the ten-byte reference parsed as binary. The first three fail 5 tables, the last
-  fails exactly 1 — `F2XMEMO`, the only ten-byte table. The blast radius matching the tables at risk
-  is itself evidence the tests point at the right thing.
+- **The corpus had to come first, and the mutation evidence proves it.** Reading the branch **child
+  pointer** little-endian instead of big-endian fails every traversal test on the three files that have
+  interior nodes — and *no* test on the two that do not. Every CDX shipped in
+  `original/examples/DATA/` is single-leaf, so that bug was invisible before this step existed. Five
+  mutations were run and each one's blast radius matches the files at risk exactly.
+- **The bit-packing is gated as an encoding, not only through the keys.** The index dump records each
+  leaf entry's stored duplicate and trail counts, so a key that comes out right from two compensating
+  mistakes — a wrong duplicate count against a wrong position in the key text — still fails. That was
+  `DESIGN.md`'s open question Q2 and the answer is yes, keep it.
+- **GENERAL collation is now witnessed against real bytes**, closing `KEY-COLLATION.md` §3.7's caveat
+  that the head-and-tail layout was verified from source only. `CDXCOLL` shows `keyLen` at twice the
+  field width, pad byte `0x00` on a *character* tag, case as a primary equality with no tail at all,
+  accents as a tail weight, and `æ`/`ß`/`þ` expanding to two head bytes. `-0.0` keying to eight zero
+  bytes and sorting below every negative is witnessed too, in `CDXBASE`.
+- **Two defects in the reference implementation, found by using it.** `tfile4count` returns 1 for any
+  descending tag — it tops the tag, landing at the physical last key, then skips forward physically
+  (I4TAG.C:1000-1019). And `d4check` reports *every* single-tag file as corrupt, because its block
+  accounting flags the tag directory's header and then each tag's header, which in an `.IDX` is the
+  same block (i4check.c:889-914). Both are in `CDX-FORMAT.md` now; the second forced a correction to
+  ADR-25, whose witness is now the dual-shape walk.
+- **A wrong `ErrorCode` was a design finding, not a typo.** A tag-header read past the end of the file
+  surfaced as `Data` from the generic short-read path, so `NodeReader.ReadHeader` now applies the same
+  bounds guard as a block read: a directory pointing outside its file is a corrupt *index*, and the
+  message names the node.
+- **Both build paths are represented.** Every index case appends records and creates the index
+  afterwards, which is the bulk path VFP's `INDEX ON` uses and which packs leaves tight; `CDXCOLL`'s
+  second tag is added to an existing file by `i4tagAdd`, and that is also why its `signature` byte is
+  `0x00` where the first tag's is `0x01` — a fact `CDX-FORMAT.md` §3 previously recorded as unexplained
+  variation between two sample files.
 
-**Known ungated paths, named rather than discovered later:** a block size other than 512, including
-zero, which legally means byte granularity; entry types 0, 2 and 3; a payload spanning more than two
-blocks (505 bytes is the longest, crossing one boundary); and `G` fields, of which only four are
-non-empty. Each is covered by component tests over hand-built images.
-
----
+**Known ungated paths, named rather than discovered later:** a packed entry wider than four bytes
+(needs a table above 65 536 records); a block size other than 512 and a multiplier above one; `keyLen`
+above 240; `GENERAL` over cp437 and cp850; `CBnnnnn` collations; a multi-block tag directory; a tree
+built by insert-and-split; the free list; and a 0-key non-root block, which the reader tolerates and
+steps over.
 
 ## 3. Next
 
-**`DBF-READ` is done for reading, so the next milestone needs corpus work before code.** `CDX-READ`
-is the priority (`PORTING-PLAN.md` §5), and **the corpus has no indexed case at all** — every table
-was generated without one. That is the gap to close first: teach the generator to build CDX files,
-and make sure the cases include **multi-level trees**, because the shipped `original/examples/DATA/`
-samples are all single-leaf and interior nodes are otherwise unreachable (`PORTING-PLAN.md` §6.3).
+**Two steps are designed and ready to execute, in either order.** They are independent — navigating in
+tag order needs traversal, not seek — but doing 005 first means the public surface arrives complete in
+007 instead of growing a `Seek` afterwards.
 
-Before or alongside that, two things that do not depend on it:
+**[`005-cdx-seek`](claude/dev/005-cdx-seek/)** — the seek *family*, because one seek cannot use a
+duplicate key and a range needs both of its ends: `Seek` (first entry not less than the value),
+`SeekAtOrBefore` (last entry not greater), `SeekLast` (last entry still matching), `SeekNext` and
+`SeekPrevious`, plus exact key-and-record positioning. `Seek(low)` to `SeekAtOrBefore(high)` is a closed
+range, which is what the optimizer's per-tag constraints will ask a tag for. Ports `b4seek`'s binary search in a
+branch, `b4leafSeek`'s scan with its duplicate-count skipping and its sub-pad-byte and all-blank cases,
+partial (prefix) seeks, and the descending seek's increment-then-step-back. **Searching is by key
+bytes**, which is what makes it gateable now: turning a *value* into key bytes is `COLLATION`'s work.
+
+Its gating is deliberately of two strengths, and the design says which is which. `Seek` and `SeekNext`
+are ported and gated against the reference — two new dump sections, `[seeks]` (roughly 170 cases derived
+from each tag's own keys) and `[seeknext]` (record sequences from `d4seekN`/`d4seekNextN`, drivable on
+the ten tags whose key transform is the identity). **`SeekAtOrBefore`, `SeekLast` and `SeekPrevious` do not exist in the
+C library at all** — `grep` for them over the whole drop returns nothing — so they are gated as
+*properties* over the key sequence 004 recorded, and tied back to the gated `Seek` by an adjacency
+check: where a value is absent the two must land on **adjacent** entries, and where it is present they
+must bracket its run.
+
+It also settles the two **stopping rules** and gates their composition, which is what makes index-order
+traversal and duplicate-walking the same machinery: `SeekNext`/`SeekPrevious` stop where the key stops
+matching (`NoEntry`, the C's own behaviour), `Next`/`Previous` stop where the tag ends (`Eof`/`Bof`, 004's
+traversal), and a cursor left anywhere by a seek — on a match, on a greater key, past either end — is a
+valid place to keep walking from. Sub-step 1 needs Windows, and the first thing to
+check after regenerating is that the existing `[keys]` and `[blocks]` sections did not move.
+
+**[`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)** — the first public index surface: open the
+production `.cdx` when DBF byte 28 declares one, expose `Table.Tags`, and navigate *records* in a tag's
+order two ways over one implementation — the C library's `Top`/`Bottom`/`Skip` with a selected tag, and
+an explicit `GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/`GoPreviousIndexed` four that name the tag at
+the call site and step unconditionally. **No generator work**: the gate joins the index dumps' key sequences to the
+table dumps' field values by record number, so navigating by index has to deliver the same records
+reading by number does. It also largely settles ADR-26 — once a tag has a table, a bare-field expression
+types the key from the field descriptors, exactly rather than by guessing (**ADR-28**), leaving `EXPR`
+needed only for composite expressions.
+
+**Then 007: seek by value.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and
+its siblings — which is `COLLATION`'s machine half, and it is **gateable from the corpus we already
+have**: every tag's stored keys sit beside the field values they were computed from, so the transforms
+can be checked byte-for-byte without generating anything. GENERAL-collated seeks additionally need the
+weight tables, and `CDXCOLL` is the case for them.
+
+Two things that do not depend on any of it:
 
 **Write `claude/specs/QUERY-OPTIMIZER.md`.** Sources: `R4RELATE.H:268-396`, `C4CONST.C`, `m4map.c`,
 to the same `FILE.C:line` standard as the existing seven. Must cover the `BITMAP4` tree and flags,
@@ -136,6 +203,7 @@ with no source-cited spec.
 `c4compress` wrapper from the layout the reader pins down, add a case with `code4memoCompress`
 enabled and a payload longer than one block. The reader is then a few lines over `ZLibStream`.
 
-Then the `CORPUS` spot-check pass against the specs: FPT `numChars` = payload-only (**now witnessed
-for all 153 entries**), CDX interior-node big-endian recno, the 263-byte reserved area, the
-`t4dblToFox` sign rule.
+The `CORPUS` spot-check pass against the specs is now largely spent: FPT `numChars` = payload-only
+(witnessed for all 153 entries, step 003), **CDX interior-node big-endian record number and child
+pointer** and **the `t4dblToFox` sign rule including `-0.0`** (witnessed in step 004, and the
+GENERAL head-and-tail layout with them). What is left of it is the 263-byte reserved area.

@@ -48,6 +48,12 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
   CodeBase extensions. Governed by `DBF-FORMAT.md` §5–§7.
 - **CDX compound indexes** (`S4FOX`): the tag-directory B-tree, interior nodes (big-endian
   recno/child), and **bit-packed compressed leaf nodes**. Governed by `CDX-FORMAT.md`.
+- **Compact single-tag `.IDX` files**, *read* — the same S4FOX format entered differently: the tag
+  header sits at file offset 0, `typeCode < 0x40` means there is no tag directory, and the tag is
+  named after the file (`i4index.c:1694, 1814-1825`). Support costs one strategy resolved at
+  open. Non-compact FoxPro 2.x `.IDX` is **not** included — its flags byte carries neither 0x20 nor
+  0x40, so `typeCode < 32` and the C library refuses it too (`i4index.c:1706`). Writing `.IDX` is out:
+  `i4create` cannot produce one (ADR-25).
 - **VFP collation** for index keys, ported as **verbatim byte tables** (machine + GENERAL for
   cp1252/cp437/cp850). Governed by `KEY-COLLATION.md`.
 - **FPT memo files** (VFP 4-byte block references, big-endian header/block headers, no free chain,
@@ -67,7 +73,8 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 
 - **Client/server** (`S4CLIENT`/`S4SERVER`) — networking, pipes, connection auth.
 - **MDX** (dBase IV compound index) and **NTX** (Clipper single-tag index). *Note the corrected
-  naming:* MDX is dBase IV's format; NTX is Clipper's. We do neither. CDX only.
+  naming:* MDX is dBase IV's format; NTX is Clipper's. We do neither. S4FOX only — which since
+  §2.1 means CDX plus the compact single-tag `.IDX`, and **not** non-compact `.IDX`.
 - **OLE-DB `r5*` field types** (`O, P, Q, R, V(GUID), W, 1, 2, 3, 4, 5, 6`) beyond *read-tolerant
   recognition where a real VFP9 file demands it* — creation of these is not supported in v1.
 - **Report writer / styles / totals** (`report4*`, `style4*`, `area4*`, `group4*`, `obj4*`).
@@ -291,9 +298,9 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 
 | ID | Capability | Priority | Status | Chief risk |
 |---|---|---|---|---|
-| `CORPUS` | Corpus + generator | **P0** | in progress — 7 DBF cases in, index cases missing | R11 |
+| `CORPUS` | Corpus + generator | **P0** | in progress — 11 cases in, 4 of them indexed; mutation and write cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
-| `CDX-READ` | CDX reading & navigation | **P1** | not started | **R1** (highest) |
+| `CDX-READ` | CDX reading & navigation | **P1** | **decode and traversal done** (004); seek (005) and the `Table` wiring (006) are designed | **R1** (largely retired) |
 | `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |
@@ -322,6 +329,12 @@ value in attacking them early — but that is a judgement to make per step, not 
   `(rawKeyBytes, recno)`, memo entries, `d4check` result). Files **and** dumps are checked into
   `net/corpus/`. A `validate` mode that opens an arbitrary file and runs the same checks is a useful
   developer aid for `WRITE` but is not wired into any test.
+- **Status (index half):** four indexed cases are in — `CDXBASE` (ten tags, one block each),
+  `CDXDEEP` (three levels deep), `CDXCOLL` (machine beside GENERAL over one field) and `IDXONE` (one
+  tree in both file shapes). The index dump format is settled (ADR-24) and everything in it comes from
+  the C library's own structures rather than a re-read of the bytes. What remains is the write-side
+  before/after pairs, the `value → key-bytes` table `COLLATION` needs, and corruption cases for
+  `HARDENING`.
 - **Status:** the build harness is **done and working** — `build-lib.bat` / `build-gen.bat` /
   `config.bat` / `copy-corpus.bat`, 137 translation units, x86, compiled as C++, zero edits to
   `original/source`. Seven no-index DBF cases are generated, dumped and checked in
@@ -365,15 +378,32 @@ VFP reserved area, the `t4dblToFox` sign rule.
 - **Deliverable:** `CodeBase.Net.Cdx` — parse tag directory, tag headers, interior nodes
   (big-endian recno/child), and **decode bit-packed leaf nodes** (`B4NODE_HEADER`, recNumLen/
   dupCntLen/trailCntLen widths, key reconstruction with dup/trail + pChar). Full-tag seek
-  (`tfile4seek`), skip, top/bottom, descending traversal. **No expression engine required** — keys
-  are read from disk, not recomputed. Machine collation only for key *comparison* (unsigned memcmp).
+  (`tfile4seek`), skip, top/bottom, descending traversal. Both file shapes: compound `.CDX` and
+  compact single-tag `.IDX` (§2.1). **No expression engine required** — keys are read from disk, not
+  recomputed, and a collated tag reads without any collation table because its pad character is fixed
+  at `'\0'` (ADR-27). **Key comparison is unsigned bytewise** (`t4cdxCmp` casts to `unsigned char *`,
+  `i4init.c:279-299`; branches use `memcmp` via `u4memcmp`, `d4declar.h:162-164`) — and it works only
+  because `COLLATION`'s transforms make the stored bytes order-preserving. Bytes are not the whole
+  order: the total order is **(key bytes, record number)**, a seek compares the search value minus its
+  trailing pad rather than the full `keyLen`, and seeking a *collated* tag needs the tables to
+  translate that value, so `COLLATION` bounds the seek half and not the decode half.
+- **Done so far:** step [`004-cdx-tags-and-traversal`](dev/004-cdx-tags-and-traversal/) built the
+  corpus's four index cases and then the reader: the tag directory, tag headers, interior nodes,
+  bit-packed leaves, and every tag walked in key order in both directions. **3364 keys, 155 blocks and
+  3425 block entries are asserted against the C library's own view of them**, and the bit-packing is
+  checked as *encoding* (each entry's stored duplicate and trail counts) and not only through the keys
+  it rebuilds. Internal only — nothing connects a tag to a `Table` yet. Seek is step 005.
 - **Gate:** for every tag in every `net/corpus/` CDX, walking the C# B-tree in key order yields exactly
   the `(key-bytes, recno)` sequence recorded in the checked-in dump; partial seeks land on the same
   entry; leaf blocks decode bit-identically. The corpus **must** include multi-level trees — the
   shipped `original/examples/DATA/` samples are all single-leaf, so interior nodes are unreachable
   without generated cases.
-- **Needs:** `DBF-READ` (a tag entry is only meaningful as a record pointer); `CORPUS` cases with
-  interior nodes, which do not exist yet.
+- **Needs:** `DBF-READ` (a tag entry is only meaningful as a record pointer) and `CORPUS` cases with
+  interior nodes, both of which step 004 supplied. **`EXPR` is needed only for the last corner:** the
+  pad character a key's trail count stands for depends on the key expression's *type*, which the file
+  does not store (ADR-26) — but once a tag has a table, a bare field-name expression types the key from
+  the field descriptors exactly (ADR-28), which covers every corpus tag and the great majority of real
+  ones. Only a composite expression such as `UPPER(NAME)` waits for `EXPR`.
 - **Why it matters beyond its tier:** this gate retires the single biggest technical risk in the
   port (R1).
 

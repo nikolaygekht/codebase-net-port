@@ -143,7 +143,12 @@ public sealed class CorpusDumpTests
         CorpusDump dump = CorpusDump.Load(tableName);
 
         dump.FileName.Should().Be(tableName + ".DBF");
-        dump.RecordCount.Should().Be(32);
+
+        // Not a fixed 32 any more: the index cases need hundreds of records to grow a tree more
+        // than one block deep. What matters is that the header's count and the parsed records
+        // agree — a parser that stopped early would otherwise shrink the gate silently.
+        dump.RecordCount.Should().BePositive();
+        dump.Records.Should().HaveCount(dump.RecordCount);
         dump.Fields.Should().NotBeEmpty();
         dump.Descriptors.Should().HaveCountGreaterThanOrEqualTo(dump.Fields.Count);
     }

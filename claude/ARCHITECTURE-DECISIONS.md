@@ -139,7 +139,7 @@ Deferred by ADR-04; batch them if a VM is ever built.
 built clean on 14.51). Pin it for reproducibility, or keep it loose for convenience? Unresolved —
 and low-stakes while ADR-01 keeps regeneration off the critical path.
 
-## ADR-13 — Dump format: DBF/FPT half settled, index half open · open
+## ADR-13 — Dump format: DBF/FPT half settled, index half open · superseded by ADR-24
 
 **Settled and implemented** (`net/corpus/README.md`): raw header, on-disk field descriptors, the C
 library's field view, and per-record raw bytes plus decoded values, with memo reference and contents.
@@ -558,3 +558,198 @@ enabled and a payload longer than one block (writing is opt-in *and* only fires 
 m4file.c:734-743). Once that case exists the reader is a few lines over `ZLibStream`. The
 recommendation is to do it as its own step; it was deliberately kept out of 003 so that step stayed
 one subsystem wide.
+
+## ADR-24 — The index half of the dump is a sibling file, not new sections · accepted
+
+**Context.** ADR-13 settled the DBF/FPT half of `<NAME>.dump.txt` — raw header, on-disk descriptors,
+the C library's field view, per-record bytes and decoded values, memo reference and contents — and
+left the index half to be designed when CDX cases arrived. Step 004 brings them.
+
+**Decision.** The index half lives in **`<NAME>.cdx.dump.txt`** (`<NAME>.idx.dump.txt` for a
+single-tag file), a sibling of the table's dump rather than more sections inside it. It carries the
+file-level header, the tag-directory entries, and per tag: the header fields, the `(key bytes, record
+number)` sequence in navigation order, and every block's structure — attribute, key count, siblings,
+the leaf bit widths and masks, and **each leaf entry's stored duplicate and trail counts**. The
+`d4check` result is recorded in it. The DBF/FPT half of ADR-13 stands unchanged; this entry supersedes
+only its open half.
+
+**Rejected — extending `<NAME>.dump.txt` with `[tags]`/`[keys]` sections.** Three reasons. The two
+halves are produced by different generator code over different library APIs, and a file per
+concern keeps a regression in one from rewriting the other's bytes. A deep table's index dump is
+larger than its record dump, and mixing them makes both unreviewable in a diff — legibility in review
+is the whole reason the dump is text. And the strict section reader (`CorpusDump` refuses a section
+it has never heard of, so a hole cannot pass as success) stays simpler with one reader per file shape.
+
+**Rejected — dumping the index by re-reading the bytes**, as the DBF header half legitimately does.
+A DBF header is a few shifts and an or; a bit-packed leaf is the highest-risk decode in the port
+(R1), and a generator that interprets it would be grading our own homework — our writer and our
+reader agreeing with each other and with nothing else. Every value in the index dump therefore comes
+from the C library's own structures: keys from `tfile4key`/`tfile4recNo`, block structure from the
+live `B4BLOCK` at `tfile4block(t4)`, per-entry counts from the library's own `x4dupCnt`/`x4trailCnt`
+macros (d4declar.h:1807-1854).
+
+**Consequence.** ADR-16 still governs growth: the sections gain optional tokens, never new columns.
+Step 005 adds a seek section the same way.
+
+## ADR-25 — The single-tag `.IDX` corpus case is derived from a single-tag `.CDX` · accepted
+
+**Context.** Reading a compact single-tag index file is in scope (`PORTING-PLAN.md` §2.1): CodeBase
+reads one — a tag header at file offset 0 with `typeCode < 0x40`, the tag named after the file
+(u4namePiece, i4index.c:1694, 1814-1825) — and a CodeBase application that called
+`i4open("X.IDX")` has these files. But the library **cannot write one**: `i4create` always builds a
+compound file with a tag directory at `typeCode = 0xE0` (i4create.c:847). So there is no way to have
+the reference implementation generate the case, and `original/examples/DATA/` contains no `.IDX` at
+all (and is never a gate).
+
+**Decision.** The generator builds `IDXONE.CDX` with exactly **one** tag and derives `IDXONE.IDX`
+from it with the smallest edit that exists: **copy the 1024-byte tag header from offset 1024 to
+offset 0, and clear the compound bit** (`typeCode` 0x60 → 0x20). Nothing else moves. Node numbers are
+byte offsets, so leaving every tree block where it is keeps `root`, both sibling pointers and every
+child pointer valid; the old header copy at offset 1024 becomes unreferenced space, which the format
+tolerates because freed blocks are ordinary. The C library then **opens the derived file and writes the
+dump from it**, and both files stay in the corpus, so the same tree is read through both shapes and the
+sequences must agree.
+
+**Correction, found while executing this step.** The paragraph above originally had `d4check` certify
+the derived file. It cannot — and **no** single-tag file can be checked by it, whoever wrote it.
+`i4checkBlocks` flags the two blocks of the tag directory's header (i4check.c:889-894) and then walks
+the tag list flagging each tag's header (i4check.c:905-914); in a single-tag file the tag list *is*
+`{tagIndex}` (i4index.c:1824) and its header is at node 0, so the flag is already set and it returns
+`e4index`. The witness is therefore the other half of the plan, which is the stronger one for what the
+derivation actually claims: the generator walks `IDXONE.cdx` and `IDXONE.IDX` side by side and requires
+the same key and record number at every one of the 300 steps. `d4check` has already certified the
+`.cdx`, whose tree blocks these are byte for byte, so what is left to prove is only that the header at
+offset 0 with the compound bit cleared reads as one tag over that same tree — which an identical walk
+proves exactly. Recorded as a format fact in `CDX-FORMAT.md` §2.1.
+
+**Why this is honest.** Generation authority and verification authority are different things. The
+bytes of every tree block are the C library's, unmodified; the derivation asserts exactly one claim —
+that the compound bit is what distinguishes the two shapes — and the reference implementation then
+reads the result and is held to agreeing with itself about it. Compare the alternative, which is a
+corpus case with no verification at all.
+
+**Rejected — hand-assembling an `.IDX` from `CDX-FORMAT.md`.** That is the self-consistent
+misunderstanding `DEV_APPROACH.md` §4 exists to prevent, and it would also have to rewrite every node
+number in the file.
+
+**Rejected — leaving `.IDX` out of scope.** It is the same S4FOX format through a different entry
+point; support costs one strategy resolved at open. Non-compact FoxPro 2.x `.IDX` files remain out —
+their flags byte carries neither 0x20 nor 0x40, so `typeCode < 32` and the C library refuses them
+too (i4index.c:1706).
+
+**Consequence.** The derivation is generator code with a comment, not a checked-in patched file, so
+regeneration reproduces it. It is listed for external live-VFP confirmation under ADR-11.
+
+## ADR-26 — The key pad character is supplied to the CDX reader until `EXPR` exists · accepted
+
+**Narrowed by ADR-27**, which limits everything below to *machine-collated* tags: a non-empty
+`sortSeq` fixes the pad character at `'\0'` on its own, so only machine collation is ambiguous.
+
+**Context.** Reconstructing a stored key needs the byte its trail count stands for: `' '` for a
+machine-collated character key, `'\0'` for numeric, date, currency and collated keys
+(i4init.c:557-602). **The file does not store it, and — for a machine-collated tag — it is not
+derivable from the header.** The C
+library knows because it parses the key expression and asks its type (`expr4type`); the header holds
+the expression *text* and no type at all. `CDX-READ` is otherwise reachable without the expression
+engine, because keys are read rather than recomputed.
+
+**Decision.** The CDX reader takes the pad character as an **input**: a `PadCharacterResolver`
+delegate supplied at open. The tag directory uses the known fact `' '` (i4init.c:520-525). Golden
+tests pass the `pChar` the corpus dump records — a value produced by the reference implementation,
+used as test *input*, which `DEV_APPROACH.md` §4 permits. When `EXPR` lands, the resolver is
+implemented over the expression's type and a test asserts the derived value equals the dump's for
+every corpus tag; only then does the reader become self-sufficient.
+
+**Rejected — inferring the key type from `keyLen`.** 8 bytes means numeric except when a character
+field is 8 wide. A wrong pad character corrupts the padded tail of every key in the tag, silently,
+and breaks comparison rather than parsing — the failure class this project cares most about.
+
+**Rejected — exposing keys as significant bytes plus a trail count and letting callers pad.** It
+pushes a format detail onto every caller and makes the corpus gate compare something that is not a
+key.
+
+**Consequence.** `CDX-READ` cannot be called *complete* until `EXPR` supplies the resolver; step 004
+closes the decode, not the dependency. `PORTING-PLAN.md` §5 records it under `CDX-READ`'s "needs".
+
+## ADR-27 — Collated tags are read without collation tables; only machine-collated tags need a supplied pad character · accepted
+
+**Context.** ADR-26 said the pad character a key's trail count stands for is "not derivable from the
+header", and step 004's first draft refused any tag whose `sortSeq` was not machine collation, on the
+grounds that `COLLATION` owns the tables. Both statements conflated **generating** a key with
+**reading** one.
+
+**Decision.** Step 004 reads machine-collated **and GENERAL-collated** tags. What a reader actually
+needs, all of it table-free:
+
+- **Selecting the collation is a string compare and a code page.** `""` ⇒ machine; `"GENERAL"` ⇒
+  cp1252 / cp437 / cp850 by **the data file's** code page (cp0 defaults to cp1252; cp1250 and cp0004
+  are refused by the C library itself); `"CBnnnnn"` ⇒ a custom ordinal; anything else ⇒ `e4index`
+  (i4init.c:372-418).
+- **A non-machine collation fixes the pad character at `'\0'`** (i4init.c:596-604). ADR-26's problem
+  therefore exists *only* for machine collation, where it is `' '` for a character key and `'\0'` for
+  numeric, date and currency keys. This entry narrows ADR-26 to that case; the resolver seam and the
+  `EXPR` dependency are unchanged for it.
+- **Traversal compares nothing.** The tables exist to turn a *search value* into key bytes, which is
+  step 005's seek, and to re-derive a key from a field value, which is the `COLLATION` gate.
+
+**Why do it now rather than later.** `KEY-COLLATION.md` §3.7 records that the GENERAL head+tail key
+layout is **verified from source only** — not one of the 33 shipped sample CDX files carries a
+`GENERAL` `sortSeq`, so nothing in the repository has ever confirmed it against real bytes (R11). A
+generated case closes that gap and gates three things machine collation cannot reach: the head/tail
+layout itself, `keyLen = 2 × the field width` (`keySizeCharPerCharAdd`, i4create.c:1040) — so `keyLen`
+stops tracking a field's width, which a reader could otherwise assume forever — and `pChar = '\0'` on
+a **character** tag, which is precisely what a wrong pad-character assumption corrupts. The cost is
+one 32-record table with the same field indexed twice: the GENERAL arrays are already compiled into
+the generator (`i4conv.c:309` includes `coll4arr.c`; cp1252, cp437 and cp850 have static arrays).
+
+**Rejected — refusing every non-machine `sortSeq` until `COLLATION` lands.** It would have left the
+port unable to open ordinary VFP indexes (GENERAL is VFP's default collation for a marked table) for
+no technical reason, and left the spec's least-verified section unverified for longer.
+
+**Still refused:** `"CBnnnnn"` custom collations, whose tables are disk-loaded
+(`collate4test` is `MUST4LOAD_ARRAY`, i4conv.c:363-365) so no corpus case can gate them; and any
+`sortSeq` the C library rejects, reproducing i4init.c:418 with the collation named.
+
+**Consequence.** Seeking a *collated* tag still needs `COLLATION`, because the search value must be
+translated before it is compared, and the descending-seek key increment is collation-dependent
+(I4TAG.C:2092-2151). Step 005 states that boundary explicitly rather than discovering it.
+
+## ADR-28 — A tag's key type comes from the table's field descriptors when its expression is a bare field name · accepted
+
+**Context.** ADR-26 established that a machine-collated tag has to be *told* the byte its trailing-pad
+counts stand for, because a tag header records the key expression's *text* and not its type, and said
+`EXPR` would answer it. Step 006 wires a tag to a table, and at that point the answer is available from
+somewhere much smaller than an expression engine: the table's own field descriptors.
+
+**Decision.** When a tag's expression is, after trimming, **the name of a field of the table it belongs
+to** — matched case-insensitively, as the C library upper-cases field names on open — that field's type
+*is* the key's type, and the pad byte follows from the C library's own mapping (i4init.c:557-604):
+`' '` for a character key under machine collation, `'\0'` for a character key under any other collation
+and for every numeric, currency, date and datetime key. Anything else — a name that matches no field, a
+composite expression such as `UPPER(NAME)` or `STR(ID)+CITY` — is **refused when the tag is selected**,
+naming the expression, and waits for `EXPR`.
+
+**Why this is exact and not a heuristic.** The rule is not "guess the type from the expression"; it is
+"if the expression is a field reference, the type is that field's". That is what `expr4parseLow`
+computes for the same input, by a much longer route. All 17 corpus tags are of this shape, as are the
+overwhelming majority of the 56 tags in the shipped `original/examples/DATA/` samples — indexes on a
+bare field are what applications write.
+
+**Refused at selection, not at open.** One tag with an expression this port cannot type must not make
+the whole table unopenable, and the C library agrees by construction: it does not care about a tag
+until something asks it to. So `OpenTable` succeeds, `Tags` lists every tag the file holds, and only
+`SelectTag` on an unresolvable one fails.
+
+**Rejected — inferring the type from `keyLen`.** Eight bytes means a numeric key except when a character
+field is eight wide, and four means an integer except when a character field is four wide. A wrong pad
+byte corrupts the padded tail of every key in the tag, silently, and breaks comparison rather than
+parsing — the failure class this project cares most about.
+
+**Rejected — waiting for `EXPR`.** It would leave the port unable to navigate by index at all, for the
+sake of tag shapes no corpus case holds, and `EXPR` is a substantially larger subsystem than the step
+that needs this.
+
+**Consequence.** ADR-26's resolver seam stays, and this is its first real implementation; a test may
+still supply a pad byte directly, which is what the internal 004 and 005 gates do. When `EXPR` lands it
+replaces the refusal branch only, and a test then asserts that the derived type agrees with this rule
+for every corpus tag — the two must never disagree where both apply.

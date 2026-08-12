@@ -24,9 +24,18 @@ turns out to be untested, add a generator case and regenerate.
 | `VFPNULL.DBF` + `.fpt` | `0x30` | Nullable fields and the hidden `_NullFlags` bitmap. See below. |
 | `CP1251.DBF` + `.fpt` | `0x30` | A marked code page, single-byte: header byte 29 = `0xC9`, Windows Cyrillic. High-byte text in the record and in the memo. See below. |
 | `CP936.DBF` + `.fpt` | `0x30` | A marked code page, multi-byte: header byte 29 = `0x7A`, Simplified Chinese GBK. Trail bytes that look like ASCII, and characters cut in half at a field boundary. See below. |
+| `CDXBASE.DBF` + `.cdx` | `0x30` | **Index, ten tags, one block each.** One tag per key shape: character with shared prefixes and blank keys, the same field descending, runs of duplicates, a unique tag, keys holding bytes below the pad character, numeric, double (including `-0.0`), date, integer, and a filtered tag. See below. |
+| `CDXDEEP.DBF` + `.cdx` | `0x30` | **Index, multi-level trees.** 600 records and four tags; `D_WIDE` is three levels deep (55 leaves under two levels of branch), so interior nodes, sibling chains and full leaves are all reachable. See below. |
+| `CDXCOLL.DBF` + `.cdx` | `0x30` | **Index, collation.** cp1252, one `C(20)` field indexed twice — machine (`keyLen` 20, pad `0x20`) and `GENERAL` (`keyLen` 40, pad `0x00`) — over accented text and the `œ`/`ß`/`þ` expansions. See below. |
+| `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
 
-Every table holds **32 records**. Rows 1-3 carry the edge cases (zero, minimum/maximum,
-blank/empty); the rest vary so the same tables can be reused when index cases arrive.
+The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
+minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
+records, and a wide key needs fewer of them.
+
+`CDXBASE`, `CDXDEEP`, `CDXCOLL` and `IDXONE` are the first tables whose header byte 28 carries the
+production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
+(`i4create.c:1404-1418`).
 
 ### What `VFPNULL` pins down
 
@@ -90,6 +99,73 @@ port resolves both: these two tables report `CodePage.Cp1251`/`Cp936` and `CodeP
 gated in `TableMetadataGoldenTests`. What is still missing is the last link — decoding a field's bytes
 to a string — which is step 002, and these two dumps are the gate for it.
 
+### What the index cases pin down
+
+**`CDXBASE` is the readable one.** Ten tags over eight fields, 32 records, every tree a single
+root-and-leaf block, so the whole dump can be read by a human. Between them the tags cover: duplicate
+counts from 0 to 14 and trail counts from 0 to the whole key; two blank keys adjacent, which is the
+invariant that a key of all pad has `dup=0` however its neighbour looks; two pairs of equal keys, whose
+order is then the record number; a key filling its field exactly; keys carrying `0x00`, `0x1F` and
+`0x80`-`0xFF`, so only an unsigned comparison orders them; `-0.0`, which keys to eight zero bytes and
+sorts below every negative; a blank date; `LONG_MIN` and `LONG_MAX`; a unique tag holding 5 keys where
+the table has 32 records; and a filtered tag holding 22.
+
+**`CDXDEEP` is where interior nodes live.** Depth is bought with key *width* rather than record count:
+`D_WIDE` is a deliberately incompressible `C(40)`, so a leaf holds about eleven keys and 600 records
+need 55 leaves, six branches and a root — **three levels**. `D_PFX` is the opposite extreme, a `C(20)`
+with a fourteen-byte shared prefix packing 114 keys into a leaf with 3 bytes to spare; `D_DUP` has ten
+distinct values over 600 records, so runs of equal keys cross leaf boundaries and interior entries end
+up with keys equal to each other; one of its leaves has `freeSpace` exactly 0.
+
+**`IDXONE` is one tree in two file shapes.** `IDXONE.cdx` is an ordinary compound file holding a single
+tag; `IDXONE.IDX` is derived from it by copying the tag header from offset 1024 to offset 0 and
+clearing the compound bit (`0x60` → `0x20`). Nothing else moves, so every node number stays valid and
+the two files differ in 1025 bytes. The C library **cannot write** a single-tag file
+(`i4create.c:847`) — and **cannot `d4check` one either**, because its block accounting flags the tag
+directory's header and then every tag's header, which in such a file is the same block
+(`i4check.c:889-914`). So this case is witnessed differently: the generator walks both files and
+requires the same 300 keys and record numbers from each. See ADR-25.
+
+## The index dump
+
+`<NAME>.cdx.dump.txt` accompanies each index file (`<NAME>.idx.dump.txt` for the `.IDX`). It is a
+sibling of the table's dump rather than more sections inside it — ADR-24, which also explains the rule
+that matters most here: **every value comes from the C library's own structures, never from a re-read
+of the bytes.** Keys and record numbers come from its navigation (`tfile4key`, `tfile4recNo`), block
+structure from the live block object at `tfile4block`, and the per-entry counts from its own
+`x4dupCnt`/`x4trailCnt`/`x4recNo` macros. A bit-packed leaf is the highest-risk decode in the port, and
+a generator that unpacked it here would prove only that our writer and our reader misunderstand the
+format the same way.
+
+```
+file         CDXBASE.cdx          the index file
+table        CDXBASE.DBF          the table it belongs to
+shape        compound             or single-tag
+blockSize    512                  multiplier 1 unless the CodeBase note says otherwise
+check        ok                   d4check, or skipped-single-tag with the reason above
+
+[tag *directory*]                 the hidden tag-name tree, read as the tag it is
+header       keyLen=… typeCode=0x… signature=0x… descending=… pChar=0x… root=… freeList=…
+             version=… headerNode=…
+text         exprPos=… exprLen=… filterPos=… filterLen=… sortSeq="GENERAL"
+expr         "K_TEXT"
+filter       ""
+count        10                   keys in the tag
+[blocks]                          every block, in the order a full walk reached it
+node=… attr=… nKeys=… left=… right=… leaf=1 freeSpace=… recNumLen=… dupCntLen=…
+       trailCntLen=… infoLen=… recNumMask=0x… dupByteCnt=0x… trailByteCnt=0x…
+  0 rec=… dup=… trail=…           one line per packed leaf entry
+  …                               an interior block instead lists: i child=… rec=… key="…"
+blocks 1                          how many blocks were listed
+[keys]                            navigation order — reversed for a descending tag
+  "ALPHA               " 5
+```
+
+Two things to know when comparing against it. `left` and `right` are printed as unsigned decimal with
+no interpretation, so "no sibling" reads as `4294967295`. And the `[blocks]` order is documentation
+rather than a promise — a port may read blocks in any order, so the golden tests compare them as a set
+keyed by node number.
+
 ## Three things to know before comparing bytes
 
 **The header date stamp is frozen.** DBF bytes 1-3 are the "last update" date, which would
@@ -98,8 +174,9 @@ otherwise change on every regeneration. The generator overwrites them with `26-0
 library wrote, and it makes these files byte-stable.
 
 **The memo extension is lower-case `.fpt`** while the table is `.DBF` — that is what CodeBase
-writes (`d4defs.h:2589-2598`). Harmless on Windows; a port running on Linux must resolve the
-companion file case-insensitively.
+writes (`d4defs.h:2589-2598`). **The production index is lower-case `.cdx` for the same reason.**
+Harmless on Windows; a port running on Linux must resolve the companion file case-insensitively. The
+derived `IDXONE.IDX` is upper-case because the generator, not CodeBase, names it.
 
 **These files carry CodeBase provenance, not Visual FoxPro's.** They are written in genuine-VFP
 shape (`flags[8]` and `autoIncrementVal` zero, no trailing `0x1A`, no CodeBase extensions), but

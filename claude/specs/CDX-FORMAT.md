@@ -84,6 +84,7 @@ then            : tree blocks (leaves & branches) of all tags, 512 bytes each, a
   (i4index.c:1760-1812). If `typeCode < 64` the file is a single-tag `.idx`-style file
   (i4index.c:1814-1825).
 - Open-time sanity check: root ≠ 0, root ≠ 0xFFFFFFFF, `typeCode >= 32` (i4index.c:1706).
+  See §2.1 for what the `typeCode` test implies about single-tag files.
 - Adding a tag to an existing file appends the key blocks, writes the 1024-byte tag header
   at the (pre-extension) EOF, then inserts `(paddedName, headerNode)` into the tag directory
   with `tfile4add(i4file->tagIndex, tagName, b4node(tagFile->headerOffset), …)`
@@ -92,6 +93,40 @@ then            : tree blocks (leaves & branches) of all tags, 512 bytes each, a
 **EOF tracking:** there is no EOF field in the file; `INDEX4FILE.eof` is derived from the
 physical file length at open (`b4nodeSetFromFilePosition(i4, &i4->eof, file4lenLow(...))`,
 i4index.c:1703) and grows by one block when extending (i4index.c:906-911).
+
+### 2.1 Single-tag files (`.IDX`)
+
+The same S4FOX format entered differently. `index4open` reads the header at file offset 0 exactly as
+for a compound file, then branches on `typeCode` (i4index.c:1760, 1814-1825):
+
+| `typeCode` | Shape | Tags |
+|---|---|---|
+| ≥ 64 (0x40) | **compound** — the header at 0 is the tag *directory* | one per directory entry, name = the 10-byte key, header node = the entry's "record number" |
+| < 64 | **single tag** — the header at 0 **is** the tag header | exactly one; `i4->tagIndex` is itself added to `i4->tags` (i4index.c:1824) |
+
+- **The tag's name comes from the file name**, not from the file: `u4namePiece(buf, 258, fileName, 0,
+  0)` strips path and extension and that string is passed to `tfile4init` as the alias
+  (i4index.c:1694). With `fileName == 0` (a production index) the alias is `""`, which is why the
+  single-tag branch is only reachable for a named file (E4MISC asserts exactly that,
+  i4index.c:1816-1821).
+- **Only *compact* single-tag files are readable.** The open-time check refuses `typeCode < 32`
+  (i4index.c:1706) and the compact bit is 0x20 (§3.1), so a compact `.IDX` has `typeCode` 0x20 plus
+  its option bits, while a **non-compact** FoxPro 2.x `.IDX` — whose flags byte carries neither 0x20
+  nor 0x40 — is refused by the C library itself. Its uncompressed fixed-entry leaf layout appears
+  nowhere in this build.
+- Everything else is identical: the header is 1024 bytes (512 + a 512-byte expression area, §3), tree
+  blocks start at offset 1024, node numbers are byte offsets, and leaves are bit-packed (§6). The
+  header's `freeList` is the file's free list (§9), since there is no separate directory header.
+- **CodeBase cannot write one.** `i4create` always writes a tag directory with `typeCode = 0xE0`
+  (i4create.c:847), so single-tag files are read-only territory for this library — and for the port,
+  which is why the corpus case is derived rather than generated (ADR-25).
+- **`d4check` cannot check one either, whoever wrote it.** `i4checkBlocks` first flags the two blocks
+  of the tag directory's header (`flagNo = b4node(tagIndex->headerOffset)`, i4check.c:889-894) and then
+  walks `i4file->tags` flagging each tag's header (i4check.c:905-914). In a single-tag file the tag
+  list *is* `{tagIndex}` (i4index.c:1824) and its `headerOffset` is 0, so the flag is already set and
+  the function returns `e4index`. Verified against `IDXONE.IDX`, which the library otherwise opens and
+  walks correctly. A `.IDX` therefore has to be validated some other way — for the corpus, by walking
+  the same tree through both file shapes and comparing.
 
 ---
 
@@ -109,7 +144,7 @@ the file for the tag directory):
 | 0x008 | 4 | u32 **BE** | `version` | multi-user change counter, stored byte-reversed (i4init.c:365; r4reinde.c:1811-1813; i4index.c:2139-2152) |
 | 0x00C | 2 | u16 LE | `keyLen` | key length in bytes (d4data.h:3899) |
 | 0x00E | 1 | u8 | `typeCode` | option bits, see §3.1 (d4data.h:3901) |
-| 0x00F | 1 | u8 | `signature` | in-memory value set to 0x01 by CodeBase; declared "unused" (d4data.h:3902; i4create.c:853,922). **On disk this byte varies**: EXAMPLE.CDX tag-directory header has 0x01, but DATA1.CDX tag-directory header has 0x00 (confirmed EXAMPLE.CDX byte 15 = 0x01, DATA1.CDX byte 15 = 0x00). Treat as unused — do not rely on the value when reading. |
+| 0x00F | 1 | u8 | `signature` | in-memory value set to 0x01 by CodeBase; declared "unused" (d4data.h:3902; i4create.c:853,922). **On disk this byte varies, and the corpus shows why**: it is 0x01 for a tag created *with* the index (`i4create`) and **0x00** for a tag *added* to an existing one (`i4tagAdd`) — both shapes occur in `CDXCOLL.cdx`, whose `C_MACH` carries 0x01 and whose `C_GEN` carries 0x00. Treat as unused; do not rely on the value when reading. |
 | 0x010 | 4 | u32 LE | `codeBaseNote` | 0xABCD ⇒ blockSize/multiplier fields valid (d4data.h:3908-3910) |
 | 0x014 | 4 | u32 LE | `blockSize` | CodeBase-only, multiple of 512 (d4data.h:3911) |
 | 0x018 | 4 | u32 LE | `multiplier` | CodeBase-only (d4data.h:3912) |
@@ -172,6 +207,11 @@ Every 512-byte tree block (branch and leaf) begins with (d4data.h:3711-3717):
 | 0x02 | 2 | u16 LE | `nKeys` | number of keys in this block |
 | 0x04 | 4 | u32 LE | `leftNode` | left sibling node #, 0xFFFFFFFF if none (d4data.h:3715) |
 | 0x08 | 4 | u32 LE | `rightNode` | right sibling node #, 0xFFFFFFFF if none (d4data.h:3716) |
+
+**"No sibling" is 0xFFFFFFFF on disk, witnessed.** Every outermost leaf and every branch of the 155
+blocks in `net/corpus/` carries `FF FF FF FF`, never 0 — so the in-memory macros
+`b4hasNoLeftNeighbor`/`b4hasNoRightNeighbor`, which test `== 0` (d4data.h:3697-3698), are not the disk
+rule. A reader should treat both 0 and 0xFFFFFFFF as absent and follow neither.
 
 Leaf test is a **bit test**, not `>= 2`: `nodeAttribute & 0x02` (Fox 8.0 files may set extra
 bits; a value of 5 is *not* a leaf) (b4block.c:2003-2014, 1966-1968). The whole 512-byte block
@@ -420,6 +460,16 @@ Skips within a leaf move `curPos` by `keyLen - dup - trail` per entry in either 
 (`b4skip`, b4block.c:2927-3008). `b4top` = `keyOn=0; curDupCnt=0; curPos = block + blockSize -
 keyLen + trailCnt(0)` (d4declar.h:1775-1776). `b4goEof` puts `curPos` just above `freeSpace`
 (b4block.c:1862-1878).
+
+**Which skip is direction-aware, and one place the C library gets it wrong.** `tfile4skip` is
+*physical*; `tfile4dskip` is the direction-aware one and negates both the count and the result for a
+descending tag (I4TAG.C:65-89). `tfile4top` **is** direction-aware — on a descending tag it calls
+`tfile4rlBottom` (I4TAG.C:3285-3288) — and the two together are what "first key" means for a tag.
+Mixing them is a live bug in the drop: **`tfile4count` returns 1 for any descending tag**, because it
+tops the tag (landing at the physical last key) and then skips forward with the physical `tfile4skip`,
+which moves nowhere (I4TAG.C:1000-1019). Witnessed on `CDXBASE.cdx`'s `T_TEXTD`, which holds 32 keys
+and is counted as 1. A port must not reproduce this; counting by walking with the direction-aware skip
+is correct, and the corpus generator does that instead.
 
 ---
 

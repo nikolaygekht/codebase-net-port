@@ -29,6 +29,16 @@ public enum ErrorCode
     FieldType = -220,
 
     /// <summary>
+    /// The index file is invalid or corrupt.
+    /// </summary>
+    /// <value>
+    /// The C library's [c]e4index[/c] (d4defs.h:2018). Raised where a tree contradicts itself: a key
+    /// whose compression counts do not fit its length, a node reference outside the file, a header
+    /// that describes an index this library cannot read.
+    /// </value>
+    Index = -310,
+
+    /// <summary>
     /// An operation was asked for in a state that has no meaning for it.
     /// </summary>
     /// <value>

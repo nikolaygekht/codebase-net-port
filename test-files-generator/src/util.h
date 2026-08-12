@@ -12,6 +12,8 @@
 #ifndef GEN_UTIL_H
 #define GEN_UTIL_H
 
+#include <stdio.h>   /* FILE, for dumpEscapedBytes */
+
 /* Report a CodeBase failure with its error code. Always returns 1, so a case
  * can `return fail( cb, "d4create X" );`. */
 int fail( CODE4 *cb, const char *what );
@@ -39,5 +41,10 @@ void assignText( FIELD4 *field, const TEXTBYTES *text );
 /* Common tail of every case: close the table, freeze its header date stamp,
  * then write <NAME>.dump.txt beside it. Returns 0 on success. */
 int finish( CODE4 *cb, DATA4 *data, const char *outDir, const char *fileName );
+
+/* Escape a byte run into C-ish text: printable ASCII verbatim, everything else
+ * as \xHH, wrapped in double quotes. Shared by both dump writers so a key and a
+ * field value are escaped by the same rules — the port has one unescaper. */
+void dumpEscapedBytes( FILE *fp, const char *p, unsigned long len );
 
 #endif /* GEN_UTIL_H */

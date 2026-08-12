@@ -14,23 +14,11 @@
 #include "dump.h"
 
 /* Escape a byte string into C-ish text: printable ASCII verbatim, everything
- * else as \xHH. Keeps the dump diffable and unambiguous. */
+ * else as \xHH. Keeps the dump diffable and unambiguous. The rules live in
+ * util.cpp so the index dump escapes keys identically. */
 static void dumpEscaped( FILE *fp, const char *p, unsigned long len )
 {
-   unsigned long k;
-
-   fputc( '"', fp );
-   for ( k = 0; k < len; k++ )
-   {
-      unsigned char c = (unsigned char)p[k];
-      if ( c == '"' || c == '\\' )
-         fprintf( fp, "\\%c", c );
-      else if ( c >= 0x20 && c <= 0x7E )
-         fputc( c, fp );
-      else
-         fprintf( fp, "\\x%02X", c );
-   }
-   fputc( '"', fp );
+   dumpEscapedBytes( fp, p, len );
 }
 
 /* Header and field descriptors read straight from the file, not through the

@@ -62,8 +62,10 @@ public sealed class FoxNumericGoldenTests
     [Fact]
     public void TheComparisonCoversEveryNumericValueInTheCorpus()
     {
-        // Says the suite above is not silently comparing nothing. The corpus holds 224 values in
-        // fields whose stored form is text: two per record in four tables and one in two more.
+        // Says the suite above is not silently comparing nothing. Every field whose stored form is
+        // text and whose value the C library decoded counts, across every table in the corpus — so
+        // the number grows when a case is added, which is why it is asserted as a floor and as an
+        // exact total that a regeneration has to move deliberately.
         int total = 0;
 
         foreach (string tableName in TestUtils.Corpus.TableNames)
@@ -72,7 +74,7 @@ public sealed class FoxNumericGoldenTests
             total += ExpectedCount(dump);
         }
 
-        total.Should().Be(224);
+        total.Should().Be(856);
     }
 
     [Fact]

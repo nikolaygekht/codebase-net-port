@@ -28,7 +28,10 @@ if not exist "%DEST%" mkdir "%DEST%"
 echo [copy-corpus] %SRC%
 echo [copy-corpus]   -^> %DEST%
 
-for %%X in (DBF fpt dump.txt) do (
+REM  Extensions, in the case CodeBase writes them: the table is .DBF while its
+REM  companions are lower-case .fpt and .cdx (d4defs.h:2589-2598). .IDX is a
+REM  derived single-tag index (ADR-25), which only this generator writes.
+for %%X in (DBF fpt cdx IDX dump.txt) do (
    if exist "%SRC%\*.%%X" (
       copy /y "%SRC%\*.%%X" "%DEST%\" >nul || (
          echo [copy-corpus] ERROR: copy of *.%%X failed

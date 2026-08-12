@@ -1,10 +1,13 @@
 # Project state
 
 **Updated:** 2026-08-12 · step 006 is **committed to `main`** and the tree is clean. Nothing is pushed
-yet: six commits are waiting, steps 002's, 003's, 004's, the design one, 005's and 006's.
+yet: seven commits are waiting — steps 002's, 003's, 004's, the design one, 005's, 006's, and this
+file's.
 **Active step:** none. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/) is **closed**:
 **1039 tests**, and `CDX-READ` is **done for reading** — what is left of it waits on `EXPR`.
-[`007`](claude/dev/) — seek by value — is next and not yet designed.
+**Next session starts at section 3**, which now holds four judgement calls from 006 to confirm and a
+**performance pass** — nothing in the port has ever been measured. Step 007, seek by value, is not yet
+designed.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -55,7 +58,7 @@ for (GoResult go = table.Top(); go == GoResult.Ok; )
 
 // or per call, leaving the table's mode alone:
 for (GoResult go = table.GoFirstIndexed(byName); go == GoResult.Ok; go = table.GoNextIndexed(byName))
-    Read(table.GetString(name));
+    Console.WriteLine(table.GetString(name));
 ```
 
 Both forms share one cursor per tag, so a walk started with either continues with the other. A tag's pad
@@ -163,6 +166,57 @@ index precludes and a hand-built pair covers instead; a table whose every tag is
 files on one table.
 
 ## 3. Next
+
+### Flagged from step 006 — decide these before 007 builds on them
+
+Four things landed yesterday that were mine to judge rather than the C library's to dictate. None blocks
+007; all four are cheaper to change now than after a public seek sits on top of them.
+
+- **ADR-29 — the two navigation surfaces fail differently.** A selected tag's `Skip` leaves the boundary
+  record readable (what `d4skip` does); the four `…Indexed` methods report no record and move past the end
+  (what a loop condition needs). The records they visit are identical and the gate proves it. **Confirm or
+  collapse**: one shape for both is simpler to document and costs one of the two properties above.
+- **ADR-30 — a refusal where the C library answers.** Stepping in a tag's order from a record the tag does
+  not list throws `NotSupported` instead of reporting end of file. Only reachable by mixing `Go(n)` to an
+  unlisted record with a tag-order step; every tag stays fully walkable from `Top`. **Confirm** that a loud
+  refusal is wanted over a quiet, wrong-but-plausible answer until `EXPR` lands.
+- **`Table.HasProductionIndex` was removed** — a public property deleted, not deprecated. It reported the
+  header's claim; `HasIndex` reports the open file, and the two could never disagree. Nothing used it.
+- **Process, not code: never `git checkout <file>` while a step is uncommitted.** Undoing a mutation check
+  that way discarded `Table.cs`'s uncommitted work; it was reconstructed and the suite went green before
+  anything else happened, and the rest of the mutations used scratchpad copies with `md5sum` verification.
+  Mutation checks should copy aside and restore by checksum, or run after the commit.
+
+### A performance pass, before more layers land on the read path
+
+**Nothing has ever been measured.** Every performance property of the port so far is a guess, and the
+optimizer — the reason the project exists — will drive the index read path far harder than a walk does:
+several cursors over one tag, thousands of seeks per query. There is **no benchmark project** in the
+solution yet, and BenchmarkDotNet is in the stack list unused.
+
+Do the measuring first, over `CDXDEEP` (600 records, three levels) and `IDXONE`: a full tag-order table
+walk, a full index-only walk, a seek storm, and `Go(n)`-then-`Skip(1)`. Then look at four suspects, in the
+order they are likely to matter:
+
+1. **No block cache at all.** `NodeReader.ReadAt` (`NodeReader.cs:73`) allocates a fresh `byte[512]` and
+   reads from the file for *every* block, so every descent from the root re-reads the root and each
+   interior level, and every `Top` re-descends. The C library keeps a block list per tag plus its own file
+   buffering. **This is also a design question, not only a speed one**: a cache shared by several cursors
+   over one tag is exactly what `QUERY` will want, and where it lives (`NodeReader`, `CdxTag`, or the
+   index file) is an ADR.
+2. **A key array allocated per entry read.** `LeafBlock.EntryAt` (`LeafBlock.cs:117`) copies the rebuilt
+   key out on every access, including once per comparison inside `LeafBlock.Seek` (`LeafBlock.cs:140`).
+   A span-returning read, or a compare-in-place path, would make a leaf scan allocation-free.
+3. **`TableTagCursor.Synchronize` is O(n) in the tag** (`TableTagCursor.cs:109`). A sequential walk hits
+   the O(1) fast path, so this is only paid when the record and tag cursors have drifted — `Go(n)` then a
+   tag-order step. The C library pays O(log n) by re-deriving the key and seeking, which needs `EXPR`;
+   until then, note the cost in the XML docs or narrow the walk.
+4. **A record read per position, with no reuse.** `Table.Fetch` reads through `RecordReader` every time,
+   which is faithful and correct, and worth measuring only because an indexed walk now issues one index
+   read plus one record read per record.
+
+Keep the rule that produced the current code: **correctness first, and no optimization without a
+measurement and a gate that still passes**. A cache that serves a stale block is a wrong record set.
 
 **Step 007: seek by value.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and its
 siblings — which is `COLLATION`'s machine half and is **gateable from the corpus already committed**, since

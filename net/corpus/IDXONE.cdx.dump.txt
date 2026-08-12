@@ -21,6 +21,16 @@ node=2048 attr=3 nKeys=1 left=4294967295 right=4294967295 leaf=1 freeSpace=479 r
 blocks 1
 [keys]
   "X_WIDE    " 1024
+[seeks]
+  first-key   "X_WIDE    " 10 rc=0 rec=1024 key="X_WIDE    "
+  last-key    "X_WIDE    " 10 rc=0 rec=1024 key="X_WIDE    "
+  middle-key  "X_WIDE    " 10 rc=0 rec=1024 key="X_WIDE    "
+  prefix-half "X_WID" 5 rc=0 rec=1024 key="X_WIDE    "
+  between     "X_WIDE   !" 10 rc=2 eof
+  below-all   "\x00" 1 rc=2 rec=1024 key="X_WIDE    "
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 10 rc=2 eof
+  empty       "" 0 rc=0 rec=1024 key="X_WIDE    "
+  all-pad     "          " 10 rc=2 rec=1024 key="X_WIDE    "
 
 [tag X_WIDE]
 header       keyLen=40 typeCode=0x60 signature=0x01 descending=0 pChar=0x20 root=18432 freeList=0 version=0 headerNode=1024
@@ -674,3 +684,23 @@ blocks 30
   "495:5M3K1IZGXEVCTAR8P6N4L2J0HYFWDUBS9Q7O" 46
   "498:2J0HYFWDUBS9Q7O5M3K1IZGXEVCTAR8P6N4L" 219
   "499:DUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYFW" 110
+[seeks]
+  first-key   "000:WDUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYF" 40 rc=0 rec=1 key="000:WDUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYF"
+  last-key    "499:DUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYFW" 40 rc=0 rec=110 key="499:DUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYFW"
+  middle-key  "250:AR8P6N4L2J0HYFWDUBS9Q7O5M3K1IZGXEVCT" 40 rc=0 rec=251 key="250:AR8P6N4L2J0HYFWDUBS9Q7O5M3K1IZGXEVCT"
+  prefix-half "250:AR8P6N4L2J0HYFWD" 20 rc=0 rec=251 key="250:AR8P6N4L2J0HYFWDUBS9Q7O5M3K1IZGXEVCT"
+  between     "250:AR8P6N4L2J0HYFWDUBS9Q7O5M3K1IZGXEVCU" 40 rc=2 rec=142 key="251:L2J0HYFWDUBS9Q7O5M3K1IZGXEVCTAR8P6N4"
+  below-all   "\x00" 1 rc=2 rec=1 key="000:WDUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYF"
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 40 rc=2 eof
+  empty       "" 0 rc=0 rec=1 key="000:WDUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYF"
+  all-pad     "                                        " 40 rc=2 rec=1 key="000:WDUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYF"
+[seeknext]
+  first-key   "000:WDUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYF" 40 seek=0 -> 1
+  last-key    "499:DUBS9Q7O5M3K1IZGXEVCTAR8P6N4L2J0HYFW" 40 seek=0 -> 110
+  middle-key  "250:AR8P6N4L2J0HYFWDUBS9Q7O5M3K1IZGXEVCT" 40 seek=0 -> 251
+  prefix-half "250:AR8P6N4L2J0HYFWD" 20 seek=0 -> 251
+  between     "250:AR8P6N4L2J0HYFWDUBS9Q7O5M3K1IZGXEVCU" 40 seek=2 -> none
+  below-all   "\x00" 1 seek=2 -> none
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 40 seek=3 -> none
+  empty       "" 0 seek=2 -> none
+  all-pad     "                                        " 40 seek=2 -> none

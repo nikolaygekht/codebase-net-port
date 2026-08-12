@@ -300,7 +300,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 |---|---|---|---|---|
 | `CORPUS` | Corpus + generator | **P0** | in progress — 11 cases in, 4 of them indexed; mutation and write cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
-| `CDX-READ` | CDX reading & navigation | **P1** | **decode and traversal done** (004); seek (005) and the `Table` wiring (006) are designed | **R1** (largely retired) |
+| `CDX-READ` | CDX reading & navigation | **P1** | **decode, traversal and seek done** (004, 005); the `Table` wiring (006) is designed | **R1** retired |
 | `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |
@@ -387,6 +387,12 @@ VFP reserved area, the `t4dblToFox` sign rule.
   order: the total order is **(key bytes, record number)**, a seek compares the search value minus its
   trailing pad rather than the full `keyLen`, and seeking a *collated* tag needs the tables to
   translate that value, so `COLLATION` bounds the seek half and not the decode half.
+- **Done so far (seek):** step [`005-cdx-seek`](dev/005-cdx-seek/) added the seek family —
+  `Seek`, `SeekAtOrBefore`, `SeekLast`, `SeekNext`, `SeekPrevious` and exact key-and-record positioning —
+  searching by **key bytes**, so no collation table is needed. Gated on 206 recorded search cases and 104
+  seek-next runs, plus properties for the three operations the C library does not have. It also settled
+  what a search value *means*: with trailing pad it stands for a whole key, without it is a prefix
+  (`CDX-FORMAT.md` §7, witnessed).
 - **Done so far:** step [`004-cdx-tags-and-traversal`](dev/004-cdx-tags-and-traversal/) built the
   corpus's four index cases and then the reader: the tag directory, tag headers, interior nodes,
   bit-packed leaves, and every tag walked in key order in both directions. **3364 keys, 155 blocks and

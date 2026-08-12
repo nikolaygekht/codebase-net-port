@@ -1,12 +1,10 @@
 # Project state
 
-**Updated:** 2026-08-12 · step 004 is **committed to `main`** and the tree is clean; the designs for
-steps 005 and 006 are committed with it. Nothing is pushed yet: four commits are waiting, steps 002's,
-003's, 004's and the design one.
-**Active step:** none. [`004-cdx-tags-and-traversal`](claude/dev/004-cdx-tags-and-traversal/) is
-**closed**: **900 tests**, and `CDX-READ` is done for decoding and traversal. Steps
-[`005-cdx-seek`](claude/dev/005-cdx-seek/) and [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)
-are **designed and not started**.
+**Updated:** 2026-08-12 · step 005 is **committed to `main`** and the tree is clean. Nothing is pushed
+yet: five commits are waiting, steps 002's, 003's, 004's, the design one and 005's.
+**Active step:** none. [`005-cdx-seek`](claude/dev/005-cdx-seek/) is **closed**: **972 tests**, and
+`CDX-READ` is done for decode, traversal and seek. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)
+is **designed and not started**.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -18,7 +16,7 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 
 **A DBF can be read, whole, and a CDX or IDX can be read and walked.** `net/CodeBase.Net.sln` builds
 four projects — `CodeBase.Net` (**no NuGet dependencies** by design, ADR-17), `CodeBase.Net.Tests`,
-`CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is green on **900 tests**, 385
+`CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is green on **972 tests**, 421
 of them golden.
 
 ```csharp
@@ -42,7 +40,7 @@ read fields out of it — `GetString`, `GetRawBytes`, `GetBoolean`, `GetInt32`, 
 too — `GetMemoBytes`, `GetMemoString`, `GetMemoLength`, `GetMemoBlock`, `GetMemoType` — in both
 reference encodings.
 
-**The index side is `internal` and not yet wired to a table**, which was step 004's scope call:
+**The index side is `internal` and not yet wired to a table**, which was steps 004 and 005' scope call:
 
 ```csharp
 using IndexFileReader index = IndexFileReader.Open(source, "CUSTOMER.cdx", padByteFor);
@@ -58,14 +56,32 @@ for (bool any = cursor.Top(); any; any = cursor.Next())
 single-tag `.IDX` whose tag is named after the file — then tag headers, interior nodes with their
 big-endian pointers, and **bit-packed leaves**. Walking follows the leaf chain in either direction and
 inverts for a descending tag. Machine and `GENERAL` collation both read; a `GENERAL` tag needs no
-weight table, because reading a key never computes one. **What is missing is seek** (step 005) and the
-wiring to a `Table` (step 006, which is also what resolves the pad byte for a bare-field tag — ADR-28).
+weight table, because reading a key never computes one.
+
+**And it can find a key rather than walk to it**, in five operations over key bytes:
+
+```csharp
+KeySearch search = KeySearch.For("SMITH"u8, tag.KeyLength, tag.PadByte);
+
+cursor.Seek(search);            // first entry not before the value, in the tag's order
+cursor.SeekAtOrBefore(search);  // last entry not after it — a range's other end
+cursor.SeekLast(search);        // last entry that still matches
+cursor.SeekNext(search);        // next match; SeekPrevious walks a run backwards
+cursor.SeekExact(search, 42);   // that key *and* that record number
+```
+
+`Seek(low)` to `SeekAtOrBefore(high)`, walked with the cursor's own steps, is a closed range — the shape
+the optimizer's per-tag constraints will ask for. **What is missing is the wiring to a `Table`**
+(step 006, which is also what resolves the pad byte for a bare-field tag — ADR-28) and turning a *value*
+into key bytes, which is `COLLATION`'s half and step 007's.
 
 **Everything is gated against the C library's own view, with nothing skipped.** On the table side: all
 eleven corpus tables, every record, every field, and every memo value. On the index side: **22 tags,
 3364 keys, 155 blocks and 3425 block entries** — including each leaf entry's stored duplicate and trail
-counts, so the bit-packing is checked as an encoding and not only through the keys it rebuilds. The one
-refusal is a **compressed memo entry**, which no corpus case can gate yet (ADR-23, open).
+counts, so the bit-packing is checked as an encoding and not only through the keys it rebuilds. Seeking
+adds **206 recorded search cases, 104 seek-next runs and 3364 exact-pair assertions**, plus properties for
+the three operations the C library does not have. The one refusal is a **compressed memo entry**, which no
+corpus case can gate yet (ADR-23, open).
 
 **`test-files-generator/`** builds and runs end to end (Windows/MSVC):
 
@@ -89,7 +105,7 @@ index file a `<NAME>.cdx.dump.txt`, both written by the C library:
 | `CP1251.DBF` + `.fpt` | `0x30` | a marked code page, single-byte (byte 29 = `0xC9`) |
 | `CP936.DBF` + `.fpt` | `0x30` | a marked code page, multi-byte (byte 29 = `0x7A`), characters cut in half |
 | `CDXBASE.DBF` + `.cdx` | `0x30` | **ten tags, one block each** — one per key shape: prefixes, blanks, descending, duplicates, unique, sub-`0x20` bytes, numeric, `-0.0`, date, integer, filtered |
-| `CDXDEEP.DBF` + `.cdx` | `0x30` | **three levels deep** — 600 records, 55 leaves under two levels of branch, full leaves, equal keys across block boundaries |
+| `CDXDEEP.DBF` + `.cdx` | `0x30` | **three levels deep** — 600 records, 55 leaves under two levels of branch, full leaves, equal keys across block boundaries, and one **descending** tag so a backwards walk crosses blocks |
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **machine beside `GENERAL`** over one cp1252 field: `keyLen` 20 and 40, pad `0x20` and `0x00`, accents and the `œ`/`ß`/`þ` expansions |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **one tree in both file shapes**, the `.IDX` derived and verified by walking both (ADR-25) |
 
@@ -103,92 +119,59 @@ is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ## 2. Last session (2026-08-12)
 
-**Step 004 was designed, planned and executed, and is closed.** `CDX-READ` is done for decoding and
-traversal; seek is step 005. Read
-[`SUMMARY.md`](claude/dev/004-cdx-tags-and-traversal/SUMMARY.md). Six things worth carrying forward:
+**Step 005 was designed, planned and executed, and is closed.** `CDX-READ` now does decode, traversal
+*and* seek. Read [`SUMMARY.md`](claude/dev/005-cdx-seek/SUMMARY.md). Five things worth carrying forward:
 
-- **The corpus had to come first, and the mutation evidence proves it.** Reading the branch **child
-  pointer** little-endian instead of big-endian fails every traversal test on the three files that have
-  interior nodes — and *no* test on the two that do not. Every CDX shipped in
-  `original/examples/DATA/` is single-leaf, so that bug was invisible before this step existed. Five
-  mutations were run and each one's blast radius matches the files at risk exactly.
-- **The bit-packing is gated as an encoding, not only through the keys.** The index dump records each
-  leaf entry's stored duplicate and trail counts, so a key that comes out right from two compensating
-  mistakes — a wrong duplicate count against a wrong position in the key text — still fails. That was
-  `DESIGN.md`'s open question Q2 and the answer is yes, keep it.
-- **GENERAL collation is now witnessed against real bytes**, closing `KEY-COLLATION.md` §3.7's caveat
-  that the head-and-tail layout was verified from source only. `CDXCOLL` shows `keyLen` at twice the
-  field width, pad byte `0x00` on a *character* tag, case as a primary equality with no tail at all,
-  accents as a tail weight, and `æ`/`ß`/`þ` expanding to two head bytes. `-0.0` keying to eight zero
-  bytes and sorting below every negative is witnessed too, in `CDXBASE`.
-- **Two defects in the reference implementation, found by using it.** `tfile4count` returns 1 for any
-  descending tag — it tops the tag, landing at the physical last key, then skips forward physically
-  (I4TAG.C:1000-1019). And `d4check` reports *every* single-tag file as corrupt, because its block
-  accounting flags the tag directory's header and then each tag's header, which in an `.IDX` is the
-  same block (i4check.c:889-914). Both are in `CDX-FORMAT.md` now; the second forced a correction to
-  ADR-25, whose witness is now the dual-shape walk.
-- **A wrong `ErrorCode` was a design finding, not a typo.** A tag-header read past the end of the file
-  surfaced as `Data` from the generic short-read path, so `NodeReader.ReadHeader` now applies the same
-  bounds guard as a block read: a directory pointing outside its file is a corrupt *index*, and the
-  message names the node.
-- **Both build paths are represented.** Every index case appends records and creates the index
-  afterwards, which is the bulk path VFP's `INDEX ON` uses and which packs leaves tight; `CDXCOLL`'s
-  second tag is added to an existing file by `i4tagAdd`, and that is also why its `signature` byte is
-  `0x00` where the first tag's is `0x01` — a fact `CDX-FORMAT.md` §3 previously recorded as unexplained
-  variation between two sample files.
+- **The corpus overturned the specification's partial-seek pseudocode, and this is the finding that
+  matters.** A search value means one of two things: with **no trailing pad** it is a prefix, compared
+  over its own length; with **trailing pad** it stands for the whole key and its pad bytes take part. So
+  `"AB      "` does *not* match the stored key `"AB\x00\x00\x00\x00\x00\x00"` — a NUL is below a
+  space, so that key sorts before the value — while `"CUSTOMER-A"` does match
+  `"CUSTOMER-ACCT-0599  "`. A pure-prefix reading passes every exact-length case and fails these, which
+  is why it took 206 recorded cases to catch. `CDX-FORMAT.md` §7 now carries the rule, witnessed.
+- **Three consequences, all in the spec now.** The increment of a padded value lands on its last *pad*
+  byte, so the successor of `"MIDDLE      "` is `"MIDDLE     !"` and not `"MIDDLF"` (which would step over
+  `"MIDDLE-EARTH"`). A value that cannot be incremented takes a different branch entirely — an all-`0xFF`
+  search on a descending tag reports end of file, not the greatest key. And `tfile4seek` can return
+  `r4after` with the cursor already past the end, while `d4seek` normalises that to `r4eof`, so a status
+  has to be decided from the pair rather than the code.
+- **`SeekAtOrBefore` became the primitive rather than an extra.** All three backwards operations are
+  "increment, seek, step back one", so the increment is written once; `SeekLast` is one comparison on top
+  of it. Two of the five operations are ports and three are additions, and the tests say which is which:
+  the additions are gated as properties over the recorded key sequence, tied to the reference-gated `Seek`
+  by an adjacency check.
+- **A mutation exposed one of my own tests as vacuous.** The adjacency check compared two expectations
+  computed from the dump rather than the two cursor landings, so making `SeekAtOrBefore` identical to
+  `Seek` left it green. It now compares where the cursors land, and that mutation fails it. Decision 9's
+  prediction about which assertions the step-back mutation would break was also wrong, and is corrected in
+  the summary: the step-back is shared with the descending seek, which *is* reference-gated.
+- **A latent bug from step 004 surfaced**: stepping back from an end-of-file landing moved *past* the last
+  entry instead of onto it. A walk that merely stops at the end never notices; a seek that lands at the end
+  and then steps back does. Both ends now re-enter the tag, as the record cursor already does.
 
-**Known ungated paths, named rather than discovered later:** a packed entry wider than four bytes
-(needs a table above 65 536 records); a block size other than 512 and a multiplier above one; `keyLen`
-above 240; `GENERAL` over cp437 and cp850; `CBnnnnn` collations; a multi-block tag directory; a tree
-built by insert-and-split; the free list; and a 0-key non-root block, which the reader tolerates and
-steps over.
+**Known ungated paths, named rather than discovered later:** `SeekNext` against the reference on a
+numeric, date or currency tag (needs 007's transforms); the three added operations against reference
+bytes, which cannot exist; a range walk as an operation, left as a composition until `QUERY` calls it; a
+partial seek on a `GENERAL`-collated tag by *value*, where the C library's own `considerPartialSeek` flag
+exists because tail weights interfere; and a seek racing a writer, which is `LOCKING`.
 
 ## 3. Next
 
-**Two steps are designed and ready to execute, in either order.** They are independent — navigating in
-tag order needs traversal, not seek — but doing 005 first means the public surface arrives complete in
-007 instead of growing a `Seek` afterwards.
+**[`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)** is designed and ready, and needs no generator
+run: the gate joins the index dumps' key sequences to the table dumps' field values by record number, so
+navigating by index has to deliver the same *records* that reading by number does. It opens the production
+`.cdx` when DBF byte 28 declares one, exposes `Table.Tags`, and navigates records in a tag's order two ways
+over one implementation — the C library's `Top`/`Bottom`/`Skip` with a selected tag, and an explicit
+`GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/`GoPreviousIndexed` four that name the tag at the call site
+and step unconditionally. It also settles ADR-26 for real tags: a bare field-name expression types the key
+from the field descriptors exactly (**ADR-28**, verified against all 18 corpus tags before any code), so
+`EXPR` is needed only for composite expressions.
 
-**[`005-cdx-seek`](claude/dev/005-cdx-seek/)** — the seek *family*, because one seek cannot use a
-duplicate key and a range needs both of its ends: `Seek` (first entry not less than the value),
-`SeekAtOrBefore` (last entry not greater), `SeekLast` (last entry still matching), `SeekNext` and
-`SeekPrevious`, plus exact key-and-record positioning. `Seek(low)` to `SeekAtOrBefore(high)` is a closed
-range, which is what the optimizer's per-tag constraints will ask a tag for. Ports `b4seek`'s binary search in a
-branch, `b4leafSeek`'s scan with its duplicate-count skipping and its sub-pad-byte and all-blank cases,
-partial (prefix) seeks, and the descending seek's increment-then-step-back. **Searching is by key
-bytes**, which is what makes it gateable now: turning a *value* into key bytes is `COLLATION`'s work.
-
-Its gating is deliberately of two strengths, and the design says which is which. `Seek` and `SeekNext`
-are ported and gated against the reference — two new dump sections, `[seeks]` (roughly 170 cases derived
-from each tag's own keys) and `[seeknext]` (record sequences from `d4seekN`/`d4seekNextN`, drivable on
-the ten tags whose key transform is the identity). **`SeekAtOrBefore`, `SeekLast` and `SeekPrevious` do not exist in the
-C library at all** — `grep` for them over the whole drop returns nothing — so they are gated as
-*properties* over the key sequence 004 recorded, and tied back to the gated `Seek` by an adjacency
-check: where a value is absent the two must land on **adjacent** entries, and where it is present they
-must bracket its run.
-
-It also settles the two **stopping rules** and gates their composition, which is what makes index-order
-traversal and duplicate-walking the same machinery: `SeekNext`/`SeekPrevious` stop where the key stops
-matching (`NoEntry`, the C's own behaviour), `Next`/`Previous` stop where the tag ends (`Eof`/`Bof`, 004's
-traversal), and a cursor left anywhere by a seek — on a match, on a greater key, past either end — is a
-valid place to keep walking from. Sub-step 1 needs Windows, and the first thing to
-check after regenerating is that the existing `[keys]` and `[blocks]` sections did not move.
-
-**[`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)** — the first public index surface: open the
-production `.cdx` when DBF byte 28 declares one, expose `Table.Tags`, and navigate *records* in a tag's
-order two ways over one implementation — the C library's `Top`/`Bottom`/`Skip` with a selected tag, and
-an explicit `GoFirstIndexed`/`GoLastIndexed`/`GoNextIndexed`/`GoPreviousIndexed` four that name the tag at
-the call site and step unconditionally. **No generator work**: the gate joins the index dumps' key sequences to the
-table dumps' field values by record number, so navigating by index has to deliver the same records
-reading by number does. It also largely settles ADR-26 — once a tag has a table, a bare-field expression
-types the key from the field descriptors, exactly rather than by guessing (**ADR-28**), leaving `EXPR`
-needed only for composite expressions.
-
-**Then 007: seek by value.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and
-its siblings — which is `COLLATION`'s machine half, and it is **gateable from the corpus we already
-have**: every tag's stored keys sit beside the field values they were computed from, so the transforms
-can be checked byte-for-byte without generating anything. GENERAL-collated seeks additionally need the
-weight tables, and `CDXCOLL` is the case for them.
+**Then 007: seek by value.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and its
+siblings — which is `COLLATION`'s machine half and is **gateable from the corpus already committed**, since
+every tag's stored keys sit beside the field values they were computed from. It inherits three named
+questions from 005: the `.NULL.` convention for an empty public seek, whether `SeekNext`'s
+degrade-to-seek should survive into a public API, and `considerPartialSeek` for collated partial seeks.
 
 Two things that do not depend on any of it:
 

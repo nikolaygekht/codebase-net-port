@@ -118,6 +118,45 @@ internal sealed class LeafBlock
     }
 
     /// <summary>
+    /// Finds the first entry whose key is not less than a search value.
+    /// </summary>
+    /// <param name="search">What to look for.</param>
+    /// <param name="index">
+    /// Where the search stopped: the first entry not less than the value, or the count when every entry
+    /// sorts before it.
+    /// </param>
+    /// <returns>True when that entry matches the value.</returns>
+    /// <remarks>
+    /// A forward scan, because a leaf's keys are stored relative to each other and there is nothing to
+    /// binary-search. The C library uses the duplicate counts to skip comparisons it can prove
+    /// unnecessary (b4leafSeek, b4block.c:2192-2474); rebuilding each key as we go costs the same walk
+    /// and keeps the comparison in one place, which matters more here than the saved byte compares —
+    /// the keys are rebuilt anyway for whoever reads the entry.
+    /// </remarks>
+    public bool Seek(KeySearch search, out int index)
+    {
+        for (int i = 0; i < Count; i++)
+        {
+            int comparison = search.Compare(EntryAt(i).Key);
+
+            if (comparison == 0)
+            {
+                index = i;
+                return true;
+            }
+
+            if (comparison > 0)
+            {
+                index = i;
+                return false;
+            }
+        }
+
+        index = Count;
+        return false;
+    }
+
+    /// <summary>
     /// Gives the entry's packed values without rebuilding its key.
     /// </summary>
     /// <param name="index">Which entry, counting from zero.</param>

@@ -445,6 +445,42 @@ loop:
 The by-product `curDupCnt` is exactly the dup count the key would get if inserted at the found
 position — the insert path relies on it (b4block.c:1182, 1257).
 
+**How a search value compares — witnessed, and not what the pseudocode above suggests.** The rule that
+falls out of 206 recorded seeks across the corpus (`net/corpus/*.cdx.dump.txt`, `[seeks]`) is that a
+search value means one of *two* things, decided by whether the caller supplied trailing pad bytes:
+
+- **No trailing pad ⇒ a prefix.** Only the value's own length is compared, so a 10-byte
+  `"CUSTOMER-A"` against a 20-byte key finds `"CUSTOMER-ACCT-0599  "` and reports `r4success`
+  (`CDXDEEP.cdx`, tag `D_PFX`, case `prefix-half`). This is the partial seek.
+- **Trailing pad ⇒ the whole key.** The value is compared across the full key length with its pad
+  bytes taking part. So `"AB      "` in an 8-byte tag does **not** match the stored key
+  `"AB\x00\x00\x00\x00\x00\x00"`, even though stripping the pad and comparing two bytes would:
+  a NUL is below a space, so that key sorts *before* the value, and the seek lands on `"AB      "`
+  instead (`CDXBASE.cdx`, tag `T_BIN`, cases `middle-key` and `prefix-half`). An all-pad value is this
+  same case, which is what "compare the full original length" in the pseudocode above amounts to.
+
+The two rules are what the `b4calcBlanks` stripping plus the sub-pad-byte handling at b4block.c:2245-2416
+add up to; the second is easy to miss because every exact-length hit behaves identically under either
+reading. **A consequence for the descending seek:** the increment of §7 applies to the value *as it
+compares*, so the successor of a padded `"MIDDLE      "` is `"MIDDLE     !"` and not `"MIDDLF"` —
+incrementing the content instead steps over `"MIDDLE-EARTH"`, which the padded value sorts below.
+
+**A value that cannot be incremented takes a different branch entirely.** On a descending tag an
+all-0xFF search returns `r4eof` rather than the tag's first entry, because `tfile4seekDescendKey` sets no
+flag and the seek falls through to its "otherwise want an eof type condition" path
+(I4TAG.C:2341-2350). Witnessed on `CDXBASE.cdx`'s `T_TEXTD`, case `above-all`. A value that is merely
+*above every key* but still incrementable does land on the first entry, with `r4after`.
+
+**`tfile4seek` can return `r4after` with the cursor already past the end** (`T_DUP`, case `above-all`),
+while the data-file wrapper `d4seek` normalises that to `r4eof` (`d4seekCheck`, D4SEEK.C:1236). A port
+therefore has to decide its own status from the pair (return code, at end) rather than from the code
+alone.
+
+**The same search value can mean two different things at the two API levels.** A zero-length value at the
+tag level matches every key; through `d4seekN` it means *seek for .NULL.* and is converted to a
+full-width key of zero bytes (`data4seekConvertKeyToTagFormat`, D4SEEK.C:951-956), which finds nothing
+unless the tag holds null keys. Both are in the corpus dumps, side by side, as `rc=0` against `seek=2`.
+
 Full-tag seek (`tfile4seek`, I4TAG.C:2203-2359): `tfile4upToRoot`, then loop `b4seek` on each
 block and `tfile4down` until a leaf; `r4after` in an interior block simply descends the located
 entry. Descending tags: keys are **physically stored ascending**; the descending flag only

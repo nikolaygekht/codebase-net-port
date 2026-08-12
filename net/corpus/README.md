@@ -25,7 +25,7 @@ turns out to be untested, add a generator case and regenerate.
 | `CP1251.DBF` + `.fpt` | `0x30` | A marked code page, single-byte: header byte 29 = `0xC9`, Windows Cyrillic. High-byte text in the record and in the memo. See below. |
 | `CP936.DBF` + `.fpt` | `0x30` | A marked code page, multi-byte: header byte 29 = `0x7A`, Simplified Chinese GBK. Trail bytes that look like ASCII, and characters cut in half at a field boundary. See below. |
 | `CDXBASE.DBF` + `.cdx` | `0x30` | **Index, ten tags, one block each.** One tag per key shape: character with shared prefixes and blank keys, the same field descending, runs of duplicates, a unique tag, keys holding bytes below the pad character, numeric, double (including `-0.0`), date, integer, and a filtered tag. See below. |
-| `CDXDEEP.DBF` + `.cdx` | `0x30` | **Index, multi-level trees.** 600 records and four tags; `D_WIDE` is three levels deep (55 leaves under two levels of branch), so interior nodes, sibling chains and full leaves are all reachable. See below. |
+| `CDXDEEP.DBF` + `.cdx` | `0x30` | **Index, multi-level trees.** 600 records and four tags; `D_WIDE` is three levels deep (55 leaves under two levels of branch), so interior nodes, sibling chains and full leaves are all reachable, and `D_PFX` is **descending** so a backwards walk and a descending seek cross block boundaries. See below. |
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **Index, collation.** cp1252, one `C(20)` field indexed twice — machine (`keyLen` 20, pad `0x20`) and `GENERAL` (`keyLen` 40, pad `0x00`) — over accented text and the `œ`/`ß`/`þ` expansions. See below. |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
 
@@ -113,9 +113,16 @@ the table has 32 records; and a filtered tag holding 22.
 **`CDXDEEP` is where interior nodes live.** Depth is bought with key *width* rather than record count:
 `D_WIDE` is a deliberately incompressible `C(40)`, so a leaf holds about eleven keys and 600 records
 need 55 leaves, six branches and a root — **three levels**. `D_PFX` is the opposite extreme, a `C(20)`
-with a fourteen-byte shared prefix packing 114 keys into a leaf with 3 bytes to spare; `D_DUP` has ten
+with a fourteen-byte shared prefix packing 114 keys into a leaf with 3 bytes to spare, and it is
+**descending** — which costs it nothing, because keys are stored ascending whatever the flag says, and
+makes it the only multi-block descending tag in the corpus. Without one, a descending seek's step back
+into the *previous block* is unreachable: `CDXBASE`'s `T_TEXTD` is a single block. `D_DUP` has ten
 distinct values over 600 records, so runs of equal keys cross leaf boundaries and interior entries end
 up with keys equal to each other; one of its leaves has `freeSpace` exactly 0.
+
+Turning that flag on is also byte-level proof of a specification claim: the whole of `CDXDEEP.cdx`
+changed in **one byte** — offset 2550, `D_PFX`'s `descending` short — so "keys are physically stored
+ascending; the flag only inverts traversal" (`CDX-FORMAT.md` §7) is witnessed and not merely sourced.
 
 **`IDXONE` is one tree in two file shapes.** `IDXONE.cdx` is an ordinary compound file holding a single
 tag; `IDXONE.IDX` is derived from it by copying the tag header from offset 1024 to offset 0 and
@@ -165,6 +172,34 @@ Two things to know when comparing against it. `left` and `right` are printed as 
 no interpretation, so "no sibling" reads as `4294967295`. And the `[blocks]` order is documentation
 rather than a promise — a port may read blocks in any order, so the golden tests compare them as a set
 keyed by node number.
+
+### The seek sections
+
+Each tag also carries what the C library answered when asked to *find* things. The search values are
+**derived from that tag's own keys** by the generator rather than listed by hand, so they stay meaningful
+when a case's data is retuned; the name on each line says how it was derived.
+
+```
+[seeks]                              tfile4seek: 10 to 12 cases per tag
+  first-key   "ALPHA   " 8 rc=0 rec=1 key="ALPHA   "
+  prefix-half "AL" 2 rc=0 rec=1 key="ALPHA   "
+  above-all   "\xFF\xFF…" 8 rc=2 eof
+[seeknext]                           d4seekN then d4seekNextN, as record numbers
+  middle-key  "GREEN     " 10 seek=0 -> 2 8 14 20 26 32
+  between     "GREEN    !" 10 seek=2 -> none
+```
+
+- `rc` is `tfile4seek`'s own return: 0 found, 2 landed on a greater key, 3 nothing at or after. It is
+  recorded **beside** whether the cursor ended past the end, because the two are not equivalent — the
+  library can return 2 with the cursor already at the end, and its data-file wrapper normalises that to 3.
+- `[seeknext]` exists only for the eleven tags whose key transform is the identity, which is a
+  machine-collated character tag: driving `d4seekNext` needs a *value*, and only there are the value
+  bytes the key bytes. A tag without one says `[seeknext]   not-identity-transform`, so its absence is a
+  statement rather than an omission.
+- **One case is deliberately not comparable between the two sections.** A zero-length value means
+  "matches everything" at the tag level and "seek for .NULL." through the data file's API
+  (`data4seekConvertKeyToTagFormat`, `D4SEEK.C:951-956`), so `empty` shows `rc=0` in one and `seek=2` in
+  the other. The dump keeps both because the difference is a fact about the library.
 
 ## Three things to know before comparing bytes
 

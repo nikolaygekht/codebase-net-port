@@ -15,7 +15,10 @@ internal sealed class DumpIndexTag
         byte[] filter,
         int count,
         IReadOnlyList<DumpIndexBlock> blocks,
-        IReadOnlyList<DumpIndexKey> keys)
+        IReadOnlyList<DumpIndexKey> keys,
+        IReadOnlyList<DumpSeekCase> seeks,
+        IReadOnlyList<DumpSeekNextRun> seekNextRuns,
+        bool identityTransform)
     {
         Name = name;
         Header = header;
@@ -25,6 +28,9 @@ internal sealed class DumpIndexTag
         Count = count;
         Blocks = blocks;
         Keys = keys;
+        Seeks = seeks;
+        SeekNextRuns = seekNextRuns;
+        IdentityTransform = identityTransform;
     }
 
     /// <summary>Gets the tag's name, or [c]*directory*[/c] for the hidden tag-name tree.</summary>
@@ -58,6 +64,23 @@ internal sealed class DumpIndexTag
     /// <summary>Gets every key with its record number, in the tag's own navigation order.</summary>
     /// <value>Reversed for a descending tag, because that is what its order is.</value>
     public IReadOnlyList<DumpIndexKey> Keys { get; }
+
+    /// <summary>Gets every seek the C library performed on this tag, with where it landed.</summary>
+    public IReadOnlyList<DumpSeekCase> Seeks { get; }
+
+    /// <summary>Gets every seek-and-seek-next run, empty when the tag's transform is not the identity.</summary>
+    /// <value>
+    /// Driven through the data file's API, which converts a value through the tag's own transform — so
+    /// runs exist only where that transform is the identity, which is a machine-collated character tag.
+    /// </value>
+    public IReadOnlyList<DumpSeekNextRun> SeekNextRuns { get; }
+
+    /// <summary>Gets a value indicating whether the tag's key transform is the identity.</summary>
+    /// <value>
+    /// True when the dump carries seek-next runs for it. The generator says so explicitly rather than
+    /// leaving the section out, so its absence is a statement and not an accident.
+    /// </value>
+    public bool IdentityTransform { get; }
 
     /// <summary>Gets the tag's key length.</summary>
     public int KeyLength => (int)Number("keyLen");
@@ -112,6 +135,10 @@ internal sealed class DumpIndexTag
         int count = -1;
         List<DumpIndexBlock> blocks = [];
         List<DumpIndexKey> keys = [];
+        List<DumpSeekCase> seeks = [];
+        List<DumpSeekNextRun> seekNextRuns = [];
+        bool identityTransform = true;
+        string section = string.Empty;
         int declaredBlocks = -1;
 
         for (i++; i < lines.Length; i++)
@@ -161,8 +188,21 @@ internal sealed class DumpIndexTag
                 continue;
             }
 
-            if (line == "[blocks]" || line == "[keys]")
+            if (line == "[blocks]" || line == "[keys]" || line == "[seeks]")
+            {
+                section = line;
                 continue;
+            }
+
+            if (line.StartsWith("[seeknext]", StringComparison.Ordinal))
+            {
+                section = "[seeknext]";
+
+                // The generator states the absence rather than omitting the section, so a reader can
+                // tell "no runs because the transform is not the identity" from "no runs at all".
+                identityTransform = !line.Contains("not-identity-transform", StringComparison.Ordinal);
+                continue;
+            }
 
             if (line.StartsWith("blocks ", StringComparison.Ordinal))
             {
@@ -176,9 +216,22 @@ internal sealed class DumpIndexTag
                 continue;
             }
 
-            // Everything left is indented: a block's entry, or a key. A key line starts with a quoted
-            // value, an entry line with its index.
+            // Everything left is indented, and which section it belongs to decides how it reads.
             string body = line.TrimStart();
+
+            if (section == "[seeks]")
+            {
+                seeks.Add(DumpSeekCase.Parse(body));
+                continue;
+            }
+
+            if (section == "[seeknext]")
+            {
+                seekNextRuns.Add(DumpSeekNextRun.Parse(body));
+                continue;
+            }
+
+            // A key line starts with a quoted value, a block entry line with its index.
             if (body.StartsWith('"'))
             {
                 keys.Add(DumpIndexKey.Parse(body));
@@ -204,7 +257,9 @@ internal sealed class DumpIndexTag
         foreach (DumpIndexBlock block in blocks)
             block.CheckEntryCount(name, what);
 
-        return new DumpIndexTag(name, header, text, expression, filter, count, blocks, keys)
+        return new DumpIndexTag(
+            name, header, text, expression, filter, count, blocks, keys,
+            seeks, seekNextRuns, identityTransform)
         {
             SortSequence = sortSequence,
         };

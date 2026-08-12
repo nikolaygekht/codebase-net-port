@@ -95,11 +95,19 @@ int caseCdxDeep( CODE4 *cb, const char *outDir )
       { 0, 0, 0, 0, 0 }
    };
 
-   /* name       expression    filter  unique  descending */
+   /* name       expression    filter  unique  descending
+    *
+    * D_PFX is **descending**, and deliberately so: keys are stored ascending
+    * whatever the flag says (CDX-FORMAT.md §7), so the flag costs this tag none
+    * of its packing coverage — its duplicate counts are what they always were —
+    * and it buys the only multi-block descending tag in the corpus. Without one,
+    * a descending seek's step back into the *previous block* is unreachable, and
+    * that is a named risk of step 005. CDXBASE's T_TEXTD is single-block and
+    * cannot reach it. */
    static TAG4INFO tags[] =
    {
       { (char *)"D_WIDE", (char *)"K_WIDE", 0, 0, 0 },
-      { (char *)"D_PFX",  (char *)"K_PFX",  0, 0, 0 },
+      { (char *)"D_PFX",  (char *)"K_PFX",  0, 0, r4descending },
       { (char *)"D_DUP",  (char *)"K_DUP",  0, 0, 0 },
       { (char *)"D_NUM",  (char *)"K_N",    0, 0, 0 },
       { 0, 0, 0, 0, 0 }

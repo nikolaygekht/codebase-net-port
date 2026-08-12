@@ -39,6 +39,16 @@ blocks 1
   "T_TEXT    " 1024
   "T_TEXTD   " 2048
   "T_UNIQ    " 4096
+[seeks]
+  first-key   "T_BIN     " 10 rc=0 rec=5120 key="T_BIN     "
+  last-key    "T_UNIQ    " 10 rc=0 rec=4096 key="T_UNIQ    "
+  middle-key  "T_INT     " 10 rc=0 rec=9216 key="T_INT     "
+  prefix-half "T_INT" 5 rc=0 rec=9216 key="T_INT     "
+  between     "T_INT    !" 10 rc=2 rec=6144 key="T_NUM     "
+  below-all   "\x00" 1 rc=2 rec=5120 key="T_BIN     "
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 10 rc=2 eof
+  empty       "" 0 rc=0 rec=5120 key="T_BIN     "
+  all-pad     "          " 10 rc=2 rec=5120 key="T_BIN     "
 
 [tag T_BIN]
 header       keyLen=8 typeCode=0x60 signature=0x01 descending=0 pChar=0x20 root=13824 freeList=0 version=0 headerNode=5120
@@ -114,6 +124,28 @@ blocks 1
   "\xFF\xFE\xFD\xFC\xFB\xFA\xF9\xF8" 11
   "\xFF\xFE\xFD\xFC\xFB\xFA\xF9\xF8" 19
   "\xFF\xFE\xFD\xFC\xFB\xFA\xF9\xF8" 27
+[seeks]
+  first-key   "\x00\x01\x02\x03\x04\x05\x06\x07" 8 rc=0 rec=1 key="\x00\x01\x02\x03\x04\x05\x06\x07"
+  last-key    "\xFF\xFE\xFD\xFC\xFB\xFA\xF9\xF8" 8 rc=0 rec=3 key="\xFF\xFE\xFD\xFC\xFB\xFA\xF9\xF8"
+  middle-key  "AB      " 8 rc=0 rec=6 key="AB      "
+  run-first   "\x00\x01\x02\x03\x04\x05\x06\x07" 8 rc=0 rec=1 key="\x00\x01\x02\x03\x04\x05\x06\x07"
+  prefix-half "AB  " 4 rc=0 rec=6 key="AB      "
+  between     "AB     !" 8 rc=2 rec=8 key="\x7F\x80\x00\xFF\x01\xFE\x02\xFD"
+  below-all   "\x00" 1 rc=0 rec=1 key="\x00\x01\x02\x03\x04\x05\x06\x07"
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 8 rc=2 eof
+  empty       "" 0 rc=0 rec=1 key="\x00\x01\x02\x03\x04\x05\x06\x07"
+  all-pad     "        " 8 rc=0 rec=4 key="        "
+[seeknext]
+  first-key   "\x00\x01\x02\x03\x04\x05\x06\x07" 8 seek=0 -> 1 9 17 25
+  last-key    "\xFF\xFE\xFD\xFC\xFB\xFA\xF9\xF8" 8 seek=0 -> 3 11 19 27
+  middle-key  "AB      " 8 seek=0 -> 6 14 22 30
+  run-first   "\x00\x01\x02\x03\x04\x05\x06\x07" 8 seek=0 -> 1 9 17 25
+  prefix-half "AB  " 4 seek=0 -> 6 14 22 30
+  between     "AB     !" 8 seek=2 -> none
+  below-all   "\x00" 1 seek=0 -> 1 9 17 25
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 8 seek=3 -> none
+  empty       "" 0 seek=2 -> none
+  all-pad     "        " 8 seek=0 -> 4 12 20 28
 
 [tag T_DATE]
 header       keyLen=8 typeCode=0x60 signature=0x01 descending=0 pChar=0x00 root=15360 freeList=0 version=0 headerNode=8192
@@ -189,6 +221,17 @@ blocks 1
   "\xC1B\xC7\x13\x80\x00\x00\x00" 14
   "\xC1B\xC7o\x00\x00\x00\x00" 15
   "\xC1B\xC7o\x80\x00\x00\x00" 16
+[seeks]
+  first-key   "\x80\x00\x00\x00\x00\x00\x00\x00" 8 rc=0 rec=3 key="\x80\x00\x00\x00\x00\x00\x00\x00"
+  last-key    "\xC1B\xC7o\x80\x00\x00\x00" 8 rc=0 rec=16 key="\xC1B\xC7o\x80\x00\x00\x00"
+  middle-key  "\xC1B\xBFR\x80\x00\x00\x00" 8 rc=0 rec=27 key="\xC1B\xBFR\x80\x00\x00\x00"
+  prefix-half "\xC1B\xBFR" 4 rc=0 rec=27 key="\xC1B\xBFR\x80\x00\x00\x00"
+  between     "\xC1B\xBFR\x80\x00\x00\x01" 8 rc=2 rec=28 key="\xC1B\xC1B\x00\x00\x00\x00"
+  below-all   "\x00" 1 rc=2 rec=3 key="\x80\x00\x00\x00\x00\x00\x00\x00"
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 8 rc=2 eof
+  empty       "" 0 rc=0 rec=3 key="\x80\x00\x00\x00\x00\x00\x00\x00"
+  all-pad     "\x00\x00\x00\x00\x00\x00\x00\x00" 8 rc=2 rec=3 key="\x80\x00\x00\x00\x00\x00\x00\x00"
+[seeknext]   not-identity-transform
 
 [tag T_DBL]
 header       keyLen=8 typeCode=0x60 signature=0x01 descending=0 pChar=0x00 root=14848 freeList=0 version=0 headerNode=7168
@@ -264,6 +307,17 @@ blocks 1
   "\x81\xA5n\x1F\xC2\xF8\xF3Y" 7
   "\xC0\x09!\xFBTD-\x18" 3
   "\xC3\x0Ck\xF5&4\x00\x00" 4
+[seeks]
+  first-key   "\x00\x00\x00\x00\x00\x00\x00\x00" 8 rc=0 rec=2 key="\x00\x00\x00\x00\x00\x00\x00\x00"
+  last-key    "\xC3\x0Ck\xF5&4\x00\x00" 8 rc=0 rec=4 key="\xC3\x0Ck\xF5&4\x00\x00"
+  middle-key  "?\xFC\x05`A\x897K" 8 rc=0 rec=22 key="?\xFC\x05`A\x897K"
+  prefix-half "?\xFC\x05`" 4 rc=0 rec=22 key="?\xFC\x05`A\x897K"
+  between     "?\xFC\x05`A\x897L" 8 rc=2 rec=23 key="?\xFC\x05\xA1\xCA\xC0\x83\x11"
+  below-all   "\x00" 1 rc=0 rec=2 key="\x00\x00\x00\x00\x00\x00\x00\x00"
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 8 rc=2 eof
+  empty       "" 0 rc=0 rec=2 key="\x00\x00\x00\x00\x00\x00\x00\x00"
+  all-pad     "\x00\x00\x00\x00\x00\x00\x00\x00" 8 rc=0 rec=2 key="\x00\x00\x00\x00\x00\x00\x00\x00"
+[seeknext]   not-identity-transform
 
 [tag T_DUP]
 header       keyLen=10 typeCode=0x60 signature=0x01 descending=0 pChar=0x20 root=12800 freeList=0 version=0 headerNode=3072
@@ -339,6 +393,28 @@ blocks 1
   "YELLOW    " 17
   "YELLOW    " 23
   "YELLOW    " 29
+[seeks]
+  first-key   "          " 10 rc=0 rec=4 key="          "
+  last-key    "YELLOW    " 10 rc=0 rec=5 key="YELLOW    "
+  middle-key  "GREEN     " 10 rc=0 rec=2 key="GREEN     "
+  run-first   "          " 10 rc=0 rec=4 key="          "
+  prefix-half "GREEN" 5 rc=0 rec=2 key="GREEN     "
+  between     "GREEN    !" 10 rc=2 rec=1 key="RED       "
+  below-all   "\x00" 1 rc=2 rec=4 key="          "
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 10 rc=2 eof
+  empty       "" 0 rc=0 rec=4 key="          "
+  all-pad     "          " 10 rc=0 rec=4 key="          "
+[seeknext]
+  first-key   "          " 10 seek=0 -> 4 10 16 22 28
+  last-key    "YELLOW    " 10 seek=0 -> 5 11 17 23 29
+  middle-key  "GREEN     " 10 seek=0 -> 2 8 14 20 26 32
+  run-first   "          " 10 seek=0 -> 4 10 16 22 28
+  prefix-half "GREEN" 5 seek=0 -> 2 8 14 20 26 32
+  between     "GREEN    !" 10 seek=2 -> none
+  below-all   "\x00" 1 seek=2 -> none
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 10 seek=3 -> none
+  empty       "" 0 seek=2 -> none
+  all-pad     "          " 10 seek=0 -> 4 10 16 22 28
 
 [tag T_FILT]
 header       keyLen=8 typeCode=0x68 signature=0x01 descending=0 pChar=0x00 root=16384 freeList=0 version=0 headerNode=10240
@@ -394,6 +470,18 @@ blocks 1
   "\xC0\xB0\x92l\x8BC\x95\x81" 10
   "\xC0\xB0\x92l\x8BC\x95\x81" 11
   "\xC1\x97\xD7\x83\xFF\xFE\xF9\xDB" 3
+[seeks]
+  first-key   "?k}\xFF\xFF\xFF\xFF\xFF" 8 rc=0 rec=6 key="?k}\xFF\xFF\xFF\xFF\xFF"
+  last-key    "\xC1\x97\xD7\x83\xFF\xFE\xF9\xDB" 8 rc=0 rec=3 key="\xC1\x97\xD7\x83\xFF\xFE\xF9\xDB"
+  middle-key  "\xC0\x8B\xBC\x00\x00\x00\x00\x00" 8 rc=0 rec=22 key="\xC0\x8B\xBC\x00\x00\x00\x00\x00"
+  run-first   "\xC0\xB0\x92l\x8BC\x95\x81" 8 rc=0 rec=10 key="\xC0\xB0\x92l\x8BC\x95\x81"
+  prefix-half "\xC0\x8B\xBC\x00" 4 rc=0 rec=22 key="\xC0\x8B\xBC\x00\x00\x00\x00\x00"
+  between     "\xC0\x8B\xBC\x00\x00\x00\x00\x01" 8 rc=2 rec=23 key="\xC0\x90\x04\x00\x00\x00\x00\x00"
+  below-all   "\x00" 1 rc=2 rec=6 key="?k}\xFF\xFF\xFF\xFF\xFF"
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 8 rc=2 eof
+  empty       "" 0 rc=0 rec=6 key="?k}\xFF\xFF\xFF\xFF\xFF"
+  all-pad     "\x00\x00\x00\x00\x00\x00\x00\x00" 8 rc=2 rec=6 key="?k}\xFF\xFF\xFF\xFF\xFF"
+[seeknext]   not-identity-transform
 
 [tag T_INT]
 header       keyLen=4 typeCode=0x60 signature=0x01 descending=0 pChar=0x00 root=15872 freeList=0 version=0 headerNode=9216
@@ -469,6 +557,17 @@ blocks 1
   "\x80\x00qH" 30
   "\x80\x00u0" 31
   "\xFF\xFF\xFF\xFF" 3
+[seeks]
+  first-key   "\x00\x00\x00\x00" 4 rc=0 rec=2 key="\x00\x00\x00\x00"
+  last-key    "\xFF\xFF\xFF\xFF" 4 rc=0 rec=3 key="\xFF\xFF\xFF\xFF"
+  middle-key  "\x80\x00.\xE0" 4 rc=0 rec=13 key="\x80\x00.\xE0"
+  prefix-half "\x80\x00" 2 rc=0 rec=1 key="\x80\x00\x00\x00"
+  between     "\x80\x00.\xE1" 4 rc=2 rec=14 key="\x80\x002\xC8"
+  below-all   "\x00" 1 rc=0 rec=2 key="\x00\x00\x00\x00"
+  above-all   "\xFF\xFF\xFF\xFF" 4 rc=0 rec=3 key="\xFF\xFF\xFF\xFF"
+  empty       "" 0 rc=0 rec=2 key="\x00\x00\x00\x00"
+  all-pad     "\x00\x00\x00\x00" 4 rc=0 rec=2 key="\x00\x00\x00\x00"
+[seeknext]   not-identity-transform
 
 [tag T_NUM]
 header       keyLen=8 typeCode=0x60 signature=0x01 descending=0 pChar=0x00 root=14336 freeList=0 version=0 headerNode=6144
@@ -544,6 +643,18 @@ blocks 1
   "\xC0\xB0\x92l\x8BC\x95\x81" 10
   "\xC0\xB0\x92l\x8BC\x95\x81" 11
   "\xC1\x97\xD7\x83\xFF\xFE\xF9\xDB" 3
+[seeks]
+  first-key   ">\x9C\xED0\x00\x081&" 8 rc=0 rec=2 key=">\x9C\xED0\x00\x081&"
+  last-key    "\xC1\x97\xD7\x83\xFF\xFE\xF9\xDB" 8 rc=0 rec=3 key="\xC1\x97\xD7\x83\xFF\xFE\xF9\xDB"
+  middle-key  "\xC0\x83$\x00\x00\x00\x00\x00" 8 rc=0 rec=20 key="\xC0\x83$\x00\x00\x00\x00\x00"
+  run-first   "\xC0\xB0\x92l\x8BC\x95\x81" 8 rc=0 rec=10 key="\xC0\xB0\x92l\x8BC\x95\x81"
+  prefix-half "\xC0\x83$\x00" 4 rc=0 rec=20 key="\xC0\x83$\x00\x00\x00\x00\x00"
+  between     "\xC0\x83$\x00\x00\x00\x00\x01" 8 rc=2 rec=21 key="\xC0\x87p\x00\x00\x00\x00\x00"
+  below-all   "\x00" 1 rc=2 rec=2 key=">\x9C\xED0\x00\x081&"
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 8 rc=2 eof
+  empty       "" 0 rc=0 rec=2 key=">\x9C\xED0\x00\x081&"
+  all-pad     "\x00\x00\x00\x00\x00\x00\x00\x00" 8 rc=2 rec=2 key=">\x9C\xED0\x00\x081&"
+[seeknext]   not-identity-transform
 
 [tag T_TEXT]
 header       keyLen=20 typeCode=0x60 signature=0x01 descending=0 pChar=0x20 root=11776 freeList=0 version=0 headerNode=1024
@@ -619,6 +730,28 @@ blocks 1
   "QUEBEC              " 19
   "ZEBRA               " 7
   "ZEBRA CROSSING      " 15
+[seeks]
+  first-key   "                    " 20 rc=0 rec=6 key="                    "
+  last-key    "ZEBRA CROSSING      " 20 rc=0 rec=15 key="ZEBRA CROSSING      "
+  middle-key  "GOLF                " 20 rc=0 rec=28 key="GOLF                "
+  run-first   "                    " 20 rc=0 rec=6 key="                    "
+  prefix-half "GOLF      " 10 rc=0 rec=28 key="GOLF                "
+  between     "GOLF               !" 20 rc=2 rec=27 key="HOTEL               "
+  below-all   "\x00" 1 rc=2 rec=6 key="                    "
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 20 rc=2 eof
+  empty       "" 0 rc=0 rec=6 key="                    "
+  all-pad     "                    " 20 rc=0 rec=6 key="                    "
+[seeknext]
+  first-key   "                    " 20 seek=0 -> 6 18
+  last-key    "ZEBRA CROSSING      " 20 seek=0 -> 15
+  middle-key  "GOLF                " 20 seek=0 -> 28
+  run-first   "                    " 20 seek=0 -> 6 18
+  prefix-half "GOLF      " 10 seek=0 -> 28
+  between     "GOLF               !" 20 seek=2 -> none
+  below-all   "\x00" 1 seek=2 -> none
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 20 seek=3 -> none
+  empty       "" 0 seek=2 -> none
+  all-pad     "                    " 20 seek=0 -> 6 18
 
 [tag T_TEXTD]
 header       keyLen=20 typeCode=0x60 signature=0x01 descending=1 pChar=0x20 root=12288 freeList=0 version=0 headerNode=2048
@@ -694,6 +827,28 @@ blocks 1
   "AARDVARK            " 14
   "                    " 18
   "                    " 6
+[seeks]
+  first-key   "ZEBRA CROSSING      " 20 rc=0 rec=15 key="ZEBRA CROSSING      "
+  last-key    "                    " 20 rc=0 rec=18 key="                    "
+  middle-key  "FOXTROT             " 20 rc=0 rec=29 key="FOXTROT             "
+  run-first   "MIDDLE              " 20 rc=0 rec=12 key="MIDDLE              "
+  prefix-half "FOXTROT   " 10 rc=0 rec=29 key="FOXTROT             "
+  between     "FOXTROT            !" 20 rc=2 rec=29 key="FOXTROT             "
+  below-all   "\x00" 1 rc=3 eof
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 20 rc=3 eof
+  empty       "" 0 rc=0 rec=15 key="ZEBRA CROSSING      "
+  all-pad     "                    " 20 rc=0 rec=18 key="                    "
+[seeknext]
+  first-key   "ZEBRA CROSSING      " 20 seek=0 -> 15
+  last-key    "                    " 20 seek=0 -> 18 6
+  middle-key  "FOXTROT             " 20 seek=0 -> 29
+  run-first   "MIDDLE              " 20 seek=0 -> 12 11
+  prefix-half "FOXTROT   " 10 seek=0 -> 29
+  between     "FOXTROT            !" 20 seek=2 -> none
+  below-all   "\x00" 1 seek=3 -> none
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 20 seek=3 -> none
+  empty       "" 0 seek=3 -> none
+  all-pad     "                    " 20 seek=0 -> 18 6
 
 [tag T_UNIQ]
 header       keyLen=10 typeCode=0x61 signature=0x01 descending=0 pChar=0x20 root=13312 freeList=0 version=0 headerNode=4096
@@ -715,3 +870,23 @@ blocks 1
   "GREEN     " 2
   "RED       " 1
   "YELLOW    " 5
+[seeks]
+  first-key   "          " 10 rc=0 rec=4 key="          "
+  last-key    "YELLOW    " 10 rc=0 rec=5 key="YELLOW    "
+  middle-key  "GREEN     " 10 rc=0 rec=2 key="GREEN     "
+  prefix-half "GREEN" 5 rc=0 rec=2 key="GREEN     "
+  between     "GREEN    !" 10 rc=2 rec=1 key="RED       "
+  below-all   "\x00" 1 rc=2 rec=4 key="          "
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 10 rc=2 eof
+  empty       "" 0 rc=0 rec=4 key="          "
+  all-pad     "          " 10 rc=0 rec=4 key="          "
+[seeknext]
+  first-key   "          " 10 seek=0 -> 4
+  last-key    "YELLOW    " 10 seek=0 -> 5
+  middle-key  "GREEN     " 10 seek=0 -> 2
+  prefix-half "GREEN" 5 seek=0 -> 2
+  between     "GREEN    !" 10 seek=2 -> none
+  below-all   "\x00" 1 seek=2 -> none
+  above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 10 seek=3 -> none
+  empty       "" 0 seek=2 -> none
+  all-pad     "          " 10 seek=0 -> 4

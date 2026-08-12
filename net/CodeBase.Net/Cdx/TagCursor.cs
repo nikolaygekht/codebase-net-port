@@ -20,6 +20,14 @@ internal sealed class TagCursor
 {
     private readonly CdxTag tag;
 
+    /// <summary>
+    /// The deepest tree this reader will descend before calling it a cycle.
+    ///
+    /// With the smallest possible fan-out of two, this many levels already address more blocks than a
+    /// node number can name, so a deeper descent is not a tree.
+    /// </summary>
+    private const int MaxDepth = 32;
+
     private TreeBlock block;
     private int index;
 
@@ -114,6 +122,272 @@ internal sealed class TagCursor
     /// <returns>True when the cursor moved, false when it was already on the first key.</returns>
     public bool Previous() => Skip(-1) == -1;
 
+
+    /// <summary>
+    /// Moves to the first entry, in the tag's own order, that is not before a search value.
+    /// </summary>
+    /// <param name="search">What to look for.</param>
+    /// <returns>
+    /// [c]Found[/c] with the cursor on the first matching entry, [c]After[/c] with it on the first entry
+    /// beyond the value, or [c]Eof[/c] with it past the end when nothing is at or beyond the value.
+    /// </returns>
+    /// <remarks>
+    /// "Before" is in the tag's order, so on a descending tag this looks for the greatest key not
+    /// *greater* than the value — the two byte-level searches swap places. That is also what the C
+    /// library does, by incrementing the search value and stepping back (I4TAG.C:2295-2356).
+    /// </remarks>
+    public SeekOutcome Seek(KeySearch search)
+    {
+        // An empty value is before everything, so the tag's first entry is the answer either way.
+        if (search.Length == 0)
+            return Top() ? SeekOutcome.Found : SeekOutcome.Eof;
+
+        // A value with no successor is above every key. On a descending tag that is past the *end*, and
+        // the C library reports exactly that rather than the greatest key — the increment fails, so its
+        // descending path takes the "otherwise want an eof type condition" branch (I4TAG.C:2341-2350).
+        if (tag.Descending && !search.TryIncrement(out _))
+        {
+            Eof = true;
+            Bof = false;
+            return SeekOutcome.Eof;
+        }
+
+        bool landed = tag.Descending ? SeekLastAtOrBelow(search) : SeekFirstAtOrAbove(search);
+
+        if (!landed)
+        {
+            Eof = true;
+            Bof = false;
+            return SeekOutcome.Eof;
+        }
+
+        return search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.After;
+    }
+
+    /// <summary>
+    /// Moves to the last entry, in the tag's own order, that is not after a search value.
+    /// </summary>
+    /// <param name="search">What to look for.</param>
+    /// <returns>
+    /// [c]Found[/c] with the cursor on the last matching entry, [c]Before[/c] with it on the last entry
+    /// short of the value, or [c]Bof[/c] when nothing is at or short of the value.
+    /// </returns>
+    /// <remarks>
+    /// A range's other end, and the primitive the backwards operations are built on. It is the mirror of
+    /// [c]Seek[/c] and so uses the opposite byte-level search, which on a descending tag means the same
+    /// one [c]Seek[/c] uses on an ascending tag.
+    /// </remarks>
+    public SeekOutcome SeekAtOrBefore(KeySearch search)
+    {
+        // An empty value matches everything, so the *last* entry is the last one that is not after it.
+        if (search.Length == 0)
+            return Bottom() ? SeekOutcome.Found : SeekOutcome.Bof;
+
+        bool landed = tag.Descending ? SeekFirstAtOrAbove(search) : SeekLastAtOrBelow(search);
+
+        if (!landed)
+        {
+            Bof = true;
+            Eof = false;
+            return SeekOutcome.Bof;
+        }
+
+        return search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.Before;
+    }
+
+    /// <summary>
+    /// Moves to the last entry whose key matches a search value.
+    /// </summary>
+    /// <param name="search">What to look for.</param>
+    /// <returns>
+    /// [c]Found[/c] with the cursor on the last matching entry, or [c]NoEntry[/c] when nothing matches —
+    /// in which case the cursor is left wherever the search reached, as [c]SeekAtOrBefore[/c] left it.
+    /// </returns>
+    /// <remarks>
+    /// One comparison on top of [c]SeekAtOrBefore[/c]: the last entry not *greater* than the value is
+    /// the last entry *equal* to it whenever an equal one exists. What makes this worth its own name is
+    /// what it reports when none does.
+    /// </remarks>
+    public SeekOutcome SeekLast(KeySearch search) =>
+        SeekAtOrBefore(search) == SeekOutcome.Found ? SeekOutcome.Found : SeekOutcome.NoEntry;
+
+    /// <summary>
+    /// Moves to the next entry that still matches a search value.
+    /// </summary>
+    /// <param name="search">What the run is of.</param>
+    /// <returns>
+    /// [c]Found[/c] on the next matching entry, [c]NoEntry[/c] when the run has ended, or whatever a
+    /// fresh seek reports when the cursor was not on a matching entry to begin with.
+    /// </returns>
+    /// <remarks>
+    /// The C library's own three steps, including the one that looks like a rough edge: when the current
+    /// entry does not match, this **degrades to a plain seek** rather than reporting nothing
+    /// (d4seekNextN, D4SEEK.C:1195-1210). That is what makes it safe to call without knowing where the
+    /// cursor is, and it is reproduced rather than tidied.
+    /// </remarks>
+    public SeekOutcome SeekNext(KeySearch search) => SeekAdjacentMatch(search, 1);
+
+    /// <summary>
+    /// Moves to the previous entry that still matches a search value.
+    /// </summary>
+    /// <param name="search">What the run is of.</param>
+    /// <returns>
+    /// [c]Found[/c] on the previous matching entry, [c]NoEntry[/c] when the run has ended, or whatever
+    /// seeking the last match reports when the cursor was not on a matching entry.
+    /// </returns>
+    /// <remarks>
+    /// The mirror of [c]SeekNext[/c], and an operation the C library does not have. Where its
+    /// counterpart falls back to a plain seek, this falls back to [c]SeekLast[/c] — the equivalent
+    /// starting point for walking a run backwards.
+    /// </remarks>
+    public SeekOutcome SeekPrevious(KeySearch search) => SeekAdjacentMatch(search, -1);
+
+    /// <summary>
+    /// Moves to an exact key and record number.
+    /// </summary>
+    /// <param name="search">The key to look for.</param>
+    /// <param name="record">The record number to look for among the entries holding that key.</param>
+    /// <returns>
+    /// [c]Found[/c] when that exact pair is present. Otherwise [c]After[/c] with the cursor on the first
+    /// entry that sorts after the pair, or [c]Eof[/c] when there is none.
+    /// </returns>
+    /// <remarks>
+    /// The tree orders by key *and* record number, so an exact position needs both: seek the key, then
+    /// walk forward while the record number is below the target (tfile4go2fox, I4TAG.C:1339-1458). It
+    /// answers a different question from [c]Seek[/c] — "is this entry present" rather than "where does
+    /// this key start" — and the write path will need it again.
+    /// </remarks>
+    public SeekOutcome SeekExact(KeySearch search, uint record)
+    {
+        SeekOutcome outcome = Seek(search);
+
+        while (outcome == SeekOutcome.Found)
+        {
+            IndexEntry entry = Current;
+
+            if (entry.Record == record)
+                return SeekOutcome.Found;
+
+            // Equal keys are ordered by record number, so a run is walked in that order — and a
+            // descending tag walks it backwards, from the highest record number to the lowest. Testing
+            // the wrong way round would give up on the first entry of every descending run.
+            bool passedIt = tag.Descending ? entry.Record < record : entry.Record > record;
+            if (passedIt)
+                return SeekOutcome.After;
+
+            if (!StepInTagOrder(1))
+                return SeekOutcome.Eof;
+
+            outcome = search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.After;
+        }
+
+        return outcome;
+    }
+
+    /// <summary>
+    /// Steps one entry in the tag's order and reports whether the entry there still matches.
+    /// </summary>
+    private SeekOutcome SeekAdjacentMatch(KeySearch search, int direction)
+    {
+        // Not on a matching entry: start over, which is what the C library does for the forward case.
+        if (!IsOnKey || !search.Matches(Current.Key))
+            return direction > 0 ? Seek(search) : SeekLast(search);
+
+        if (!StepInTagOrder(direction))
+            return SeekOutcome.NoEntry;
+
+        return search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.NoEntry;
+    }
+
+    /// <summary>
+    /// Positions on the first entry whose key is not less than a value, in **byte** order.
+    /// </summary>
+    /// <returns>False when every key sorts below the value, and the cursor is then past the end.</returns>
+    private bool SeekFirstAtOrAbove(KeySearch search)
+    {
+        TreeBlock current = tag.ReadBlock(tag.Header.Root);
+        int guard = 0;
+
+        while (!current.IsLeaf)
+        {
+            if (current.Count == 0)
+            {
+                throw new CodeBaseException(
+                    ErrorCode.Index,
+                    $"Interior node {current.Node} of tag {tag.Name} has no children.");
+            }
+
+            if (++guard > MaxDepth)
+            {
+                throw new CodeBaseException(
+                    ErrorCode.Index,
+                    $"Seeking tag {tag.Name} did not reach a leaf, so its tree has a cycle.");
+            }
+
+            current = tag.ReadBlock(current.Branch!.EntryAt(current.Branch!.Seek(search)).Child);
+        }
+
+        block = current;
+        Eof = false;
+        Bof = false;
+
+        if (current.Count > 0)
+        {
+            current.Leaf!.Seek(search, out int at);
+
+            if (at < current.Count)
+            {
+                index = at;
+                return true;
+            }
+        }
+
+        // Past the last entry of this leaf, so the answer is the first entry of the next one along —
+        // a step in physical order, since this search is byte-ordered rather than tag-ordered.
+        index = Math.Max(current.Count - 1, 0);
+
+        if (current.Count == 0 || !StepPhysical(1))
+        {
+            Eof = true;
+            Bof = false;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Positions on the last entry whose key is not greater than a value, in **byte** order.
+    /// </summary>
+    /// <returns>False when every key sorts above the value, and the cursor is then before the start.</returns>
+    /// <remarks>
+    /// One past the value, then one step back: what lies before "the first key above v" is "the last key
+    /// not above v". A value with no successor has nothing above it, so the answer is the last key of all.
+    /// </remarks>
+    private bool SeekLastAtOrBelow(KeySearch search)
+    {
+        if (!search.TryIncrement(out KeySearch past))
+            return DescendLast();
+
+        if (!SeekFirstAtOrAbove(past))
+            return DescendLast();
+
+        if (!StepPhysical(-1))
+        {
+            Bof = true;
+            Eof = false;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Steps one entry in the tag's own order, whichever way that is physically.
+    /// </summary>
+    private bool StepInTagOrder(int direction) =>
+        StepPhysical(tag.Descending ? -direction : direction);
+
     /// <summary>
     /// Moves one entry in physical key order, following the leaf chain when a block runs out.
     /// </summary>
@@ -123,6 +397,25 @@ internal sealed class TagCursor
     {
         if (block.Leaf is null)
             return false;
+
+        // Re-entering the tag from either end lands *on* the boundary entry rather than stepping past
+        // it: the index still remembers where the walk ran out, so stepping back from the end must
+        // return to the last entry and not to the one before it. This is the same rule the record
+        // cursor follows for a table (d4skip.c:1197-1202), and the reason it needs saying is that a
+        // walk which merely stops at the end never notices the difference.
+        if (Eof && direction < 0 && index < block.Leaf.Count)
+        {
+            Eof = false;
+            Bof = false;
+            return true;
+        }
+
+        if (Bof && direction > 0 && index < block.Leaf.Count)
+        {
+            Eof = false;
+            Bof = false;
+            return true;
+        }
 
         int next = index + (direction > 0 ? 1 : -1);
 
@@ -208,9 +501,7 @@ internal sealed class TagCursor
                     $"Interior node {current.Node} of tag {tag.Name} has no children.");
             }
 
-            // A tree deeper than this is a cycle, not a tree: with the smallest possible fan-out of
-            // two, thirty-two levels already address more blocks than a node number can name.
-            if (++guard > 32)
+            if (++guard > MaxDepth)
             {
                 throw new CodeBaseException(
                     ErrorCode.Index,

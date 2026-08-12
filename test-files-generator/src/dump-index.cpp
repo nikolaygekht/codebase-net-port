@@ -25,6 +25,7 @@
 #include "d4all.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "util.h"
@@ -260,6 +261,293 @@ static int dumpKeys( FILE *out, TAG4FILE *t4, long count )
    return 0;
 }
 
+/* ---------------------------------------------------------------- seek cases
+ *
+ * The search values are **derived from each tag's own keys** rather than listed
+ * by hand, so they stay meaningful if a case's data is retuned: the first key,
+ * the last, one from the middle, the first key of a run of duplicates, a prefix
+ * of a middle key, a value that falls between two keys, and four values chosen
+ * to fall outside or on the edges of the key space.
+ *
+ * Every result is tfile4seek's own — the code it returned and where it left the
+ * cursor. Note tfile4seek MUTATES the key buffer it is given on a descending tag
+ * (it increments it and undoes that, I4TAG.C:2295-2340), so each case is seeked
+ * from a fresh copy.
+ */
+
+#define MAX4SEEK_CASES 12
+
+typedef struct
+{
+   const char *what;                     /* how the case was derived, for the reader */
+   unsigned char bytes[I4MAX_KEY_SIZE];
+   int len;
+} SEEK4CASE;
+
+/* The keys of a tag, in navigation order, so cases can be derived from them. */
+typedef struct
+{
+   unsigned char *keys;                  /* count * keyLen bytes */
+   long count;
+   int keyLen;
+} KEY4LIST;
+
+static int keysCollect( TAG4FILE *t4, long count, KEY4LIST *list )
+{
+   long i;
+
+   list->count = count;
+   list->keyLen = (int)t4->header.keyLen;
+   list->keys = (unsigned char *)malloc( (size_t)count * (size_t)list->keyLen );
+
+   if ( list->keys == 0 )
+   {
+      fprintf( stderr, "  ERROR: out of memory for %ld keys of %s\n", count, t4->alias );
+      return 1;
+   }
+
+   if ( tfile4top( t4 ) < 0 )
+      return 1;
+
+   for ( i = 0; i < count; i++ )
+   {
+      char *key = tfile4key( t4 );
+
+      if ( key == 0 )
+         return 1;
+
+      memcpy( list->keys + i * list->keyLen, key, (size_t)list->keyLen );
+
+      if ( i + 1 < count && tfile4dskip( t4, 1L ) != 1L )
+         return 1;
+   }
+
+   return 0;
+}
+
+static const unsigned char *keyAt( const KEY4LIST *list, long i )
+{
+   return list->keys + i * list->keyLen;
+}
+
+static void caseAdd( SEEK4CASE *cases, int *n, const char *what,
+                     const unsigned char *bytes, int len )
+{
+   if ( *n >= MAX4SEEK_CASES || len > I4MAX_KEY_SIZE )
+      return;
+
+   cases[*n].what = what;
+   cases[*n].len = len;
+   if ( len > 0 )
+      memcpy( cases[*n].bytes, bytes, (size_t)len );
+   (*n)++;
+}
+
+/* The ten derived cases of the plan, plus the two edge values. */
+static int casesDerive( SEEK4CASE *cases, const KEY4LIST *list, unsigned char padByte )
+{
+   unsigned char buf[I4MAX_KEY_SIZE];
+   int n = 0, keyLen = list->keyLen, i;
+   long middle = list->count / 2;
+   long run = -1;
+
+   caseAdd( cases, &n, "first-key", keyAt( list, 0 ), keyLen );
+   caseAdd( cases, &n, "last-key", keyAt( list, list->count - 1 ), keyLen );
+   caseAdd( cases, &n, "middle-key", keyAt( list, middle ), keyLen );
+
+   /* The first key of the first run of equal keys, if the tag has one. A seek
+    * must land on the run's *first* entry, which only a run can show. */
+   for ( i = 0; i + 1 < list->count; i++ )
+   {
+      if ( memcmp( keyAt( list, i ), keyAt( list, i + 1 ), (size_t)keyLen ) == 0 )
+      {
+         run = i;
+         break;
+      }
+   }
+   if ( run >= 0 )
+      caseAdd( cases, &n, "run-first", keyAt( list, run ), keyLen );
+
+   /* A prefix of a middle key: the partial-seek path. */
+   caseAdd( cases, &n, "prefix-half", keyAt( list, middle ), keyLen / 2 );
+
+   /* Between two keys: the middle key with its last non-0xFF byte raised, which
+    * lands after it and (unless the next key equals it) before the next. */
+   memcpy( buf, keyAt( list, middle ), (size_t)keyLen );
+   for ( i = keyLen - 1; i >= 0; i-- )
+   {
+      if ( buf[i] != 0xFF )
+      {
+         buf[i]++;
+         break;
+      }
+      buf[i] = 0x00;
+   }
+   caseAdd( cases, &n, "between", buf, keyLen );
+
+   memset( buf, 0x00, sizeof( buf ) );
+   caseAdd( cases, &n, "below-all", buf, 1 );
+
+   memset( buf, 0xFF, sizeof( buf ) );
+   caseAdd( cases, &n, "above-all", buf, keyLen );
+
+   caseAdd( cases, &n, "empty", buf, 0 );
+
+   memset( buf, padByte, sizeof( buf ) );
+   caseAdd( cases, &n, "all-pad", buf, keyLen );
+
+   return n;
+}
+
+static int dumpSeeks( FILE *out, TAG4FILE *t4, long count )
+{
+   SEEK4CASE cases[MAX4SEEK_CASES];
+   unsigned char search[I4MAX_KEY_SIZE];
+   KEY4LIST list;
+   int n, i;
+
+   fprintf( out, "[seeks]\n" );
+
+   if ( count == 0 )
+      return 0;
+
+   if ( keysCollect( t4, count, &list ) != 0 )
+   {
+      free( list.keys );
+      return 1;
+   }
+
+   n = casesDerive( cases, &list, (unsigned char)t4->pChar );
+   free( list.keys );
+
+   for ( i = 0; i < n; i++ )
+   {
+      int rc;
+
+      /* A fresh copy per case: the descending path writes through this pointer. */
+      memset( search, 0, sizeof( search ) );
+      if ( cases[i].len > 0 )
+         memcpy( search, cases[i].bytes, (size_t)cases[i].len );
+
+      rc = tfile4seek( t4, search, cases[i].len );
+      if ( rc < 0 )
+      {
+         fprintf( stderr, "  ERROR: tfile4seek failed on tag %s case %s\n", t4->alias, cases[i].what );
+         return 1;
+      }
+
+      fprintf( out, "  %-11s ", cases[i].what );
+      dumpEscapedBytes( out, (const char *)cases[i].bytes, (unsigned long)cases[i].len );
+      fprintf( out, " %d rc=%d ", cases[i].len, rc );
+
+      if ( tfile4eof( t4 ) )
+      {
+         fprintf( out, "eof\n" );
+      }
+      else
+      {
+         char *key = tfile4key( t4 );
+
+         if ( key == 0 )
+            return 1;
+
+         fprintf( out, "rec=%lu key=", (unsigned long)tfile4recNo( t4 ) );
+         dumpEscapedBytes( out, key, (unsigned long)t4->header.keyLen );
+         fprintf( out, "\n" );
+      }
+   }
+
+   return 0;
+}
+
+/* ------------------------------------------------------------ seek-next runs
+ *
+ * d4seekNext takes a *value* and converts it through the tag's own transform,
+ * which normally needs the key transforms this step keeps out. The exception is
+ * the interesting one: for a machine-collated character tag the transform is the
+ * identity (t4noChangeStr, i4init.c:583-592), so the value bytes *are* the key
+ * bytes and the length-taking d4seekN/d4seekNextN can be driven with raw bytes.
+ * The length-taking forms matter: T_BIN's keys hold 0x00, which would stop the
+ * string forms dead.
+ */
+static int identityTransform( TAG4FILE *t4 )
+{
+   return tfile4type( t4 ) == r4str && t4->collateName == collate4machine;
+}
+
+static int dumpSeekNext( FILE *out, DATA4 *data, TAG4 *tag, long count )
+{
+   TAG4FILE *t4 = tag->tagFile;
+   SEEK4CASE cases[MAX4SEEK_CASES];
+   KEY4LIST list;
+   int n, i;
+
+   if ( !identityTransform( t4 ) )
+   {
+      /* Said explicitly rather than omitted: a reader of the dump should see that
+       * the section is absent by decision, not by accident. */
+      fprintf( out, "[seeknext]   not-identity-transform\n" );
+      return 0;
+   }
+
+   fprintf( out, "[seeknext]\n" );
+
+   if ( count == 0 )
+      return 0;
+
+   if ( keysCollect( t4, count, &list ) != 0 )
+   {
+      free( list.keys );
+      return 1;
+   }
+
+   n = casesDerive( cases, &list, (unsigned char)t4->pChar );
+   free( list.keys );
+
+   d4tagSelect( data, tag );
+
+   for ( i = 0; i < n; i++ )
+   {
+      int rc = d4seekN( data, (const char *)cases[i].bytes, (short)cases[i].len );
+      int visited = 0;
+
+      if ( rc < 0 )
+      {
+         fprintf( stderr, "  ERROR: d4seekN failed on tag %s case %s\n", t4->alias, cases[i].what );
+         return 1;
+      }
+
+      fprintf( out, "  %-11s ", cases[i].what );
+      dumpEscapedBytes( out, (const char *)cases[i].bytes, (unsigned long)cases[i].len );
+      fprintf( out, " %d seek=%d ->", cases[i].len, rc );
+
+      while ( rc == 0 )
+      {
+         fprintf( out, " %ld", (long)d4recNo( data ) );
+         visited++;
+
+         if ( visited > 4000000 )
+         {
+            fprintf( stderr, "  ERROR: seek-next run on %s does not end\n", t4->alias );
+            return 1;
+         }
+
+         rc = d4seekNextN( data, (const char *)cases[i].bytes, (short)cases[i].len );
+         if ( rc < 0 )
+         {
+            fprintf( stderr, "  ERROR: d4seekNextN failed on tag %s\n", t4->alias );
+            return 1;
+         }
+      }
+
+      if ( visited == 0 )
+         fprintf( out, " none" );
+      fprintf( out, "\n" );
+   }
+
+   return 0;
+}
+
 /* The expression and filter text of a tag, as the library parsed them back.
  * Written on their own lines so a long expression cannot make the header line
  * unreadable. The tag directory has neither, and dumps both as empty. */
@@ -282,7 +570,7 @@ static void dumpTagText( FILE *out, TAG4FILE *t4 )
  * "*directory*" for the hidden tag-name B-tree, which is dumped by this same
  * function because it *is* a tag — keyLen 10, pad character ' ', and its
  * "record numbers" are the header node of each tag (CDX-FORMAT.md §2). */
-static int dumpTag( FILE *out, TAG4FILE *t4, const char *name )
+static int dumpTag( FILE *out, DATA4 *data, TAG4 *tag, TAG4FILE *t4, const char *name )
 {
    T4HEADER *h = &t4->header;
    long count = countKeys( t4 );
@@ -315,14 +603,23 @@ static int dumpTag( FILE *out, TAG4FILE *t4, const char *name )
    if ( count == 0 )
    {
       /* Nothing to walk, and nothing legitimate to say about blocks. */
-      fprintf( out, "[blocks]\nblocks 0\n[keys]\n" );
+      fprintf( out, "[blocks]\nblocks 0\n[keys]\n[seeks]\n" );
       return 0;
    }
 
    if ( dumpBlocks( out, t4, count ) != 0 )
       return 1;
+   if ( dumpKeys( out, t4, count ) != 0 )
+      return 1;
+   if ( dumpSeeks( out, t4, count ) != 0 )
+      return 1;
 
-   return dumpKeys( out, t4, count );
+   /* The tag directory has no TAG4 and cannot be selected, so it gets no
+    * seek-next runs — they are driven through the data file's own API. */
+   if ( tag != 0 && dumpSeekNext( out, data, tag, count ) != 0 )
+      return 1;
+
+   return 0;
 }
 
 int dumpIndex( CODE4 *cb, const char *outDir, const char *dbfName, const char *indexName )
@@ -420,7 +717,7 @@ int dumpIndex( CODE4 *cb, const char *outDir, const char *dbfName, const char *i
    }
 
    if ( rc == 0 && file->tagIndex->header.typeCode >= 64 )
-      rc = dumpTag( out, file->tagIndex, "*directory*" );
+      rc = dumpTag( out, data, 0, file->tagIndex, "*directory*" );
 
    for ( tag = 0; rc == 0; )
    {
@@ -432,7 +729,7 @@ int dumpIndex( CODE4 *cb, const char *outDir, const char *dbfName, const char *i
       if ( tag->index != index )
          continue;
 
-      rc = dumpTag( out, tag->tagFile, tag->tagFile->alias );
+      rc = dumpTag( out, data, tag, tag->tagFile, tag->tagFile->alias );
    }
 
    fclose( out );

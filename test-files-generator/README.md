@@ -167,6 +167,16 @@ time through insert-and-split has a looser shape; that belongs to `WRITE`, where
 `CDXCOLL`'s second tag is the one exception — `i4tagAdd` puts it in an existing file, which is also why
 its `signature` byte is `0x00` where the first tag's is `0x01`.
 
+**The dumps carry seek cases too.** `dump-index.cpp` derives ten to twelve search values per tag from
+that tag's own keys — the first, last and a middle key, the first key of a run of duplicates, a prefix, a
+value between two keys, one below and one above everything, an empty one and an all-pad one — then records
+what `tfile4seek` returned and where it left the cursor. For the eleven tags whose key transform is the
+identity (a machine-collated character tag, where value bytes *are* key bytes) it also records
+`d4seekN`-then-`d4seekNextN` runs as record sequences. Two traps: `tfile4seek` **writes through the key
+pointer it is given** on a descending tag, so every case is seeked from a fresh copy; and the
+**length-taking** forms of the seek calls are required, because `T_BIN`'s keys hold `0x00` and the string
+forms would stop there.
+
 **Two library calls cannot be used, and both are worth knowing.** `tfile4count` returns 1 for any
 descending tag (it tops the tag, landing at the physical last key, then skips forward physically), so
 `dump-index.cpp` counts by walking with the direction-aware `tfile4dskip` instead. And `d4check`

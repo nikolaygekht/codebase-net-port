@@ -66,6 +66,38 @@ internal sealed class BranchBlock
     }
 
     /// <summary>
+    /// Finds the first entry whose key is not less than a search value.
+    /// </summary>
+    /// <param name="search">What to look for.</param>
+    /// <returns>
+    /// The position to descend into. When every entry sorts before the value, that is the last entry —
+    /// because an interior entry holds the *greatest* key of its child, so a value beyond all of them
+    /// still belongs under the last child if it belongs anywhere.
+    /// </returns>
+    /// <remarks>
+    /// A binary search, which an interior block allows because its entries are a plain array of whole
+    /// keys (b4seek, b4block.c:2123-2168). A leaf cannot be searched this way: its keys exist only
+    /// relative to the one before them.
+    /// </remarks>
+    public int Seek(KeySearch search)
+    {
+        int low = 0;
+        int high = Count - 1;
+
+        while (low < high)
+        {
+            int middle = low + ((high - low) / 2);
+
+            if (search.Compare(EntryAt(middle).Key) < 0)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low;
+    }
+
+    /// <summary>
     /// Gives the entry at a position.
     /// </summary>
     /// <param name="index">Which entry, counting from zero.</param>

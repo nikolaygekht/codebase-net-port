@@ -1,8 +1,8 @@
 # Project state
 
-**Updated:** 2026-08-12 · step 004 is **committed to `main`**; the only thing left in the working tree is
-the pair of design folders for steps 005 and 006, which land next. Nothing is pushed yet: three commits
-are waiting, steps 002's, 003's and 004's.
+**Updated:** 2026-08-12 · step 004 is **committed to `main`** and the tree is clean; the designs for
+steps 005 and 006 are committed with it. Nothing is pushed yet: four commits are waiting, steps 002's,
+003's, 004's and the design one.
 **Active step:** none. [`004-cdx-tags-and-traversal`](claude/dev/004-cdx-tags-and-traversal/) is
 **closed**: **900 tests**, and `CDX-READ` is done for decoding and traversal. Steps
 [`005-cdx-seek`](claude/dev/005-cdx-seek/) and [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/)

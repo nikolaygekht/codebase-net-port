@@ -105,11 +105,39 @@ public sealed class FoxDateTests
     [Fact]
     public void ToDate_OfYearZero_IsNothingEvenThoughTheJulianFormHasAValue()
     {
-        // Year zero is a legal date to the C library and has no counterpart in a DateOnly. Reported
-        // as no date rather than as a wrong one, and the divergence is deliberate.
+        // There is no year zero to report -- the calendar runs from 1 BC to AD 1 -- but the C library
+        // still gives the bytes a number, so the two forms answer differently on purpose (ADR-33).
         Julian("00000101").Should().BeGreaterThan(0);
 
         FoxDate.ToDate("00000101"u8).Should().BeNull();
+    }
+
+    [Fact]
+    public void ToJulian_RunsYearZeroAsALeapYear_WhichIsWhatTheAnchorConstantAssumes()
+    {
+        // The C library computes year zero as leap (D4DATE.C:324) and its JULIAN4ADJUSTMENT depends
+        // on it: make year zero common and every date from AD 1 on moves by a day. Stated as an
+        // identity rather than against the constant, so it needs no magic number to be convincing.
+        (Julian("00001231") - Julian("00000101")).Should().Be(365, "year zero runs 366 days");
+
+        Julian("00000229").Should().BeGreaterThan(0, "year zero has a leap day");
+    }
+
+    [Fact]
+    public void ToJulian_JoinsYearZeroToYearOneWithoutAGap()
+    {
+        // The seam the anchor sits on. If year zero's length were wrong this is where it would show,
+        // because AD 1 is pinned independently by ToJulian_CountsDaysSinceTheEpoch.
+        (Julian("00010101") - Julian("00001231")).Should().Be(1);
+    }
+
+    [Fact]
+    public void ToJulian_ReadsABlankYearAsYearZero_BecauseASpaceCountsAsAZeroDigit()
+    {
+        // How year zero is actually reached: not by anyone writing "0000", but by a partly written
+        // date field. Dates before AD 1 are out of scope (ADR-33); this is a malformed field whose
+        // number still has to match the C library, because a date tag's key is built from it.
+        Julian("    0229").Should().Be(Julian("00000229"));
     }
 
     [Fact]

@@ -30,7 +30,6 @@ internal static class FieldValueDecoder
         ['B'] = 8,
         ['Y'] = FoxCurrency.Length,
         ['T'] = FoxDateTime.Length,
-        ['7'] = FoxDateTime.Length,
         ['H'] = 4,
     };
 
@@ -59,7 +58,7 @@ internal static class FieldValueDecoder
     /// The list [c]f4double[/c] and [c]f4long[/c] both carry (F4DOUBLE.C:279-291, F4LONG.C:220-231).
     /// A logical is not a number, and a datetime is two numbers rather than one.
     /// </value>
-    private static readonly char[] RefuseAsNumber = ['L', 'T', '7', '0'];
+    private static readonly char[] RefuseAsNumber = ['L', 'T', '0'];
 
     /// <summary>
     /// Returns the bytes a field occupies, which is not always the width its descriptor declares.
@@ -196,7 +195,7 @@ internal static class FieldValueDecoder
     {
         Refuse(
             field,
-            field.Type is not ('T' or '7'),
+            field.Type is not 'T',
             "read as a date and time",
             "only a datetime field holds one (F4FIELD.C:1925-1929)");
 

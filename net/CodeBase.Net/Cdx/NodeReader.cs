@@ -32,6 +32,15 @@ internal sealed class NodeReader
     public int BlockSize => addressing.BlockSize;
 
     /// <summary>
+    /// Gets how many blocks the file is large enough to hold.
+    /// </summary>
+    /// <value>
+    /// An upper bound on how many distinct blocks any walk through the file can visit, which is what
+    /// makes a walk that visits more than this a cycle rather than a long chain.
+    /// </value>
+    public long BlockCount => source.Length / addressing.BlockSize;
+
+    /// <summary>
     /// Reads the block a node number refers to.
     /// </summary>
     /// <param name="node">The node number, from a header or a sibling or child pointer.</param>
@@ -70,6 +79,6 @@ internal sealed class NodeReader
                 $"end of a {source.Length}-byte index file.");
         }
 
-        return source.ReadExactly(offset, length, $"index node {node}");
+        return source.ReadExactly(offset, length, $"index node {node}", ErrorCode.Index);
     }
 }

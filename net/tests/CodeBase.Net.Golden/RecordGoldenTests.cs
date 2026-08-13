@@ -157,8 +157,8 @@ public sealed class RecordGoldenTests
         if (value.Text is not null && field.Type == 'D')
             RenderDate(table, field).Should().Be(value.Text, because);
 
-        if (value.Text is not null && field.Type is 'T' or '7')
-            FoxDateTime.ToText(table.GetRawBytes(field), field.Type == '7').Should().Be(value.Text, because);
+        if (value.Text is not null && field.Type == 'T')
+            FoxDateTime.ToText(table.GetRawBytes(field)).Should().Be(value.Text, because);
     }
 
     /// <summary>

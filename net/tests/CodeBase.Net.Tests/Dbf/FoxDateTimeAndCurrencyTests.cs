@@ -43,14 +43,6 @@ public sealed class FoxDateTimeAndCurrencyTests
     }
 
     [Fact]
-    public void ToText_KeepsTheMillisecondsForTheVariantThatHasThem()
-    {
-        // The millisecond-keeping type has no corpus case at all, so this is its only cover.
-        FoxDateTime.ToText(Stored(2444606, 1500), includeMilliseconds: true)[8..]
-                   .Should().Be("00:00:01.500");
-    }
-
-    [Fact]
     public void ToDateTime_KeepsTheMillisecondsTheTextThrowsAway()
     {
         // The rendered form rounds; the value does not. A caller asking for the moment gets what the
@@ -64,6 +56,28 @@ public sealed class FoxDateTimeAndCurrencyTests
     {
         // Nothing constrains the millisecond field to one day, and the reference lets the hours run.
         FoxDateTime.ToText(Stored(2444606, 25 * 3600 * 1000))[8..].Should().Be("25:00:00");
+    }
+
+    [Fact]
+    public void ToDateTime_AMillisecondCountPastTheEndOfTheDay_RollsForwardRatherThanBeingRefused()
+    {
+        // Reproduced, not fixed: nothing in the reference constrains this field to one day, so a
+        // stored 25 hours means the same moment to both. Pinned so that "tidying" it would fail.
+        FoxDateTime.ToDateTime(Stored(2444606, 25 * 3600 * 1000))
+                   .Should().Be(new DateTime(1981, 1, 2, 1, 0, 0));
+    }
+
+    [Fact]
+    public void ToDateTime_AMillisecondCountThatLeavesTheCalendar_IsALibraryError()
+    {
+        // The line between the two: rolling a day is the reference's behaviour, but running off the
+        // end of DateTime is this port's own arithmetic failing. It has to surface as the library's
+        // exception type, not as an ArgumentOutOfRangeException the caller cannot catch with the rest.
+        // The last day the calendar holds, plus about 24 days of milliseconds. A smaller julian is
+        // caught by the existing range guard and reported as no datetime, which is a different path.
+        Action act = () => FoxDateTime.ToDateTime(Stored(5373484, int.MaxValue));
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Data);
     }
 
     [Theory]

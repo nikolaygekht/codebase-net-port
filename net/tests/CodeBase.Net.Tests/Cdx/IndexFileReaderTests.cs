@@ -219,13 +219,15 @@ public sealed class IndexFileReaderTests
     public void Open_AShortReadIsRefusedRatherThanPadded()
     {
         // A header of zeros is a plausible-looking header, so a read that returns less than it was
-        // asked for has to fail rather than leave the rest zero.
+        // asked for has to fail rather than leave the rest zero. It is an index error, not a data
+        // one: the shared reader takes the code from its caller so a truncated index is classified
+        // the way the rest of the index path classifies its failures.
         Action act = () => IndexFileReader.Open(
             new FaultySource(4096, FaultySource.Fault.ShortRead),
             "PEOPLE.cdx",
             Spaces);
 
-        act.Should().Throw<CodeBaseException>();
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Index);
     }
 
     [Trait("Layer", "Fault")]

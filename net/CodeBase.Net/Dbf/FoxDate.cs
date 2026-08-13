@@ -11,6 +11,11 @@ namespace CodeBase.Net.Dbf;
 /// The calendar is proleptic Gregorian, applied to every year including those before the reform.
 /// That is what [c]c4ytoj[/c] computes (D4DATE.C:346-361) and it is what the stored keys were built
 /// with, so the arithmetic is ported rather than handed to a calendar class.
+///
+/// Dates before AD 1 are out of scope. A stored date is digits and spaces, so it carries no sign and
+/// no year below zero can be written at all. Year zero is reachable only because a blank digit counts
+/// as a zero, which makes it a malformed field rather than a date; its Julian number is reproduced to
+/// match the C library, and nothing beyond that is promised.
 /// </summary>
 internal static class FoxDate
 {
@@ -103,8 +108,10 @@ internal static class FoxDate
 
         int year = Digits(bytes, 0, 4);
 
-        // Year zero is a legal date to the C library and has no counterpart in a DateOnly, whose
-        // calendar starts at year one. Reported as no date rather than as a wrong one.
+        // There is no year zero to report: the calendar runs from 1 BC straight to AD 1, and a
+        // DateOnly starts at year one for the same reason. The C library still gives the bytes a
+        // Julian number, which ToJulian reproduces; here there is no date, so there is none to hand
+        // back.
         return year < 1
             ? null
             : new DateOnly(year, Digits(bytes, 4, 2), Digits(bytes, 6, 2));
@@ -117,8 +124,10 @@ internal static class FoxDate
     {
         long y = year - 1;
 
-        // The correction for negative years is the C library's, and is kept so that the arithmetic
-        // matches for every input rather than only for the ones a real file holds.
+        // The correction for negative years is the C library's (D4DATE.C:358-361), and one input
+        // reaches it: year zero, where y is -1. Years below zero cannot be stored -- a date field
+        // holds digits and spaces only, so there is no sign to write -- and DayOfYear refuses them
+        // before this is ever called. It is kept because it is what the stored keys were built with.
         return (y * 365L) + (y / 4L) - (y / 100L) + (y / 400L) - (y < 0 ? 1 : 0);
     }
 
@@ -130,7 +139,13 @@ internal static class FoxDate
         if (month < 1 || month > 12)
             return -1;
 
-        // Year zero is 1 BC and is not a leap year, which the C library corrected for deliberately.
+        // Year zero takes the 400 branch and comes out leap. That is deliberate: YearToDays(0) is
+        // -366, so year zero runs 366 days, and -366 + 366 + JulianAdjustment lands exactly on the
+        // last day of year zero. A common year zero would move every date from AD 1 on by a day.
+        //
+        // The C library's own comment here says the opposite -- "year 0 is really 1BC, and is not a
+        // leap year!" (D4DATE.C:323) -- but the line beneath it was never changed to match, while
+        // the same author's sibling fix in c4ytoj was. Reproduce the code, not the comment.
         int leap = ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) ? 1 : 0;
         int monthDays = MonthTotals[month + 1] - MonthTotals[month] + (month == 2 ? leap : 0);
 

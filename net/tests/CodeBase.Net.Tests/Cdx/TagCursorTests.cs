@@ -170,6 +170,28 @@ public sealed class TagCursorTests
         Keys(cursor).Should().Equal("ALPHA   ", "ZULU    ");
     }
 
+    [Trait("Layer", "Fault")]
+    [Fact(Timeout = 10000)]
+    public void Walk_ALeafChainThatCyclesThroughEmptyBlocksIsRefusedRatherThanFollowedForever()
+    {
+        // Empty blocks are stepped over, so a cycle made of them is a loop with no exit condition.
+        // The bound cannot be a constant -- a delete path can leave a long legitimate run behind --
+        // so it is the file's own size: more blocks than exist means one has been seen twice.
+        byte[] image = IndexImage.SingleTag(8, IndexImage.NodeOf(0))
+            .WithLeaf(8, [("ALPHA", 1)], attribute: 2, right: IndexImage.NodeOf(1))
+            .WithLeaf(8, [], attribute: 2, left: IndexImage.NodeOf(0), right: IndexImage.NodeOf(2))
+            .WithLeaf(8, [], attribute: 2, left: IndexImage.NodeOf(1), right: IndexImage.NodeOf(1))
+            .Build();
+
+        using IndexFileReader index = IndexFileReader.Open(new InMemorySource(image), "T.IDX", Spaces);
+        TagCursor cursor = index.Tags[0].OpenCursor();
+        cursor.Top();
+
+        Action act = () => cursor.Skip(1);
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Index);
+    }
+
     [Fact]
     public void Walk_ALeafChainThatReachesAnInteriorNodeIsRefused()
     {

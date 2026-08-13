@@ -1,13 +1,14 @@
 # Project state
 
-**Updated:** 2026-08-12 · step 006 is **committed to `main`** and the tree is clean. Nothing is pushed
-yet: seven commits are waiting — steps 002's, 003's, 004's, the design one, 005's, 006's, and this
-file's.
-**Active step:** none. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/) is **closed**:
-**1039 tests**, and `CDX-READ` is **done for reading** — what is left of it waits on `EXPR`.
-**Next session starts at section 3**, which now holds four judgement calls from 006 to confirm and a
-**performance pass** — nothing in the port has ever been measured. Step 007, seek by value, is not yet
-designed.
+**Updated:** 2026-08-13 · the tree is **clean**: the 002–005 audit, its remediation, and step 007's
+design and plan are all committed to `main`. Nothing is pushed — **six commits are waiting**: step
+004's, the 005/006 design one, 005's, 006's, the previous state note, and this one.
+**Active step:** none. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/) is closed, and the audit
+that followed it is [closed too](claude/dev/006-audit-glm/SUMMARY.md): **1054 tests**, 453 golden, with
+**no golden expectation changed and no corpus file touched**.
+**Next session starts at section 3**, at step **007, seek by value** — designed and planned, ready to execute. Then
+**008, `EXPR`**. The performance pass follows both, and has shrunk: two of its four suspects were
+resolved by design rather than measurement.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -20,7 +21,7 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 **A DBF can be read whole, and its records can be read in an index tag's order.**
 `net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is
-green on **1039 tests**, 453 of them golden.
+green on **1054 tests**, 453 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -85,7 +86,7 @@ cursor.SeekExact(search, 42);   // that key *and* that record number
 
 `Seek(low)` to `SeekAtOrBefore(high)`, walked with the cursor's own steps, is a closed range — the shape
 the optimizer's per-tag constraints will ask for. **What is missing is turning a *value* into key bytes**,
-which is `COLLATION`'s half and step 007's; seeking is still `internal` for that reason.
+which is `COLLATION`'s half and step 008's; seeking is still `internal` for that reason.
 
 **Everything is gated against the C library's own view, with nothing skipped.** On the table side: all
 eleven corpus tables, every record, every field, and every memo value. On the index side: **22 tags,
@@ -167,32 +168,49 @@ files on one table.
 
 ## 3. Next
 
-### Flagged from step 006 — decide these before 007 builds on them
+### The 002–005 audit is closed — five defects fixed, three of its claims overturned
 
-Four things landed yesterday that were mine to judge rather than the C library's to dictate. None blocks
-007; all four are cheaper to change now than after a public seek sits on top of them.
+An independent pass over steps 002–005 lives in
+[`claude/dev/006-audit-glm/`](claude/dev/006-audit-glm/), with the triage, the decisions, and the
+remediation beside it. Read [`SUMMARY.md`](claude/dev/006-audit-glm/SUMMARY.md). It found **no
+wrong-record-set bug**, which matches its own verdict.
 
-- **ADR-29 — the two navigation surfaces fail differently.** A selected tag's `Skip` leaves the boundary
-  record readable (what `d4skip` does); the four `…Indexed` methods report no record and move past the end
-  (what a loop condition needs). The records they visit are identical and the gate proves it. **Confirm or
-  collapse**: one shape for both is simpler to document and costs one of the two properties above.
-- **ADR-30 — a refusal where the C library answers.** Stepping in a tag's order from a record the tag does
-  not list throws `NotSupported` instead of reporting end of file. Only reachable by mixing `Go(n)` to an
-  unlisted record with a tag-order step; every tag stays fully walkable from `Top`. **Confirm** that a loud
-  refusal is wanted over a quiet, wrong-but-plausible answer until `EXPR` lands.
-- **`Table.HasProductionIndex` was removed** — a public property deleted, not deprecated. It reported the
-  header's claim; `HasIndex` reports the open file, and the two could never disagree. Nothing used it.
-- **Process, not code: never `git checkout <file>` while a step is uncommitted.** Undoing a mutation check
-  that way discarded `Table.cs`'s uncommitted work; it was reconstructed and the suite went green before
-  anything else happened, and the rest of the mutations used scratchpad copies with `md5sum` verification.
-  Mutation checks should copy aside and restore by checksum, or run after the commit.
+**Fixed:** `'7'` removed (ADR-32); `MemoFileHeader.BlockSize` reads signed; the leaf chain is bounded,
+so a cycle of empty blocks no longer hangs; `LeafGeometry` bounds its mask widths and not only their
+sum; `SeekFirstAtOrAbove` steps over an empty leaf the way a walk already did; an index short read says
+`ErrorCode.Index`; a `'T'` millisecond count that leaves the calendar is a library error rather than an
+`ArgumentOutOfRangeException`; and `IsNull` past a short bitmap is pinned as not-null.
 
-### A performance pass, before more layers land on the read path
+**Overturned:** `'H'` blanking was already correct (`f4blank` space-fills `r4floatBin`); `'7'`'s stated
+justification was false; and **`FoxDate`'s year zero was right all along** — the C library computes it
+as leap and `JULIAN4ADJUSTMENT` depends on it, while the comment above the line, which this port had
+faithfully copied, was never applied upstream (ADR-33). Dates before AD 1 are now out of scope.
+
+**Decided along the way**, all recorded rather than left in this file: ADR-29 and ADR-30 stand as
+written; `Table.HasProductionIndex` stays removed (**ADR-31**); `'7'` is out of scope (**ADR-32**); dates
+before AD 1 are out of scope (**ADR-33**); and the mutation-check process rule is now `DEV_APPROACH.md`
+§4, "Proving a gate".
+
+**Everything else has a home**, in [`REMEDIATION-PLAN.md`](claude/dev/006-audit-glm/REMEDIATION-PLAN.md)
+§5: the performance findings below, and **twelve corpus gaps** named in `PORTING-PLAN.md` §6.3 that want
+generator cases rather than unit tests standing in for them.
+
+### The performance pass — after 007 and 008, and smaller than it was
 
 **Nothing has ever been measured.** Every performance property of the port so far is a guess, and the
 optimizer — the reason the project exists — will drive the index read path far harder than a walk does:
 several cursors over one tag, thousands of seeks per query. There is **no benchmark project** in the
 solution yet, and BenchmarkDotNet is in the stack list unused.
+
+**Measure first, cache later.** A baseline is cheap, non-destructive, and is not invalidated by anything
+that lands after it; the block cache is a design whose right answer depends on how `QUERY` drives the
+index, and `QUERY` does not exist yet. Suspect 2 is local to `LeafBlock`/`BranchBlock` and has no design
+content, so it lands with the measurement; **suspect 1 does not**. Where the cache lives becomes an ADR
+written against a real access pattern rather than a guessed one.
+
+**Two of the original suspects have already left this list** — P3 into step 007, where re-deriving the
+key turns out not to need `EXPR`, and P5 into 007's design, where the cursor owning its key buffer makes
+the per-seek copy disappear. Both are struck through below.
 
 Do the measuring first, over `CDXDEEP` (600 records, three levels) and `IDXONE`: a full tag-order table
 walk, a full index-only walk, a seek storm, and `Go(n)`-then-`Skip(1)`. Then look at four suspects, in the
@@ -207,27 +225,52 @@ order they are likely to matter:
 2. **A key array allocated per entry read.** `LeafBlock.EntryAt` (`LeafBlock.cs:117`) copies the rebuilt
    key out on every access, including once per comparison inside `LeafBlock.Seek` (`LeafBlock.cs:140`).
    A span-returning read, or a compare-in-place path, would make a leaf scan allocation-free.
-3. **`TableTagCursor.Synchronize` is O(n) in the tag** (`TableTagCursor.cs:109`). A sequential walk hits
-   the O(1) fast path, so this is only paid when the record and tag cursors have drifted — `Go(n)` then a
-   tag-order step. The C library pays O(log n) by re-deriving the key and seeking, which needs `EXPR`;
-   until then, note the cost in the XML docs or narrow the walk.
+3. ~~**`TableTagCursor.Synchronize` is O(n) in the tag**~~ — **moved into step 007, and it never needed
+   `EXPR`.** It is paid only when the record and tag cursors have drifted (`Go(n)` then a tag-order
+   step), and the fix is to re-derive the record's key and seek it, exactly as `d4seekSynchToCurrentPos`
+   does. That was thought to need the expression engine; it does not, because ADR-28 already restricts a
+   selectable tag to a **bare field name**, so deriving the key means reading a field. 007's transforms
+   plus 005's `SeekExact` make it O(log n).
 4. **A record read per position, with no reuse.** `Table.Fetch` reads through `RecordReader` every time,
    which is faithful and correct, and worth measuring only because an indexed walk now issues one index
    read plus one record read per record.
+5. **Two more the audit added, to measure and probably keep.** (Its third, P5's per-seek copy, is
+   **designed away in 007** rather than measured: once the cursor owns its key buffer the copy happens
+   once per cursor, not once per seek.) `IndexFileReader.Tag(name)` is a linear scan
+   (`IndexFileReader.cs:119`) over tens of tags, very likely noise against one block read. And
+   `LeafBlock.Seek` does not use duplicate-count skipping, which its own remarks already record as a
+   **deliberate** trade rather than an oversight. Measure all three and say plainly when the answer is
+   "leave it" — an un-restated finding reads as an un-examined one.
+
+**Measure P7 with P2, not after it.** P2 removes the per-entry *copy*; the *rebuild* stays, because a
+compressed leaf's keys are relative. So P7's justification survives P2 — but once the copy is gone, the
+full-length comparison is a far larger share of what is left, and measuring them in sequence would
+attribute the cost to the wrong one.
 
 Keep the rule that produced the current code: **correctness first, and no optimization without a
 measurement and a gate that still passes**. A cache that serves a stale block is a wrong record set.
 
-**Step 007: seek by value.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and its
+**Step 007: seek by value** — [`DESIGN.md`](claude/dev/007-seek-by-value/DESIGN.md) and [`PLAN.md`](claude/dev/007-seek-by-value/PLAN.md) are written; twelve sub-steps, **stoppable after five** with `COLLATION` closed and nothing public.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and its
 siblings — which is `COLLATION`'s machine half and is **gateable from the corpus already committed**, since
 every tag's stored keys sit beside the field values they were computed from. It is the last piece before a
 caller can ask a table a question rather than walk it, and it inherits three named questions from 005: the
 `.NULL.` convention for an empty public seek, whether `SeekNext`'s degrade-to-seek should survive into a
 public API, and `considerPartialSeek` for collated partial seeks. Nothing is designed yet.
 
-**`EXPR` is what `CDX-READ` still owes**, in exactly two places, both refusals rather than gaps: typing a
-key expression that is not a bare field name (ADR-28) and positioning a tag on a record it does not list
-(ADR-30).
+It also inherits one finding from the audit (§1.3): **nothing checks that a tag's collation name matches
+the table's code page.** A `GENERAL` tag on a cp850 table is read with the cp1252 weight table today.
+That is harmless while only stored keys are read — a key is bytes — and wrong the moment a *value* is
+seeked, which is exactly what this step adds. Gating it needs `S4CODEPAGE_850` in the generator.
+
+**Step 008 is `EXPR`**, which is what `CDX-READ` still owes — in exactly two places, both refusals rather
+than gaps: typing a key expression that is not a bare field name (ADR-28) and positioning a tag on a
+record it does not list (ADR-30). 007 builds the seam it plugs into: an `IKeyValueSource` whose only
+implementation reads a bare field, with an expression-based one added beside it here.
+
+**The performance pass follows them**, no longer as step 007. Its two headline findings have moved:
+P3 into 007 (above) and P5 into 007's design (the cursor owns its key buffer). What is left is the
+measurement itself, the block cache — still an ADR best written against `QUERY`'s real access pattern —
+P2's per-entry allocation, and the two small ones, P6 and P7.
 
 Two things that do not depend on any of it:
 

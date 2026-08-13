@@ -189,6 +189,34 @@ public sealed class BlockDecodingTests
         act.Should().Throw<CodeBaseException>().WithMessage("*bits*");
     }
 
+    [Theory]
+    [InlineData(40, 4, 4)]
+    [InlineData(24, 16, 8)]
+    [InlineData(24, 8, 16)]
+    public void Leaf_BitWidthsWiderThanTheFieldTheyAreReadIntoAreRefused(
+        int recordBits, int dupBits, int trailBits)
+    {
+        // Each of these still sums to 48, so the end-to-end check passes them. The record number is
+        // masked out of a 32-bit word and the two counts out of single bytes, so a wider declaration
+        // shifts the extraction along and yields a silently wrong count rather than a refusal.
+        // Eight-bit counts always suffice because a key over 255 bytes is refused at the tag header.
+        byte[] block = LeafGeometryBlock(recordBits, dupBits, trailBits, infoLength: 6);
+
+        Action act = () => LeafGeometry.Parse(block, 1024);
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Index);
+    }
+
+    [Fact]
+    public void Leaf_TheWidestGeometryThisPortReads_IsAccepted()
+    {
+        // The boundary the refusal above must not overshoot: a 32-bit record number with 8-bit
+        // counts is exactly six bytes, which is what MaxInfoLength is sized for.
+        byte[] block = LeafGeometryBlock(recordBits: 32, dupBits: 8, trailBits: 8, infoLength: 6);
+
+        LeafGeometry.Parse(block, 1024).InfoLength.Should().Be(6);
+    }
+
     [Fact]
     public void Leaf_AnEntryArrayThatWouldRunPastTheBlockIsRefused()
     {

@@ -202,6 +202,29 @@ This sharpens the CLAUDE.md rule ("never hand-write expected bytes"):
   interpretation of the format, then asserts we interpreted it the way we interpreted it. If no
   corpus case covers the path, generate one.
 
+### Proving a gate: break the code and watch it fail
+
+A gate that has never failed is a gate nobody has checked. Before a step closes, break the code the
+gate is supposed to protect — read a neighbouring record, drop a byte-order swap, off-by-one a count —
+and confirm that **exactly the intended tests go red**, then restore. A break that reddens nothing
+means the gate is decorative; a break that reddens the whole suite means it is not localised enough to
+say what it proves.
+
+(This is a *mutation check* on our own code, and is a different thing from the corpus's **mutation
+cases** — the before/after file pairs in `PORTING-PLAN.md` §7 that gate write operations. Same word,
+unrelated mechanism.)
+
+**Never restore by `git checkout <file>` while the step is uncommitted.** That discards the step's own
+uncommitted work along with the deliberate break, and the two are indistinguishable once it has run.
+Either:
+
+- copy the file aside first, restore from the copy, and verify with `md5sum` that the restored file
+  matches the pre-break one; or
+- run the mutation checks **after** the step is committed, where `git` can restore safely.
+
+The first is preferred during a step; the second is fine for a retrospective check. Step 006 lost
+`Table.cs`'s uncommitted work to exactly this and had to reconstruct it.
+
 ### Mechanics
 
 - Layer 4 tests live in `net/tests/CodeBase.Net.Golden`; layers 1–3 in `net/tests/CodeBase.Net.Tests`.

@@ -53,23 +53,32 @@ internal static class FoxDateTime
         if (dayNumber < 0 || dayNumber > DateOnly.MaxValue.DayNumber)
             return null;
 
-        return DateOnly.FromDayNumber(dayNumber).ToDateTime(TimeOnly.MinValue)
-               .AddMilliseconds(milliseconds);
+        DateTime midnight = DateOnly.FromDayNumber(dayNumber).ToDateTime(TimeOnly.MinValue);
+
+        // A count past the end of the day is not refused: the C library does not check either, and a
+        // stored value of 90000000 means the same tomorrow-morning moment to both. What is refused is
+        // one so large it leaves the calendar, because AddMilliseconds would then throw a type the
+        // caller cannot catch alongside the library's own (API-ERRORS.md).
+        if (milliseconds > (DateTime.MaxValue - midnight).TotalMilliseconds)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"A datetime field holds {milliseconds} milliseconds past {midnight:yyyy-MM-dd}, " +
+                "which is not a moment this calendar reaches.");
+        }
+
+        return midnight.AddMilliseconds(milliseconds);
     }
 
     /// <summary>
     /// Renders a stored datetime the way the C library renders it.
     /// </summary>
     /// <param name="bytes">The field's bytes. Only the first eight are read.</param>
-    /// <param name="includeMilliseconds">
-    /// Whether to keep the milliseconds, which the millisecond-keeping variant of the type does and
-    /// the ordinary one does not.
-    /// </param>
     /// <returns>
     /// Eight characters of date followed by the time. The date is eight spaces when the field is
     /// blank, so a blank datetime renders as spaces and a zero time rather than as an empty string.
     /// </returns>
-    public static string ToText(ReadOnlySpan<byte> bytes, bool includeMilliseconds = false)
+    public static string ToText(ReadOnlySpan<byte> bytes)
     {
         (int julian, int milliseconds) = ToParts(bytes);
 
@@ -89,18 +98,15 @@ internal static class FoxDateTime
         long seconds = milliseconds / 1000;
         long remainder = milliseconds - (seconds * 1000);
 
-        // The reference rounds the second up at half, rather than truncating, and does it only when
-        // the milliseconds are being thrown away.
-        if (!includeMilliseconds && remainder >= 500)
+        // The reference rounds the second up at half rather than truncating, because the stored
+        // milliseconds are thrown away (F4FIELD.C:1868-1873).
+        if (remainder >= 500)
             seconds++;
 
         string time =
             (seconds / 3600).ToString("D2", CultureInfo.InvariantCulture) + ":" +
             (seconds / 60 % 60).ToString("D2", CultureInfo.InvariantCulture) + ":" +
             (seconds % 60).ToString("D2", CultureInfo.InvariantCulture);
-
-        if (includeMilliseconds && remainder != 0)
-            time += "." + remainder.ToString("D3", CultureInfo.InvariantCulture);
 
         return date + time;
     }

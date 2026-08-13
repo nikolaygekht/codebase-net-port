@@ -12,6 +12,13 @@ cp -r claude/dev/_template claude/dev/001-step-name
 Numbers are never reused or renumbered. An abandoned step keeps its folder and gets a `SUMMARY.md`
 explaining why — that is a record, not clutter.
 
+Not every folder here is a step. [`006-audit-glm/`](006-audit-glm/) holds an independent audit of steps
+002–005 and the remediation it prompted — `audit.md`, the triage and decisions in `REMEDIATION-PLAN.md`,
+then `DESIGN.md`, `PLAN.md` and `SUMMARY.md` for the fixes. It carries no number of its own because it
+opened no capability and `PORTING-PLAN.md` §5 gained no row from it; it is filed under the step it
+followed. **Closed 2026-08-13** at 1054 tests: five real defects fixed, three of the audit's own claims
+overturned, and every remaining finding given a home.
+
 | Step | Milestone | Status | What it did |
 |---|---|---|---|
 | [`001-dbf-open-and-header`](001-dbf-open-and-header/) | `DBF-READ` | **done**, amended 2026-08-10 | Open a DBF (+ companion FPT) and expose its metadata: header, stored descriptors, resolved field table, resolved code page. 224 tests at close, 341 after the amendment; gate green on all seven corpus tables. The amendment fixed the code-page map, which was wrong for 22 of the 26 marks and had no marked table to prove it (ADR-18, ADR-19, ADR-20) |

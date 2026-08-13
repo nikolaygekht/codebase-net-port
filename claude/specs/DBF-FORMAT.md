@@ -261,6 +261,14 @@ Right-justified ASCII decimal in a field of `len` bytes with `dec` decimals, pro
 
 8 ASCII bytes `"YYYYMMDD"` (`date4assignLow` writes year 4 digits, month 2, day 2, zero-filled, D4DATE.C:404-406). Blank/empty = 8 spaces; `"00000000"` is also treated as blank on read (D4DATE.C:690-693). Internal numeric form is the Julian day number — days since Jan 1, 4713 BC, computed as `c4ytoj(year) + dayOfYear + 1721425` where `c4ytoj(y) = (y-1)*365 + (y-1)/4 - (y-1)/100 + (y-1)/400` (proleptic Gregorian; D4DATE.C:346-361, 659-665; `JULIAN4ADJUSTMENT 1721425` = 0000/12/31, d4defs.h:2715).
 
+**Year zero is treated as a leap year, and the anchor constant depends on it.** `c4ymdDoY` computes the leap flag as `((year%4 == 0) && (year%100 != 0)) || (year%400 == 0)` (D4DATE.C:324), which for year 0 takes the `%400` branch and yields 1. That is deliberate arithmetic, not an accident: `c4ytoj(0)` returns −366, so year 0 is 366 days long, and `-366 + 366 + 1721425` lands exactly on `JULIAN4ADJUSTMENT` = 0000/12/31. Treating year 0 as a common year would shift every date from AD 1 onward by one day and require the constant to be 1721424.
+
+**The comment above that line contradicts it.** D4DATE.C:323 reads `// AS 06/21/00 it turns out that year 0 is really 1BC, and is not a leap year!` — but the expression beneath it was never changed to match. The same author, same date, *did* apply the sibling fix in `c4ytoj`, the `- ((yr < 0) ? 1 : 0)` correction for negative years (D4DATE.C:358-361). One of the two notes landed and one did not. A port must reproduce the code, not the comment.
+
+**No stored date can be BC.** `date4long` accepts only ASCII digits and spaces in the 8 bytes (D4DATE.C:670-699), so there is no sign character and no year below 0 is representable. Year 0 is reachable only because a space counts as a zero digit in the conversion, so a year field of blanks (or any partial write such as `"    0229"`) decodes as year 0 with whatever month and day follow. `c4ymdDoY`'s `year < 0` guard is therefore defensive, unreachable from any stored field, and `c4ytoj`'s negative-year correction is exercised by exactly one input in practice: year 0, where `yr = -1`.
+
+*Aside, not a format fact:* whether year 0 "is" 1 BC is a numbering convention, not a property of the calendar. Historical BC/AD reckoning has no year 0 at all — 1 BC is followed directly by AD 1 — while astronomical numbering (and ISO 8601) defines 0 = 1 BC precisely so arithmetic can cross the boundary. The C library's constants commit to the astronomical convention; its comment argues from the historical one.
+
 ### 6.4 `L` logical
 
 1 byte. True = `'Y'`,`'y'`,`'T'`,`'t'`; anything else reads as false (F4TRUE.C:41-49). Blank = `' '` (space) via default `f4blank` path (F4FIELD.C:167-169).

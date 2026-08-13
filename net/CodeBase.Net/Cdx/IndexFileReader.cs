@@ -82,7 +82,7 @@ internal sealed class IndexFileReader : IDisposable
         try
         {
             IndexHeader header = IndexHeader.Parse(
-                source.ReadExactly(0, IndexHeader.Size, $"the header of {fileName}"),
+                source.ReadExactly(0, IndexHeader.Size, $"the header of {fileName}", ErrorCode.Index),
                 fileName);
 
             NodeReader nodes = new(source, header.Addressing);

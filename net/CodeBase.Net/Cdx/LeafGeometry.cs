@@ -33,6 +33,21 @@ internal readonly struct LeafGeometry
     /// </value>
     private const int MaxInfoLength = 6;
 
+    /// <summary>The widest record number a packed entry can carry.</summary>
+    /// <value>
+    /// Thirty-two bits, because [c]recNumLen[/c] is capped there and the mask is read as a 32-bit
+    /// word (CDX-FORMAT.md section 14, item 3).
+    /// </value>
+    private const int MaxRecordBits = 32;
+
+    /// <summary>The widest duplicate or trailing count a packed entry can carry.</summary>
+    /// <value>
+    /// Eight bits. The stored counts are single bytes, and the 16-bit form is a runtime derivation
+    /// that applies only when the key is longer than 255 bytes (CDX-FORMAT.md section 6.5). This
+    /// port refuses such a tag at its header, where the limit is 240, so eight bits always suffice.
+    /// </value>
+    private const int MaxCountBits = 8;
+
     private LeafGeometry(
         int freeSpace,
         uint recordMask,
@@ -132,6 +147,18 @@ internal readonly struct LeafGeometry
                 ErrorCode.Index,
                 $"Leaf node {node} packs {recordBits} + {dupBits} + {trailBits} bits into " +
                 $"{infoLength} bytes.");
+        }
+
+        // Each width also has to fit the field it will be read into: the record number comes out of a
+        // 32-bit word and the two counts out of single bytes. The sum above does not catch this on its
+        // own -- 16 duplicate bits and 8 fewer record bits still add up -- and the result would be a
+        // silently wrong count rather than a refusal.
+        if (recordBits > MaxRecordBits || dupBits > MaxCountBits || trailBits > MaxCountBits)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Index,
+                $"Leaf node {node} declares {recordBits} record bits and {dupBits}/{trailBits} count " +
+                $"bits; this format allows at most {MaxRecordBits} and {MaxCountBits}.");
         }
 
         return new LeafGeometry(

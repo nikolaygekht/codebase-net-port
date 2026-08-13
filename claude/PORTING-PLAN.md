@@ -85,12 +85,19 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - **`largeFileOffset` proprietary lock scheme** (>4 GB via 64-bit lock offsets) — breaks VFP
   interop; default is `largeFileOffset == 0`.
 - **The demo record cap** (`E4DEMO_MAX = 200`, `e4demo`) — must NOT be ported.
+- **Dates before AD 1.** No `D` field can hold one: the conversion takes digits and spaces only, so
+  there is no sign character and no year below zero is representable (`DBF-FORMAT.md` §6.3). Year 0
+  is reachable, but only as the decode of a blank or partially written year, and it is handled as a
+  malformed field whose Julian number is reproduced bit-for-bit rather than as a date the library
+  supports. No BC semantics, no corpus case, no gate — ADR-33.
 
 ### 2.3 LATER maybe
 
 - **Multi-table relations** (`relate4createSlave` and the join/skip machinery in `r4relate.c`).
   The *optimizer itself* is now IN scope (§2.1, `QUERY`); only joins are deferred.
 - Unicode (`r5wstr`/`r5wstrLen`) collated index keys (CodeBase extension; VFP has none).
+- The **`'7'` datetime-with-milliseconds** field type (CodeBase extension; VFP never writes one, and
+  the C library admits it only on `version >= 0x30`). Refused at open — ADR-32.
 - Additional VFP collations beyond GENERAL (DUTCH, NORDAN, croatian/spanish/avaya tables) — the
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself.
@@ -613,6 +620,26 @@ tags; unique/candidate tags; filtered tags; memos forcing FPT growth and compact
 driven to the widening/split boundary; **multi-level index trees** (for interior nodes); and record
 counts crossing `recNumLen` thresholds; deleted records; and a `0x31` CodeBase-extension case,
 labelled as non-VFP. **Done since:** code-page-marked tables, single-byte and multi-byte (ADR-18).
+
+**Named gaps, from the 002–005 audit (2026-08-13).** These are paths the generator *can* produce and was
+never taught — unlike the corrupt-file guards, which are layer 3 because no valid file can express them.
+Tracked here rather than in a step folder, because corpus contents are this document's to own. Full
+disposition in `claude/dev/006-audit-glm/REMEDIATION-PLAN.md` §5.2.
+
+| Gap | Why it matters |
+|---|---|
+| **Deleted records** — all **1188** dumped corpus records are `deleted=0` | The `Deleted` accessor and the skip-over behaviour are unit-tested only |
+| A **memo block size** other than 0 and 512 | The `blockSize == 0 ⇒ 1` branch and the block arithmetic are only witnessed at one value |
+| A **CDX block size** other than 512, and a multiplier above one | `codeBaseNote` extension; unit-tested at `IndexHeaderTests:229`, no golden case |
+| **`keyLen` above 240**, with the 16-bit compression counters that go with it | Currently refused; the refusal itself is ungated |
+| A **multi-block tag directory** (roughly 40+ tags) | The directory's own chaining is never exercised |
+| A tree built by **insert-and-split** rather than the bulk path | Every case appends then `INDEX ON`; only `CDXCOLL`'s second tag uses `i4tagAdd`. Different free-list state |
+| A non-empty **free list** | Only a delete path fills it; the reader tolerates a 0-key non-root block untested |
+| A **VFP 9 (`0x32`) table with a memo** | Not merely uncovered — `LegacyVariant.cs:10-15` *reproduces a C library defect* here (the memo file is not opened). A case would pin the reproduction |
+| `SeekExact` on a **descending tag's duplicate run** | Unit-only; no descending tag has duplicate keys |
+| `SeekNext` across a **branch boundary** | Unit-only; `CDXDEEP`'s duplicate runs stay within one leaf level |
+| `SeekNext` against the reference on **numeric/date/currency** tags | Needs the value-to-key transforms — gated only once `COLLATION` lands |
+| A **deep, multi-block single-tag `.IDX`** | `IDXONE` is single-block; a deep `.IDX` is structurally a deep `.CDX` tag but ungated as one |
 
 Test frameworks and their version constraints are listed once, in `CLAUDE.md` §Technology stack.
 How the tests are layered within a step — unit, component, fault injection, golden — is

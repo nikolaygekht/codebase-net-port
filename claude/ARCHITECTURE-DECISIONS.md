@@ -811,3 +811,133 @@ give an order the tag does not have.
 `Top` or `GoFirstIndexed` — and only mixing `Go(n)` to a record *outside* the tag with a tag-order step
 is refused. `EXPR` removes the restriction by supplying the key, and the refusal branch is the only
 thing it replaces.
+
+---
+
+## ADR-31 — `Table.HasProductionIndex` stays removed; `HasIndex` is the only index question a caller can ask · accepted
+
+**Context.** Step 006 deleted `Table.HasProductionIndex`, a public property that reported the header's
+production-index bit (`hasMdxMemo & 0x01`, `DbfHeader.cs:114`). It was designed in step 001
+(`001-dbf-open-and-header/DESIGN.md:89`) before the index actually opened. The deletion was made
+without an ADR and was carried as an open judgement call. The 002–005 audit did not reach it; this
+closes it either way.
+
+**Decision.** The removal stands. `Table.HasIndex` (`Table.cs:116`, `opened.Index is not null`) is the
+public surface, and it reports the opened file rather than the header's claim about one.
+
+**Why.** The two could never disagree. A header that declares a production index whose file is missing
+is an error at open, so by the time a caller holds a `Table` the bit and the open file agree by
+construction. Two properties that are provably equal are one property and a question about which to
+trust. The one that reports a fact about the object the caller holds is the one to keep.
+
+**Rejected — deprecate rather than delete.** `[Obsolete]` buys a migration path for callers, and there
+are none: the property had no test and no caller, and nothing in this library is released or pushed.
+A deprecation cycle for a property nobody ever called is ceremony.
+
+**Rejected — keep it as the header's raw claim.** It would be honest only if a caller could act on the
+difference, and there is no state in which the difference exists.
+
+**Consequence.** The header bit is now not publicly reachable at all: `DbfHeader` is `internal`
+(`DbfHeader.cs:16`) and nothing re-exposes it. That is accepted — the bit's only meaning to a caller is
+"is there an index", which `HasIndex` answers more truthfully. If `WRITE` ever needs to set the bit
+without opening the index, it does so through the internal header, not a public property.
+
+---
+
+## ADR-32 — The `'7'` datetime-with-milliseconds type is out of scope, and its code goes with it · accepted
+
+**Context.** `FieldResolver.ReadableTypes` (`FieldResolver.cs:33-34`) omits `'7'`, so a table carrying
+one cannot be opened, while `FieldValueDecoder` and `FoxDateTime` carry live `'7'` branches — a natural
+width entry (`FieldValueDecoder.cs:33`), a refuse-as-number entry (`:62`), a type guard (`:199`), and
+`FoxDateTime.ToText`'s `includeMilliseconds` parameter with its two branches (`FoxDateTime.cs:72,94,102`).
+The 002–005 audit raised the asymmetry (E1) and proposed admitting the type, on the grounds that "the
+decoder is ready" and that a real FoxPro 2.x table would otherwise be refused.
+
+**Decision.** `'7'` is **out of scope**. Remove the dead branches, the `includeMilliseconds` parameter,
+the unit test that exercises the millisecond path
+(`FoxDateTimeAndCurrencyTests.ToText_KeepsTheMillisecondsForTheVariantThatHasThem`), and the
+`field.Type == '7'` sub-expression in `RecordGoldenTests.cs:161`, which can never evaluate true. The
+refusal at open stays and is the honest statement of support.
+
+**Why — the scope already said so.** `PORTING-PLAN.md` §2.1 lists the in-scope field types as
+`C, N, F, D, L, M, G, I, B, Y, T, H` plus `'0'`. `'7'` is not among them. `FieldResolver` implements
+the declared scope correctly; it is the decoder branches that were never in it.
+
+**Why — the audit's two premises are both wrong.** *"A real FoxPro 2.x table would be refused"*: it
+cannot happen. `'7'` is a CodeBase extension (`D4CREATE.C:1572-1574`, `DBF-FORMAT.md` §5) admitted only
+when `version >= 0x30` compared **signed** (`DBF-FORMAT.md` §2.1), and every FoxPro 2.x version byte is
+`0x80` or above, so it compares below `0x30` and the C library denies the type itself. *"The decoder is
+ready"*: it is not. `BlankRecord.ZeroBlankTypes` is `['I','Y','T','B','X','Z']` and omits `'7'`, while
+`f4blank` zero-fills `r4dateTimeMilli` (`original/source/f4field.c:145`). Admitting `'7'` today would
+blank it to eight spaces where the C library writes eight zeros — a wrong byte, not a missing feature.
+
+**Why — nothing can gate it.** No corpus case has a `'7'` column and the generator has no case that
+would produce one. Admitting the type means admitting an ungated read path, against the rule that every
+capability is gated against the C library's own view.
+
+**Rejected — admit `'7'` and add a corpus case.** That is a defensible future step: teach the generator
+a `'7'` column, fix `BlankRecord`, gate the text rendering. It is not this step, and it widens v1 scope
+past `PORTING-PLAN.md` §2.1 for a type Visual FoxPro never writes — and VFP compatibility, not CodeBase
+feature parity, is what the port is for.
+
+**Rejected — leave the dead branches in place as groundwork.** Dead code behind a refusal reads as
+support to anyone auditing the type list; the 002–005 audit read it exactly that way and filed it as a
+gap. The branches are three lines and a parameter; they cost more as a false signal than they save.
+
+**Consequence.** `'7'` moves to `PORTING-PLAN.md` §2.3 (LATER maybe) beside the other CodeBase-only
+extensions, and `FoxDateTime` renders `'T'` only — rounding at 500 ms, which is the sole behaviour the
+corpus witnesses. If `'7'` is ever wanted, this ADR is superseded and the work is: generator case,
+`BlankRecord`, `ReadableTypes`, and the text path back.
+
+---
+
+## ADR-33 — Dates before AD 1 are out of scope; year zero is a malformed field, reproduced not supported · accepted
+
+**Context.** The 002-005 audit raised (E3) that `FoxDate.DayOfYear` computes year 0 as a leap year while
+the comment directly above it says year 0 is 1 BC and is not one. Reading `D4DATE.C` settled what the C
+library does and exposed a scope question the port had never stated: what, if anything, does this library
+promise about dates before AD 1?
+
+**What the C library does.** `c4ymdDoY` (D4DATE.C:324) computes the leap flag as
+`((year%4 == 0) && (year%100 != 0)) || (year%400 == 0)`, which for year 0 takes the `%400` branch and
+yields 1. This is load-bearing rather than incidental: `c4ytoj(0)` returns -366, so year 0 runs 366 days,
+and `-366 + 366 + 1721425` lands exactly on `JULIAN4ADJUSTMENT`, documented as 0000/12/31. A common year
+zero would move every date from AD 1 onward by one day and require the constant to be 1721424. The
+comment above the line (D4DATE.C:323) claims the opposite and was never applied; the same author's
+sibling fix that same day, the negative-year correction in `c4ytoj`, was.
+
+**Decision.** Dates before AD 1 are **out of scope** (`PORTING-PLAN.md` §2.2). The port makes no promise
+about BC semantics, adds no corpus case, and gates nothing. It continues to reproduce the C library's
+arithmetic exactly, including year 0 as leap, because that arithmetic is what every stored date key was
+built from. `FoxDate.ToDate` keeps returning null for year below 1, and the code comments now say why.
+
+**Why this costs nothing.** A stored date cannot be BC. `date4long` accepts ASCII digits and spaces only
+(D4DATE.C:670-699), so there is no sign character and no year below zero is representable in the eight
+bytes. `DayOfYear`'s `year < 0` guard is defensive and unreachable from any stored field, and
+`c4ytoj`'s negative-year correction is exercised by exactly one input in practice: year 0, where
+`yr = -1`. Scoping BC out therefore removes no capability a real file could ask for.
+
+**Why year zero still has to work.** It is not a date; it is what a **malformed field decodes to**. A
+space counts as a zero digit in the conversion, so a blank year, or a partial write such as `"    0229"`,
+comes out as year 0 with whatever month and day follow. Refusing it would diverge from the C library on
+input a real file can contain, and the resulting Julian number feeds a date tag's index key — so getting
+it wrong is a wrong record set, which the project's ground rule ranks worse than anything else here.
+
+**Rejected — "fix" year zero to a common year.** It would break `JULIAN4ADJUSTMENT`, shift every date
+from AD 1 onward by a day, and make every date index key disagree with the C library and with Visual
+FoxPro. Compatibility means reproducing exact bytes, not equivalent behaviour, and this is the clearest
+case of it in the date code.
+
+**Rejected — refuse year zero at decode.** Cleaner-looking and wrong for the same reason: the C library
+answers, so this port answers identically.
+
+**Rejected — arguing the calendar.** Whether year 0 "is" 1 BC is a numbering convention, not a fact about
+the world. Historical BC/AD reckoning has no year 0 at all; astronomical numbering and ISO 8601 define
+0 = 1 BC so that arithmetic can cross the boundary. The C library's constants commit to the astronomical
+convention while its comment argues from the historical one, which is how the discrepancy arose. The port
+does not adjudicate it -- it reproduces the constants and records the ambiguity.
+
+**Consequence.** `DBF-FORMAT.md` §6.3 gains the leap-year fact, the un-applied-comment note and the
+"no stored date can be BC" statement, all cited. `FoxDate`'s class summary states the scope limit, and
+the two inline comments that were wrong now say what the code actually does and why. The audit's E3 is
+closed as **the code is correct and the comment was wrong**, not as a defect fixed.

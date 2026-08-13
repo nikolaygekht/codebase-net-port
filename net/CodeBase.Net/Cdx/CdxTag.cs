@@ -61,6 +61,12 @@ internal sealed class CdxTag
     public bool Descending => Header.Descending;
 
     /// <summary>
+    /// Gets how many blocks the index file is large enough to hold.
+    /// </summary>
+    /// <value>The bound a walk along the leaf chain has to stay inside to be following a chain.</value>
+    public long BlockCount => nodes.BlockCount;
+
+    /// <summary>
     /// Opens a cursor over the tag, positioned nowhere.
     /// </summary>
     /// <returns>A cursor that has to be positioned before it reports anything.</returns>

@@ -19,7 +19,6 @@ public sealed class FieldValueDecoderTests
     [Theory]
     [InlineData('L')]
     [InlineData('T')]
-    [InlineData('7')]
     [InlineData('0')]
     public void Double_OfATypeTheReferenceRefuses_IsRefused(char type)
     {
@@ -32,7 +31,6 @@ public sealed class FieldValueDecoderTests
     [Theory]
     [InlineData('L')]
     [InlineData('T')]
-    [InlineData('7')]
     [InlineData('0')]
     public void Int32_OfATypeTheReferenceRefuses_IsRefused(char type)
     {

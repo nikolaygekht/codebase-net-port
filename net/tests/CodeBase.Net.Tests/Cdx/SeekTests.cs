@@ -343,6 +343,21 @@ public sealed class SeekTests
         cursor.SeekAtOrBefore(Search(index, "ALPHA")).Should().Be(SeekOutcome.Bof);
     }
 
+    [Fact]
+    public void Seek_ADescentThatLandsOnAKeylessLeafFindsTheNextOneAlong()
+    {
+        // A branch can point at a leaf a delete emptied. Walking already steps over such a block
+        // (CDX-FORMAT.md section 14, item 10); a descent used to stop on it and report end of file,
+        // which would hide every key past the gap from a seek while a walk still found them.
+        using IndexFileReader index = BranchOverAnEmptyMiddleLeaf();
+        TagCursor cursor = index.Tags[0].OpenCursor();
+
+        cursor.Seek(Search(index, "MIKE")).Should().Be(SeekOutcome.After);
+
+        cursor.Eof.Should().BeFalse();
+        cursor.Current.Record.Should().Be(9, "ZULU is the first key at or above MIKE");
+    }
+
     private static KeySearch Search(IndexFileReader index, string value) =>
         KeySearch.For(
             System.Text.Encoding.Latin1.GetBytes(value),
@@ -382,6 +397,22 @@ public sealed class SeekTests
             .WithBranch(8, [("BRAVO", 2, IndexImage.NodeOf(0))], attribute: 0)
             .WithBranch(8, [("DELTA", 4, IndexImage.NodeOf(1))], attribute: 0)
             .WithBranch(8, [("BRAVO", 2, IndexImage.NodeOf(2)), ("DELTA", 4, IndexImage.NodeOf(3))])
+            .Build();
+
+        return IndexFileReader.Open(new InMemorySource(image), "T.IDX", Spaces);
+    }
+
+    /// <summary>Three leaves whose middle one is keyless, with a branch that points straight at it.</summary>
+    private static IndexFileReader BranchOverAnEmptyMiddleLeaf()
+    {
+        byte[] image = IndexImage.SingleTag(8, IndexImage.NodeOf(3))
+            .WithLeaf(8, [("ALPHA", 1)], attribute: 2, right: IndexImage.NodeOf(1))
+            .WithLeaf(8, [], attribute: 2, left: IndexImage.NodeOf(0), right: IndexImage.NodeOf(2))
+            .WithLeaf(8, [("ZULU", 9)], attribute: 2, left: IndexImage.NodeOf(1))
+            .WithBranch(8, [
+                ("ALPHA", 1, IndexImage.NodeOf(0)),
+                ("MIKE", 1, IndexImage.NodeOf(1)),
+                ("ZULU", 9, IndexImage.NodeOf(2))])
             .Build();
 
         return IndexFileReader.Open(new InMemorySource(image), "T.IDX", Spaces);

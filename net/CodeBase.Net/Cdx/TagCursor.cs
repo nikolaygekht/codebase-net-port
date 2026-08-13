@@ -344,9 +344,14 @@ internal sealed class TagCursor
 
         // Past the last entry of this leaf, so the answer is the first entry of the next one along —
         // a step in physical order, since this search is byte-ordered rather than tag-ordered.
+        //
+        // A descent that lands on a keyless leaf takes this path too, rather than reporting the end
+        // of the tag. StepPhysical already steps over empty blocks, and a descent can reach one for
+        // the same reason a walk can: the reference implementation's delete path leaves them behind.
+        // Short-circuiting here on a count of zero was the one place the two disagreed.
         index = Math.Max(current.Count - 1, 0);
 
-        if (current.Count == 0 || !StepPhysical(1))
+        if (!StepPhysical(1))
         {
             Eof = true;
             Bof = false;
@@ -446,8 +451,21 @@ internal sealed class TagCursor
         // leave one behind, and treating it as the end of the tag would silently lose every key past
         // it (CDX-FORMAT.md section 14, item 10).
         uint node = sibling;
+        long visited = 0;
+
         while (true)
         {
+            // A run of empty blocks is legitimate and can be long, so the bound cannot be a constant.
+            // What it can be is the file itself: a chain that visits more blocks than the file holds
+            // has come back to one it already saw, whatever the shape of the loop.
+            if (++visited > tag.BlockCount)
+            {
+                throw new CodeBaseException(
+                    ErrorCode.Index,
+                    $"The leaf chain of tag {tag.Name} passed through more than {tag.BlockCount} " +
+                    $"blocks without finding a key, so it has a cycle at node {node}.");
+            }
+
             TreeBlock candidate = tag.ReadBlock(node);
             if (!candidate.IsLeaf)
             {

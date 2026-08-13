@@ -38,7 +38,10 @@ internal readonly struct MemoFileHeader
     /// </summary>
     /// <value>
     /// Usually 512. Zero is legal and means byte granularity rather than an error, so it must not
-    /// be treated as a corrupt file.
+    /// be treated as a corrupt file. The stored field is a [b]signed[/b] 16-bit quantity
+    /// (d4data.h:2858), so a value with the high bit set is negative here exactly as it is in the C
+    /// library; the offset arithmetic then refuses it as a corrupt file rather than reading from a
+    /// wild position.
     /// </value>
     public int BlockSize { get; }
 
@@ -59,6 +62,6 @@ internal readonly struct MemoFileHeader
 
         return new MemoFileHeader(
             BinaryPrimitives.ReadUInt32BigEndian(bytes),
-            BinaryPrimitives.ReadUInt16BigEndian(bytes[6..]));
+            BinaryPrimitives.ReadInt16BigEndian(bytes[6..]));
     }
 }

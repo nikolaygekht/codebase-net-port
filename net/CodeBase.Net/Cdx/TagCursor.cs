@@ -303,6 +303,19 @@ internal sealed class TagCursor
     /// Positions on the first entry whose key is not less than a value, in **byte** order.
     /// </summary>
     /// <returns>False when every key sorts below the value, and the cursor is then past the end.</returns>
+    /// <summary>
+    /// Positions on the first entry whose key is not below a value, in stored byte order.
+    /// </summary>
+    /// <param name="search">What to look for.</param>
+    /// <returns>True when the cursor landed on an entry, false when every key sorts below it.</returns>
+    /// <remarks>
+    /// Byte order, not the tag's order, so a descending tag is not inverted here. That is what the C
+    /// library's [c]tfile4go[/c] positions with when it cannot find an exact key and record
+    /// (I4TAG.C:1339-1516), and reproducing where a failed lookup leaves the cursor is the point of
+    /// exposing it.
+    /// </remarks>
+    public bool SeekNearestByBytes(KeySearch search) => SeekFirstAtOrAbove(search);
+
     private bool SeekFirstAtOrAbove(KeySearch search)
     {
         TreeBlock current = tag.ReadBlock(tag.Header.Root);

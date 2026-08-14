@@ -485,7 +485,9 @@ public sealed class Table : IDisposable
             return SkipResult.Moved;
 
         if (!cursor.Synchronize((uint)position.Number, this.record))
-            throw NotInTag(cursor.Tag, position.Number);
+            return AwayFromTheTag(count);
+
+        count = Adjusted(count, cursor);
 
         bool endOfFileBefore = position.Eof;
 
@@ -519,22 +521,6 @@ public sealed class Table : IDisposable
     }
 
     /// <summary>
-    /// Refuses to move in a tag's order from a record the tag does not list.
-    ///
-    /// The C library re-derives the record's key through the tag's expression and seeks with it, so it can
-    /// carry on from the nearest key (d4seekSynchToCurrentPos, D4SEEK.C:1141). Without the expression
-    /// engine this port can only look for the record itself, and a record a filtered or unique tag leaves
-    /// out is not there to be found. Answering end of file instead would be a plausible-looking wrong
-    /// answer, so it says so (ADR-28).
-    /// </summary>
-    private static CodeBaseException NotInTag(Tag tag, int record) =>
-        new(
-            ErrorCode.NotSupported,
-            $"Record {record} has no entry in tag '{tag.Name}', so this version cannot tell where in " +
-            $"that tag's order to carry on from. Reaching it needs the key expression '{tag.Expression}' " +
-            "to be evaluated, which waits on the expression engine.");
-
-    /// <summary>
     /// Moves one step in a tag's order, synchronizing the tag with the record cursor first.
     /// </summary>
     private GoResult StepIndexed(Tag tag, int count)
@@ -560,7 +546,9 @@ public sealed class Table : IDisposable
         // pointing somewhere else. Stepping from where the *record* cursor is, rather than from where the
         // tag was left, is what makes the two surfaces interchangeable.
         if (!cursor.Synchronize((uint)position.Number, this.record))
-            throw NotInTag(tag, position.Number);
+            return Reached(false, 0);
+
+        count = Adjusted(count, cursor);
 
         // Unlike the selected-tag Skip, these four are positioning calls: a move that could not be made
         // reports no record and leaves the cursor past the end, the way Top and Bottom do on an empty
@@ -763,6 +751,57 @@ public sealed class Table : IDisposable
         position.Invalidate();
 
         return GoResult.NoRecord;
+    }
+
+    /// <summary>
+    /// Takes one off a step that landing near an absent record has already covered.
+    /// </summary>
+    /// <param name="count">The steps the caller asked for.</param>
+    /// <param name="cursor">The tag cursor, just synchronized.</param>
+    /// <returns>The steps still to take.</returns>
+    /// <remarks>
+    /// When the tag does not list the record, the cursor is left on the nearest key **in byte
+    /// order** — [c]tfile4go[/c] clears the descending flag before seeking (I4TAG.C:1285-1290), so
+    /// the landing does not depend on the tag's direction. That entry is the one the caller would
+    /// have reached by stepping forwards on an ascending tag and backwards on a descending one, so
+    /// exactly that step has already been taken and the count owes one fewer.
+    ///
+    /// **A divergence from the reference, deliberately.** The C adjusts the same two cases but
+    /// subtracts in both (d4skip.c:1262-1272), which on a descending tag makes a negative count
+    /// larger. Read together with [c]tfile4dskip[/c], which negates the count for a descending tag
+    /// (I4TAG.C:65-88), that steps further away from the entry it just landed on rather than
+    /// stopping there. This port moves toward zero in both cases, which is what the ascending half
+    /// of the C does and what the tag's own order demands.
+    ///
+    /// Settling it needs a reference run: a descending filtered tag in the corpus with the skips the
+    /// C library itself takes recorded beside it. Until then the ascending half matches the
+    /// reference exactly and the descending half matches the order the tag stores.
+    /// </remarks>
+    private static int Adjusted(int count, TableTagCursor cursor)
+    {
+        if (!cursor.AtNearest)
+            return count;
+
+        if (cursor.Tag.Descending)
+            return count < 0 ? count + 1 : count;
+
+        return count > 0 ? count - 1 : count;
+    }
+
+    /// <summary>
+    /// Answers a skip taken from a record whose key sorts past everything the tag holds.
+    /// </summary>
+    /// <param name="count">The steps the caller asked for.</param>
+    /// <returns>Which end the cursor ended at.</returns>
+    /// <remarks>
+    /// The record is not in the tag and there is no nearer key to carry on from, so the step runs
+    /// out of tag the way it would have from the record's own entry.
+    /// </remarks>
+    private SkipResult AwayFromTheTag(int count)
+    {
+        MovePastEnd();
+
+        return count < 0 ? SkipResult.Bof : SkipResult.Eof;
     }
 
     private TableTagCursor CursorFor(Tag tag)

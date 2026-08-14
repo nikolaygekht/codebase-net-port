@@ -1,13 +1,14 @@
 # Project state
 
-**Updated:** 2026-08-13 · the tree is **clean**: the 002–005 audit, its remediation, and step 007's
-design and plan are all committed to `main`. Nothing is pushed — **six commits are waiting**: step
-004's, the 005/006 design one, 005's, 006's, the previous state note, and this one.
-**Active step:** none. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/) is closed, and the audit
-that followed it is [closed too](claude/dev/006-audit-glm/SUMMARY.md): **1054 tests**, 453 golden, with
-**no golden expectation changed and no corpus file touched**.
-**Next session starts at section 3**, at step **008, `EXPR`**. The performance pass follows both, and has shrunk: two of its four suspects were
-resolved by design rather than measurement.
+**Updated:** 2026-08-14 · the tree is **clean** and everything is committed to `main`. Nothing is
+pushed — **three commits are waiting**, all of step 007's.
+**Active step:** none. [`007-seek-by-value`](claude/dev/007-seek-by-value/) is
+**[closed](claude/dev/007-seek-by-value/SUMMARY.md)**: **1177 tests**, 526 golden. A table can be asked
+where a value is, and **no navigation path refuses any more** — ADR-34 closed the last one.
+**`COLLATION` is done, `CDX-READ` is done, and risk R2 is retired.**
+**Next session starts at section 3**, at step **008, `EXPR`** —
+[designed](claude/dev/008-expr/DESIGN.md), not yet planned. The performance pass follows it, and has
+shrunk: two of its four suspects were resolved by design rather than measurement.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -20,7 +21,7 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 **A DBF can be read whole, and its records can be read in an index tag's order.**
 `net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is
-green on **1174 tests**, 526 of them golden.
+green on **1177 tests**, 526 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -303,10 +304,11 @@ the table's code page.** A `GENERAL` tag on a cp850 table is read with the cp125
 That is harmless while only stored keys are read — a key is bytes — and wrong the moment a *value* is
 seeked, which is exactly what this step adds. Gating it needs `S4CODEPAGE_850` in the generator.
 
-**Step 008 is `EXPR`**, which is what `CDX-READ` still owes — in exactly two places, both refusals rather
-than gaps: typing a key expression that is not a bare field name (ADR-28) and positioning a tag on a
-record it does not list (ADR-30). 007 builds the seam it plugs into: an `IKeyValueSource` whose only
-implementation reads a bare field, with an expression-based one added beside it here.
+**Step 008 is `EXPR`**, and it is [designed](claude/dev/008-expr/DESIGN.md). `CDX-READ` owes it exactly
+**one** thing now: typing a key expression that is not a bare field name (ADR-28). The second refusal,
+ADR-30, turned out not to need the expression engine at all and was closed inside 007 as **ADR-34** —
+the third time that premise had been repeated without being checked. Scope is the **whole** function
+table, 36 named functions and the operator set, because `QUERY` needs the filter vocabulary anyway.
 
 **The performance pass follows them**, no longer as step 007. Its two headline findings have moved:
 P3 into 007 (above) and P5 into 007's design (the cursor owns its key buffer). What is left is the

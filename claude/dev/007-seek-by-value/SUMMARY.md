@@ -1,7 +1,8 @@
 # 007-seek-by-value — summary
 
-**Closed 2026-08-14.** A caller can now ask a table where a value is instead of walking until they
-find it. **1174 tests** (648 unit and component, 526 golden), up from 1054.
+**Closed 2026-08-14**, reopened the same day to close ADR-30, and closed again. A caller can now ask a
+table where a value is instead of walking until they find it, and **no navigation path refuses any
+more**. **1177 tests** (651 unit and component, 526 golden), up from 1054.
 
 This is the step the library exists for. Byte-compatibility was the foundation; a seek that lands in
 one descent is the first thing this port does that a plain DBF reader cannot, and it is the operation
@@ -88,6 +89,27 @@ The rule was followed correctly for `TableTagCursor.cs` and `CollatedKey.cs` in 
 copies aside and `md5sum` verification. It failed on `Table.cs` because that mutation was in a
 *different* file from the one being restored, and the habit did not transfer. **The rule should say:
 restore by checksum from a copy, never by `git`, regardless of which file the mutation touched.**
+
+## ADR-30 closed too, and it never needed `EXPR` either
+
+The step was reopened to finish this, because the design for 008 found that ADR-30's premise had been
+false since 007's own `RecordKey.Write` landed. Stepping in a tag's order from a record the tag does
+not list now derives that record's key, positions on the nearest entry, and carries on — which is what
+`d4skip` does. **ADR-34 supersedes ADR-30**, `Table.NotInTag` is gone, and `CDX-READ` owes `EXPR`
+exactly one thing: typing a key expression that is not a bare field name.
+
+**The end-case came from the C, not from intuition**, and it is worth restating because guessing it
+was the plan's named risk. Landing "at or after" an absent record means the cursor is already on the
+entry the caller was stepping toward, so the count owes one fewer — and `tfile4go` clears the
+descending flag before seeking (`I4TAG.C:1285-1290`), so which direction was part-taken depends on the
+tag while where it lands does not.
+
+**One divergence, stated rather than smoothed over.** The C subtracts from the count in both
+directions (`d4skip.c:1262-1272`); on a descending tag, read with `tfile4dskip`'s negation
+(`I4TAG.C:65-88`), that steps away from the entry it just landed on. This port moves toward zero in
+both. The ascending half matches the reference exactly; the descending half matches the tag's stored
+order. ADR-34 records what would settle it — a descending filtered tag in the corpus with the C's own
+skips recorded beside its keys.
 
 ## Not in this step
 

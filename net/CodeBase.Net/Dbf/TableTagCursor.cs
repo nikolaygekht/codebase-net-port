@@ -300,14 +300,40 @@ internal sealed class TableTagCursor
 
         // The record number is what picks this entry out of a run of equal keys, which is exactly
         // what SeekExact takes it for.
-        bool found = cursor.SeekExact(key, record) == SeekOutcome.Found;
+        bool exact = cursor.SeekExact(key, record) == SeekOutcome.Found;
+
+        // A record the tag does not list still has a key, and the reference carries on from where
+        // that key would sit rather than refusing: tfile4go leaves the cursor at the nearest entry
+        // in byte order and reports that it was not the one asked for (d4skip.c:1248-1274,
+        // I4TAG.C:1339-1516). A filtered or unique tag omits records for ordinary reasons, so this
+        // is a normal path and not a corrupt one.
+        AtNearest = !exact;
+
+        if (!exact && !cursor.SeekNearestByBytes(key))
+        {
+            // Every key in the tag sorts below this record's, so there is nothing to carry on from
+            // in that direction. The caller's step then runs off the end, which it would have done
+            // from the record's own entry too.
+            searching = false;
+            return false;
+        }
 
         // The search was built to find a position, not to answer a caller's question, so it must not
         // be left behind for SeekNext to continue.
         searching = false;
 
-        return found;
+        return true;
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the last synchronize landed near a record rather than on it.
+    /// </summary>
+    /// <value>
+    /// True when the tag does not list the record the table's cursor is on, so the cursor sits at the
+    /// nearest key instead. A step from there has already covered one entry, which is why the count
+    /// is adjusted for it.
+    /// </value>
+    public bool AtNearest { get; private set; }
 
 
     /// <summary>

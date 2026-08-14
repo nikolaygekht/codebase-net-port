@@ -787,7 +787,7 @@ tested per surface, and stated in the XML docs of the methods that have it.
 
 ---
 
-## ADR-30 — Stepping in a tag's order from a record the tag does not list is refused, not answered · accepted
+## ADR-30 — Stepping in a tag's order from a record the tag does not list is refused, not answered · superseded by ADR-34
 
 **Context.** `d4skip` re-derives the current record's key through the tag's expression and seeks with it
 before stepping (d4skip.c:1245-1275), so it can carry on from the nearest key even when the record has
@@ -941,3 +941,46 @@ does not adjudicate it -- it reproduces the constants and records the ambiguity.
 "no stored date can be BC" statement, all cited. `FoxDate`'s class summary states the scope limit, and
 the two inline comments that were wrong now say what the code actually does and why. The audit's E3 is
 closed as **the code is correct and the comment was wrong**, not as a defect fixed.
+
+---
+
+## ADR-34 — Stepping from a record the tag does not list carries on from the nearest key · accepted
+
+**Supersedes ADR-30**, whose premise stopped being true in step 007.
+
+**Context.** ADR-30 refused this step on the grounds that "without `EXPR` this port cannot derive that
+key; it can only look for the record itself, by walking the tag." Step 007 built that derivation:
+`RecordKey.Write` produces the key a tag holds for a record, and `Synchronize` already calls it. The
+refusal survived only because `Synchronize` asked `SeekExact` for the key *and* the record number, so
+a record the tag omits missed. Nothing was waiting on the expression engine — ADR-28 already limits a
+selectable tag to a bare field name, so the key was always derivable.
+
+**Decision.** When the tag does not list the record, derive its key, position on the **nearest entry
+in byte order**, and step from there — which is what the C library does (`d4skip.c:1248-1274`). A
+filtered or unique tag omits records for ordinary reasons, so this is a normal path, not a corrupt
+one. The step count owes one fewer, because landing on the nearest entry has already covered the step
+in one direction.
+
+**Why the landing is in byte order and not the tag's.** `tfile4go` clears the descending flag before
+seeking and restores it afterwards (`I4TAG.C:1285-1290`), so where a failed lookup leaves the cursor
+does not depend on the tag's direction. The direction only decides which step was thereby taken:
+forwards on an ascending tag, backwards on a descending one.
+
+**One deliberate divergence, and it is a divergence rather than a reading.** The C adjusts both cases
+by *subtracting* (`d4skip.c:1262-1272`). On a descending tag that makes a negative count larger, and
+read with `tfile4dskip` negating the count for such a tag (`I4TAG.C:65-88`), it steps further away
+from the entry just landed on instead of stopping there. This port moves the count toward zero in
+both cases: the ascending half then matches the reference exactly, and the descending half matches
+the order the tag stores.
+
+**Rejected — transcribing the C literally.** It produces a record set that skips an entry on a
+descending filtered tag, and "a wrong record set is far worse than a slow one" outranks fidelity to a
+line whose surrounding context could not be reconciled. The disagreement is recorded in the code and
+here rather than smoothed over.
+
+**What would settle it:** a descending filtered tag in the corpus with the skips the C library itself
+takes recorded beside its keys. The dump already has a `[seeks]` section, so the shape exists; the
+generator would need to be taught to walk and record. Until then the divergence is stated, not hidden.
+
+**Consequence.** `Table.NotInTag` is gone and no navigation path refuses any more. `CDX-READ` owes
+`EXPR` exactly one thing: typing a key expression that is not a bare field name (ADR-28).

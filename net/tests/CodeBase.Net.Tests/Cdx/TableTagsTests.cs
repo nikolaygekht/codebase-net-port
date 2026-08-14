@@ -306,11 +306,15 @@ public sealed class TableTagsTests
 
     [Trait("Layer", "Fault")]
     [Fact]
-    public void Skipping_FromARecordTheTagDoesNotListIsRefusedRatherThanAnswered()
+    public void Skipping_FromARecordTheTagDoesNotList_CarriesOnFromWhereItsKeyWouldSit()
     {
-        // A filtered or unique tag leaves records out, and the C library carries on from the nearest key by
-        // re-deriving the record's own key through the expression. Without the expression engine there is
-        // no honest answer here, and end of file would be a plausible-looking wrong one (ADR-28).
+        // A filtered or unique tag leaves records out. The reference does not refuse: it re-derives
+        // the record's key, positions at the nearest entry, and steps from there (d4skip.c:1248-1274).
+        // This port derives the key the same way, so it answers rather than refusing -- superseding
+        // ADR-30, whose premise was that the key could not be derived without the expression engine.
+        //
+        // Record 2 is absent and its key BRAVO sorts above ALPHA, so the nearest entry going forward
+        // is past the end of the tag.
         (CodeBaseEngine engine, Table table) = IndexedTableImage.Open(
             ["ALPHA", "BRAVO"],
             [("ALPHA", 1)]);
@@ -320,15 +324,83 @@ public sealed class TableTagsTests
             table.SelectTag(table.Tags[0]);
             table.Go(2);
 
-            Action act = () => table.Skip(1);
-
-            act.Should().Throw<CodeBaseException>()
-                .Where(e => e.Code == ErrorCode.NotSupported)
-                .WithMessage("*Record 2*TEXT*");
+            table.Skip(1).Should().Be(SkipResult.Eof, "nothing in the tag sorts above BRAVO");
 
             // The tag's own records are still reachable, and so is record order.
             table.Top().Should().Be(GoResult.Ok);
             table.RecordNumber.Should().Be(1);
+        }
+    }
+
+    [Fact]
+    public void Skipping_FromAnAbsentRecord_StopsOnTheNearestEntryRatherThanPastIt()
+    {
+        // The end-case that has to come from the C rather than from intuition. Landing "at or after"
+        // an absent record means the cursor is already on the next entry in tag order, so a forward
+        // step of one must stop there instead of moving off it. The reference takes one off the
+        // count for exactly this (d4skip.c:1262-1272).
+        //
+        // Record 2 (BRAVO) is absent; ALPHA is below it and CHARLIE above, so a forward step of one
+        // from record 2 must land on CHARLIE and not past it.
+        (CodeBaseEngine engine, Table table) = IndexedTableImage.Open(
+            ["ALPHA", "BRAVO", "CHARLIE"],
+            [("ALPHA", 1), ("CHARLIE", 3)]);
+
+        using (engine)
+        {
+            table.SelectTag(table.Tags[0]);
+            table.Go(2);
+
+            table.Skip(1).Should().Be(SkipResult.Moved);
+            table.RecordNumber.Should().Be(3, "CHARLIE is the first entry above BRAVO");
+        }
+    }
+
+    [Fact]
+    public void SkippingBackwards_FromAnAbsentRecord_TakesTheFullCount()
+    {
+        // The other side of the same adjustment: on an ascending tag only a *forward* step has
+        // already been part-taken. Going backwards from the nearest-above entry still has to cross
+        // it, so the count is left alone.
+        (CodeBaseEngine engine, Table table) = IndexedTableImage.Open(
+            ["ALPHA", "BRAVO", "CHARLIE"],
+            [("ALPHA", 1), ("CHARLIE", 3)]);
+
+        using (engine)
+        {
+            table.SelectTag(table.Tags[0]);
+            table.Go(2);
+
+            table.Skip(-1).Should().Be(SkipResult.Moved);
+            table.RecordNumber.Should().Be(1, "ALPHA is the entry below BRAVO");
+        }
+    }
+
+    [Fact]
+    public void Skipping_FromAnAbsentRecordOnADescendingTag_AdjustsTheOtherDirection()
+    {
+        // The half of the rule that flips. The cursor is left at the nearest entry in *byte* order,
+        // which on a descending tag is the entry the caller reaches by stepping *backwards*. So it
+        // is the backward step that has already been part-taken, and the reference tests the count
+        // the other way round for a descending tag (d4skip.c:1262-1272).
+        //
+        // Tag order is CHARLIE then ALPHA. Record 2 (BRAVO) is absent and sits between them.
+        (CodeBaseEngine engine, Table table) = IndexedTableImage.Open(
+            ["ALPHA", "BRAVO", "CHARLIE"],
+            [("ALPHA", 1), ("CHARLIE", 3)],
+            descending: true);
+
+        using (engine)
+        {
+            table.SelectTag(table.Tags[0]);
+
+            table.Go(2);
+            table.Skip(-1).Should().Be(SkipResult.Moved);
+            table.RecordNumber.Should().Be(3, "CHARLIE is where BRAVO's key lands going back");
+
+            table.Go(2);
+            table.Skip(1).Should().Be(SkipResult.Moved);
+            table.RecordNumber.Should().Be(1, "and ALPHA is the next one on in the tag's order");
         }
     }
 

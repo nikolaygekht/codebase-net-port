@@ -56,6 +56,7 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseCdxDeep( &cb, outDir );
    if ( rc == 0 ) rc = caseIdxOne ( &cb, outDir );
    if ( rc == 0 ) rc = caseCdxColl( &cb, outDir );
+   if ( rc == 0 ) rc = caseCdxTime( &cb, outDir );
 
    code4close( &cb );
    code4initUndo( &cb );

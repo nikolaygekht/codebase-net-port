@@ -27,5 +27,6 @@ int caseCdxBase( CODE4 *cb, const char *outDir );   /* CDXBASE.DBF — 0x30 + CD
 int caseCdxDeep( CODE4 *cb, const char *outDir );   /* CDXDEEP.DBF — 0x30 + CDX, multi-level trees */
 int caseIdxOne ( CODE4 *cb, const char *outDir );   /* IDXONE.DBF  — 0x30 + CDX + derived single-tag IDX */
 int caseCdxColl( CODE4 *cb, const char *outDir );   /* CDXCOLL.DBF — 0x30 + CDX, machine and GENERAL collation */
+int caseCdxTime( CODE4 *cb, const char *outDir );   /* CDXTIME.DBF — 0x30 + CDX, datetime keys and the fox flag bitmap */
 
 #endif /* GEN_CASES_H */

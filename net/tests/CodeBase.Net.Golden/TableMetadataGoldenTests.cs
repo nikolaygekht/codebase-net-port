@@ -22,7 +22,7 @@ public sealed class TableMetadataGoldenTests
         // Part of the gate rather than commentary. A data-driven suite that silently discovers
         // nothing reports success having asserted nothing, which is the most likely way this step
         // could pass while proving nothing.
-        AllTables().Should().HaveCount(11);
+        AllTables().Should().HaveCount(12);
     }
 
     [Theory]

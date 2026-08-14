@@ -21,7 +21,7 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 **A DBF can be read whole, and its records can be read in an index tag's order.**
 `net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is
-green on **1054 tests**, 453 of them golden.
+green on **1126 tests**, 489 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -167,6 +167,32 @@ index precludes and a hand-built pair covers instead; a table whose every tag is
 files on one table.
 
 ## 3. Next
+
+### Step 007 is under way, and `COLLATION` is closed
+
+[`007-seek-by-value`](claude/dev/007-seek-by-value/) is designed, planned and **half executed** — read
+its [`STATE.md`](claude/dev/007-seek-by-value/STATE.md). Sub-steps 1 to 5 of twelve are done, which is
+the plan's deliberate stopping point: everything a key is made of exists and is gated, and no public
+method has changed.
+
+**What landed.** The `COLL4ARR.C` weight tables for cp1252, cp437 and cp850, copied verbatim; every
+numeric transform including `t4dblToFox` with its `-0.0` wraparound; the `GENERAL` head-and-tail key;
+the 10802-byte `flags4dateTime` bitmap and the datetime transform that consults it; the partial-seek
+rules; and the selection table that picks between them, with `IKeyValueSource` as the seam `EXPR` will
+plug into.
+
+**A corpus case the plan did not have.** `CDXTIME` — 256 datetimes over one `T` field, ascending and
+descending, chosen so 97 land on a set bit of the decrement bitmap and the rest do not, plus the day's
+edges and the calendar's. It exists because the bitmap is empirical and 10802 bytes of data are worth
+nothing unless real keys can check the copy. Now they do.
+
+**The gate.** Every key of every tag of every indexed case, rebuilt from the value in the record it
+names: **3559 keys**, counted per case and asserted. `COLLATION` is **done** and **risk R2 is retired**
+(`PORTING-PLAN.md` §5).
+
+**Also closed early:** the audit's §1.3 finding, that nothing checked a tag's collation against the
+table's code page. It had to be — GENERAL names a sort order, not a table, and the weight table cannot
+be chosen without the code page. A mismatch is now refused at tag resolution.
 
 ### The 002–005 audit is closed — five defects fixed, three of its claims overturned
 

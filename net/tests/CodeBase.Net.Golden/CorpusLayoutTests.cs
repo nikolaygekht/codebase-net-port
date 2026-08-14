@@ -18,8 +18,8 @@ public sealed class CorpusLayoutTests
     /// <summary>The cases the corpus is documented to hold (net/corpus/README.md).</summary>
     private static readonly string[] ExpectedTables =
     [
-        "CDXBASE", "CDXCOLL", "CDXDEEP", "CP1251", "CP936", "DB3TYPE",
-        "F2XMEMO", "IDXONE", "VFPMEMO", "VFPNULL", "VFPTYPE",
+        "CDXBASE", "CDXCOLL", "CDXDEEP", "CDXTIME", "CP1251", "CP936",
+        "DB3TYPE", "F2XMEMO", "IDXONE", "VFPMEMO", "VFPNULL", "VFPTYPE",
     ];
 
     /// <summary>The index files the corpus is documented to hold, with the table each belongs to.</summary>
@@ -28,6 +28,7 @@ public sealed class CorpusLayoutTests
         { "CDXBASE", "CDXBASE.cdx" },
         { "CDXCOLL", "CDXCOLL.cdx" },
         { "CDXDEEP", "CDXDEEP.cdx" },
+        { "CDXTIME", "CDXTIME.cdx" },
         { "IDXONE", "IDXONE.cdx" },
         { "IDXONE", "IDXONE.IDX" },
     };

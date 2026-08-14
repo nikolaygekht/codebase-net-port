@@ -308,7 +308,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 | `CORPUS` | Corpus + generator | **P0** | in progress — 11 cases in, 4 of them indexed; mutation and write cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
 | `CDX-READ` | CDX reading & navigation | **P1** | **done for reading** — decode and traversal (004), seek (005), tags on a `Table` (006). Only a non-field key expression waits on `EXPR` | **R1** retired |
-| `COLLATION` | Collation tables & key transforms | **P1** | not started | **R2**, R7 |
+| `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (007 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |
 | `WRITE` | Single-user write & round-trip | **P2** | not started | R4, R9 |
@@ -628,6 +628,7 @@ disposition in `claude/dev/006-audit-glm/REMEDIATION-PLAN.md` §5.2.
 
 | Gap | Why it matters |
 |---|---|
+| ~~A tag over a `T` datetime field~~ — **closed 2026-08-14** by `CDXTIME`, which also gates the `flags4dateTimeFlags` bitmap | was the only way to check a 10800-byte verbatim copy |
 | **Deleted records** — all **1188** dumped corpus records are `deleted=0` | The `Deleted` accessor and the skip-over behaviour are unit-tested only |
 | A **memo block size** other than 0 and 512 | The `blockSize == 0 ⇒ 1` branch and the block arithmetic are only witnessed at one value |
 | A **CDX block size** other than 512, and a multiplier above one | `codeBaseNote` extension; unit-tested at `IndexHeaderTests:229`, no golden case |
@@ -659,7 +660,7 @@ something different. Never use it for keys, indexes, or memos.
 | # | Risk | Impact | Likelihood | Mitigation |
 |---|------|--------|-----------|------------|
 | R1 | **CDX leaf-node bit-packed compression** decoded/encoded wrong (recNumLen/dupCnt/trailCnt bit layout, widening loop, split re-encode) | Index unreadable by VFP / wrong navigation; silent | High | De-risk **`CDX-READ`** before anything depends on it; generated leaf-block corpus decoded bit-identically to the checked-in dumps; port `b4leafInit`/`x4putInfo`/`b4key` faithfully (`CDX-FORMAT.md` §6) |
-| R2 | **Collation tables** transcribed incorrectly, or someone reaches for `CultureInfo` | Keys sort differently → seek misses, corrupt index | High | §3.4 hard rule; verbatim `COLL4ARR.C` + `flags4dateTime`; `COLLATION` key-transform differential gate; code review flags any `CompareInfo`/`GetSortKey` in `Collation` |
+| ~~R2~~ **retired 2026-08-14** | **Collation tables** transcribed incorrectly, or someone reaches for `CultureInfo` | Keys sort differently → seek misses, corrupt index | High | §3.4 hard rule; verbatim `COLL4ARR.C` + `flags4dateTime`; `COLLATION` key-transform differential gate; code review flags any `CompareInfo`/`GetSortKey` in `Collation` |
 | R3 | **VFP byte-range lock interop with live VFP apps** — append-path offset must match VFP exactly | Data corruption under real-world concurrent VFP + C# | Medium | Reproduce exact offsets (`LOCKING-TRANSACTIONS.md` §5.3); `LOCKING` two-process interop test; append path flagged for **external live-VFP verification** |
 | R4 | **FPT block reuse / monotonic growth** — S4FOX keeps no free chain; wrong allocation orphans or overwrites blocks | Memo corruption; files grow unbounded | Medium | Port allocation-at-EOF + `nextBlock` header semantics exactly (`FPT-MEMO.md` §3.7); implement `d4memoCompress` equivalent; corruption-guard checks; `WRITE` memo round-trip gate |
 | R5 | **Expression quirks leaking into index keys** — `STR()`/`DTOS()`/`TTOC()` text formatting, rounding, `*`-overflow; prefix `=`; divide-by-zero→0; blank-date propagation | Keys differ by a byte → silent seek failures | Medium | Port §7 of `EXPRESSIONS.md` bit-exactly; `c4dtoa45` behavior recovered empirically from generated output; `EXPR` expression + re-derived-key gate |

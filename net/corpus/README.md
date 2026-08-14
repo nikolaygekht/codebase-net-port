@@ -26,6 +26,7 @@ turns out to be untested, add a generator case and regenerate.
 | `CP936.DBF` + `.fpt` | `0x30` | A marked code page, multi-byte: header byte 29 = `0x7A`, Simplified Chinese GBK. Trail bytes that look like ASCII, and characters cut in half at a field boundary. See below. |
 | `CDXBASE.DBF` + `.cdx` | `0x30` | **Index, ten tags, one block each.** One tag per key shape: character with shared prefixes and blank keys, the same field descending, runs of duplicates, a unique tag, keys holding bytes below the pad character, numeric, double (including `-0.0`), date, integer, and a filtered tag. See below. |
 | `CDXDEEP.DBF` + `.cdx` | `0x30` | **Index, multi-level trees.** 600 records and four tags; `D_WIDE` is three levels deep (55 leaves under two levels of branch), so interior nodes, sibling chains and full leaves are all reachable, and `D_PFX` is **descending** so a backwards walk and a descending seek cross block boundaries. See below. |
+| `CDXTIME.DBF` + `.cdx` | `0x30` | **Index, datetime keys.** 256 datetimes over one `T` field, indexed ascending and descending. The `T` key is the only one that is not arithmetic: an empirical 86400-bit bitmap decides whether the computed double is nudged down before conversion (i4conv.c:1513-2191), and these values are chosen so roughly a third land on a set bit and the rest do not. Also the day's edges, leap and non-leap Februaries, month and year rollovers, a blank datetime, and a duplicate run. |
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **Index, collation.** cp1252, one `C(20)` field indexed twice — machine (`keyLen` 20, pad `0x20`) and `GENERAL` (`keyLen` 40, pad `0x00`) — over accented text and the `œ`/`ß`/`þ` expansions. See below. |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
 
@@ -33,7 +34,7 @@ The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
 records, and a wide key needs fewer of them.
 
-`CDXBASE`, `CDXDEEP`, `CDXCOLL` and `IDXONE` are the first tables whose header byte 28 carries the
+`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME` and `IDXONE` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
 (`i4create.c:1404-1418`).
 

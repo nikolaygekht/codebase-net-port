@@ -146,6 +146,7 @@ through the C library. 32 records each; rows 1-3 carry the edge cases.
 | `CP936.DBF` | `0x30` | a marked code page, multi-byte: header byte 29 = `0x7A`; GBK characters whose trail byte is an ASCII byte (`\`, `|`, `A`, `~`, `@`), and characters cut in half at a field boundary and at a memo length — see `net/corpus/README.md` |
 | `CDXBASE.DBF` | `0x30` | the small index case: 32 records, ten tags, one block per tree — one tag per key shape (character, descending, duplicates, unique, sub-`0x20` bytes, numeric, double with `-0.0`, date, integer, filtered) |
 | `CDXDEEP.DBF` | `0x30` | the multi-level index case: 600 records, four tags, one of them three levels deep. Depth comes from a wide incompressible key rather than from record count |
+| `CDXTIME.DBF` | `0x30` | the datetime-key case: 256 datetimes over one `T` field, ascending and descending tags. Chosen so that about a third of the stored keys exercise the set half of `flags4dateTimeFlags` and the rest the clear half, plus the day's edges and the calendar's. Whole seconds only, because `f4assignDateTime` ignores a millisecond part for `T` |
 | `CDXCOLL.DBF` | `0x30` | the collation case: cp1252, one `C(20)` field indexed both machine and `GENERAL`, so `keyLen` 20 and 40 and pad bytes `0x20` and `0x00` sit in one file |
 | `IDXONE.DBF` | `0x30` | the single-tag case: a one-tag `.cdx` plus the `.IDX` derived from it, verified by walking both — see below |
 

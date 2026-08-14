@@ -307,7 +307,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 |---|---|---|---|---|
 | `CORPUS` | Corpus + generator | **P0** | in progress — 11 cases in, 4 of them indexed; mutation and write cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
-| `CDX-READ` | CDX reading & navigation | **P1** | **done for reading** — decode and traversal (004), seek (005), tags on a `Table` (006). Only a non-field key expression waits on `EXPR` | **R1** retired |
+| `CDX-READ` | CDX reading & navigation | **P1** | **done** — decode and traversal (004), seek by key bytes (005), tags on a `Table` (006), seek by value (007). Only a non-field key expression waits on `EXPR` | **R1** retired |
 | `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (007 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |

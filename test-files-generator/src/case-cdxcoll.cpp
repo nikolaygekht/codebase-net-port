@@ -47,7 +47,7 @@
 #include "dump-index.h"
 #include "cases.h"
 
-#define ROWS 32          /* records in this table */
+#define ROWS 34          /* records in this table */
 
 /* --------------------------------------------------------------- test data
  *
@@ -90,6 +90,20 @@ static const unsigned char C_OL_2[]     = { 'O','L' };                          
 static const unsigned char C_ZEBRA_1[]  = { 'z','e','b','r','a' };                    /* "zebra" */
 static const unsigned char C_ZEBRA_2[]  = { 'Z','e','b','r','a' };                    /* "Zebra" */
 
+/* Ten expanding characters, then ten ordinary ones. Each ligature contributes two
+ * head weights and two tail weights, and an expansion's tails are added *without*
+ * the length guard that ordinary characters get (u4util.c:2296-2336). By the
+ * eleventh character the tail array is already full, so every tail after it is
+ * dropped -- the one branch of the transform that silently discards weights, and
+ * the only value in the corpus that reaches it. */
+static const unsigned char C_TAILFULL[]  =
+   { 0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,0x9C, 'a','b','c','d','e','f','g','h','i','j' };
+
+/* The same shape one ligature short, so the pair differs only in where the tails
+ * run out rather than in their characters. */
+static const unsigned char C_TAILFULL2[] =
+   { 0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,0x9C,'O','E', 'a','b','c','d','e','f','g','h' };
+
 static const TEXTBYTES TEXTS[ROWS] =
 {
    TEXT_BYTES( C_ALPHA_U ),  TEXT_BYTES( C_ALPHA_L ),  TEXT_BYTES( C_ALPHA_M ),
@@ -105,7 +119,8 @@ static const TEXTBYTES TEXTS[ROWS] =
    TEXT_BYTES( C_NAND_1 ),   TEXT_BYTES( C_NAND_2 ),
    TEXT_BYTES( C_ELAN_1 ),   TEXT_BYTES( C_ELAN_2 ),
    TEXT_BYTES( C_OL_1 ),     TEXT_BYTES( C_OL_2 ),
-   TEXT_BYTES( C_ZEBRA_1 ),  TEXT_BYTES( C_ZEBRA_2 )
+   TEXT_BYTES( C_ZEBRA_1 ),  TEXT_BYTES( C_ZEBRA_2 ),
+   TEXT_BYTES( C_TAILFULL ),  TEXT_BYTES( C_TAILFULL2 )
 };
 
 /* ------------------------------------------------------------------- case */

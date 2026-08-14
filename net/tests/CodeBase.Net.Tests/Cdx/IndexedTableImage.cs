@@ -31,16 +31,24 @@ internal static class IndexedTableImage
     /// <param name="entries">The index entries, in key order, as key text and record number.</param>
     /// <param name="expression">The tag's key expression. Defaults to the field's own name.</param>
     /// <param name="descending">Whether the tag is descending.</param>
+    /// <param name="encoding">The encoding to read text with, for a host with no provider registered.</param>
     /// <returns>The open table and the engine that owns it.</returns>
     public static (CodeBaseEngine Engine, Table Table) Open(
         string[] values,
         (string Key, uint Record)[] entries,
         string expression = FieldName,
-        bool descending = false)
+        bool descending = false,
+        System.Text.Encoding? encoding = null)
     {
         CodeBaseEngine engine = new(
             new PairFactory(Table(values), Index(entries, expression, descending)),
-            new AlwaysCompanion());
+            new AlwaysCompanion())
+        {
+            // Read when the table is opened, so it has to be set before rather than after. A test
+            // that seeks by text needs it: this project registers no code-page provider (ADR-17
+            // leaves that to the host), and the image's unmarked table asks for cp437.
+            DefaultEncoding = encoding,
+        };
 
         return (engine, engine.OpenTable("memory.dbf"));
     }

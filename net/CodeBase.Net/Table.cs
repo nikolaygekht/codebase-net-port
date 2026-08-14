@@ -1,3 +1,4 @@
+using CodeBase.Net.Cdx;
 using System.Text;
 using CodeBase.Net.Dbf;
 using CodeBase.Net.Memo;
@@ -253,6 +254,7 @@ public sealed class Table : IDisposable
     public GoResult Go(int recordNumber)
     {
         EnsureOpen();
+        selected?.ForgetSearch();
         ArgumentOutOfRangeException.ThrowIfLessThan(recordNumber, 1);
 
         if (recordNumber > RecordCount)
@@ -277,6 +279,7 @@ public sealed class Table : IDisposable
     public GoResult Top()
     {
         EnsureOpen();
+        selected?.ForgetSearch();
 
         if (selected is not null)
             return Reached(selected.First(RecordCount, out int first), first);
@@ -302,6 +305,7 @@ public sealed class Table : IDisposable
     public GoResult Bottom()
     {
         EnsureOpen();
+        selected?.ForgetSearch();
 
         if (selected is not null)
             return Reached(selected.Last(RecordCount, out int last), last);
@@ -397,6 +401,7 @@ public sealed class Table : IDisposable
     public void SelectTag(Tag? tag)
     {
         EnsureOpen();
+        selected?.ForgetSearch();
 
         selected = tag is null ? null : CursorFor(tag);
     }
@@ -479,7 +484,7 @@ public sealed class Table : IDisposable
         if (count == 0)
             return SkipResult.Moved;
 
-        if (!cursor.Synchronize((uint)position.Number))
+        if (!cursor.Synchronize((uint)position.Number, this.record))
             throw NotInTag(cursor.Tag, position.Number);
 
         bool endOfFileBefore = position.Eof;
@@ -554,7 +559,7 @@ public sealed class Table : IDisposable
         // A caller may have moved by record number since the last indexed move, which would leave the tag
         // pointing somewhere else. Stepping from where the *record* cursor is, rather than from where the
         // tag was left, is what makes the two surfaces interchangeable.
-        if (!cursor.Synchronize((uint)position.Number))
+        if (!cursor.Synchronize((uint)position.Number, this.record))
             throw NotInTag(tag, position.Number);
 
         // Unlike the selected-tag Skip, these four are positioning calls: a move that could not be made
@@ -566,6 +571,200 @@ public sealed class Table : IDisposable
     /// <summary>
     /// Gives the cursor that follows a tag, refusing a tag this table cannot use.
     /// </summary>
+    /// <summary>
+    /// Moves to the record whose key is exactly a value, in the selected tag.
+    /// </summary>
+    /// <param name="value">The value to look for, as text.</param>
+    /// <returns>Ok with the cursor on it, or NoRecord with the cursor on no record.</returns>
+    /// <exception cref="CodeBaseException">
+    /// No tag is selected, or the selected tag's keys cannot be built from a value of this type.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <remarks>
+    /// A whole-key match: the value is padded to the tag's key width, so seeking SMITH finds SMITH
+    /// and not SMITHSON. Use [clink=CodeBase.Net.Table.SeekPrefix]SeekPrefix[/clink] for that.
+    ///
+    /// A miss leaves the cursor on no record rather than on a neighbour, which is what
+    /// [clink=CodeBase.Net.Table.Go]Go[/clink] already does past the end of the table. A caller that
+    /// wants the neighbour asks for it by name, with
+    /// [clink=CodeBase.Net.Table.SeekAtOrAfter]SeekAtOrAfter[/clink].
+    /// </remarks>
+    public GoResult Seek(string value) => Exact(Search(value, prefix: false));
+
+    /// <summary>
+    /// Moves to the first record whose key begins with a value, in the selected tag.
+    /// </summary>
+    /// <param name="value">The prefix to look for.</param>
+    /// <returns>Ok with the cursor on the first match, or NoRecord when there is none.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not text.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <remarks>
+    /// Seeking the prefix SMITH finds SMITH, SMITHSON and SMITHERS alike, and
+    /// [clink=CodeBase.Net.Table.SeekNext]SeekNext[/clink] walks the rest of them.
+    ///
+    /// This is a separate method rather than a shorter argument to
+    /// [clink=CodeBase.Net.Table.Seek]Seek[/clink] on purpose. The reference decides between the two
+    /// meanings by whether the caller's value carried trailing blanks, which makes one call mean
+    /// opposite things depending on invisible whitespace.
+    /// </remarks>
+    public GoResult SeekPrefix(string value) => Exact(Search(value, prefix: true));
+
+    /// <summary>
+    /// Moves to the first record at or after a value, in the selected tag.
+    /// </summary>
+    /// <param name="value">The value to look for.</param>
+    /// <returns>Found, After with the cursor on the next record up, or Eof when there is none.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not text.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <remarks>The start of a forward scan, and one end of a range.</remarks>
+    public SeekResult SeekAtOrAfter(string value) => Position(Search(value, prefix: false), forwards: true);
+
+    /// <summary>
+    /// Moves to the last record at or before a value, in the selected tag.
+    /// </summary>
+    /// <param name="value">The value to look for.</param>
+    /// <returns>Found, Before with the cursor on the last record short of it, or Bof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not text.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <remarks>A range's other end, walked back to with Skip.</remarks>
+    public SeekResult SeekAtOrBefore(string value) => Position(Search(value, prefix: false), forwards: false);
+
+    /// <summary>Moves to the record whose key is exactly a number.</summary>
+    /// <param name="value">The value to look for.</param>
+    /// <returns>Ok, or NoRecord with the cursor on no record.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not numbers.</exception>
+    public GoResult Seek(double value) => Exact(Seeking().SearchForDouble(value));
+
+    /// <summary>Moves to the record whose key is exactly an integer.</summary>
+    /// <param name="value">The value to look for.</param>
+    /// <returns>Ok, or NoRecord with the cursor on no record.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not integers.</exception>
+    public GoResult Seek(int value) => Exact(Seeking().SearchForInt32(value));
+
+    /// <summary>Moves to the record whose key is exactly a date.</summary>
+    /// <param name="value">The date to look for.</param>
+    /// <returns>Ok, or NoRecord with the cursor on no record.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not dates.</exception>
+    public GoResult Seek(DateOnly value) => Exact(Seeking().SearchForDate(value));
+
+    /// <summary>Moves to the first record at or after a number.</summary>
+    /// <param name="value">The value to look for.</param>
+    /// <returns>Found, After, or Eof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not numbers.</exception>
+    public SeekResult SeekAtOrAfter(double value) =>
+        Position(Seeking().SearchForDouble(value), forwards: true);
+
+    /// <summary>Moves to the last record at or before a number.</summary>
+    /// <param name="value">The value to look for.</param>
+    /// <returns>Found, Before, or Bof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not numbers.</exception>
+    public SeekResult SeekAtOrBefore(double value) =>
+        Position(Seeking().SearchForDouble(value), forwards: false);
+
+    /// <summary>Moves to the first record at or after a date.</summary>
+    /// <param name="value">The date to look for.</param>
+    /// <returns>Found, After, or Eof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not dates.</exception>
+    public SeekResult SeekAtOrAfter(DateOnly value) =>
+        Position(Seeking().SearchForDate(value), forwards: true);
+
+    /// <summary>Moves to the last record at or before a date.</summary>
+    /// <param name="value">The date to look for.</param>
+    /// <returns>Found, Before, or Bof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, or its keys are not dates.</exception>
+    public SeekResult SeekAtOrBefore(DateOnly value) =>
+        Position(Seeking().SearchForDate(value), forwards: false);
+
+    /// <summary>
+    /// Moves to the next record still matching the search that is running.
+    /// </summary>
+    /// <returns>Ok with the cursor on it, or NoRecord when the matches have run out.</returns>
+    /// <exception cref="CodeBaseException">No search is running, or no tag is selected.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <remarks>
+    /// Continues whichever seek last ran, so a run of equal keys or a prefix's matches are walked
+    /// without repeating the value. Any move that is not a seek ends the search, so this cannot
+    /// quietly continue one the caller has stepped away from.
+    /// </remarks>
+    public GoResult SeekNext() => Continue(forwards: true);
+
+    /// <summary>
+    /// Moves to the previous record still matching the search that is running.
+    /// </summary>
+    /// <returns>Ok with the cursor on it, or NoRecord when the matches have run out.</returns>
+    /// <exception cref="CodeBaseException">No search is running, or no tag is selected.</exception>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public GoResult SeekPrevious() => Continue(forwards: false);
+
+    private TableTagCursor Seeking()
+    {
+        EnsureOpen();
+
+        return selected ?? throw new CodeBaseException(
+            ErrorCode.Info,
+            "Seeking needs a tag to seek in, and none is selected. Call SelectTag first.");
+    }
+
+    private KeySearch Search(string value, bool prefix) =>
+        Seeking().SearchFor(TextEncoding.GetBytes(value), prefix);
+
+    private GoResult Exact(KeySearch search)
+    {
+        TableTagCursor cursor = Seeking();
+
+        return cursor.SeekAtOrAfter(search, RecordCount, out int found) == SeekOutcome.Found
+            ? Reached(true, found)
+            : NoRecordFound();
+    }
+
+    private SeekResult Position(KeySearch search, bool forwards)
+    {
+        TableTagCursor cursor = Seeking();
+
+        SeekOutcome outcome = forwards
+            ? cursor.SeekAtOrAfter(search, RecordCount, out int found)
+            : cursor.SeekAtOrBefore(search, RecordCount, out found);
+
+        if (outcome is SeekOutcome.Eof or SeekOutcome.Bof or SeekOutcome.NoEntry)
+        {
+            MovePastEnd();
+            return forwards ? SeekResult.Eof : SeekResult.Bof;
+        }
+
+        Fetch(found);
+
+        return outcome == SeekOutcome.Found
+            ? SeekResult.Found
+            : forwards ? SeekResult.After : SeekResult.Before;
+    }
+
+    private GoResult Continue(bool forwards)
+    {
+        TableTagCursor cursor = Seeking();
+
+        if (!cursor.HasSearch)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Info,
+                "There is no search to continue. Call Seek, SeekPrefix or one of the positioning " +
+                "seeks first.");
+        }
+
+        SeekOutcome outcome = forwards
+            ? cursor.SeekNext(RecordCount, out int found)
+            : cursor.SeekPrevious(RecordCount, out found);
+
+        return outcome == SeekOutcome.Found ? Reached(true, found) : NoRecordFound();
+    }
+
+    private GoResult NoRecordFound()
+    {
+        record.Blank(blankRecord);
+        position.Invalidate();
+
+        return GoResult.NoRecord;
+    }
+
     private TableTagCursor CursorFor(Tag tag)
     {
         if (!ReferenceEquals(Tags.TryGet(tag.Name, out Tag? mine) ? mine : null, tag))
@@ -579,7 +778,7 @@ public sealed class Table : IDisposable
         {
             // Constructing it is what asks for the pad byte, so a tag whose expression cannot be typed
             // fails here — at the first attempt to use it, and not when the table was opened.
-            cursor = new TableTagCursor(tag);
+            cursor = new TableTagCursor(tag, [.. Fields], CodePageNumber ?? CodePageMap.UnmarkedCodePage);
             tagCursors[tag] = cursor;
         }
 

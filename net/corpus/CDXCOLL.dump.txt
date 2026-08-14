@@ -4,7 +4,7 @@
 file         CDXCOLL.DBF
 version      0x30
 lastUpdate   26-01-01  (yy mm dd, frozen)
-numRecs      32
+numRecs      34
 headerLen    360
 recordLen    25
 hasMdxMemo   0x01
@@ -15,7 +15,7 @@ codePage     0x03
 2 K_TEXT     type=C offset=5 len=20 dec=0 flags=0x00 hasTag=0
 
 [fields]        (as the C library reports them after open)
-recCount 32 numFields 2
+recCount 34 numFields 2
 1 ID type=I len=4 dec=0
 2 K_TEXT type=C len=20 dec=0
 
@@ -116,3 +116,9 @@ rec 31 deleted=0
 rec 32 deleted=0
   ID         "\x1F\x00\x00\x00" long=31
   K_TEXT     "Zebra               "
+rec 33 deleted=0
+  ID         " \x00\x00\x00" long=32
+  K_TEXT     "\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9Cabcdefghij"
+rec 34 deleted=0
+  ID         "!\x00\x00\x00" long=33
+  K_TEXT     "\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9COEabcdefgh "

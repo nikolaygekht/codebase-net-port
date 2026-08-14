@@ -214,7 +214,7 @@ say what it proves.
 cases** — the before/after file pairs in `PORTING-PLAN.md` §7 that gate write operations. Same word,
 unrelated mechanism.)
 
-**Never restore by `git checkout <file>` while the step is uncommitted.** That discards the step's own
+**Never restore by `git checkout <file>` while the step is uncommitted — whichever file it is.** That discards the step's own
 uncommitted work along with the deliberate break, and the two are indistinguishable once it has run.
 Either:
 
@@ -222,8 +222,13 @@ Either:
   matches the pre-break one; or
 - run the mutation checks **after** the step is committed, where `git` can restore safely.
 
-The first is preferred during a step; the second is fine for a retrospective check. Step 006 lost
-`Table.cs`'s uncommitted work to exactly this and had to reconstruct it.
+The first is preferred during a step; the second is fine for a retrospective check.
+
+**Copy aside the file you are about to break, and restore that same file from the copy.** The trap is
+a mutation that touches a *different* file from the one being restored: step 006 lost `Table.cs` this
+way, and step 007 lost it again in a session that had already used the copy-aside rule correctly twice
+on other files. The habit does not transfer by itself, so the rule is per-restore and not per-session:
+if a file changed, it comes back from a checksummed copy, never from `git`.
 
 ### Mechanics
 

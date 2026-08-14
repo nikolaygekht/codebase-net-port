@@ -117,9 +117,11 @@ internal static class CollatedKey
             {
                 destination[head++] = headWeight;
 
-                // The guard is the reference's, and it counts against the *untrimmed* length: a
-                // character can contribute a head and lose its tail when the tails have filled up
-                // (u4util.c:2331-2336).
+                // The guard is the reference's, and it counts against the *untrimmed* length
+                // (u4util.c:2331-2336). Kept for fidelity, though it can never change the result:
+                // it only bites once the tails outnumber the field width, and by then the copy
+                // below is already clipping them to the room the heads left, which is smaller.
+                // Checked exhaustively over every width and mix of expanding characters.
                 if (includeTails && tailWeight != CollationTables.NoTail && tail < length)
                     tails[tail++] = tailWeight;
 

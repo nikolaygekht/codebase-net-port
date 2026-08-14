@@ -70,7 +70,31 @@ internal readonly struct KeySearch
     public static KeySearch For(ReadOnlySpan<byte> value, int keyLength, byte padByte)
     {
         int length = Math.Min(value.Length, keyLength);
-        byte[] copy = value[..length].ToArray();
+
+        return Into(value[..length].ToArray(), length, keyLength, padByte);
+    }
+
+    /// <summary>
+    /// Prepares a search over a buffer the caller already owns and has filled.
+    /// </summary>
+    /// <param name="buffer">The key bytes, which this search borrows rather than copies.</param>
+    /// <param name="length">How many bytes of the buffer the value occupies.</param>
+    /// <param name="keyLength">The tag's key length.</param>
+    /// <param name="padByte">The byte the tag pads its keys with.</param>
+    /// <returns>The search, with its comparison rule settled.</returns>
+    /// <remarks>
+    /// The allocation-free form, and the one a cursor uses. A cursor owns one buffer sized to its
+    /// tag, converts each value straight into it, and keeps the search alive to answer
+    /// [c]SeekNext[/c] — so the bytes and the search share a lifetime and the borrow cannot dangle.
+    /// The C library reaches the same arrangement from the other side, parking a scratch buffer on
+    /// the engine and re-converting per call (D4SEEK.C:1130-1137).
+    ///
+    /// The caller must not write to the buffer again while the search is in use, which is why this
+    /// stays internal.
+    /// </remarks>
+    public static KeySearch Into(byte[] buffer, int length, int keyLength, byte padByte)
+    {
+        byte[] copy = buffer;
 
         int content = length;
         while (content > 0 && copy[content - 1] == padByte)

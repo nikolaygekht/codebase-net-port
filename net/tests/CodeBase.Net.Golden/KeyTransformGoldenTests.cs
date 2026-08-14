@@ -92,7 +92,7 @@ public sealed class KeyTransformGoldenTests
     private static readonly Dictionary<string, int> KeysPerTable = new()
     {
         ["CDXBASE"] = 283,
-        ["CDXCOLL"] = 64,
+        ["CDXCOLL"] = 68,
         ["CDXDEEP"] = 2400,
         ["CDXTIME"] = 512,
         ["IDXONE"] = 300,
@@ -148,7 +148,7 @@ public sealed class KeyTransformGoldenTests
             built.Should().Equal(stored.Key, $"record {stored.Record} holds '{Ascii(text)}'");
         }
 
-        tag.Keys.Should().HaveCount(32);
+        tag.Keys.Should().HaveCount(34);
     }
 
     [Fact]

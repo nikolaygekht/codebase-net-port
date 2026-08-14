@@ -39,9 +39,9 @@ header       keyLen=40 typeCode=0x60 signature=0x00 descending=0 pChar=0x00 root
 text         exprPos=0 exprLen=7 filterPos=7 filterLen=1 sortSeq="GENERAL"
 expr         "K_TEXT"
 filter       ""
-count        32
+count        34
 [blocks]
-node=3072 attr=3 nKeys=32 left=4294967295 right=4294967295 leaf=1 freeSpace=329 recNumLen=12 dupCntLen=6 trailCntLen=6 infoLen=3 recNumMask=0x00000FFF dupByteCnt=0x3F trailByteCnt=0x3F
+node=3072 attr=3 nKeys=34 left=4294967295 right=4294967295 leaf=1 freeSpace=295 recNumLen=12 dupCntLen=6 trailCntLen=6 infoLen=3 recNumMask=0x00000FFF dupByteCnt=0x3F trailByteCnt=0x3F
   0 rec=4 dup=0 trail=40
   1 rec=11 dup=0 trail=36
   2 rec=12 dup=4 trail=36
@@ -58,22 +58,24 @@ node=3072 attr=3 nKeys=32 left=4294967295 right=4294967295 leaf=1 freeSpace=329 
   13 rec=27 dup=4 trail=35
   14 rec=26 dup=0 trail=35
   15 rec=25 dup=5 trail=31
-  16 rec=13 dup=0 trail=34
-  17 rec=14 dup=6 trail=34
-  18 rec=15 dup=6 trail=34
-  19 rec=30 dup=1 trail=38
-  20 rec=29 dup=2 trail=37
-  21 rec=16 dup=0 trail=33
-  22 rec=17 dup=7 trail=33
-  23 rec=18 dup=7 trail=33
-  24 rec=19 dup=0 trail=35
-  25 rec=20 dup=5 trail=35
-  26 rec=21 dup=5 trail=35
-  27 rec=23 dup=0 trail=36
-  28 rec=24 dup=4 trail=36
-  29 rec=22 dup=4 trail=35
-  30 rec=31 dup=0 trail=35
-  31 rec=32 dup=5 trail=35
+  16 rec=34 dup=0 trail=12
+  17 rec=33 dup=28 trail=10
+  18 rec=13 dup=2 trail=34
+  19 rec=14 dup=6 trail=34
+  20 rec=15 dup=6 trail=34
+  21 rec=30 dup=1 trail=38
+  22 rec=29 dup=2 trail=37
+  23 rec=16 dup=0 trail=33
+  24 rec=17 dup=7 trail=33
+  25 rec=18 dup=7 trail=33
+  26 rec=19 dup=0 trail=35
+  27 rec=20 dup=5 trail=35
+  28 rec=21 dup=5 trail=35
+  29 rec=23 dup=0 trail=36
+  30 rec=24 dup=4 trail=36
+  31 rec=22 dup=4 trail=35
+  32 rec=31 dup=0 trail=35
+  33 rec=32 dup=5 trail=35
 blocks 1
 [keys]
   "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 4
@@ -92,6 +94,8 @@ blocks 1
   "fm`p\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 27
   "p`pdx\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 26
   "p`pdx\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 25
+  "rfrfrfrfrfrfrfrfrfrf`abdfghi\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 34
+  "rfrfrfrfrfrfrfrfrfrf`abdfghijk\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 33
   "rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 13
   "rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 14
   "rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 15
@@ -111,10 +115,10 @@ blocks 1
 [seeks]
   first-key   "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 40 rc=0 rec=4 key="\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
   last-key    "~fau`\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 40 rc=0 rec=31 key="~fau`\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-  middle-key  "rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 40 rc=0 rec=13 key="rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+  middle-key  "rfrfrfrfrfrfrfrfrfrf`abdfghijk\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 40 rc=0 rec=33 key="rfrfrfrfrfrfrfrfrfrf`abdfghijk\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
   run-first   "`frp\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 40 rc=0 rec=11 key="`frp\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-  prefix-half "rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" 20 rc=0 rec=13 key="rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-  between     "rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" 40 rc=2 rec=30 key="rm\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+  prefix-half "rfrfrfrfrfrfrfrfrfrf" 20 rc=0 rec=34 key="rfrfrfrfrfrfrfrfrfrf`abdfghi\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+  between     "rfrfrfrfrfrfrfrfrfrf`abdfghijk\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" 40 rc=2 rec=13 key="rfxzuf\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
   below-all   "\x00" 1 rc=0 rec=4 key="\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
   above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 40 rc=2 eof
   empty       "" 0 rc=0 rec=4 key="\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
@@ -126,9 +130,9 @@ header       keyLen=20 typeCode=0x60 signature=0x01 descending=0 pChar=0x20 root
 text         exprPos=0 exprLen=7 filterPos=7 filterLen=1 sortSeq=""
 expr         "K_TEXT"
 filter       ""
-count        32
+count        34
 [blocks]
-node=2560 attr=3 nKeys=32 left=4294967295 right=4294967295 leaf=1 freeSpace=264 recNumLen=14 dupCntLen=5 trailCntLen=5 infoLen=3 recNumMask=0x00003FFF dupByteCnt=0x1F trailByteCnt=0x1F
+node=2560 attr=3 nKeys=34 left=4294967295 right=4294967295 leaf=1 freeSpace=229 recNumLen=14 dupCntLen=5 trailCntLen=5 infoLen=3 recNumMask=0x00003FFF dupByteCnt=0x1F trailByteCnt=0x1F
   0 rec=4 dup=0 trail=20
   1 rec=10 dup=0 trail=14
   2 rec=1 dup=1 trail=15
@@ -153,14 +157,16 @@ node=2560 attr=3 nKeys=32 left=4294967295 right=4294967295 leaf=1 freeSpace=264 
   21 rec=31 dup=0 trail=15
   22 rec=15 dup=0 trail=15
   23 rec=13 dup=0 trail=15
-  24 rec=9 dup=0 trail=15
-  25 rec=29 dup=0 trail=18
-  26 rec=20 dup=0 trail=16
-  27 rec=11 dup=0 trail=17
-  28 rec=27 dup=0 trail=16
-  29 rec=25 dup=0 trail=15
-  30 rec=22 dup=0 trail=16
-  31 rec=19 dup=0 trail=16
+  24 rec=34 dup=1 trail=1
+  25 rec=33 dup=9 trail=0
+  26 rec=9 dup=0 trail=15
+  27 rec=29 dup=0 trail=18
+  28 rec=20 dup=0 trail=16
+  29 rec=11 dup=0 trail=17
+  30 rec=27 dup=0 trail=16
+  31 rec=25 dup=0 trail=15
+  32 rec=22 dup=0 trail=16
+  33 rec=19 dup=0 trail=16
 blocks 1
 [keys]
   "                    " 4
@@ -187,6 +193,8 @@ blocks 1
   "zebra               " 31
   "\x8Cuvre               " 15
   "\x9Cuvre               " 13
+  "\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9COEabcdefgh " 34
+  "\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9C\x9Cabcdefghij" 33
   "\xC6ther               " 9
   "\xD6l                  " 29
   "\xDEorn                " 20
@@ -198,9 +206,9 @@ blocks 1
 [seeks]
   first-key   "                    " 20 rc=0 rec=4 key="                    "
   last-key    "\xFEorn                " 20 rc=0 rec=19 key="\xFEorn                "
-  middle-key  "nandu               " 20 rc=0 rec=26 key="nandu               "
-  prefix-half "nandu     " 10 rc=0 rec=26 key="nandu               "
-  between     "nandu              !" 20 rc=2 rec=18 key="strasse             "
+  middle-key  "strasse             " 20 rc=0 rec=18 key="strasse             "
+  prefix-half "strasse   " 10 rc=0 rec=18 key="strasse             "
+  between     "strasse            !" 20 rc=2 rec=16 key="stra\xDFe              "
   below-all   "\x00" 1 rc=2 rec=4 key="                    "
   above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 20 rc=2 eof
   empty       "" 0 rc=0 rec=4 key="                    "
@@ -208,9 +216,9 @@ blocks 1
 [seeknext]
   first-key   "                    " 20 seek=0 -> 4
   last-key    "\xFEorn                " 20 seek=0 -> 19
-  middle-key  "nandu               " 20 seek=0 -> 26
-  prefix-half "nandu     " 10 seek=0 -> 26
-  between     "nandu              !" 20 seek=2 -> none
+  middle-key  "strasse             " 20 seek=0 -> 18
+  prefix-half "strasse   " 10 seek=0 -> 18
+  between     "strasse            !" 20 seek=2 -> none
   below-all   "\x00" 1 seek=2 -> none
   above-all   "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF" 20 seek=3 -> none
   empty       "" 0 seek=2 -> none

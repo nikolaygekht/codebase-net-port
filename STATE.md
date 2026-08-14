@@ -6,8 +6,7 @@ design and plan are all committed to `main`. Nothing is pushed — **six commits
 **Active step:** none. [`006-tags-on-a-table`](claude/dev/006-tags-on-a-table/) is closed, and the audit
 that followed it is [closed too](claude/dev/006-audit-glm/SUMMARY.md): **1054 tests**, 453 golden, with
 **no golden expectation changed and no corpus file touched**.
-**Next session starts at section 3**, at step **007, seek by value** — designed and planned, ready to execute. Then
-**008, `EXPR`**. The performance pass follows both, and has shrunk: two of its four suspects were
+**Next session starts at section 3**, at step **008, `EXPR`**. The performance pass follows both, and has shrunk: two of its four suspects were
 resolved by design rather than measurement.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
@@ -21,7 +20,7 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 **A DBF can be read whole, and its records can be read in an index tag's order.**
 `net/CodeBase.Net.sln` builds four projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden` and `CodeBase.Net.TestUtils` — and `dotnet test` is
-green on **1126 tests**, 489 of them golden.
+green on **1174 tests**, 526 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -72,21 +71,32 @@ big-endian pointers, and **bit-packed leaves**. Walking follows the leaf chain i
 inverts for a descending tag. Machine and `GENERAL` collation both read; a `GENERAL` tag needs no
 weight table, because reading a key never computes one.
 
-**And it can find a key rather than walk to it**, in five operations over key bytes:
+**And a table can be asked where a value is**, which is what the whole read path was for:
 
 ```csharp
-KeySearch search = KeySearch.For("SMITH"u8, tag.KeyLength, tag.PadByte);
+table.SelectTag(table.Tags["NAME"]);
 
-cursor.Seek(search);            // first entry not before the value, in the tag's order
-cursor.SeekAtOrBefore(search);  // last entry not after it — a range's other end
-cursor.SeekLast(search);        // last entry that still matches
-cursor.SeekNext(search);        // next match; SeekPrevious walks a run backwards
-cursor.SeekExact(search, 42);   // that key *and* that record number
+table.Seek("SMITH");             // exact, whole key: Ok or NoRecord, and a miss lands on nothing
+table.SeekPrefix("SMITH");       // SMITH, SMITHSON, SMITHERS alike
+table.SeekAtOrAfter("S");        // Found | After | Eof -- positions on a neighbour by design
+table.SeekAtOrBefore("S");       // Found | Before | Bof -- a range's other end
+
+while (table.SeekNext() == GoResult.Ok)
+    Console.WriteLine(table.GetString(name));
 ```
 
-`Seek(low)` to `SeekAtOrBefore(high)`, walked with the cursor's own steps, is a closed range — the shape
-the optimizer's per-tag constraints will ask for. **What is missing is turning a *value* into key bytes**,
-which is `COLLATION`'s half and step 008's; seeking is still `internal` for that reason.
+**One method per behaviour.** Whether a miss repositions, and whether a short value is a prefix, are
+each a choice of method rather than a status code to read or a trailing space to remember. `Seek` also
+takes a `double`, an `int` and a `DateOnly` where the tag's keys are of that kind, and refuses by name
+where they are not.
+
+Behind it: the `COLL4ARR.C` weight tables for cp1252, cp437 and cp850 **copied verbatim**, every
+numeric transform including `t4dblToFox`'s `-0.0` wraparound, the `GENERAL` head-and-tail key with its
+expansions, and the empirical `flags4dateTime` bitmap. Collated tags are checked against the table's
+code page, because `GENERAL` names a sort order and not a table.
+
+`TagCursor` still offers the same five operations over raw key bytes underneath, and `Synchronize` now
+**descends** to a record's position instead of walking to it.
 
 **Everything is gated against the C library's own view, with nothing skipped.** On the table side: all
 eleven corpus tables, every record, every field, and every memo value. On the index side: **22 tags,
@@ -168,31 +178,36 @@ files on one table.
 
 ## 3. Next
 
-### Step 007 is under way, and `COLLATION` is closed
+### Step 007 is closed — a table can be asked where a value is
 
-[`007-seek-by-value`](claude/dev/007-seek-by-value/) is designed, planned and **half executed** — read
-its [`STATE.md`](claude/dev/007-seek-by-value/STATE.md). Sub-steps 1 to 5 of twelve are done, which is
-the plan's deliberate stopping point: everything a key is made of exists and is gated, and no public
-method has changed.
+[`007-seek-by-value`](claude/dev/007-seek-by-value/) is done; read its
+[`SUMMARY.md`](claude/dev/007-seek-by-value/SUMMARY.md). **`COLLATION` is complete, `CDX-READ` is
+complete, and risk R2 is retired** — the second of the port's two highest silent-corruption risks,
+after `CDX-READ`'s bit-packed leaves. Both are now closed.
 
-**What landed.** The `COLL4ARR.C` weight tables for cp1252, cp437 and cp850, copied verbatim; every
-numeric transform including `t4dblToFox` with its `-0.0` wraparound; the `GENERAL` head-and-tail key;
-the 10802-byte `flags4dateTime` bitmap and the datetime transform that consults it; the partial-seek
-rules; and the selection table that picks between them, with `IKeyValueSource` as the seam `EXPR` will
-plug into.
+Section 1 has the surface. Underneath it: the `COLL4ARR.C` weight tables copied verbatim, every numeric
+transform, the `GENERAL` head-and-tail key, and the empirical `flags4dateTime` bitmap — with a new
+corpus case, **`CDXTIME`**, built specifically so real keys could check that 10802-byte copy.
 
-**A corpus case the plan did not have.** `CDXTIME` — 256 datetimes over one `T` field, ascending and
-descending, chosen so 97 land on a set bit of the decrement bitmap and the rest do not, plus the day's
-edges and the calendar's. It exists because the bitmap is empirical and 10802 bytes of data are worth
-nothing unless real keys can check the copy. Now they do.
+**Gated by 3559 keys** rebuilt from the values that produced them, every character tag sought end to
+end, and every position of eight tags stepped through `Go(n)` then `Skip(±1)` against the dump's own
+key order.
 
-**The gate.** Every key of every tag of every indexed case, rebuilt from the value in the record it
-names: **3559 keys**, counted per case and asserted. `COLLATION` is **done** and **risk R2 is retired**
-(`PORTING-PLAN.md` §5).
+**Three things the step corrected in the documents rather than in code.** `considerPartialSeek` is
+bigger than `KEY-COLLATION.md` §3.4 describes — the key is also cut back to its head bytes.
+`Synchronize` never needed `EXPR`, because ADR-28 already limits a selectable tag to a bare field name.
+And the audit's §1.3 collation/code-page finding closed as a side effect of writing the code, five
+sub-steps before it was scheduled.
 
-**Also closed early:** the audit's §1.3 finding, that nothing checked a tag's collation against the
-table's code page. It had to be — GENERAL names a sort order, not a table, and the weight table cannot
-be chosen without the code page. A mismatch is now refused at tag resolution.
+**Two C branches are provably untestable**, and are recorded in the summary rather than left looking
+like gaps: the datetime one-byte borrow, and the collated tail-count guard. Both are faithful
+reproductions whose effect is always masked; neither can be made to fail by mutation, and the summary
+says why so nobody removes them later.
+
+**A process failure worth carrying forward.** `git checkout -- Table.cs` destroyed the uncommitted seek
+surface mid-session — the same mistake step 006 made, in a rule written to prevent it. It was
+reconstructed and the suite went green immediately. `DEV_APPROACH.md` §4 is sharpened: restore by
+checksum from a copy, **never** by `git`, regardless of which file the mutation touched.
 
 ### The 002–005 audit is closed — five defects fixed, three of its claims overturned
 

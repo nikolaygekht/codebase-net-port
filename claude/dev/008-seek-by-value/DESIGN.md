@@ -1,4 +1,4 @@
-# 007-seek-by-value — design
+# 008-seek-by-value — design
 
 Using an index while reading a table: **select an index, seek to a value (exactly or not), then step
 forward and back — either through everything in the tag's order, or through just what matches.**
@@ -191,7 +191,7 @@ record + tag  --[IKeyValueSource]-->  a typed value  --[KeyTransform]-->  key by
 ```
 
 `IKeyValueSource` is the seam. One implementation exists in 007 — `FieldValueSource`, which reads the
-bare field the tag names — and step 008 adds `ExpressionValueSource` beside it without touching
+bare field the tag names — and step 010 adds `ExpressionValueSource` beside it without touching
 `RecordKey`, `KeyTransform`, `Synchronize`, or anything above them. The interface is narrow enough to
 fake in three lines, which is what `DEV_APPROACH.md` §3.2 asks of a boundary.
 

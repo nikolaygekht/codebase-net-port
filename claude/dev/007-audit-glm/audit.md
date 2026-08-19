@@ -76,7 +76,7 @@ audit is complete.
   collation array is chosen by the table's code page; cp850 would need `S4CODEPAGE_850` in the
   generator. The reader does not validate that the collation name matches the table's code page — a
   `GENERAL` tag on a cp850 table would be read with the cp1252 weight table, producing wrong key
-  *comparisons* only when a value is seeked (007's problem, since reading keys needs no table).
+  *comparisons* only when a value is seeked (008's problem, since reading keys needs no table).
   **E, Medium** — reading is correct (keys are bytes); seeking by value is where this bites.
 
 - **A block size other than 512, and a multiplier above one** (`codeBaseNote` extension). Unit-tested
@@ -122,7 +122,7 @@ audit is complete.
 |---|---|---|---|---|
 | E10 | `SeekExact` on a descending tag's duplicate run | unit only | corpus has no descending tag with duplicate keys and a seek-exact case | **E, Low** |
 | E11 | `SeekNext` across a branch boundary (run spans leaves at two depths) | unit only | `CDXDEEP`'s `D_DUP` runs within one leaf level | **E, Low** |
-| E12 | `SeekNext` against reference on numeric/date/currency tags | property check only | driving `d4seekNext` needs value→key transforms (007) | **E, Low** |
+| E12 | `SeekNext` against reference on numeric/date/currency tags | property check only | driving `d4seekNext` needs value→key transforms (008) | **E, Low** |
 | E13 | Single-tag `.IDX` with a deep (multi-block) tree | `IDXONE` is single-block | only `IDXONE` exists; a deep `.IDX` is structurally identical to a deep `.CDX` tag but ungated | **E, Low** |
 | E14 | Collation table **construction** (key generation) | none | `COLLATION` not started; `CDXCOLL` gates only reading stored keys, not building them | **E, High** — this is the R2 risk and the prerequisite for `WRITE` and value-seek |
 
@@ -292,7 +292,7 @@ mutation-checked, gate-count assertions) is sound. No wrong-record-set bug was f
 
 The highest-value actions, in order:
 
-1. **Start `COLLATION`** — it is the remaining P1 prerequisite for value-seek (007) and write, and
+1. **Start `COLLATION`** — it is the remaining P1 prerequisite for value-seek (008) and write, and
    the only High-severity edge-case gap (E14). The corpus already has the `value → key-bytes` table
    needed to gate it.
 2. **Measure then cache** — the block-cache and per-entry allocation findings (P1, P2) are the

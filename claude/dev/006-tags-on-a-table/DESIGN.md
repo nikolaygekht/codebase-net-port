@@ -220,7 +220,7 @@ The first two already exist; `TableImage` gains an index and that is the only ne
    `PORTING-PLAN.md` §4 keeps deliberately (`r4*` flow values, `Top`/`Skip` semantics) so that a port of
    an existing application is a rename and not a rewrite.
 
-10. **The explicit methods step unconditionally, and that is the whole distinction from 007's seeking.**
+10. **The explicit methods step unconditionally, and that is the whole distinction from 008's seeking.**
     `GoNextIndexed` moves to the next record in the tag's order whatever its key is, stopping only at the
     end of the tag. The match-bounded stepping — stop when the key stops matching a search value — is
     `SeekNext`, arriving publicly in 007 over the internal operation 005 ports. Both stopping rules are

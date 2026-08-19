@@ -1,4 +1,4 @@
-# 006-audit-glm remediation — plan
+# 007-audit-glm remediation — plan
 
 Phases 3 and 5 of [`DEV_APPROACH.md`](../../DEV_APPROACH.md), for the work
 [`DESIGN.md`](DESIGN.md) designs.

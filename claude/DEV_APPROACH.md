@@ -226,7 +226,7 @@ The first is preferred during a step; the second is fine for a retrospective che
 
 **Copy aside the file you are about to break, and restore that same file from the copy.** The trap is
 a mutation that touches a *different* file from the one being restored: step 006 lost `Table.cs` this
-way, and step 007 lost it again in a session that had already used the copy-aside rule correctly twice
+way, and step 008 lost it again in a session that had already used the copy-aside rule correctly twice
 on other files. The habit does not transfer by itself, so the rule is per-restore and not per-session:
 if a file changed, it comes back from a checksummed copy, never from `git`.
 

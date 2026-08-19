@@ -1,4 +1,4 @@
-# 006-audit-glm — summary
+# 007-audit-glm — summary
 
 **Closed 2026-08-13.** An independent audit of steps 002–005, its triage, and the remediation it
 prompted. Carried out here rather than under a step number: it opened no capability and
@@ -105,9 +105,9 @@ Six, per `DEV_APPROACH.md` §6:
 
 ## What this deliberately did not do
 
-- **P1, the block cache** — step 007 measures, and the cache is designed against `QUERY`'s access
+- **P1, the block cache** — step 009 measures, and the cache is designed against `QUERY`'s access
   pattern rather than guessed at now.
-- **P2, P5, P6, P7** — step 007, measure-first. P5's copy is *defensive*, P6 runs over tens of tags, and
+- **P2, P5, P6, P7** — step 009, measure-first. P5's copy is *defensive*, P6 runs over tens of tags, and
   P7 is already a documented decision in `LeafBlock.Seek`'s own remarks. Expect to keep at least two.
 - **Child-pointer block alignment** — `HARDENING`. It needs a rule about what a legal child offset *is*,
   which is `BlockAddressing`'s to state; that is a design question, not a guard.

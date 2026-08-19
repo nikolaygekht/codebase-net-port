@@ -1,4 +1,4 @@
-# 008-expr — design
+# 010-expr — design
 
 The xBase expression engine, in the subset a reader needs: evaluate a tag's key expression against a
 record, and evaluate a filter.
@@ -140,7 +140,7 @@ type says how — and `ExpressionValueSource` evaluates. `RecordKey` then conver
 than from bytes, which is also what `expr4keyConvert` does (§9.2). The transforms of 007 are
 untouched; only their input side moves.
 
-**Say this plainly in the summary:** 007's design claimed the seam would take an expression
+**Say this plainly in the summary:** 008's design claimed the seam would take an expression
 implementation "without anything above it moving". That was half right. The interface changes shape
 once, here, and everything above `RecordKey` is genuinely unaffected.
 

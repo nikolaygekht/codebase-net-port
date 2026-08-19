@@ -104,7 +104,13 @@ here, beside the audit that motivated it. Designed in [`DESIGN.md`](DESIGN.md).
    *is*, which is `BlockAddressing`'s to state, and that is a design question rather than a guard.
    It stays on the `HARDENING` list.
 
-### 2.2 Step 007 — measure
+> **Numbering note, added 2026-08-19.** §2.2 and §2.3 are in the order this plan *proposed* on
+> 2026-08-13: measure first, then `COLLATION`. What happened was the reverse — seek by value went first
+> as step 008 and the measurement landed as [`009-performance-audit`](../009-performance-audit/) — so
+> §2.3 precedes §2.2 in reality. The step numbers here have been corrected to where the work actually
+> went; the section order is left as written, because it is the record of a plan and not of an outcome.
+
+### 2.2 Step 009 — measure
 
 Add the benchmark project (BenchmarkDotNet is in the stack list, unused) and take the baseline
 `STATE.md` §3 already specifies: over `CDXDEEP` and `IDXONE`, a full tag-order table walk, a full
@@ -199,11 +205,11 @@ table and **every** bullet of its §1.3 appears here with a home, including the 
 | Rank | # | Home |
 |---|---|---|
 | 1 | E14 collation construction | Step 008 (§2.3) |
-| 2 | P1 block cache | Step 007, then **deferred past it** — the cache is designed against `QUERY`'s access pattern, not guessed at now (§3 #7) |
-| 3 | P2 per-entry allocation | Step 007 (§2.2) |
+| 2 | P1 block cache | Step 009, then **deferred past it** — the cache is designed against `QUERY`'s access pattern, not guessed at now (§3 #7) |
+| 3 | P2 per-entry allocation | Step 009 (§2.2) |
 | 4 | E1 `'7'` | **Closed** — ADR-32, out of scope, dead branches removed in the remediation |
 | 5 | E2 `'H'` blanking | **Closed — false positive.** `f4blank` space-fills `r4floatBin` (`f4field.c:135-168`); the port was already right (§1.2) |
-| 6 | P3 `Synchronize` O(n) | **Resolved in 007, and it never needed `EXPR`.** ADR-28 restricts a selectable tag to a bare field name, so deriving the current record's key means reading a field — not evaluating an expression. With 007's transforms plus 005's `SeekExact` it becomes O(log n). The "needs `EXPR`" note here, in the audit, and in `STATE.md` was wrong |
+| 6 | P3 `Synchronize` O(n) | **Resolved in 008, and it never needed `EXPR`.** ADR-28 restricts a selectable tag to a bare field name, so deriving the current record's key means reading a field — not evaluating an expression. With 008's transforms plus 005's `SeekExact` it becomes O(log n). The "needs `EXPR`" note here, in the audit, and in `STATE.md` was wrong |
 | 7 | Cycle guard | Remediation, `DESIGN.md` item 4 |
 | 8 | E3 `FoxDate` year 0 | **Closed** — ADR-33. The code was right; the C's own comment was wrong and had been copied faithfully |
 | 9 | E4 `MemoFileHeader.BlockSize` | Remediation, `DESIGN.md` item 2 |
@@ -217,9 +223,9 @@ table and **every** bullet of its §1.3 appears here with a home, including the 
 | 17 | `SeekFirstAtOrAbove` empty leaf | Remediation, `DESIGN.md` item 6 |
 | 18 | Child-pointer block alignment | **`HARDENING`**, deliberately — it needs a rule about what a legal child offset is, which is `BlockAddressing`'s to state (`DESIGN.md` item 6) |
 | 19 | Index short read reports `Data` | Remediation, `DESIGN.md` item 6 |
-| 20 | P5 `KeySearch.For` copies | **Resolved by 007's design, not by measurement.** The triage above called the copy "defensive" and separately let 007 keep the search on the cursor — those are the same decision, and splitting them made a settled question look like an open finding. A cursor that owns its key buffer copies once per cursor, not once per seek. See `007-seek-by-value/DESIGN.md` |
-| 21 | P6 `Tag(name)` linear scan | **Step 007** (§2.2) — measure first; a tag directory holds tens of tags, so this is very likely noise |
-| 22 | P7 no duplicate-count skipping | **Step 007** (§2.2) — measure **together with P2**, see §2.2 |
+| 20 | P5 `KeySearch.For` copies | **Resolved by 008's design, not by measurement.** The triage above called the copy "defensive" and separately let 008 keep the search on the cursor — those are the same decision, and splitting them made a settled question look like an open finding. A cursor that owns its key buffer copies once per cursor, not once per seek. See `008-seek-by-value/DESIGN.md` |
+| 21 | P6 `Tag(name)` linear scan | **Step 009** (§2.2) — measure first; a tag directory holds tens of tags, so this is very likely noise |
+| 22 | P7 no duplicate-count skipping | **Step 009** (§2.2) — measure **together with P2**, see §2.2 |
 
 ### 5.2 Corpus gaps — they want generator cases, not unit tests
 

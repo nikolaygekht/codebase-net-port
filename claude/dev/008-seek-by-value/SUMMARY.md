@@ -1,4 +1,4 @@
-# 007-seek-by-value — summary
+# 008-seek-by-value — summary
 
 **Closed 2026-08-14**, reopened the same day to close ADR-30, and closed again. A caller can now ask a
 table where a value is instead of walking until they find it, and **no navigation path refuses any
@@ -93,7 +93,7 @@ restore by checksum from a copy, never by `git`, regardless of which file the mu
 ## ADR-30 closed too, and it never needed `EXPR` either
 
 The step was reopened to finish this, because the design for 008 found that ADR-30's premise had been
-false since 007's own `RecordKey.Write` landed. Stepping in a tag's order from a record the tag does
+false since this step's own `RecordKey.Write` landed. Stepping in a tag's order from a record the tag does
 not list now derives that record's key, positions on the nearest entry, and carries on — which is what
 `d4skip` does. **ADR-34 supersedes ADR-30**, `Table.NotInTag` is gone, and `CDX-READ` owes `EXPR`
 exactly one thing: typing a key expression that is not a bare field name.
@@ -113,7 +113,7 @@ skips recorded beside its keys.
 
 ## Not in this step
 
-- **`EXPR`** — step 008. `IKeyValueSource` is the seam it plugs into; `FieldValueSource` is its only
+- **`EXPR`** — step 010. `IKeyValueSource` is the seam it plugs into; `FieldValueSource` is its only
   implementation today and `ExpressionValueSource` sits beside it without anything above moving.
 - **The performance pass** — after 008, and smaller than it was: P3 and P5 were resolved here by
   design rather than measurement.

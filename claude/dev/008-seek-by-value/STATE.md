@@ -1,4 +1,4 @@
-# 007-seek-by-value — state
+# 008-seek-by-value — state
 
 **Live, per-step.** Where execution is, decisions taken during it, and what is blocking. The project
 state is the root [`STATE.md`](../../../STATE.md).

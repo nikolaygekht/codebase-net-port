@@ -946,10 +946,10 @@ closed as **the code is correct and the comment was wrong**, not as a defect fix
 
 ## ADR-34 — Stepping from a record the tag does not list carries on from the nearest key · accepted
 
-**Supersedes ADR-30**, whose premise stopped being true in step 007.
+**Supersedes ADR-30**, whose premise stopped being true in step 008.
 
 **Context.** ADR-30 refused this step on the grounds that "without `EXPR` this port cannot derive that
-key; it can only look for the record itself, by walking the tag." Step 007 built that derivation:
+key; it can only look for the record itself, by walking the tag." Step 008 built that derivation:
 `RecordKey.Write` produces the key a tag holds for a record, and `Synchronize` already calls it. The
 refusal survived only because `Synchronize` asked `SeekExact` for the key *and* the record number, so
 a record the tag omits missed. Nothing was waiting on the expression engine — ADR-28 already limits a

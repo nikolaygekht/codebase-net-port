@@ -1,4 +1,4 @@
-# 006-audit-glm — remediation design
+# 007-audit-glm — remediation design
 
 **Executed and closed 2026-08-13.** See [`SUMMARY.md`](SUMMARY.md), which records six places where
 execution contradicted this document — item 6 in particular turned out to be a one-clause fix rather
@@ -21,7 +21,7 @@ expectation changes, because none of this alters what a well-formed file decodes
 
 ## Not in this step
 
-- **The block cache and the per-entry allocation** (P1, P2) — step 007, and P1 is deferred past it
+- **The block cache and the per-entry allocation** (P1, P2) — step 009, and P1 is deferred past it
   (§3 #7).
 - **Block-alignment validation for child pointers** — needs a rule about what a legal child offset *is*,
   which is `BlockAddressing`'s to state. That is a design question, not a guard, and it stays on

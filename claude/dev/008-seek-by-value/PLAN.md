@@ -1,4 +1,4 @@
-# 007-seek-by-value — plan
+# 008-seek-by-value — plan
 
 Phases 3 and 5 of [`DEV_APPROACH.md`](../../DEV_APPROACH.md), for what [`DESIGN.md`](DESIGN.md)
 designs.

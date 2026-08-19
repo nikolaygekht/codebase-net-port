@@ -1,14 +1,21 @@
 # Project state
 
-**Updated:** 2026-08-14 · the tree is **clean** and everything is committed to `main`. Nothing is
-pushed — **three commits are waiting**, all of step 007's.
-**Active step:** none. [`007-seek-by-value`](claude/dev/007-seek-by-value/) is
-**[closed](claude/dev/007-seek-by-value/SUMMARY.md)**: **1177 tests**, 526 golden. A table can be asked
-where a value is, and **no navigation path refuses any more** — ADR-34 closed the last one.
+**Updated:** 2026-08-19 · the tree is **clean**, and everything is committed and **pushed** to `main` —
+including step 008's three commits, which had been waiting (their messages say `007-seek-by-value`, the
+name the folder carried when they were written). `net/` is untouched — **no `.cs` file was opened this
+session** — so **1177 tests, 526 golden** still stands.
+**Active step:** [`009-performance-audit`](claude/dev/009-performance-audit/) — its audit is
+**[closed](claude/dev/009-performance-audit/SUMMARY.md)** and its remediation is
+[designed](claude/dev/009-performance-audit/DESIGN.md),
+[planned](claude/dev/009-performance-audit/PLAN.md) and **not started**; the live sub-step is named in
+[its own `STATE.md`](claude/dev/009-performance-audit/STATE.md).
+[`008-seek-by-value`](claude/dev/008-seek-by-value/) is
+**[closed](claude/dev/008-seek-by-value/SUMMARY.md)**: a table can be asked where a value is, and
+**no navigation path refuses any more** — ADR-34 closed the last one.
 **`COLLATION` is done, `CDX-READ` is done, and risk R2 is retired.**
-**Next session starts at section 3**, at step **008, `EXPR`** —
-[designed](claude/dev/008-expr/DESIGN.md), not yet planned. The performance pass follows it, and has
-shrunk: two of its four suspects were resolved by design rather than measurement.
+**Next session starts at `PLAN.md` sub-step 1** — the benchmark project — of six, none executed. Step **010, `EXPR`**
+is [designed](claude/dev/010-expr/DESIGN.md) and follows it. **The performance pass now has numbers
+instead of guesses**, and the block cache is measured to be worth an order of magnitude here too.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -143,46 +150,60 @@ is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ---
 
-## 2. Last session (2026-08-12)
+## 2. Last session (2026-08-19)
 
-**Step 006 was designed, planned and executed, and is closed.** A table now opens its production index
-and can be navigated in a tag's order, which makes this the first index feature a caller can see. Read
-[`SUMMARY.md`](claude/dev/006-tags-on-a-table/SUMMARY.md). Five things worth carrying forward:
+**The port was measured for the first time, and `claude/dev` was renumbered.** No code changed —
+`net/` is byte-for-byte what step 008 left.
 
-- **The pad byte is settled for real tags, and derived rather than supplied.** ADR-28's rule — a tag whose
-  expression is a bare field name takes that field's type — is implemented in `KeyTypeResolver` and checked
-  against the `pChar` the C library recorded for **all 18 corpus tags**. Resolution is lazy, per tag, on
-  first use, so a tag whose expression this port cannot type refuses when it is selected and the table's
-  other tags keep working. That was a change to 004's reader, which resolved every tag at open.
-- **The gate verifies records, not record numbers.** Every one of the 3364 positions a tag-order walk
-  reaches is compared field by field against that record's entry in the table's own dump. The mutation that
-  justifies it: reading a *neighbouring* record while reporting the right number fails exactly those four
-  golden walks and nothing else — every record-number assertion in the suite stays green.
-- **Reading `d4skip`'s tag path closely changed four behaviours the design had guessed at.** A skip of zero
-  does not consult the tag at all; at end of file a backwards skip re-enters through the tag's bottom and
-  counts that as a step; a backwards skip that runs out stops on the tag's *first* record and leaves it
-  readable, raising only the beginning flag; and running out is *not* always both flags. The facts are now
-  `CDX-FORMAT.md` §7.1, and the difference they create between `Skip` and the four `…Indexed` methods is
-  **ADR-29**: a skip is relative and boundary-readable, a positioning call reports no record.
-- **One case is refused rather than answered** (**ADR-30**): stepping in a tag's order from a record the tag
-  does not list. The C library re-derives the record's key through the expression; this port cannot, and
-  answering "end of file" would hand back a record set that silently stops early. A filtered or unique tag
-  is still fully walkable — only mixing `Go(n)` to an unlisted record with a tag-order step is refused.
-- **`Table.HasProductionIndex` was removed.** It reported the header's claim; `HasIndex` reports the open
-  file, and since a declared index that is missing is an error at open the two could never disagree.
+**[`009-performance-audit`](claude/dev/009-performance-audit/) is closed.** 10 000 seeks over a
+10 000-record table, run through the reference C library and through `CodeBase.Net`, against the same
+file and the same query files, with per-record checksums proving both did identical work. Read its
+[`SUMMARY.md`](claude/dev/009-performance-audit/SUMMARY.md); the numbers and what they change are in
+§3, and the decomposition of the 14× is
+[`ANALYSIS.md`](claude/dev/009-performance-audit/ANALYSIS.md). The short version: **the 14× is read
+syscalls and nothing else, and the same win is available here — 11.6× on a seek, 23.4× on a walk. The
+port's own CPU work is 1.4–1.7× the C's, and faster on a walk.**
 
-**Known ungated paths, named rather than discovered later:** a composite key expression such as
-`UPPER(NAME)`, refused until `EXPR`; a tag over a `Y`, `T`, `Z` or `F` field, which the resolver handles and
-no corpus tag exercises; an index entry naming a record past the end of the table, which every generated
-index precludes and a hand-built pair covers instead; a table whose every tag is refused; and two index
-files on one table.
+**Its remediation is designed and planned, and not started.**
+[`DESIGN.md`](claude/dev/009-performance-audit/DESIGN.md) and
+[`PLAN.md`](claude/dev/009-performance-audit/PLAN.md) — six sub-steps, stoppable after three. Three
+things go in: the block cache, compare-in-place, and the padded comparison; plus `Table.Refresh()` and
+the coherency hooks. `d4lock` deliberately stays out. §3 has the shape and the reasoning.
+
+**The `claude/dev` numbering collision is fixed.** The audit that followed step 006 had been filed as a
+*second* `006-`, on the reasoning that an audit opening no capability deserved no number. That made two
+folders share a number, so the folders were renumbered and every reference moved with them:
+
+| Was | Is |
+|---|---|
+| `006-audit-glm` | [`007-audit-glm`](claude/dev/007-audit-glm/) |
+| `007-seek-by-value` | [`008-seek-by-value`](claude/dev/008-seek-by-value/) |
+| — | [`009-performance-audit`](claude/dev/009-performance-audit/) *(new)* |
+| `008-expr` | [`010-expr`](claude/dev/010-expr/) |
+
+**The rule changed with it**, in [`claude/dev/README.md`](claude/dev/README.md): *a folder that opens no
+capability still takes the next number.* An audit is numbered like a step; what makes it not a step is
+that `PORTING-PLAN.md` §5 gains no row, not that it goes unnumbered.
+
+Two consequences worth knowing before reading a `git log`:
+
+- **The three unpushed commits say `007-seek-by-value`.** That was the folder's name when they were
+  written. Their content is step 008's.
+- **`007-audit-glm/REMEDIATION-PLAN.md` §2.2 and §2.3 are out of order** — it planned to measure before
+  `COLLATION`, and the reverse happened. Its step numbers now point where the work actually went; a note
+  at §2.2 says so, and the section order is left alone because it records a plan, not an outcome.
+
+**`experiments/` is gitignored**, and holds the scratch area the harness was built in. The harness
+*sources* are committed, under
+[`009-performance-audit/harness/`](claude/dev/009-performance-audit/harness/), so the measurement can be
+rebuilt from the repository; the 610 KB table it generates is not.
 
 ## 3. Next
 
-### Step 007 is closed — a table can be asked where a value is
+### Step 008 is closed — a table can be asked where a value is
 
-[`007-seek-by-value`](claude/dev/007-seek-by-value/) is done; read its
-[`SUMMARY.md`](claude/dev/007-seek-by-value/SUMMARY.md). **`COLLATION` is complete, `CDX-READ` is
+[`008-seek-by-value`](claude/dev/008-seek-by-value/) is done; read its
+[`SUMMARY.md`](claude/dev/008-seek-by-value/SUMMARY.md). **`COLLATION` is complete, `CDX-READ` is
 complete, and risk R2 is retired** — the second of the port's two highest silent-corruption risks,
 after `CDX-READ`'s bit-packed leaves. Both are now closed.
 
@@ -213,8 +234,8 @@ checksum from a copy, **never** by `git`, regardless of which file the mutation 
 ### The 002–005 audit is closed — five defects fixed, three of its claims overturned
 
 An independent pass over steps 002–005 lives in
-[`claude/dev/006-audit-glm/`](claude/dev/006-audit-glm/), with the triage, the decisions, and the
-remediation beside it. Read [`SUMMARY.md`](claude/dev/006-audit-glm/SUMMARY.md). It found **no
+[`claude/dev/007-audit-glm/`](claude/dev/007-audit-glm/), with the triage, the decisions, and the
+remediation beside it. Read [`SUMMARY.md`](claude/dev/007-audit-glm/SUMMARY.md). It found **no
 wrong-record-set bug**, which matches its own verdict.
 
 **Fixed:** `'7'` removed (ADR-32); `MemoFileHeader.BlockSize` reads signed; the leaf chain is bounded,
@@ -233,87 +254,131 @@ written; `Table.HasProductionIndex` stays removed (**ADR-31**); `'7'` is out of 
 before AD 1 are out of scope (**ADR-33**); and the mutation-check process rule is now `DEV_APPROACH.md`
 §4, "Proving a gate".
 
-**Everything else has a home**, in [`REMEDIATION-PLAN.md`](claude/dev/006-audit-glm/REMEDIATION-PLAN.md)
+**Everything else has a home**, in [`REMEDIATION-PLAN.md`](claude/dev/007-audit-glm/REMEDIATION-PLAN.md)
 §5: the performance findings below, and **twelve corpus gaps** named in `PORTING-PLAN.md` §6.3 that want
 generator cases rather than unit tests standing in for them.
 
-### The performance pass — after 007 and 008, and smaller than it was
+### Step 010 is `EXPR` — where the next session starts
 
-**Nothing has ever been measured.** Every performance property of the port so far is a guess, and the
-optimizer — the reason the project exists — will drive the index read path far harder than a walk does:
-several cursors over one tag, thousands of seeks per query. There is **no benchmark project** in the
-solution yet, and BenchmarkDotNet is in the stack list unused.
+**It is [designed](claude/dev/010-expr/DESIGN.md), not yet planned.** `CDX-READ` owes it exactly **one**
+thing: typing a key expression that is not a bare field name (ADR-28). The second refusal, ADR-30, turned
+out not to need the expression engine at all and was closed inside step 008 as **ADR-34** — the third
+time that premise had been repeated without being checked. Scope is the **whole** function table, 36
+named functions and the operator set, because `QUERY` needs the filter vocabulary anyway.
 
-**Measure first, cache later.** A baseline is cheap, non-destructive, and is not invalidated by anything
-that lands after it; the block cache is a design whose right answer depends on how `QUERY` drives the
-index, and `QUERY` does not exist yet. Suspect 2 is local to `LeafBlock`/`BranchBlock` and has no design
-content, so it lands with the measurement; **suspect 1 does not**. Where the cache lives becomes an ADR
-written against a real access pattern rather than a guessed one.
+### The performance pass — measured, and P1 dominates
 
-**Two of the original suspects have already left this list** — P3 into step 007, where re-deriving the
-key turns out not to need `EXPR`, and P5 into 007's design, where the cursor owning its key buffer makes
-the per-seek copy disappear. Both are struck through below.
+**It has numbers now.** [`009-performance-audit`](claude/dev/009-performance-audit/) closed 2026-08-19:
+10 000 seeks over a 10 000-record table, the same file and the same query files driven through the
+reference C library and through `CodeBase.Net`, with matching per-record checksums proving both did
+identical work. Full findings and method in its
+[`SUMMARY.md`](claude/dev/009-performance-audit/SUMMARY.md) and
+[`METHOD.md`](claude/dev/009-performance-audit/METHOD.md); what follows is only what it changes here.
 
-Do the measuring first, over `CDXDEEP` (600 records, three levels) and `IDXONE`: a full tag-order table
-walk, a full index-only walk, a seek storm, and `Go(n)`-then-`Skip(1)`. Then look at four suspects, in the
-order they are likely to matter:
+Four configurations, because the C library's cache is off unless `code4optStart` is called, and because
+the port can be given a perfect one by swapping its internal `IRandomAccessSource` for a `byte[]`:
 
-1. **No block cache at all.** `NodeReader.ReadAt` (`NodeReader.cs:73`) allocates a fresh `byte[512]` and
-   reads from the file for *every* block, so every descent from the root re-reads the root and each
-   interior level, and every `Top` re-descends. The C library keeps a block list per tag plus its own file
-   buffering. **This is also a design question, not only a speed one**: a cache shared by several cursors
-   over one tag is exactly what `QUERY` will want, and where it lives (`NodeReader`, `CdxTag`, or the
-   index file) is an ADR.
-2. **A key array allocated per entry read.** `LeafBlock.EntryAt` (`LeafBlock.cs:117`) copies the rebuilt
-   key out on every access, including once per comparison inside `LeafBlock.Seek` (`LeafBlock.cs:140`).
-   A span-returning read, or a compare-in-place path, would make a leaf scan allocation-free.
-3. ~~**`TableTagCursor.Synchronize` is O(n) in the tag**~~ — **moved into step 007, and it never needed
-   `EXPR`.** It is paid only when the record and tag cursors have drifted (`Go(n)` then a tag-order
-   step), and the fix is to re-derive the record's key and seek it, exactly as `d4seekSynchToCurrentPos`
-   does. That was thought to need the expression engine; it does not, because ADR-28 already restricts a
-   selectable tag to a **bare field name**, so deriving the key means reading a field. 007's transforms
-   plus 005's `SeekExact` make it O(log n).
-4. **A record read per position, with no reuse.** `Table.Fetch` reads through `RecordReader` every time,
-   which is faithful and correct, and worth measuring only because an indexed walk now issues one index
-   read plus one record read per record.
-5. **Two more the audit added, to measure and probably keep.** (Its third, P5's per-seek copy, is
-   **designed away in 007** rather than measured: once the cursor owns its key buffer the copy happens
-   once per cursor, not once per seek.) `IndexFileReader.Tag(name)` is a linear scan
-   (`IndexFileReader.cs:119`) over tens of tags, very likely noise against one block read. And
-   `LeafBlock.Seek` does not use duplicate-count skipping, which its own remarks already record as a
-   **deliberate** trade rather than an oversight. Measure all three and say plainly when the answer is
-   "leave it" — an un-restated finding reads as an un-examined one.
+| µs per operation | C | C **cached** | `CodeBase.Net` | port **cached** |
+|---|---|---|---|---|
+| seek, `C(20)` key, 4 levels | 5.56 | 0.40 | 7.84 | **0.68** |
+| seek, `N(12,2)` key, 3 levels | 4.97 | 0.75 | 7.22 | **1.04** |
+| tag walk, per record | 2.49 | 0.08 | 1.05 | **0.045** |
 
-**Measure P7 with P2, not after it.** P2 removes the per-entry *copy*; the *rebuild* stays, because a
-compressed leaf's keys are relative. So P7's justification survives P2 — but once the copy is gone, the
-full-length comparison is a far larger share of what is left, and measuring them in sequence would
-attribute the cost to the wrong one.
+**The 14× is read syscalls, and only read syscalls.** Counted with `GetProcessIoCounters`, not inferred:
+the C issues 4.286 reads per character seek at a measured **1.18–1.21 µs** each — 93% of its 5.56 µs —
+and zero with the cache on. A hit is a hash lookup plus a `memcpy`: 0.002 µs for 512 bytes.
 
-Keep the rule that produced the current code: **correctness first, and no optimization without a
-measurement and a gate that still passes**. A cache that serves a stale block is a wrong record set.
+**What the measurement settled:**
 
-**Step 007: seek by value** — [`DESIGN.md`](claude/dev/007-seek-by-value/DESIGN.md) and [`PLAN.md`](claude/dev/007-seek-by-value/PLAN.md) are written; twelve sub-steps, **stoppable after five** with `COLLATION` closed and nothing public.** `Table.Seek("SMITH")` needs the value-to-key transforms — `t4dblToFox` and its
-siblings — which is `COLLATION`'s machine half and is **gateable from the corpus already committed**, since
-every tag's stored keys sit beside the field values they were computed from. It is the last piece before a
-caller can ask a table a question rather than walk it, and it inherits three named questions from 005: the
-`.NULL.` convention for an empty public seek, whether `SeekNext`'s degrade-to-seek should survive into a
-public API, and `considerPartialSeek` for collated partial seeks. Nothing is designed yet.
+1. **Build the cache — it is worth 11.6× on a seek and 23.4× on a walk**, and those are the port's own
+   numbers, measured, not the C's borrowed. P1 is far and away the largest item in the pass. **The walk
+   is the one to keep in view**: `QUERY` builds a bitmap by seeking one end of a range and then
+   *walking*, so a 10 000-record range goes from 10.5 ms to 0.45 ms.
+2. **The port's own CPU work is only 1.4–1.7× the C's, and on a walk it is 1.7× faster.** With I/O out
+   of both sides: character seek 1.70×, numeric 1.38×, walk 0.58×. The 1.41× headline was not hiding
+   anything, and P4 stays struck from the list.
+3. **P2 is the whole of the remaining gap, and it needs no design decision.** The port materialises a
+   fresh `byte[keyLength]` for *every* key comparison (`BranchBlock.EntryAt`, `LeafBlock.EntryAt`) where
+   the C compares in place. Removing just those copies is measured at **1.7–1.9× of the descent** and
+   1 292–1 744 bytes/seek, with no algorithmic change and identical results — `KeySearch.Compare` already
+   takes a `ReadOnlySpan<byte>`. **The copy is deliberate and documented, and justified at exactly one of
+   its five call sites** — `TagCursor.Current`, which hands an entry outward while the cursor moves on.
+   The other four compare and discard, or read only the child pointer. The fix is therefore *additive*: a
+   compare-in-place path beside `EntryAt`, whose contract does not change. `ANALYSIS.md` §6 has the call
+   site table.
+4. **P7 is implemented and measured, and does nothing here.** The C's duplicate-count skip changed the
+   comparison count by zero on both tags, because every key is unique. It needs a duplicate-heavy corpus
+   tag before it can be judged.
+5. **Root retention is subsumed by the cache.** The port issues 5 reads per character seek where the C
+   issues 4.286, because `tfile4upToRoot` keeps the root loaded per tag. Worth ~11% uncached; with a
+   cache the root is a hash hit and the saving vanishes.
+6. **GC is not the lever.** Forcing a 512 MB Gen0 budget took collections to zero and moved the timings
+   under 1%.
 
-It also inherits one finding from the audit (§1.3): **nothing checks that a tag's collation name matches
-the table's code page.** A `GENERAL` tag on a cp850 table is read with the cp1252 weight table today.
-That is harmless while only stored keys are read — a key is bytes — and wrong the moment a *value* is
-seeked, which is exactly what this step adds. Gating it needs `S4CODEPAGE_850` in the generator.
+**The remediation is designed and planned**, in [`DESIGN.md`](claude/dev/009-performance-audit/DESIGN.md)
+and [`PLAN.md`](claude/dev/009-performance-audit/PLAN.md), filed inside 009 the way `007-audit-glm` held
+its own. **The next session starts at `PLAN.md` step 1**, and
+[`009-performance-audit/STATE.md`](claude/dev/009-performance-audit/STATE.md) is the live step state that
+names the current sub-step. **Six sub-steps, stoppable after three** with all the CPU work done and the cache still owed:
+benchmark project → compare-in-place → padded comparison → eviction rule → wire the cache up →
+`Table.Refresh()` and the coherency hooks. Nothing is
+executed yet; no `.cs` file has been opened.
 
-**Step 008 is `EXPR`**, and it is [designed](claude/dev/008-expr/DESIGN.md). `CDX-READ` owes it exactly
-**one** thing now: typing a key expression that is not a bare field name (ADR-28). The second refusal,
-ADR-30, turned out not to need the expression engine at all and was closed inside 007 as **ADR-34** —
-the third time that premise had been repeated without being checked. Scope is the **whole** function
-table, 36 named functions and the operator set, because `QUERY` needs the filter vocabulary anyway.
+**Two design decisions worth knowing before reading it:**
 
-**The performance pass follows them**, no longer as step 007. Its two headline findings have moved:
-P3 into 007 (above) and P5 into 007's design (the cursor owns its key buffer). What is left is the
-measurement itself, the block cache — still an ADR best written against `QUERY`'s real access pattern —
-P2's per-entry allocation, and the two small ones, P6 and P7.
+- **The cache decorates `IRandomAccessSource`, not `NodeReader`** — because a tag walk issues 1.044 reads
+  per record of which **1.000 is the DBF record**, so an index-only cache would miss the 23.4× entirely.
+  `RecordReader` and `NodeReader` already read through that one interface, which is exactly where the C
+  caches (`file4readInternal`, below both layers).
+- **It is optional, with the reference's own three-valued policy**: `Off` / `WhenExclusive` / `Always`,
+  defaulting to `WhenExclusive`. `OPT4EXCLUSIVE` is the C's shipped default and it is a *safety* rule, not
+  a convenience one — `optFlag = (file->lowAccessMode != OPEN4DENY_NONE)` (`f4opt.c:492-501`) caches only
+  files opened excluding other writers, which makes staleness impossible rather than unlikely. Today no
+  file this port opens is exclusive, so the faithful default caches nothing and keeps today's freshness;
+  it **starts caching by itself** when `LOCKING` adds deny modes. A caller who knows they are the only
+  writer asks for `Always`.
+
+**`d4refresh` is in; `d4lock` is not, and that was not an oversight.** `LOCKING` is **P3, not started**
+in `PORTING-PLAN.md` §5, `claude/specs/LOCKING-TRANSACTIONS.md` is already written, and **risk R6 already
+names this exact hazard** — "read caching on unlocked files can mix old/new bytes; default to no unsafe
+read-opt on shared files" — which is what the `WhenExclusive` default does. What this step adds is
+`Table.Refresh()` and the cache's `Invalidate` / `Flush` entry points, so §3.7's **flush before unlock,
+invalidate after lock** has something to call when `LOCKING` arrives. Worth noting for when it is
+scheduled: in shared mode a read lock *is* a write lock (§1.2), so a locking reader really does exclude
+writers — which would make `LOCKING` valuable **before** `WRITE` for the first time, and that is a change
+to §5's priorities to decide rather than assume.
+
+**And so the coupling cannot be forgotten**, `PORTING-PLAN.md` §5 now carries a
+**cross-capability obligation** table: what `WRITE`, `LOCKING` and `TRANS` each owe the block cache,
+with the C citations, plus a pointer from each capability's own section and from risk **R6**. Nobody
+starting `WRITE` in six months will read a closed audit's design folder, so the obligation lives with
+the capability that owes it, and a capability is not done until its row there is done.
+
+The rule is unchanged and now has teeth: **correctness first, and no optimization without a measurement
+and a gate that still passes.** A cache that serves a stale block is a wrong record set — which is why
+the default is the reference's, and why the eviction rule is a pure class proved before it ever serves a
+read.
+
+**One methodological scar worth keeping.** The analysis' first pass reported the port's cached seek at
+3.10 µs and concluded a cache was worth only 2.6× here. That was a harness defect, not a finding: it
+warmed up by pass count, and a RAM-backed pass is fast enough that five of them never gave the JIT the
+wall-clock it needs to reach tier-1. The harness now warms by wall clock and runs two variants in
+reverse order as an order-effect check, and the two tiering settings agree to 2%. **The file-backed
+numbers were never affected.**
+
+Full decomposition, with the source citations and the two hypotheses it rules out, is
+[`ANALYSIS.md`](claude/dev/009-performance-audit/ANALYSIS.md).
+
+**Two things the audit could not reach**, and the next measurement should:
+
+- **It measured CPU, not I/O.** 610 KB of DBF and 305 KB of CDX sit in the page cache after warm-up, so
+  the 14× is CPU work avoided against an already-cached file — a **lower** bound for a cold or larger
+  table, not an upper one.
+- **There is still no benchmark project in the solution**, and BenchmarkDotNet is still an unused entry in
+  the stack list — **that is `PLAN.md` sub-step 1**, which promotes the audit's harness
+  ([`harness/`](claude/dev/009-performance-audit/harness/), committed as documentation, not as a gate)
+  into `net/benchmarks/` and adds the `PERF10K` case. The baseline the audit *did not* take — an
+  index-only walk and `Go(n)`-then-`Skip(1)` — is owed there.
 
 Two things that do not depend on any of it:
 

@@ -307,13 +307,13 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 |---|---|---|---|---|
 | `CORPUS` | Corpus + generator | **P0** | in progress — 11 cases in, 4 of them indexed; mutation and write cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
-| `CDX-READ` | CDX reading & navigation | **P1** | **done** — decode and traversal (004), seek by key bytes (005), tags on a `Table` (006), seek by value (007). Only a non-field key expression waits on `EXPR` | **R1** retired |
-| `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (007 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
+| `CDX-READ` | CDX reading & navigation | **P1** | **done** — decode and traversal (004), seek by key bytes (005), tags on a `Table` (006), seek by value (008). Only a non-field key expression waits on `EXPR` | **R1** retired |
+| `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (008 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |
-| `WRITE` | Single-user write & round-trip | **P2** | not started | R4, R9 |
-| `LOCKING` | Locking & multi-user | **P3** | not started | R3, R10 |
-| `TRANS` | Transactions & recovery | **P3** | not started | — |
+| `WRITE` | Single-user write & round-trip | **P2** | not started — **owes the block cache, see §5's cross-capability obligation** | R4, R9, **R6** |
+| `LOCKING` | Locking & multi-user | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | R3, R10, **R6** |
+| `TRANS` | Transactions & recovery | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | **R6** |
 | `HARDENING` | Hardening, benchmarks, API polish | **P4** | not started | — |
 
 Two things the table does not say, deliberately. It does not say what to build next — that is a step
@@ -508,6 +508,9 @@ which is why it is P1 and write support is P2.
   step a developer may run the generator's `validate` mode over C#-written files; that is a manual
   confirmation, not part of the suite.
 - **Needs:** `CDX-READ`, `COLLATION`, `EXPR` (you cannot write a key you cannot compute or verify).
+- **Owes the block cache** — write-through or retire, the separate write-optimization switch, and a
+  record count that is never read stale. See §5's *cross-capability obligation* below; a write that
+  leaves a stale block resident is a wrong record set.
 
 ### `LOCKING` — locking & multi-user · P3
 
@@ -516,6 +519,10 @@ which is why it is P1 and write support is P2.
   FPT `0x40000000`), in-memory lock registry, `unlockAuto` modes, self-conflict/`WAIT4EVER`
   deadlock rule, retry loop, cache-coherency ordering (flush-before-unlock / invalidate-after-lock),
   CDX version-counter re-validation.
+- **Owes the block cache** — the §3.7 ordering above, plus extending its policy from "opened exclusive"
+  to "opened exclusive **or** locked", and a currency bypass for unlocked reads. See §5's
+  *cross-capability obligation* below. **This is also what makes the cache usable on shared files**, so
+  the two capabilities are worth scheduling together.
 - **Gate:** two parts. (a) *Always-on:* a C#-only multi-process test — two C# processes concurrently
   lock/append/read the same table without corruption, and the byte-range offsets observed on disk
   match the constants above. (b) *Opt-in interop:* a C# process and a second process built from
@@ -553,6 +560,29 @@ which is why it is P1 and write support is P2.
 memo, VFP9 varchar semantics (§2.3).
 
 ---
+
+### Cross-capability obligation — the block cache
+
+**Read this before starting `WRITE`, `LOCKING` or `TRANS`.** The block cache
+([`dev/009-performance-audit/DESIGN.md`](dev/009-performance-audit/DESIGN.md)) sits
+under every read in the library, decorating `IRandomAccessSource`. It is measured at **11.6× on a seek
+and 23.4× on a tag walk**, and its failure mode is **a wrong record set** — the one outcome this project
+ranks above being slow. Each capability below therefore owes it something specific, and these are
+obligations rather than reminders: a capability is not done until its row here is done.
+
+*(If the cache has not been built yet, every row is vacuous — but check it off deliberately rather than
+by omission.)*
+
+| Capability | Owes the cache |
+|---|---|
+| **`WRITE`** | **Every write must reach the cache.** A resident block covering written bytes is updated or retired, or a later read returns pre-write bytes — the C writes *through* the pool and marks the block `changed` (`opt4fileWrite`, `o4opt.c:1221`). **Read- and write-optimization are separate switches** in the reference (`cb->optimizeWrite`, `file4optimizeWrite`, `f4opt.c:642`); do not conflate them, write buffering has its own safety rules. **Appending must not read a stale record count** — the C forces currency around it (`D4APPEND.C:154-163`). Header updates flush before an append/file lock is released (`df4unlok.c:70-83`). |
+| **`LOCKING`** | **The ordering in `LOCKING-TRANSACTIONS.md` §3.7: flush before unlock, invalidate after lock.** The cache exposes `Invalidate(source)` / `Flush(source)` for exactly this and has since it was built. **The cache policy gains a lock test**: `WhenExclusive` extends from "opened exclusive" to "opened exclusive **or** a lock is held", which is `d4refresh`'s own condition (`D4FRESH.C:131-134`). **A read needing currency while unlocked must bypass the cache** — the C's `opt->forceCurrent` (`o4opt.c:1575-1585`). And `Table.Refresh()` regains the shortcut it cannot have today: skip the work when a lock proves nothing changed. |
+| **`TRANS`** | **Rollback discards cached blocks** — the C calls `d4freeBlocks` on every table in the transaction (`c4trans.c:2861`). A rolled-back write that survives in the pool is a wrong record set with no file on disk to blame. |
+| **`QUERY`** | Nothing owed for correctness, but note the shape: a bitmap build seeks one end of a range and then **walks**, which is the 23.4× case. Whether sequential read-ahead (`opt4fileReadSpBuffer`) is worth adding is a `QUERY`-era question. |
+
+**Why this is written here rather than in the step that built the cache.** Nobody starting `WRITE` in six
+months will read a closed audit's design folder. `PORTING-PLAN.md` §5 is where a capability's gates live,
+so the obligation lives with the capability that owes it.
 
 ## 6. Testing strategy
 
@@ -624,7 +654,7 @@ labelled as non-VFP. **Done since:** code-page-marked tables, single-byte and mu
 **Named gaps, from the 002–005 audit (2026-08-13).** These are paths the generator *can* produce and was
 never taught — unlike the corrupt-file guards, which are layer 3 because no valid file can express them.
 Tracked here rather than in a step folder, because corpus contents are this document's to own. Full
-disposition in `claude/dev/006-audit-glm/REMEDIATION-PLAN.md` §5.2.
+disposition in `claude/dev/007-audit-glm/REMEDIATION-PLAN.md` §5.2.
 
 | Gap | Why it matters |
 |---|---|
@@ -664,7 +694,7 @@ something different. Never use it for keys, indexes, or memos.
 | R3 | **VFP byte-range lock interop with live VFP apps** — append-path offset must match VFP exactly | Data corruption under real-world concurrent VFP + C# | Medium | Reproduce exact offsets (`LOCKING-TRANSACTIONS.md` §5.3); `LOCKING` two-process interop test; append path flagged for **external live-VFP verification** |
 | R4 | **FPT block reuse / monotonic growth** — S4FOX keeps no free chain; wrong allocation orphans or overwrites blocks | Memo corruption; files grow unbounded | Medium | Port allocation-at-EOF + `nextBlock` header semantics exactly (`FPT-MEMO.md` §3.7); implement `d4memoCompress` equivalent; corruption-guard checks; `WRITE` memo round-trip gate |
 | R5 | **Expression quirks leaking into index keys** — `STR()`/`DTOS()`/`TTOC()` text formatting, rounding, `*`-overflow; prefix `=`; divide-by-zero→0; blank-date propagation | Keys differ by a byte → silent seek failures | Medium | Port §7 of `EXPRESSIONS.md` bit-exactly; `c4dtoa45` behavior recovered empirically from generated output; `EXPR` expression + re-derived-key gate |
-| R6 | **Torn reads under I/O optimization** — read caching on unlocked files can mix old/new bytes; write caching unsafe without record lock | Wrong data returned to app | Medium | Preserve flush-before-unlock / invalidate-after-lock ordering (`LOCKING-TRANSACTIONS.md` §3.7); default to no unsafe read-opt on shared files; document the hazard |
+| R6 | **Torn reads under I/O optimization** — read caching on unlocked files can mix old/new bytes; write caching unsafe without record lock | Wrong data returned to app | Medium | Preserve flush-before-unlock / invalidate-after-lock ordering (`LOCKING-TRANSACTIONS.md` §3.7); default to no unsafe read-opt on shared files; document the hazard. **Designed 2026-08-19**: the cache is optional on the reference's own three-valued policy, defaulting to `WhenExclusive` — which caches only files opened excluding other writers and therefore caches *nothing* until `LOCKING` exists. `WRITE`, `LOCKING` and `TRANS` each owe it something concrete: **§5's cross-capability obligation table** |
 | R7 | **`flags4dateTimeFlags` ULP bitset** transcription error | datetime keys off by 1 ULP → seek equality breaks silently | Medium | Copy the 10 802-byte table verbatim; `COLLATION` gate covers many seconds-of-day; unit test the bit-extraction against generated key bytes |
 | R8 | **Missing C bodies** (`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4atoCurrency`, `code4initLow` defaults, `code4logOpen`) absent from the source drop | Numeric/currency text + defaults + log format guessed wrong | Medium | Recover behavior empirically from generated output; adopt documented Sequiter defaults; treat as `[UNVERIFIED]` and gate against corpus bytes |
 | R9 | **0x31 → 0x30 version normalization / skip-byte-0 header rewrite** done naively | 0x31 files silently downgraded; extensions lost | Low | Replicate the "never rewrite byte 0" write windows (`DBF-FORMAT.md` §2.5); round-trip test on 0x31 files |

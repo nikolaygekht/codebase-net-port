@@ -22,3 +22,6 @@ obj/
 
 .claude/settings.local.json
 audit/
+
+# Local performance/scratch experiments -- never committed (see experiments/README.md)
+experiments/

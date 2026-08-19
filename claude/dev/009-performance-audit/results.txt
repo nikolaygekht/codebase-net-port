@@ -1,0 +1,67 @@
+performance-1-experiment -- raw results
+date: 2026-08-19T15:09:12Z
+host: WSL over Windows; all binaries run on Windows against D:\...\out; 5 warm-up passes then N timed reps
+
+########## round 1
+--- c (plain: no library block cache) ---
+side=c     records=10000 reps=9 optimize=-1 blockcache=off
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=57.718 med_ms=58.087 mean_ms=58.072 us_per_op=5.772
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=57.476 med_ms=57.649 mean_ms=57.765 us_per_op=5.748
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=51.380 med_ms=51.873 mean_ms=51.843 us_per_op=5.138
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=26.090 med_ms=26.350 mean_ms=26.479 us_per_op=2.609
+--- c (opt: code4optStart, block cache on) ---
+side=c-opt records=10000 reps=9 optimize=1 blockcache=on
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=4.022 med_ms=4.041 mean_ms=4.060 us_per_op=0.402
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=4.004 med_ms=4.108 mean_ms=4.223 us_per_op=0.400
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=7.607 med_ms=7.698 mean_ms=7.705 us_per_op=0.761
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=0.796 med_ms=0.868 mean_ms=0.846 us_per_op=0.080
+--- cs (CodeBase.Net) ---
+side=cs records=10000 reps=9 runtime=8.0.29 gcserver=False
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=82.729 med_ms=82.934 mean_ms=83.140 us_per_op=8.273 bytes_per_op=3956 gen0=2
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=81.718 med_ms=82.336 mean_ms=82.556 us_per_op=8.172 bytes_per_op=3957 gen0=3
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=77.094 med_ms=79.449 mean_ms=80.751 us_per_op=7.709 bytes_per_op=3808 gen0=2
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=10.973 med_ms=11.529 mean_ms=12.381 us_per_op=1.097 bytes_per_op=129 gen0=0
+scenario=name-hit-2   ops=10000 checksum=49995000 reps=9 min_ms=90.929 med_ms=94.229 mean_ms=95.057 us_per_op=9.093 bytes_per_op=3956 gen0=3
+
+########## round 2
+--- c (plain: no library block cache) ---
+side=c     records=10000 reps=9 optimize=-1 blockcache=off
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=57.699 med_ms=57.918 mean_ms=58.000 us_per_op=5.770
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=57.291 med_ms=57.655 mean_ms=57.865 us_per_op=5.729
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=51.445 med_ms=51.602 mean_ms=51.636 us_per_op=5.144
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=26.166 med_ms=26.260 mean_ms=26.416 us_per_op=2.617
+--- c (opt: code4optStart, block cache on) ---
+side=c-opt records=10000 reps=9 optimize=1 blockcache=on
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=4.136 med_ms=4.182 mean_ms=4.203 us_per_op=0.414
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=4.107 med_ms=4.152 mean_ms=4.159 us_per_op=0.411
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=7.615 med_ms=7.694 mean_ms=7.733 us_per_op=0.761
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=0.828 med_ms=0.860 mean_ms=0.877 us_per_op=0.083
+--- cs (CodeBase.Net) ---
+side=cs records=10000 reps=9 runtime=8.0.29 gcserver=False
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=82.395 med_ms=82.705 mean_ms=83.955 us_per_op=8.240 bytes_per_op=3956 gen0=2
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=81.615 med_ms=82.057 mean_ms=82.146 us_per_op=8.161 bytes_per_op=3957 gen0=3
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=78.519 med_ms=82.728 mean_ms=83.226 us_per_op=7.852 bytes_per_op=3808 gen0=2
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=11.094 med_ms=12.826 mean_ms=12.603 us_per_op=1.109 bytes_per_op=129 gen0=0
+scenario=name-hit-2   ops=10000 checksum=49995000 reps=9 min_ms=91.314 med_ms=94.760 mean_ms=94.627 us_per_op=9.131 bytes_per_op=3956 gen0=3
+
+########## round 3
+--- c (plain: no library block cache) ---
+side=c     records=10000 reps=9 optimize=-1 blockcache=off
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=57.722 med_ms=58.005 mean_ms=58.142 us_per_op=5.772
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=57.409 med_ms=57.709 mean_ms=57.832 us_per_op=5.741
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=51.385 med_ms=51.828 mean_ms=52.050 us_per_op=5.139
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=26.232 med_ms=26.487 mean_ms=26.469 us_per_op=2.623
+--- c (opt: code4optStart, block cache on) ---
+side=c-opt records=10000 reps=9 optimize=1 blockcache=on
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=4.030 med_ms=4.067 mean_ms=4.079 us_per_op=0.403
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=4.009 med_ms=4.058 mean_ms=4.056 us_per_op=0.401
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=7.609 med_ms=7.654 mean_ms=7.705 us_per_op=0.761
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=0.803 med_ms=0.831 mean_ms=0.850 us_per_op=0.080
+--- cs (CodeBase.Net) ---
+side=cs records=10000 reps=9 runtime=8.0.29 gcserver=False
+scenario=name-hit     ops=10000 checksum=49995000 reps=9 min_ms=82.865 med_ms=82.978 mean_ms=83.429 us_per_op=8.286 bytes_per_op=3956 gen0=2
+scenario=name-miss    ops=10000 checksum=49967928 reps=9 min_ms=81.978 med_ms=82.488 mean_ms=82.471 us_per_op=8.198 bytes_per_op=3957 gen0=3
+scenario=amount-hit   ops=10000 checksum=49995000 reps=9 min_ms=69.807 med_ms=69.946 mean_ms=70.142 us_per_op=6.981 bytes_per_op=3808 gen0=2
+scenario=tag-walk     ops=10000 checksum=49995000 reps=9 min_ms=10.665 med_ms=10.722 mean_ms=10.924 us_per_op=1.067 bytes_per_op=129 gen0=0
+scenario=name-hit-2   ops=10000 checksum=49995000 reps=9 min_ms=82.508 med_ms=82.567 mean_ms=82.873 us_per_op=8.251 bytes_per_op=3956 gen0=3
+

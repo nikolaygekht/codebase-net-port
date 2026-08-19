@@ -1,0 +1,74 @@
+performance-1-experiment -- where the 14x comes from
+date: 2026-08-19T15:44:01Z
+
+### syscall / cache-hit constants (no CodeBase involved)
+syscall  seek+read (2 calls)      blocks=595 reps=7 count=100000 min_ms=109.968 med_ms=110.335 us_per_read=1.100
+syscall  positional (1 call)      reps=7 count=100000 min_ms=84.887 med_ms=84.988 us_per_read=0.849
+memcpy   512 bytes from RAM      reps=7 count=100000 min_ms=0.225 us_per_copy=0.002
+
+########## round 1
+--- c    : reference library, no block cache ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=55.810 med_ms=56.405 mean_ms=56.274 us_per_op=5.581 reads_per_op=4.286 readbytes_per_op=1247.2
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=55.860 med_ms=56.036 mean_ms=56.331 us_per_op=5.586 reads_per_op=4.286 readbytes_per_op=1247.3
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=50.054 med_ms=50.308 mean_ms=50.492 us_per_op=5.005 reads_per_op=3.500 readbytes_per_op=845.2
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=25.659 med_ms=25.824 mean_ms=26.128 us_per_op=2.566 reads_per_op=2.044 readbytes_per_op=99.5
+--- c-opt: reference library, code4optStart ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=4.030 med_ms=4.073 mean_ms=4.082 us_per_op=0.403 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=4.030 med_ms=4.061 mean_ms=4.230 us_per_op=0.403 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=7.584 med_ms=7.634 mean_ms=7.620 us_per_op=0.758 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=0.847 med_ms=0.910 mean_ms=0.918 us_per_op=0.085 reads_per_op=0.012 readbytes_per_op=12.7
+--- cs   : CodeBase.Net, file-backed ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=79.722 med_ms=80.965 mean_ms=83.560 us_per_op=7.972 bytes_per_op=3956 gen0=3 reads_per_op=5.000 readbytes_per_op=2109.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=78.826 med_ms=79.337 mean_ms=79.554 us_per_op=7.883 bytes_per_op=3957 gen0=3 reads_per_op=4.999 readbytes_per_op=2108.9
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=67.662 med_ms=68.416 mean_ms=70.430 us_per_op=6.766 bytes_per_op=3808 gen0=2 reads_per_op=4.000 readbytes_per_op=1597.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=11.185 med_ms=11.438 mean_ms=11.597 us_per_op=1.118 bytes_per_op=129 gen0=0 reads_per_op=1.044 readbytes_per_op=83.4
+--- cs-ram: CodeBase.Net, whole file in byte[] ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=30.965 med_ms=31.316 mean_ms=31.368 us_per_op=3.097 bytes_per_op=3956 gen0=2 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=30.786 med_ms=36.633 mean_ms=36.041 us_per_op=3.079 bytes_per_op=4053 gen0=3 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=17.620 med_ms=17.854 mean_ms=17.815 us_per_op=1.762 bytes_per_op=3827 gen0=3 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=0.911 med_ms=0.926 mean_ms=0.937 us_per_op=0.091 bytes_per_op=129 gen0=0 reads_per_op=0.000 readbytes_per_op=0.0
+
+########## round 2
+--- c    : reference library, no block cache ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=56.230 med_ms=56.556 mean_ms=56.564 us_per_op=5.623 reads_per_op=4.286 readbytes_per_op=1247.2
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=55.785 med_ms=56.053 mean_ms=56.177 us_per_op=5.579 reads_per_op=4.286 readbytes_per_op=1247.3
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=50.026 med_ms=50.403 mean_ms=50.387 us_per_op=5.003 reads_per_op=3.500 readbytes_per_op=845.2
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=25.450 med_ms=25.627 mean_ms=25.771 us_per_op=2.545 reads_per_op=2.044 readbytes_per_op=99.5
+--- c-opt: reference library, code4optStart ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=4.006 med_ms=4.025 mean_ms=4.028 us_per_op=0.401 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=4.045 med_ms=4.082 mean_ms=4.087 us_per_op=0.405 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=7.602 med_ms=7.631 mean_ms=7.669 us_per_op=0.760 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=0.889 med_ms=0.935 mean_ms=0.933 us_per_op=0.089 reads_per_op=0.013 readbytes_per_op=13.0
+--- cs   : CodeBase.Net, file-backed ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=79.713 med_ms=80.184 mean_ms=81.611 us_per_op=7.971 bytes_per_op=3956 gen0=3 reads_per_op=5.000 readbytes_per_op=2109.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=79.234 med_ms=79.604 mean_ms=79.632 us_per_op=7.923 bytes_per_op=3957 gen0=2 reads_per_op=4.999 readbytes_per_op=2108.9
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=67.776 med_ms=68.145 mean_ms=70.166 us_per_op=6.778 bytes_per_op=3808 gen0=2 reads_per_op=4.000 readbytes_per_op=1597.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=11.095 med_ms=11.509 mean_ms=11.843 us_per_op=1.110 bytes_per_op=129 gen0=0 reads_per_op=1.044 readbytes_per_op=83.4
+--- cs-ram: CodeBase.Net, whole file in byte[] ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=31.278 med_ms=31.716 mean_ms=32.069 us_per_op=3.128 bytes_per_op=3956 gen0=2 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=30.935 med_ms=36.614 mean_ms=36.086 us_per_op=3.093 bytes_per_op=4053 gen0=3 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=16.828 med_ms=17.769 mean_ms=17.692 us_per_op=1.683 bytes_per_op=3808 gen0=3 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=0.869 med_ms=0.874 mean_ms=0.891 us_per_op=0.087 bytes_per_op=129 gen0=0 reads_per_op=0.000 readbytes_per_op=0.0
+
+########## round 3
+--- c    : reference library, no block cache ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=55.499 med_ms=55.891 mean_ms=55.996 us_per_op=5.550 reads_per_op=4.286 readbytes_per_op=1247.2
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=55.334 med_ms=55.681 mean_ms=55.700 us_per_op=5.533 reads_per_op=4.286 readbytes_per_op=1247.3
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=49.734 med_ms=50.134 mean_ms=50.371 us_per_op=4.973 reads_per_op=3.500 readbytes_per_op=845.2
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=25.118 med_ms=25.252 mean_ms=25.342 us_per_op=2.512 reads_per_op=2.044 readbytes_per_op=99.5
+--- c-opt: reference library, code4optStart ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=4.044 med_ms=4.060 mean_ms=4.060 us_per_op=0.404 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=4.057 med_ms=4.113 mean_ms=4.117 us_per_op=0.406 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=7.519 med_ms=7.552 mean_ms=7.557 us_per_op=0.752 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=0.780 med_ms=0.851 mean_ms=0.856 us_per_op=0.078 reads_per_op=0.012 readbytes_per_op=12.4
+--- cs   : CodeBase.Net, file-backed ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=79.508 med_ms=79.945 mean_ms=80.125 us_per_op=7.951 bytes_per_op=3956 gen0=3 reads_per_op=5.000 readbytes_per_op=2109.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=78.326 med_ms=78.803 mean_ms=78.849 us_per_op=7.833 bytes_per_op=3957 gen0=2 reads_per_op=4.999 readbytes_per_op=2108.9
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=67.207 med_ms=67.555 mean_ms=67.535 us_per_op=6.721 bytes_per_op=3808 gen0=2 reads_per_op=4.000 readbytes_per_op=1597.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=10.293 med_ms=10.340 mean_ms=10.681 us_per_op=1.029 bytes_per_op=129 gen0=0 reads_per_op=1.044 readbytes_per_op=83.4
+--- cs-ram: CodeBase.Net, whole file in byte[] ---
+scenario=name-hit     ops=10000 checksum=49995000 reps=7 min_ms=30.949 med_ms=31.135 mean_ms=31.374 us_per_op=3.095 bytes_per_op=3956 gen0=2 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=name-miss    ops=10000 checksum=49967928 reps=7 min_ms=29.904 med_ms=36.113 mean_ms=35.211 us_per_op=2.990 bytes_per_op=4053 gen0=3 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=amount-hit   ops=10000 checksum=49995000 reps=7 min_ms=17.133 med_ms=17.587 mean_ms=17.546 us_per_op=1.713 bytes_per_op=3812 gen0=3 reads_per_op=0.000 readbytes_per_op=0.0
+scenario=tag-walk     ops=10000 checksum=49995000 reps=7 min_ms=0.877 med_ms=0.878 mean_ms=0.952 us_per_op=0.088 bytes_per_op=129 gen0=0 reads_per_op=0.000 readbytes_per_op=0.0
+

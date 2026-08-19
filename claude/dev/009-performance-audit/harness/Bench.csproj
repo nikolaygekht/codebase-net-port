@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Deliberately outside net/, so net/Directory.Build.props does not apply and
+    this experiment cannot influence how the library is built. Everything it
+    needs is stated here.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      Named as one of the library's InternalsVisibleTo targets on purpose. The `ram` mode needs
+      CodeBaseEngine's internal constructor and the internal IRandomAccessSource seam, and borrowing
+      an already-trusted assembly name gets that WITHOUT adding an InternalsVisibleTo to
+      net/CodeBase.Net/CodeBase.Net.csproj for the sake of an experiment. The real
+      CodeBase.Net.Tests is never loaded beside this, so the shared name costs nothing.
+    -->
+    <AssemblyName>CodeBase.Net.Tests</AssemblyName>
+    <RootNamespace>Bench</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\net\CodeBase.Net\CodeBase.Net.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -314,3 +314,69 @@ All in [`harness/`](harness/):
 `Bench.csproj` sets `AssemblyName` to `CodeBase.Net.Tests`, one of the library's existing
 `InternalsVisibleTo` targets. **`net/` is still untouched** — no `InternalsVisibleTo` was added, and no
 library code was changed, for any of this.
+
+---
+
+## 11. How the threading contract was arrived at — added 2026-08-21
+
+**This section is derivation, not measurement.** Everything above it is the audit of 2026-08-19; this
+records how the remediation's design reached a threading contract, because the route matters more than
+the conclusion and none of it was visible when the audit closed.
+
+**The audit never asked the question, and was right not to.** It measured a read path in which every
+buffer is allocated per call. Nothing is shared, nothing is reused, so there is nothing to race on —
+`RandomAccess.Read` is positional and safe on one handle, and the port holds no other mutable state
+across a call except a cursor, which is per table. A library that allocates everything is trivially
+free of shared-state races, and that is what the audit measured.
+
+**Buffer reuse is what raised it.** Sub-step 2 removed the per-comparison key copies, and measuring
+what remained showed **allocation is ~40% of a RAM-backed descent** — almost all of it one `byte[512]`
+per block read (`results-compare-in-place.txt` §8). Removing *that* means a buffer outliving the call
+that filled it, which is the first shared mutable state this port would ever have. So the contract was
+forced by the optimisation, not chosen for its own sake.
+
+**The first answer was wrong: "single-threaded".** It is the C library's own posture — `E4EXPR.C:87-135`
+serialises expression evaluation through one global critical section — and it is unusable here. With
+`async`, a continuation resumes on whatever pool thread is free, so an API demanding thread affinity is
+unusable in ordinary modern code, and demanding it would be demanding something no caller can promise.
+
+**The distinction that resolved it: affinity is not exclusion.** What the port needs is not *one
+thread* but *not two at once* — before an `await` on thread A, after it on thread B, never both — and
+the task machinery supplies the barrier that makes A's writes visible to B. That is exactly what
+ADO.NET asks of `DbConnection` and `DbCommand`, and what `Stream` asks: the mainstream contract for a
+data-access API, and async-compatible by construction. Two consequences fell out of it: **nothing may
+be thread-affine** (renting a buffer on one thread and returning it on another is *normal* under async,
+so `[ThreadStatic]` or a thread-local pool would corrupt silently), and the **per-index-file** pool the
+design had already arrived at needs no lock at all, because only that file's readers touch it.
+
+**Then: does it bind a call or a group?** The group — because **the cursor is the protocol.** `Seek(x)`,
+`SeekNext()`, `GetString(f)` mean something only because the position survives between them. An
+internal lock would make each call atomic and leave the sequence wrong: another thread's `Seek` landing
+between the first two hands the reader someone else's record while every individual call behaves
+correctly.
+
+**Which is why an internal lock on a table is not merely insufficient but harmful.** It would trade a
+torn buffer — visible, immediate, obviously a bug — for a wrong record set, which `CLAUDE.md` names as
+the worst outcome this project has. Paying for a lock to convert a loud failure into a silent wrong
+answer is a bad trade at any price. So the lock is the caller's, at the granularity of its own unit of
+work.
+
+**But the split is not "no locks anywhere".** Engine-shared residency has no cross-call semantics —
+"give me block X", "take block Y back" are self-contained — so a lock or striping *inside* it is
+correct and sufficient, and it is needed regardless of buffers, because two tables opened from one
+engine and queried in parallel is an ordinary thing to do that the contract above does not forbid.
+`DESIGN.md` decision 4 (an engine-wide budget) therefore owes an internal lock; what it costs is a
+sub-step 5 measurement, not a choice.
+
+**And since it cannot be made safe, make misuse loud** — which is why the detector is **sub-step 7**
+rather than a sentence in a document. An `Interlocked` flag on entry to a public operation, cleared on
+exit, turns a contract violation into an exception instead of a plausible-looking record. It is not a
+lock and not protection: the caller's lock is the protection, and this is what tells them it is
+missing. That is the same instinct as the rest of this port — refuse rather than guess — applied to a
+contract instead of to a byte layout.
+
+| | synchronised by | why |
+|---|---|---|
+| a table's cursor, position, buffers | **the caller**, around a group of calls | the cursor is the protocol; an internal lock makes calls atomic and answers wrong |
+| residency and pools shared across an engine | **us**, internally | each operation stands alone, and parallel tables are legitimate |
+| misuse of the first row | **an `Interlocked` detector** | it cannot be made safe, so it is made loud (sub-step 7) |

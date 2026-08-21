@@ -6,6 +6,14 @@ Phase 3 and 5 of [`DEV_APPROACH.md`](../../DEV_APPROACH.md). The design is [`DES
 public surface; the cache is 4–6 and carries the ADR. If the step has to end early, it ends after 3 with
 a `SUMMARY.md` saying the cache is still owed.
 
+**Sub-step 7 is independent of all of them** and can be taken whenever — it needs nothing the cache
+builds, and the cache does not need it. It is here because the cache's design is what forced the
+question; `ANALYSIS.md` §11 records how.
+
+**One ordering question is still open**, raised 2026-08-21 and not decided: whether sub-step 3 moves
+*after* 5, so the padded comparison is measured in the cached world where a descent's CPU is visible
+rather than buried under five read syscalls. Left as written until it is answered.
+
 ## Tests
 
 Four layers, each naming what only it can catch (`DEV_APPROACH.md` §4), and **a fifth this step
@@ -16,7 +24,7 @@ the four correctness layers all pass on a cache that never hits.
 |---|---|---|
 | **1. Unit** | `BlockResidency` driven exhaustively: which block retires for a given set of slots, priorities and access order; that an index block is never chosen while a data block is available; that a pool of one still makes progress. The three-valued policy resolved against each access mode — `Off` never caches, `Always` always does, `WhenExclusive` caches only a source that reports itself exclusive — which is `f4opt.c:492-501` as a truth table. `KeySearch.Compare` over prefix and padded values, including a value one byte short of the key and an all-pad value. | Every branch of the eviction rule and of the policy, at memory speed, with no file and no clock. A wrong victim is the one way this step can corrupt a read, and it is provable only here — as is `WhenExclusive`, which no real file can currently exercise. |
 | **2. Component** | `CachingRandomAccessSource` over a **counting in-memory source**: a second read of the same block does not reach the source; a read spanning two blocks returns the same bytes as the uncached source; a read larger than the pool still returns the right bytes; an unaligned record-sized read at every offset in a block. And `LeafBlock.CompareAt` / `BranchBlock.ChildAt` agreeing with `EntryAt` on every entry of a real corpus block. | Sequencing and residency without a disk — the straddling read, the eviction under pressure, and the promise that a hit is a hit. Nothing below it sees two calls; nothing above it can tell a hit from a miss. |
-| **3. Fault injection** | Moq on the wrapped source: `IOException` mid-fetch leaves no half-filled block resident; a short read is not admitted as a full block; the exception propagates unchanged. Hand-built corrupt blocks are already covered by existing tests and are not re-done here. | That a failed fetch cannot leave the pool holding wrong bytes — the corpus cannot express a failing disk. |
+| **3. Fault injection** | Moq on the wrapped source: `IOException` mid-fetch leaves no half-filled block resident; a short read is not admitted as a full block; the exception propagates unchanged. Hand-built corrupt blocks are already covered by existing tests and are not re-done here. **And hostile *use*, not just hostile I/O** (sub-step 7): two operations overlapping on one table throw rather than return a record. | That a failed fetch cannot leave the pool holding wrong bytes — the corpus cannot express a failing disk. And that breaking the concurrency contract is *reported*, which no corpus file and no correct caller can ever demonstrate. |
 | **4. Golden / corpus** | The **whole existing golden suite, unchanged**, run twice: once uncached and once with the cache enabled through the engine's internal constructor. Both must produce identical results. | Whether the cache changes what a real file decodes to. This is the gate. |
 | **5. Performance ratio** | Two deterministic and one timed, all on `PERF10K` in-process, cache `Off` against cache `Always`: (a) the cached seek storm and the cached tag walk issue **at least 2× fewer reads** than the uncached ones over the same query set, counted at the source; (b) allocation per seek is under a documented ceiling (`GC.GetAllocatedBytesForCurrentThread`); (c) **the cached wall clock is at least 2× faster**, best-of-N, both orderings. | That the optimization *still pays*. Nothing in layers 1–4 can tell a working cache from a correct one that never hits, or from a machine on which caching has stopped being worth doing — and those are the two ways this step silently becomes dead weight. |
 
@@ -72,6 +80,8 @@ corpus blocks (a round-trip invariant, allowed by §4); the cache is asserted ag
 
 | **6** | **`Table.Refresh()`, and the hooks `LOCKING` will call.** `d4refresh` semantics without the lock branch: reset memo state, drop this table's cached blocks, re-read the current record in place. The cache's `Invalidate(source)` / `Flush(source)` entry points exist as such rather than as private helpers, so §3.7's "flush before unlock, invalidate after lock" has something to call. | Suite green; a layer-2 test writes behind the cache's back and proves the change is invisible before `Refresh()` and visible after; `Refresh()` leaves the cursor on the same record. |
 
+| **7** | **Make concurrent misuse loud, and write the contract down.** The threading contract stated in the public XML docs — *not thread-safe; do not run two operations against one table at once; moving between threads, as an `await` does, is fine* — plus the detector that enforces the diagnosis: an `Interlocked` flag taken on entry to a public `Table` operation and cleared on exit, so a second operation arriving while the first is in flight **throws** rather than returning someone else's record. Not a lock and not protection: the caller's own lock is the protection, and this is what tells them it is missing. **Independent of the cache** — it needs nothing from sub-steps 4 to 6 and could land before them. | A layer-3 test drives two overlapping operations and gets a `CodeBaseException` instead of a record; the whole suite stays green, because a correct caller never trips it; and the benchmark says what the flag costs, so the decision to keep it out of `Release` or not is measured rather than assumed. |
+
 Sub-step 4 before 5 is deliberate: the part that can be *wrong* gets built and proved with no file
 anywhere near it, and only then does it start serving real reads.
 
@@ -113,6 +123,7 @@ Break the code, watch exactly the intended tests fail, restore **from a checksum
 | `LeafBlock.CompareAt` compares at `DupCount` instead of 0 | the seek goldens and the `CompareAt`-vs-`EntryAt` component test |
 | The cache is consulted but **every lookup reports a miss** (results still correct) | **layer 5 only** — the read-count test and the timed test. Every other gate in this table stays green, which is the whole reason layer 5 exists |
 | `CompareAt` copies the key before comparing, as `EntryAt` does | the layer-5 allocation ceiling only |
+| The concurrency detector never sets its flag | the sub-step 7 misuse test only — every other test passes, because a correct caller never overlaps two operations |
 | `BranchBlock.ChildAt` reads the record number instead of the child | every tag-order golden walk |
 
 A break that reddens nothing means the gate is decorative; one that reddens everything means it is not

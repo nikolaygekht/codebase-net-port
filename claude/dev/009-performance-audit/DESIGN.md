@@ -397,12 +397,36 @@ changes shape.
     *multiplier*.
 
     Which makes the root fix cheaper than a size-keyed pool: **stop using `arr.Length` as the block
-    size** — thread the length through, or hand out a slice of exactly `blockSize`. Then an oversized
-    buffer is harmless, one pool of one size serves every file, buckets become unnecessary, and even
-    `ArrayPool<byte>.Shared` is admissible. `ArrayPool` is out only for as long as `block.Length` is
-    treated as the truth. Nothing hands out an oversized array today — `NodeReader` allocates exactly
-    `length` — so this is a trap rather than a live defect, and sub-step 4 should close it while it is
-    still free to close.
+    size** and carry the length beside the buffer instead.
+
+    ```csharp
+    internal readonly record struct Block(byte[] Buffer, int Offset, int Length)
+    {
+        public ReadOnlySpan<byte> Span => Buffer.AsSpan(Offset, Length);
+    }
+    ```
+
+    **The change is four signatures and one call site**, because the helpers that only *read* a block
+    already take a span: `LeafGeometry.Parse`, `LeafGeometry.Unpack` and `NodeHeader.Parse` keep their
+    signatures and their bound checks start being *right* rather than merely permissive, since the span
+    they are handed is already cut to `Length`. Only `LeafBlock` and `BranchBlock` retain the bytes, so
+    only their field, constructor and `Parse` change, plus `CdxTag.cs:83`. The two `textEnd =
+    block.Length` lines stay **textually identical** and start counting from the end of the *slice*.
+
+    **`Offset` is what turns "spend some memory" into a win rather than waste.** With it, the pool's
+    buffer size and the cached window size stop having to be the same number: a 1024- or 4096-byte
+    window can hold two or eight 512-byte index blocks, and renting one hands out a *slice* of that
+    window with **no copy at all** — where a length-only `Block` would force either a copy or a window
+    pinned to the block size. Bigger windows then mean fewer, larger reads, which is the direction the
+    audit's syscall counting points in.
+
+    Two consequences to keep in view: the exact-size invariant disappears (an oversized buffer is
+    correct by construction, so `ArrayPool<byte>.Shared` becomes admissible after all — it was out only
+    while `block.Length` was the truth), and the residency unit becomes the *window*, so eviction
+    retires a window and everything sliced out of it must be returned first. **ADR candidate.**
+
+    Nothing hands out an oversized array today — `NodeReader` allocates exactly `length` — so this is a
+    trap rather than a live defect, and sub-step 4 closes it while it is still free to close.
   - **Rent and return do not reach DBF records.** A record is not block-aligned and routinely straddles
     two blocks, so that path needs assembly into one contiguous buffer — copy semantics, which is what
     `IRandomAccessSource.Read` already is. And the cache still has to sit at the source, because 96% of

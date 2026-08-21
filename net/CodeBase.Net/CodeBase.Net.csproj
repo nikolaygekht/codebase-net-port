@@ -23,6 +23,12 @@
     <InternalsVisibleTo Include="CodeBase.Net.Tests" />
     <InternalsVisibleTo Include="CodeBase.Net.Golden" />
     <InternalsVisibleTo Include="CodeBase.Net.TestUtils" />
+    <!--
+      The benchmark measures the block layer, which is internal, and the design has it composing a
+      cached source through the engine's internal constructor (009-performance-audit/DESIGN.md,
+      Seams). It asserts nothing, so it cannot turn an internal into a promise.
+    -->
+    <InternalsVisibleTo Include="CodeBase.Net.Benchmarks" />
     <!-- Moq builds proxies of the internal boundary interfaces from a generated assembly. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>

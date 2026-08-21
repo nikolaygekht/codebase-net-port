@@ -17,8 +17,13 @@ internal static class Program
     private static void Main(string[] args)
     {
         if (args.Length == 0)
+        {
             BenchmarkRunner.Run<ReadPathBenchmarks>();
+            BenchmarkRunner.Run<DescentBenchmarks>();
+        }
         else
+        {
             BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+        }
     }
 }

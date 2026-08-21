@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — the audit is closed and its remediation is **under way**: sub-step 1 of six
-is done
-**Current sub-step:** [`PLAN.md`](PLAN.md) step 2, compare in place. Not begun.
+**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 and 2
+of six are done
+**Current sub-step:** [`PLAN.md`](PLAN.md) step 3, the padded comparison. Not begun.
 
 ## Done so far
 
@@ -22,8 +22,9 @@ The remediation:
 
 - [x] 1 — benchmark project + `PERF10K` generator case, committed as **benchmark data, not a gate** —
       baseline in [`results-benchmark-baseline.txt`](results-benchmark-baseline.txt)
-- [ ] 2 — compare in place (`LeafBlock.CompareAt`, `BranchBlock.ChildAt`, span compare in `Seek`),
-      with the layer-5 allocation ceiling as its gate
+- [x] 2 — compare in place (`LeafBlock.CompareAt`, `BranchBlock.ChildAt`, span compare in `Seek`),
+      with the layer-5 allocation ceiling as its gate —
+      [`results-compare-in-place.txt`](results-compare-in-place.txt)
 - [ ] 3 — the padded comparison: measure, then fix or write down that it did not matter
 - [ ] 4 — `BlockResidency` + `BlockPool`, proved with no source attached
 - [ ] 5 — wire the cache up: `BlockCacheMode`, `CachingSourceFactory`, `DropCachedBlocks()`, and the
@@ -52,6 +53,28 @@ Within run-to-run variation of the audit's own numbers, which is what makes it a
 a new measurement. **The allocation column is new and is what sub-step 2 aims at**: `ANALYSIS.md` §6
 attributes 1 292–1 744 B of the ~3 900 B per seek to the key copied per comparison, so the layer-5
 ceiling has a concrete number to be set below.
+
+### Sub-step 2, done 2026-08-21
+
+**The copies are gone and the allocation is gated. The wall clock did not move, and that is the
+finding.** Full numbers in [`results-compare-in-place.txt`](results-compare-in-place.txt).
+
+| | before | after | |
+|---|---|---|---|
+| seek `C(20)`, end to end | 9.238 µs / 3 956 B | 9.189 µs / **2 808 B** | −29% allocated |
+| seek `N(12,2)`, end to end | 7.662 µs / 3 808 B | 7.414 µs / **2 160 B** | −43% allocated |
+| leaf scan, the descent alone | 211.5 ns / 576 B | 148.0 ns / **0 B** | **1.43×** |
+| branch search + child | 15.2 ns / 96 B | 6.2 ns / **0 B** | **2.45×** |
+
+`dotnet test` green at **1197 tests** (669 + 528), up 18: fifteen `CompareInPlaceTests` — `CompareAt`
+and `ChildAt` against `EntryAt` on every entry of every block of every tag of the five indexed corpus
+files — and three `SeekAllocationTests`, the ceilings plus a guard that every measured seek really
+finds its record. No golden expectation changed.
+
+**Both mutations were proved and both were localised as predicted.** `CompareAt` comparing at
+`DupCount` reddens the equivalence test, 52 goldens and the find-guard; `ChildAt` reading the record
+number reddens the equivalence test, 36 seek/cursor tests and 53 goldens. Restored from checksummed
+copies, never from `git` (`DEV_APPROACH.md` §4).
 
 ## Notes for the next session
 
@@ -107,6 +130,28 @@ its own generated code, so this assembly's `Main` never executes there.
 
 **4. `SonarQube.Analysis.xml` needed no change.** The plan listed it. `**/*.Benchmarks/**` is already
 in `sonar.coverage.exclusions` and `net/corpus/**` already covers the new subdirectory.
+
+**5. Sub-step 2 needed a second benchmark class, and the benchmark needed the library's internals.**
+The plan's gate is "benchmark shows the descent's CPU down", and the end-to-end seek could not show it
+— ~60% of a file-backed seek is read syscalls, so the whole descent is a small slice of the rest.
+`DescentBenchmarks` measures the same search over the same real block through both paths, which is
+where 1.43× and 2.45× are visible. It needs `LeafBlock` and `KeySearch`, so `CodeBase.Net` and
+`CodeBase.Net.TestUtils` now name `CodeBase.Net.Benchmarks` in `InternalsVisibleTo` — which
+`DESIGN.md` §Seams already assumed when it said the benchmark would inject a cached factory through
+the engine's internal constructor.
+
+**6. The allocation test asks for `DefaultEncoding` rather than registering a provider.** `PERF10K`
+names no code page, an unmarked table is read as cp437, and `CodeBase.Net.Tests` registers no encoding
+provider — nor should it, since layers 1–3 include tests about what happens when one is absent. The
+engine's `DefaultEncoding` is the other documented route, and the table's text is ASCII so Latin1
+reproduces its bytes exactly.
+
+**7. `DESIGN.md`'s "P2 … 1.7–1.9× of the descent" invites a wrong reading, and the measurement says
+so.** It is 1.7–1.9× of the *comparison work*, which is ~1% of a file-backed seek and ~13% of a cached
+one — about 90 ns either way. P2 was worth doing: it is free, it is measured, and it removes 29–43% of
+the allocation on the hot path. But **it is not where the time is, and P1 is.** `results-compare-in-place.txt`
+§3 has the arithmetic; the design table is left as written, because it records what the audit believed
+when it was written.
 
 ## Blockers
 

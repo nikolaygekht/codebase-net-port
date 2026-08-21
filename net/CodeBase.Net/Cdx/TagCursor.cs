@@ -337,7 +337,7 @@ internal sealed class TagCursor
                     $"Seeking tag {tag.Name} did not reach a leaf, so its tree has a cycle.");
             }
 
-            current = tag.ReadBlock(current.Branch!.EntryAt(current.Branch!.Seek(search)).Child);
+            current = tag.ReadBlock(current.Branch!.ChildAt(current.Branch!.Seek(search)));
         }
 
         block = current;
@@ -539,8 +539,7 @@ internal sealed class TagCursor
                     $"Descending tag {tag.Name} did not reach a leaf, so its tree has a cycle.");
             }
 
-            BranchEntry entry = current.Branch!.EntryAt(first ? 0 : current.Count - 1);
-            current = tag.ReadBlock(entry.Child);
+            current = tag.ReadBlock(current.Branch!.ChildAt(first ? 0 : current.Count - 1));
         }
 
         block = current;

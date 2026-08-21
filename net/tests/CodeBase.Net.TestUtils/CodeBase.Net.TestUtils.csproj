@@ -27,6 +27,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="CodeBase.Net.Tests" />
     <InternalsVisibleTo Include="CodeBase.Net.Golden" />
+    <InternalsVisibleTo Include="CodeBase.Net.Benchmarks" />
   </ItemGroup>
 
 </Project>

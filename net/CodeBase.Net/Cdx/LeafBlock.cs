@@ -95,7 +95,42 @@ internal sealed class LeafBlock
     /// block. Both mean the block is corrupt, and both are refusals rather than a key made of
     /// whatever was nearby.
     /// </exception>
-    public IndexEntry EntryAt(int index)
+    public IndexEntry EntryAt(int index) =>
+        new(KeyAt(index).ToArray(), Geometry.Unpack(block, index).Record);
+
+    /// <summary>
+    /// Compares the key at a position against a search value, without copying it.
+    /// </summary>
+    /// <param name="index">Which entry, counting from zero.</param>
+    /// <param name="search">What to compare against.</param>
+    /// <returns>
+    /// Negative when the stored key sorts before the value, zero when it matches, positive when it
+    /// sorts after — the same answer as comparing against the entry from [c]EntryAt[/c].
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">The block has no entry at that position.</exception>
+    /// <exception cref="CodeBaseException">
+    /// The block is corrupt in one of the ways rebuilding a key can discover.
+    /// </exception>
+    /// <remarks>
+    /// A seek compares and discards, so the array [c]EntryAt[/c] hands out is built and thrown away
+    /// once per comparison — measured at 1 292 to 1 744 bytes per seek together with the interior
+    /// block's copy (claude/dev/009-performance-audit/ANALYSIS.md section 6). The rebuild still
+    /// happens, because that is what a compressed leaf costs; only the copy is gone. No span escapes
+    /// this class.
+    /// </remarks>
+    public int CompareAt(int index, KeySearch search) => search.Compare(KeyAt(index));
+
+    /// <summary>
+    /// Rebuilds up to a position and gives the key where it was built.
+    /// </summary>
+    /// <param name="index">Which entry, counting from zero.</param>
+    /// <returns>The rebuilt key, over this block's own buffer.</returns>
+    /// <remarks>
+    /// Private, and it has to be: the buffer is overwritten by the next call, so a span handed
+    /// outward would silently change under a caller that kept it. [c]EntryAt[/c] copies for exactly
+    /// that reason.
+    /// </remarks>
+    private ReadOnlySpan<byte> KeyAt(int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
@@ -114,7 +149,7 @@ internal sealed class LeafBlock
             Build(builtIndex);
         }
 
-        return new IndexEntry(key.AsSpan().ToArray(), Geometry.Unpack(block, index).Record);
+        return key;
     }
 
     /// <summary>
@@ -137,7 +172,7 @@ internal sealed class LeafBlock
     {
         for (int i = 0; i < Count; i++)
         {
-            int comparison = search.Compare(EntryAt(i).Key);
+            int comparison = CompareAt(i, search);
 
             if (comparison == 0)
             {

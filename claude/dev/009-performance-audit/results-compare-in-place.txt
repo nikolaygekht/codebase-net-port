@@ -1,0 +1,77 @@
+009-performance-audit -- sub-step 2, compare in place
+
+Run 2026-08-21, natively on Windows, over net/corpus/benchmark/PERF10K.*.
+Before is results-benchmark-baseline.txt, taken the same way an hour earlier.
+
+1. END TO END -- what a caller sees (ReadPathBenchmarks)
+
+  operation                     before      after     alloc before -> after
+  tag walk, per record          1.148 us   1.185 us      129 B ->   129 B
+  seek, C(20), 4 levels         9.238 us   9.189 us    3 956 B -> 2 808 B
+  seek, N(12,2), 3 levels       7.662 us   7.414 us    3 808 B -> 2 160 B
+  Go(n) then Skip(1), per pair  1.913 us   1.969 us        0 B ->     0 B
+
+  Allocation: -1 148 B and -1 648 B per seek, inside the 1 292-1 744 B the
+  audit predicted (ANALYSIS.md 6).
+
+  Wall clock: -0.5% and -3.2%. The walk and Go-then-Skip moved +3% and +3%,
+  which is inside their standard deviation and is not a change. NOTHING WAS
+  EXPECTED TO SHOW HERE, and section 3 says why.
+
+2. THE DESCENT ITSELF -- the same work with the file taken out
+   (DescentBenchmarks: the same search over the same real block, once each way)
+
+  leaf scan, key copied per comparison   211.477 ns    576 B
+  leaf scan, compared in place           147.981 ns      0 B    1.43x
+  branch search + child, keys copied      15.156 ns     96 B
+  branch search + child, in place          6.175 ns      0 B    2.45x
+
+  The copies are gone -- not reduced, zero -- and the comparison work is
+  1.43x on a leaf and 2.45x on an interior block. That brackets the audit's
+  1.7-1.9x "of the descent".
+
+3. WHY 1.43x AND 2.45x MOVE A SEEK BY HALF A PER CENT
+
+  A 4-level seek is about three interior searches and one leaf scan:
+
+    saved = 3 x (15.156 - 6.175) + (211.477 - 147.981) = ~90 ns
+
+  against a 9 238 ns seek. 1%. The audit measured that ~60% of a file-backed
+  seek is read syscalls (4.286 reads at 1.18-1.21 us each), and the whole
+  descent is a small slice of the remainder, so removing work from it cannot
+  show up end to end while the syscalls are still there.
+
+  This is a CORRECTION TO THE FRAMING, not to the numbers. DESIGN.md's
+  finding table reads "P2 ... 1.7-1.9x of the descent", which invites reading
+  it as 1.7-1.9x of a seek. It is 1.7-1.9x of the comparison work, and the
+  comparison work is ~1% of a file-backed seek and ~13% of a cached one
+  (~90 ns of the audit's 680 ns cached seek). P2 was worth doing -- it is
+  free, it is measured, and it removes 29-43% of the allocation on the hot
+  path -- but it is not where the time is. P1, the block cache, is.
+
+4. THE GATE
+
+  dotnet test green at 1197 tests (669 + 528), up 18 from 1179:
+    15  CompareInPlaceTests   -- CompareAt and ChildAt against EntryAt on
+                                 every entry of every block of every tag of
+                                 the five indexed corpus files
+     3  SeekAllocationTests   -- the ceilings, plus a guard that every
+                                 measured seek actually finds its record
+
+  No golden expectation changed, no corpus file altered.
+
+  Allocation measures the same 2 808 / 2 160 bytes in Debug and in Release,
+  which is what makes it a gate rather than a benchmark.
+
+5. MUTATIONS (DEV_APPROACH.md 4, restored from checksummed copies)
+
+  CompareAt compares at DupCount instead of 0
+    -> CompareInPlaceTests.CompareAt_AnswersWhatComparingTheEntryAnswers,
+       52 seek/navigation goldens, and the allocation suite's find-guard.
+       Predicted: "the seek goldens and the CompareAt-vs-EntryAt component
+       test". Matched.
+
+  ChildAt reads the record number instead of the child
+    -> CompareInPlaceTests.ChildAt_AnswersWhatTheEntryAnswers, 36 SeekTests
+       and TagCursor tests, 53 goldens. Predicted: "every tag-order golden
+       walk". Matched, and wider -- a wrong child breaks every descent.

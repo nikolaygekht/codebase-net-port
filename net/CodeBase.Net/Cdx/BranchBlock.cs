@@ -88,7 +88,7 @@ internal sealed class BranchBlock
         {
             int middle = low + ((high - low) / 2);
 
-            if (search.Compare(EntryAt(middle).Key) < 0)
+            if (search.Compare(KeyAt(middle)) < 0)
                 low = middle + 1;
             else
                 high = middle;
@@ -96,6 +96,40 @@ internal sealed class BranchBlock
 
         return low;
     }
+
+    /// <summary>
+    /// Gives the node number of the child at a position, without touching its key.
+    /// </summary>
+    /// <param name="index">Which entry, counting from zero.</param>
+    /// <returns>The child's node number, stored big-endian.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">The block has no entry at that position.</exception>
+    /// <remarks>
+    /// A descent needs the child and nothing else, and [c]EntryAt[/c] would copy the key to hand it
+    /// over — measured at 1 292 to 1 744 bytes per seek across the two blocks
+    /// (claude/dev/009-performance-audit/ANALYSIS.md section 6). Four bytes are read here instead.
+    /// [c]EntryAt[/c] keeps its copy, because a caller that keeps an entry needs a key of its own.
+    /// </remarks>
+    public uint ChildAt(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
+
+        return BinaryPrimitives.ReadUInt32BigEndian(
+            block.AsSpan(NodeHeader.Size + (index * entrySize) + keyLength + 4, 4));
+    }
+
+    /// <summary>
+    /// Gives an entry's key where it lies, for comparing against.
+    /// </summary>
+    /// <param name="index">Which entry, counting from zero.</param>
+    /// <returns>The key, over the block's own bytes.</returns>
+    /// <remarks>
+    /// Private, and safe to hand out only because an interior block never rewrites its buffer: the
+    /// bytes stay valid for the block's whole life. A leaf cannot do this — its key buffer is rebuilt
+    /// as it is walked.
+    /// </remarks>
+    private ReadOnlySpan<byte> KeyAt(int index) =>
+        block.AsSpan(NodeHeader.Size + (index * entrySize), keyLength);
 
     /// <summary>
     /// Gives the entry at a position.

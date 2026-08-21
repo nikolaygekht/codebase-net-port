@@ -1,0 +1,80 @@
+009-performance-audit -- sub-step 6, Table.Refresh() and the hooks LOCKING will call
+
+1. WHAT LANDED
+
+  Table.Refresh()           d4refresh (D4FRESH.C:130-175) without its lock branch
+  Table.DropCachedBlocks()  d4freeBlocks (d4index.c:29), one table's share
+  IndexFileReader.Invalidate()
+  TagCursor.Forget() / TableTagCursor.ForgetBlocks()
+
+  The engine already had DropCachedBlocks (code4optSuspend) from sub-step 5.
+
+2. THE FINDING: DROPPING BLOCKS HAS TWO HALVES IN THIS PORT
+
+  Blocks are held in two places, not one:
+
+    the engine's pool     shared by every file, dropped by invalidating the
+                          caching source
+    a parked tag cursor   holding its OWN COPY of the leaf it is sitting on,
+                          because NodeReader allocates a fresh array per read
+                          and the cache copies into it
+
+  Dropping only the pool would leave an indexed walk reading stale bytes while
+  the record path read fresh ones -- worse than dropping neither, because the
+  two would disagree. The C has the same two levels and d4freeBlocks drops both:
+  it "drops every block a table's tags hold" and not only the pool's.
+
+  This is also what ANALYSIS.md section 9 said the port would NOT need
+  ("this port re-descends from the root every time, so it has one cache and one
+  invalidation point"). That was true when a cursor held nothing between calls
+  and stopped being true when TagCursor started keeping its block. The design
+  note is now wrong and the code is right; recorded here rather than silently
+  diverging.
+
+3. WHAT REFRESH DELIBERATELY DOES NOT DO
+
+  No memo reset. f4memoReset has no counterpart because MemoReader keeps no
+  state between calls. When a write path gives memo values somewhere to be held,
+  that is where resetting them belongs.
+
+  No Flush(source). PLAN.md asked for Invalidate/Flush as real entry points so
+  LOCKING-TRANSACTIONS.md 3.7's "flush before unlock, invalidate after lock" has
+  something to call. Invalidate exists at four levels (engine, table, index
+  file, caching source). FLUSH DOES NOT, and deliberately: nothing is dirty in a
+  read-only library, so a Flush today would be a method whose body is a comment.
+  It is the write path's own first job, and it cannot be written before there is
+  something to write.
+
+  No lock-driven skip. The reference can skip the whole thing when a lock proves
+  nothing changed (D4FRESH.C:131-144); with no locks this port always does the
+  work. Slower and honest, and the branch arrives with the capability.
+
+4. THE GATE
+
+  1325 tests green (759 + 566), up 7.
+
+  MUTATIONS (DEV_APPROACH.md 4, restored from a checksummed copy):
+
+    DropCachedBlocks retires nothing
+      -> AWriteBehindTheCacheIsInvisibleUntilTheTableIsRefreshed and
+         AParkedCursorStopsBelievingItsOwnBlockToo. Predicted by PLAN.md as
+         "the staleness test only". Matched.
+
+    Drop the pool but leave the cursors believing their own blocks
+      -> AParkedCursorStopsBelievingItsOwnBlockToo only.
+
+  THE SECOND MUTATION IS WHY THIS SECTION EXISTS. Run against the FIRST version
+  of that test it reddened NOTHING: the test parked a cursor, dropped, then
+  called Top() -- which re-descends from the root whatever the cursor was
+  holding -- and compared record numbers with a freshly opened table. It passed
+  while covering none of what it claimed.
+
+  The rewritten test observes a READ instead of a value: a step inside a leaf the
+  cursor already holds must read the index ZERO times, and the same step after
+  forgetting must read it. Asserting on what the step returns can never work,
+  because a re-descent to the same place answers the same thing.
+
+  One more thing the rewrite had to get right: only the INDEX file's reads count.
+  A tag-order walk visits scattered record numbers, so the record's window misses
+  most of the time however good the cache is -- the first attempt asserted zero
+  reads overall and got two, which said nothing about the cursor's block.

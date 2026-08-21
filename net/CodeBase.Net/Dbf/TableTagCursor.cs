@@ -71,6 +71,19 @@ internal sealed class TableTagCursor
     public void ForgetSearch() => searching = false;
 
     /// <summary>
+    /// Forgets the block this cursor holds as well as any search in progress.
+    /// </summary>
+    /// <remarks>
+    /// The per-tag half of dropping a table's cached blocks: the pool's windows are the engine's, and
+    /// this is the copy a parked cursor is still holding.
+    /// </remarks>
+    public void ForgetBlocks()
+    {
+        cursor.Forget();
+        searching = false;
+    }
+
+    /// <summary>
     /// Builds a search over this tag's keys, into the cursor's own buffer.
     /// </summary>
     /// <param name="value">The value to look for, in its stored form.</param>

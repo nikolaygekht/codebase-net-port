@@ -1,6 +1,7 @@
 using CodeBase.Net.Cdx;
 using System.Text;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.IO;
 using CodeBase.Net.Memo;
 
 namespace CodeBase.Net;
@@ -1071,6 +1072,65 @@ public sealed class Table : IDisposable
     }
 
     /// <summary>
+    /// Forgets every block of this table's files that the cache is holding.
+    /// </summary>
+    /// <returns>How many blocks were given up, which is zero when nothing was being cached.</returns>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <remarks>
+    /// [c]d4freeBlocks[/c] ([c]d4index.c:29[/c]), and it has **two halves** because this port holds
+    /// blocks in two places. One is the engine's pool, shared by every file. The other is the block a
+    /// parked tag cursor is sitting on, which is its own copy of those bytes and would otherwise keep
+    /// answering from what it read before — so dropping only the pool would leave an indexed walk
+    /// reading stale bytes while the record path read fresh ones, which is worse than doing neither.
+    ///
+    /// The engine's own [c]DropCachedBlocks[/c] drops every table's; this drops one table's.
+    /// </remarks>
+    public int DropCachedBlocks()
+    {
+        EnsureOpen();
+
+        int dropped = Dropped(opened.Data) + Dropped(opened.Memo) + (opened.Index?.Invalidate() ?? 0);
+
+        foreach (TableTagCursor cursor in tagCursors.Values)
+            cursor.ForgetBlocks();
+
+        return dropped;
+    }
+
+    /// <summary>
+    /// Reads this table's files again, from the record the cursor is on outwards.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <remarks>
+    /// [c]d4refresh[/c] ([c]D4FRESH.C:130-175[/c]) without its lock branch. The reference can skip the
+    /// work when a lock proves nothing may have changed; this library holds no locks, so it always does
+    /// it, which is slower and honest. That branch arrives with the locking capability rather than being
+    /// guessed at now.
+    ///
+    /// What it does: drops what is cached for this table, forgets the blocks its cursors hold, and
+    /// **re-reads the current record in place** — the cursor stays on the same record number, and a
+    /// [c]Skip[/c] from there re-finds its place in the tag by descending rather than walking.
+    ///
+    /// What it does *not* do is reset a memo cache, because there is none: [c]MemoReader[/c] keeps no
+    /// state between calls, so [c]f4memoReset[/c] has no counterpart here. When a write path gives memo
+    /// values somewhere to be held, this is where resetting them belongs.
+    ///
+    /// It is not a promise of currency and cannot be one until locking exists: it says "forget what you
+    /// saw", and another process may write between this call and the next read.
+    /// </remarks>
+    public void Refresh()
+    {
+        EnsureOpen();
+
+        DropCachedBlocks();
+
+        // Only when the cursor is on a record. Past either end there is nothing to re-read, and the
+        // blank record behind the cursor is not something a file can refresh.
+        if (position.Number >= 1 && position.Number <= RecordCount && !position.Eof && !position.Bof)
+            Fetch(position.Number);
+    }
+
+    /// <summary>
     /// Closes the table and the files opened for it.
     /// </summary>
     public void Dispose()
@@ -1111,6 +1171,9 @@ public sealed class Table : IDisposable
     /// <summary>
     /// Reads a record into the buffer and puts the cursor on it.
     /// </summary>
+    private static int Dropped(IRandomAccessSource? source) =>
+        source is CachingRandomAccessSource caching ? caching.Invalidate() : 0;
+
     private void Fetch(int recordNumber)
     {
         reader.Read(recordNumber, record);

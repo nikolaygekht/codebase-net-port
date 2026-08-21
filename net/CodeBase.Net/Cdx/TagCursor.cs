@@ -42,6 +42,27 @@ internal sealed class TagCursor
         Bof = true;
     }
 
+    /// <summary>
+    /// Forgets where the cursor is and the block it was holding.
+    /// </summary>
+    /// <remarks>
+    /// What makes refreshing a table honest. A cursor keeps the block it is parked on, and that block
+    /// is **its own copy** of those bytes rather than a window in the cache — so dropping what the
+    /// cache believes leaves a parked cursor still reading what it read before. This is the second
+    /// half of [c]d4freeBlocks[/c], which drops "every block a table's tags hold"
+    /// ([c]d4index.c:29[/c]) and not only the pool's.
+    ///
+    /// Afterwards the cursor is where a new one is: nowhere. Nothing is lost by that, because
+    /// re-finding the record it was on is a descent through [c]Synchronize[/c] rather than a walk.
+    /// </remarks>
+    public void Forget()
+    {
+        block = default;
+        index = 0;
+        Eof = true;
+        Bof = true;
+    }
+
     /// <summary>Gets a value indicating whether the cursor is past the last key.</summary>
     public bool Eof { get; private set; }
 

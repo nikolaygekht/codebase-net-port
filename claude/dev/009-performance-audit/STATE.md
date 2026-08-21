@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 to 5
+**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 to 6
 of seven are done
-**Current sub-step:** [`PLAN.md`](PLAN.md) step 6, `Table.Refresh()` and the `LOCKING` hooks. Not begun.
+**Current sub-step:** [`PLAN.md`](PLAN.md) step 7, the threading contract and its detector. Not begun.
 
 ## Done so far
 
@@ -32,7 +32,9 @@ The remediation:
 - [x] 5 — the cache wired up: `BlockCacheMode`, `BlockCache`, `CachingRandomAccessSource`,
       `CachingSourceFactory`, `DropCachedBlocks()`, and the **layer-5 2× gate** —
       [`results-block-cache.txt`](results-block-cache.txt)
-- [ ] 6 — `Table.Refresh()` and the `Invalidate` / `Flush` hooks §3.7 will call
+- [x] 6 — `Table.Refresh()`, `Table.DropCachedBlocks()` and the `Invalidate` hooks §3.7 will call —
+      [`results-refresh.txt`](results-refresh.txt). `Flush` waits for `WRITE`, because nothing is dirty
+      yet
 
 - [ ] 7 — the threading contract in the docs, and the `Interlocked` detector that makes a violation
       throw instead of returning someone else's record (independent of 4–6)
@@ -294,6 +296,34 @@ cache, where eviction removes its key in the same breath, which is also where th
 `TwoFilesSharingAPoolAreNeverServedEachOthersBytes` is that case, on a pool of one slot.
 
 **1318 tests** green (752 + 566), up 72.
+
+### Sub-step 6, done 2026-08-21
+
+**`Table.Refresh()` and `Table.DropCachedBlocks()` are in, and dropping blocks turned out to have two
+halves.** Details in [`results-refresh.txt`](results-refresh.txt).
+
+Blocks live in **two** places: the engine's pool, and the block a **parked tag cursor** is sitting on —
+its own copy, because `NodeReader` allocates per read and the cache copies into it. Dropping only the
+pool would leave an indexed walk on stale bytes while the record path read fresh ones, which is worse
+than dropping neither. The C has the same two levels and `d4freeBlocks` drops both.
+
+**That contradicts `ANALYSIS.md` §9**, which said this port would need only one invalidation point
+because it "re-descends from the root every time". True when a cursor held nothing between calls; false
+since `TagCursor` began keeping its block. The note is wrong, the code is right, and this is where it is
+recorded.
+
+**`Flush` is not built** — `Invalidate` exists at four levels, but nothing is dirty in a read-only
+library, so `Flush` today would be a method whose body is a comment. It is the write path's first job.
+
+**A vacuous test, caught by a mutation, and this is the part worth remembering.** The first version of
+`AParkedCursorStopsBelievingItsOwnBlockToo` parked a cursor, dropped, then called `Top()` — which
+re-descends from the root whatever the cursor held — and compared record numbers with a freshly opened
+table. Against the mutation "drop the pool but leave the cursors alone" it reddened **nothing**. The
+rewrite observes a **read** rather than a value: stepping inside a held leaf must read the index zero
+times, and the same step after forgetting must read it. And only the *index* file's reads count, because
+a tag-order walk visits scattered records, so the record window misses regardless.
+
+**1325 tests** green (759 + 566).
 
 ## A defect found on the way, and deliberately not fixed here
 

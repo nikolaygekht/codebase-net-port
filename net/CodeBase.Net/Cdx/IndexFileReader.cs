@@ -133,6 +133,18 @@ internal sealed class IndexFileReader : IDisposable
     /// <summary>
     /// Closes the index file.
     /// </summary>
+    /// <summary>
+    /// Forgets every block of this index file that the cache is holding.
+    /// </summary>
+    /// <returns>How many were given up, which is zero when the file is not cached.</returns>
+    /// <remarks>
+    /// Half of [c]d4freeBlocks[/c] ([c]d4index.c:29[/c]); the other half is the blocks the tags' own
+    /// cursors hold, which belong to whoever opened them.
+    /// </remarks>
+    public int Invalidate() =>
+        source is CachingRandomAccessSource caching ? caching.Invalidate() : 0;
+
+    /// <inheritdoc/>
     public void Dispose() => source.Dispose();
 
     /// <summary>

@@ -372,7 +372,17 @@ changes shape.
 
   Two boundaries this has to respect, both found before writing any of it:
 
-  - **The pool hands out buffers of exactly `BlockSize`.** `block.Length` is load-bearing: a leaf's
+  - **The pool hands out buffers of exactly the block size *that file* declared**, which is not one
+    number. A CDX's block size is **per index file** — 512 in everything Visual FoxPro writes, because
+    the `codeBaseNote` marker is absent and `Resolve` returns `Standard`, but CodeBase may declare its
+    own: any multiple of 512, with a `multiplier` up to 1024 that divides it (`i4init.c:536-548`), and
+    **this port accepts such a file**. An FPT's is **per memo file** and may be under 33, zero or one
+    included (`m4create.c:68`). A DBF has no blocks at all — only a record length, with reads aligned
+    to nothing. The cache's own window is an engine-wide 512 by default and is a third thing again.
+    So an engine-wide pool holding one buffer size would break silently on an index declaring 1024,
+    and the choice — a pool per file, or one pool with a bucket per size — has to be made rather than
+    defaulted into. `NodeReader` already carries the `addressing` that knows the answer.
+  - **And the buffers are exactly that size, never merely at least it.** `block.Length` is load-bearing: a leaf's
     keys grow *downwards from the end of the block*, so `LeafBlock` takes `textEnd = block.Length`
     (`LeafBlock.cs:40`, `:143`) and both `Parse` methods bound-check against it. A buffer that is
     merely *at least* as large as asked — which is all `ArrayPool<byte>.Shared` promises — would shift

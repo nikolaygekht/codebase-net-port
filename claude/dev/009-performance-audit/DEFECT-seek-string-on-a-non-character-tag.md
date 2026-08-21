@@ -57,3 +57,55 @@ every string seek, exception type included, and requires the cached and uncached
 current behaviour — right or wrong — is pinned against the cache changing it, without being blessed as
 correct. When the refusal lands, that test's recorded outcomes change from `Ok`/`NoRecord`/
 `ArgumentOutOfRangeException` to a refusal, and it will still be comparing like with like.
+
+---
+
+## The larger finding behind it, added 2026-08-21
+
+Raised in review: *a function that answers `0.0` for everything it cannot parse means the unsuccessful
+scenarios are not covered by testing at all.* That is the sharper version of this defect and it is
+about the suite, not about one branch.
+
+**Where the swallowing is, and where it is not a bug.** `FoxNumeric.ToDouble` returns `0.0` when the
+text does not parse (`Dbf/FoxNumeric.cs:37-44`). On the **read** path that is almost certainly right: a
+blank numeric field reads as zero in xBase, the corpus witnesses it, and the port matches the C library
+bit for bit there (`FoxNumericGoldenTests.ToDouble_MatchesTheCLibraryBitForBit`). **So the fix is not to
+make `ToDouble` throw** — that would break behaviour the corpus proves. The fix is that the *seek* path
+must not route a caller's string through a function whose job is reading a field's bytes.
+
+**What is genuinely uncovered.**
+
+- **`FoxNumeric` has no layer-1 tests at all.** There is no `FoxNumericTests.cs`; it is exercised only
+  through the corpus, on values the generator wrote — which are all valid. `DEV_APPROACH.md` §4 says in
+  as many words that layer 4 must not be the only thing standing, and here it is: *"The corpus is a
+  witness to happy paths that happen to exist in it. It cannot prove behaviour on … an input no sane
+  writer produces."*
+- **The C library's own answer is unwitnessed.** `f4double` ends in `c4atod` (`F4DOUBLE.C:335-340`),
+  which is *declared* in `d4declar.h:224` and **has no definition anywhere in this source drop**. So
+  what the reference does with a numeric field holding `"ABC"` is not knowable from the sources we
+  have, and no corpus case contains one. Until a generator case writes a malformed numeric field, this
+  port's answer for it is a guess that happens to be plausible.
+- **`RecordKey` and `TableTagCursor` are named by no layer-1 or layer-2 test.** They are reached only
+  through `Table`, which is why a string seek at a numeric tag had never been tried until sub-step 5's
+  equivalence test pointed one at every tag of every table.
+
+**A sweep of the library for the same shape**, by which production types are named by no test below
+layer 4: `FoxNumeric`, `RecordKey`, `SeekConverter`, `DateTimeKeyFlags`, `IndexEntry` are golden-only;
+`CollationWeights`, `NodeReader`, `SourceReader`, `TableTagCursor`, `FieldCollection`, `TagCollection`,
+`DbfVersion`, `FeatureFlags`, `LegacyVariant`, `VisualFoxProVariant` are named by none. Most of those
+are covered transitively through their callers and that is legitimate — the approach tests contracts,
+not classes. The ones that matter are the ones where a **failure path resolves to a plausible value**,
+because those are invisible to a corpus-driven suite by construction: nothing in the corpus is
+malformed, so nothing exercises them, and a wrong answer looks like an answer.
+
+## What this asks for, beyond the refusal
+
+1. **`Seek` requires the exact type**, refusing otherwise — decided in review. Conversion for callers
+   who want it becomes an extension method later, outside the library's own contract.
+2. **Layer-1 tests for `FoxNumeric`**, pinning what unparseable, over-long, over-precise and
+   sign-only text answer — as a *decision recorded*, not as a discovery.
+3. **A generator case with a malformed numeric field**, so the C library's answer stops being unknown.
+   That is the only way to settle whether `0.0` is faithful or merely convenient, and it is the same
+   move the project already makes for every other format question.
+4. **A pass for the rest of the shape**: every place a parse or a lookup resolves to a default rather
+   than refusing, checked for whether the default is witnessed or assumed.

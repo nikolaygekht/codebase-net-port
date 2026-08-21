@@ -37,7 +37,7 @@ public sealed class SeekAllocationTests
     ///
     /// It sits between two measurements, both in
     /// claude/dev/009-performance-audit/results-compare-in-place.txt: **3 956** bytes per seek while
-    /// every compared key was copied, and **2 808** once they were not. 3 200 leaves the current
+    /// every compared key was copied, and **2 760** once they were not. 3 200 leaves the current
     /// figure 14 per cent of room and still sits 19 per cent below the copying one, so it catches
     /// that regression and tolerates ordinary change.
     ///
@@ -51,7 +51,7 @@ public sealed class SeekAllocationTests
     /// Bytes a seek over the three-level numeric tag may allocate, on the same reasoning.
     ///
     /// Its own number because its tree is a level shallower and its key less than half the width, so
-    /// it copied less to begin with: 3 808 bytes before, 2 160 after.
+    /// it copied less to begin with: 3 808 bytes before, 2 128 after.
     /// </summary>
     private const long NumericSeekCeiling = 2600;
 

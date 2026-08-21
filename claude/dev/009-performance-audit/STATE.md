@@ -71,6 +71,40 @@ and `ChildAt` against `EntryAt` on every entry of every block of every tag of th
 files — and three `SeekAllocationTests`, the ceilings plus a guard that every measured seek really
 finds its record. No golden expectation changed.
 
+**The 1.7–1.9× claim was run down rather than reinterpreted**, because the first write-up of this
+sub-step explained the shortfall away and that was not good enough. `results-compare-in-place.txt` §6
+has it in full. The short version, all on today's build:
+
+| | copying | the audit's hand-inlined loop | **the library** |
+|---|---|---|---|
+| T_NAME, RAM-backed descent | 664.4 ns | 460.2 ns (**1.44×**) | 531.7 ns (1.25×) |
+| T_AMT, RAM-backed descent | 924.1 ns | 517.2 ns (**1.79×**) | 683.6 ns (1.35×) |
+
+**The audit reproduces** — its copying arm to 3–4%, its in-place arm to 3–9%, and its *allocation* to
+1–3% in every arm. It measured what it said it measured. What does not reproduce is reaching its
+number through the library's structure: identical allocation, so the same work, but `Build` is a call
+per compared entry and carries two corruption checks the harness omitted and the library must keep.
+That is ~3.3 ns an entry, which the numeric tag pays fifty times a seek.
+
+**Inlining the scan did not close it** — 1.14×/1.34× before, 1.15×/1.32× after — **so that change was
+reverted.** It bought nothing measurable and made `Seek` drive `builtIndex` directly, which is more
+coupling for no return. The remaining gap is the call itself. Closing it means duplicating `Build` inside `Seek` or moving its throws out of
+line, and **that is left undone on purpose**: 133 ns is 1.4% of a file-backed seek and 20% of a
+RAM-backed descent, and the residual is worth the same order again *in the same cached world*. It gets
+revisited after the cache exists and can be measured where it matters.
+
+**And the elephant is corroborated without borrowing the audit's numbers**: the same descent costs
+**9 189 ns through a file and ~530 ns from RAM — ~17×**, all of it I/O. That is what P1 converts one
+into the other, and it is the same fact as `SUMMARY.md`'s 11.6× and 23.4×, measured a different way.
+P2 was never that and is not that.
+
+**One more copy, one level up.** `TagCursor` compared `search.Matches(Current.Key)` at five sites, and
+`Current` copies the key to do it — the same compare-and-discard, a level higher. Now `MatchesHere`,
+through `CompareAt`: allocation per seek 2 808 → **2 760 B** and 2 160 → **2 128 B**, exactly one
+`byte[20]` and one `byte[8]`. No measurable time change; kept for the allocation and because it is the
+same defect. `ANALYSIS.md` §6's call-site table marks `TagCursor.Current` as "keeps the key: yes" —
+true of the caller outside, and it missed the cursor's own five compare-and-discard uses.
+
 **Both mutations were proved and both were localised as predicted.** `CompareAt` comparing at
 `DupCount` reddens the equivalence test, 52 goldens and the find-guard; `ChildAt` reading the record
 number reddens the equivalence test, 36 seek/cursor tests and 53 goldens. Restored from checksummed

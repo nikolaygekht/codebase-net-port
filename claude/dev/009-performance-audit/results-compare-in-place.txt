@@ -75,3 +75,85 @@ Before is results-benchmark-baseline.txt, taken the same way an hour earlier.
     -> CompareInPlaceTests.ChildAt_AnswersWhatTheEntryAnswers, 36 SeekTests
        and TagCursor tests, 53 goldens. Predicted: "every tag-order golden
        walk". Matched, and wider -- a wrong child breaks every descent.
+
+===========================================================================
+6. THE 1.7-1.9x CLAIM, RUN DOWN (added later the same day, on the question
+   "is the audit lying, or did we test a strange case?")
+
+Neither. The audit reproduces. What does not reproduce is getting its number
+through the library's structure.
+
+RAM-backed descent, PERF10K, three arms in one process over the same blocks,
+all three returning the same checksum -- the audit's own shape
+(harness/Micro.cs), so nothing here is a different case:
+
+  tag      arm                              time      allocated
+  T_NAME   key copied per comparison      664.4 ns      3.77 KB
+  T_NAME   audit's hand-inlined loop      460.2 ns      2.60 KB    1.44x
+  T_NAME   the library, compare in place  531.7 ns      2.60 KB    1.25x
+  T_AMT    key copied per comparison      924.1 ns      3.60 KB
+  T_AMT    audit's hand-inlined loop      517.2 ns      1.96 KB    1.79x
+  T_AMT    the library, compare in place  683.6 ns      1.96 KB    1.35x
+
+  ANALYSIS.md 6 said 0.695 -> 0.401 (1.73x) and 1.061 -> 0.550 (1.93x).
+  The copying arm reproduces to 3-4%, the hand-inlined arm to 3-9%, and the
+  ALLOCATION reproduces to 1-3% in every arm. The audit measured what it said.
+
+WHY THE LIBRARY IS 1.15-1.32x OFF THE HAND-INLINED LOOP
+
+  Identical allocation, so it is not doing more work -- it is paying per-entry
+  call overhead the hand-written loop does not have. Build() is a call per
+  compared entry, plus its two corruption checks (a stored length below zero,
+  key text running into the entry array) which the harness omitted and the
+  library must not. 71 ns over 21 entries and 166 ns over 50 is ~3.3 ns an
+  entry, and the numeric tag pays it 50 times per seek, which is why T_AMT
+  suffers more.
+
+  Inlining LeafBlock.Seek's scan and hoisting the geometry into a field DID
+  NOT close it: the gap was 1.14x / 1.34x before that change and 1.15x / 1.32x
+  after. THAT CHANGE WAS THEREFORE REVERTED -- it bought nothing measurable
+  and made Seek drive builtIndex directly, which is more coupling for no
+  return. "No optimization without a measurement" cuts both ways, and this is
+  the second time this step has had to apply it to its own work.
+
+  Closing the rest means duplicating Build inside Seek, or making it small
+  enough to inline by moving its throws out of line. NOT DONE, and
+  deliberately -- see the sizing below.
+
+WHAT IT IS WORTH, AND WHY WE STOP HERE
+
+  against a file-backed seek (9 189 ns)        133 ns    1.4%
+  against a RAM-backed descent (531.7 ns)      133 ns    20%
+  the residual, against a RAM-backed descent    71-166 ns   13-24%
+
+  P2 buys nothing measurable while a seek is five read syscalls, and about a
+  fifth of it once those are gone. The residual is worth the same order again
+  -- but only in the same, cached, world. So it is measured, written down, and
+  left, to be revisited after the cache exists and can be measured where it
+  matters. "No optimization without a measurement" cuts both ways.
+
+AND THE ELEPHANT, CORROBORATED WITHOUT BORROWING THE AUDIT'S NUMBERS
+
+  the same descent, through a file        9 189 ns
+  the same descent, from RAM               ~530 ns      ~17x
+
+  That is today's data, on today's build, and it is what P1 -- the block cache
+  -- converts one into the other. The 11.6x and 23.4x in SUMMARY.md are the
+  same fact measured a different way. P2 was never claimed to be that, and it
+  is not that.
+
+7. ONE MORE COPY, ONE LEVEL UP (found while running this down)
+
+  TagCursor compared search.Matches(Current.Key) at five sites, and Current
+  copies the key out of the block to do it -- the same compare-and-discard the
+  block layer had just stopped doing. Now MatchesHere(search), which calls
+  LeafBlock.CompareAt.
+
+  End-to-end allocation per seek: 2 808 -> 2 760 B and 2 160 -> 2 128 B,
+  exactly one byte[20] and one byte[8]. No measurable time change. Kept for
+  the allocation and because it is the same defect, not for the clock.
+
+  Worth noting: ANALYSIS.md 6's call-site table lists five uses of EntryAt and
+  marks TagCursor.Current as "keeps the key: yes". That is true of the caller
+  outside, and it missed that the cursor itself uses Current five times to
+  compare and discard.

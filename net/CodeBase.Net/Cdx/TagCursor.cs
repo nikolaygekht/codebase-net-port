@@ -74,6 +74,19 @@ internal sealed class TagCursor
     }
 
     /// <summary>
+    /// Says whether the entry the cursor is on matches a search value.
+    /// </summary>
+    /// <param name="search">What to compare against.</param>
+    /// <returns>True when the key at this position matches.</returns>
+    /// <remarks>
+    /// Every caller of this asks the question straight after landing or stepping, so the cursor is on
+    /// a key and the answer is the comparison alone. Reading [c]Current[/c] to compare it would copy
+    /// the key out of the block first — the same compare-and-discard the block layer stopped doing,
+    /// one level up.
+    /// </remarks>
+    private bool MatchesHere(KeySearch search) => block.Leaf!.CompareAt(index, search) == 0;
+
+    /// <summary>
     /// Moves to the first key in the tag's own order.
     /// </summary>
     /// <returns>True when there is one, false when the tag holds no keys at all.</returns>
@@ -161,7 +174,7 @@ internal sealed class TagCursor
             return SeekOutcome.Eof;
         }
 
-        return search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.After;
+        return MatchesHere(search) ? SeekOutcome.Found : SeekOutcome.After;
     }
 
     /// <summary>
@@ -192,7 +205,7 @@ internal sealed class TagCursor
             return SeekOutcome.Bof;
         }
 
-        return search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.Before;
+        return MatchesHere(search) ? SeekOutcome.Found : SeekOutcome.Before;
     }
 
     /// <summary>
@@ -278,7 +291,7 @@ internal sealed class TagCursor
             if (!StepInTagOrder(1))
                 return SeekOutcome.Eof;
 
-            outcome = search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.After;
+            outcome = MatchesHere(search) ? SeekOutcome.Found : SeekOutcome.After;
         }
 
         return outcome;
@@ -290,13 +303,13 @@ internal sealed class TagCursor
     private SeekOutcome SeekAdjacentMatch(KeySearch search, int direction)
     {
         // Not on a matching entry: start over, which is what the C library does for the forward case.
-        if (!IsOnKey || !search.Matches(Current.Key))
+        if (!IsOnKey || !MatchesHere(search))
             return direction > 0 ? Seek(search) : SeekLast(search);
 
         if (!StepInTagOrder(direction))
             return SeekOutcome.NoEntry;
 
-        return search.Matches(Current.Key) ? SeekOutcome.Found : SeekOutcome.NoEntry;
+        return MatchesHere(search) ? SeekOutcome.Found : SeekOutcome.NoEntry;
     }
 
     /// <summary>

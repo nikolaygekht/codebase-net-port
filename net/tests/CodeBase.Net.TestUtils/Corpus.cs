@@ -54,7 +54,16 @@ public static class Corpus
     /// <summary>
     /// Absolute path of the directory holding benchmark data.
     /// </summary>
-    public static string BenchmarkRoot => Path.Combine(Root, BenchmarkDirectoryName);
+    /// <value>
+    /// The [c]benchmark[/c] directory beside the corpus, unless the [c]CODEBASE_BENCHMARK_DATA[/c]
+    /// environment variable names another one. The override exists to measure the same workload from
+    /// two filesystems — a repository under [c]/mnt[/c] on WSL is reached across a bridge, and how much
+    /// that costs is a question about the machine that only the same code on both can answer.
+    /// </value>
+    public static string BenchmarkRoot =>
+        Environment.GetEnvironmentVariable("CODEBASE_BENCHMARK_DATA") is { Length: > 0 } elsewhere
+            ? elsewhere
+            : Path.Combine(Root, BenchmarkDirectoryName);
 
     /// <summary>
     /// Full path of a benchmark data file, whose existence is checked here rather than at first read.

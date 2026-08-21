@@ -64,6 +64,15 @@ public class ReadPathBenchmarks
     public void Setup()
     {
         engine = new CodeBaseEngine { BlockCache = Cache };
+
+        // A pool smaller than the working set is the only way to make the eviction policy matter: with
+        // the default 2048 windows, PERF10K's ~1788 fit whole and nothing is ever retired, so every
+        // figure taken that way says nothing about which block would have been given up.
+        if (Environment.GetEnvironmentVariable("CODEBASE_BENCHMARK_CACHE_BLOCKS") is { Length: > 0 } size
+            && int.TryParse(size, out int blocks))
+        {
+            engine.BlockCacheBlocks = blocks;
+        }
         table = engine.OpenTable(Corpus.BenchmarkPathOf("PERF10K.DBF"));
 
         byName = table.Tags["T_NAME"];

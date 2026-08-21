@@ -1,0 +1,109 @@
+009-performance-audit -- four checks before closing, 2026-08-21
+
+Asked for before the step is closed. Three confirmed something; the fourth
+overturned a conclusion this step had already written down.
+
+===========================================================================
+1. WHERE A CACHED SEEK'S TIME GOES -- AND SUB-STEP 5 HAD IT WRONG
+
+  Sub-step 5 concluded that "~3.9 us of a cached seek is CPU in the Table layer
+  above the tree". That came from subtracting a RAM-backed descent (0.53 us,
+  RamDescentBenchmarks) from a cached Table.Seek (4.4 us, ReadPathBenchmarks) --
+  two benchmarks of different shapes. IT IS WRONG.
+
+  SeekLayersBenchmarks measures the layers on top of each other, one process,
+  one cached engine (Windows, Release, PERF10K, T_NAME):
+
+    0a. blocks only, straight from an array      545 ns    2.63 KB
+    0.  blocks only, through the cache         4 214 ns    2.63 KB
+    1.  + the cursor's seek protocol           4 157 ns    2.68 KB
+    2.  + reading the record                   4 297 ns    2.68 KB
+    3.  + building the search from a string    4 299 ns    2.73 KB
+    4.  Table.Seek(string)                     4 353 ns    2.73 KB
+
+  EVERYTHING ABOVE THE BLOCK READS COSTS ~0.14 us -- three per cent. The Table
+  layer is not where the time is, and neither is the cursor.
+
+  WHERE IT IS: arm 0a against arm 0. The same loop, the same parses, the same
+  comparisons, THE SAME ALLOCATION (2.63 KB both), differing only in where the
+  bytes are copied from -- a plain array, or the cache's own window. 545 ns
+  against 4 214.
+
+  So A CACHE HIT COSTS ABOUT 730 ns PER 512-BYTE WINDOW, against roughly 10 for
+  an array copy. That is the same order as an actual read on a fast filesystem
+  (400-1 100 ns), which is exactly why a cached seek is only about twice as fast
+  as an uncached one, and why on ext4 the ratio falls to 1.80.
+
+  WHAT IT IS NOT: not the lock (the cached seek was 4 400 ns before the lock
+  existed and 4 100 after); not allocation (identical in both arms); not the
+  Table layer; not the cursor.
+
+  WHAT IT IS: NOT KNOWN. The hit path is a dictionary lookup, a pin, an LRU
+  relink and a 512-byte copy, which add up to something like 100 ns and not 730.
+  Recorded as measured and unexplained rather than explained away -- profiling
+  it is the next action, and it should happen before this step is called done,
+  because it means P1 IS NOT FULLY DELIVERED. The cache removes a syscall and
+  puts something of nearly the same cost in its place. A hit at ~50 ns would put
+  a cached seek near 0.8 us and the audit's predicted 11.6x within reach.
+
+===========================================================================
+2. WHAT THE Block STRUCT COST
+
+  Allocation per seek, measured exactly (SeekAllocationTests):
+
+    after sub-step 3       2 760 B (character)   2 128 B (numeric)
+    now                    2 792 B               2 152 B
+
+  +32 and +24, and the difference between them is the answer: the character tag
+  is four index levels deep and the numeric three, so it is +8 BYTES PER INDEX
+  BLOCK READ. LeafBlock and BranchBlock now hold a Block (a reference plus two
+  ints, 16 bytes) where they held a byte[] (8), and one of those objects is
+  allocated per block read.
+
+  On the clock: nothing. Comparing the same arms across runs -- walk 1 190 ->
+  1 206 -> 1 074 ns, seek 9 136 -> 9 386 -> 8 458 -- every movement is inside the
+  ~10% variance between processes on this machine, and the later run was faster.
+  Eight bytes added to an object that already costs 536 do not show.
+
+===========================================================================
+3. A CACHE SMALLER THAN THE WORKING SET
+
+  Not done yet. PERF10K is ~1 788 windows and the default pool is 2 048, so
+  everything measured so far fits whole and NOTHING IS EVER EVICTED -- which
+  means none of these numbers say anything about the eviction policy, simple or
+  faithful. CODEBASE_BENCHMARK_CACHE_BLOCKS is wired into ReadPathBenchmarks for
+  exactly this and the run is still owed.
+
+===========================================================================
+4. THE FILESYSTEM, MEASURED INSTEAD OF ASSUMED
+
+  Every figure in this step was taken natively on Windows because WSL numbers
+  looked absurd. FilesystemBenchmarks measures the same 200 record reads in each
+  place, cached and uncached. The machine: Samsung 990 NVMe (WSL ext4), Samsung
+  800 SATA SSD (D:), WD Black HDD on SATA (F:).
+
+    place                        medium/path              Off         Always   ratio
+    ~/codebase-bench             990 NVMe, ext4, WSL      399.7 ns    59.3 ns    6.7x
+    D:\...\benchmark             800 SATA, NTFS, Windows  1 105.9 ns  73.9 ns   15.0x
+    F:\codebase-bench            WD Black, NTFS, Windows  1 173.0 ns  71.6 ns   16.4x
+    /mnt/d/...                   THE SAME 800 SATA, 9p    171 557.6 ns 59.0 ns 2 907x
+
+  THE BRIDGE, ISOLATED. The last two rows are the same file on the same physical
+  disk: 1 106 ns read natively, 171 558 ns through /mnt. 155x, and it is 9p and
+  nothing else. Every WSL figure this step distrusted is explained.
+
+  THE CACHED COLUMN IS FLAT -- 59 to 74 ns everywhere -- because a hit does not
+  touch a filesystem. So the cache's worth is exactly the cost of the read it
+  avoids, and it ranges from 6.7x to 2 907x on one machine.
+
+  HDD AND SSD ARE THE SAME HERE (1 173 vs 1 106) and that is not a surprise: the
+  benchmark warms up, so the file sits in the page cache and what is timed is a
+  syscall and a memcpy, not a platter. A cold HDD would cost milliseconds per
+  read and the cache would look enormously better. THESE NUMBERS THEREFORE
+  UNDERSTATE THE CACHE on any machine whose data does not fit in RAM.
+
+  And one for the gate: the fastest configuration here is the one where the
+  cache helps least. On ext4 the seek ratio is 1.80x -- ALREADY UNDER THE 2x
+  FLOOR. Retargeting the timed assertions onto the walk and Go+Skip in sub-step 5
+  was not a convenience; it was necessary, and for a better reason than the one
+  given at the time.

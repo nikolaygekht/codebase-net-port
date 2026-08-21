@@ -346,10 +346,29 @@ changes shape.
   exercise eviction and a benchmark nobody can re-run is the state this audit just got us out of. Sub-step
   1 owes `net/corpus/README.md` and `test-files-generator/README.md` with it. It is a **benchmark** case,
   not a gate: no `.dump.txt`, and no golden test asserts against it.
-- **Pooled blocks without a copy.** Removing `NodeReader`'s `byte[512]` needs a rule for a block held by
-  a live `LeafBlock` while the pool wants to retire it. Reference counting, or blocks pinned for a
-  cursor's lifetime, or leaving the copy. Deferred, and worth its own measurement first — after item 3
-  the copy is 2 144 of 2 568 bytes per seek.
+- ~~**Pooled blocks without a copy.**~~ **Measured 2026-08-21, and it turns out to be two questions,
+  not one** (`results-compare-in-place.txt` §8). A RAM-backed descent spends **~40% of its time on the
+  per-read `byte[512]`** — 213 of 553 ns, more than the whole compare-in-place win — and reusing one
+  buffer takes the descent to **339.7 ns and 296 bytes per seek**, 1.63× faster than the current path.
+  The two questions this Open question had merged:
+  - **Handing out the *pool's* array** needs pinning or reference counting, because a `LeafBlock` keeps
+    its array for life and a `TagCursor` keeps blocks across calls. **Still deferred**, still hard.
+  - **Letting the *caller* reuse its own buffer** needs only what a cursor already guarantees: about
+    three of the five reads per seek are branch blocks, read then searched then descended then
+    discarded. Two buffers per cursor replace five allocations per seek. **This one is in scope**, and
+    deferring the hard question deferred it by accident.
+
+  The risk to name correctly: it is **object lifetime within one thread**, not threading. Overwriting a
+  buffer under a live `LeafBlock` corrupts reads on the same thread, and a per-thread buffer does not
+  fix that — a lifetime rule does.
+- **What the threading contract is.** The port has never stated one: no locks, no `[ThreadStatic]`, no
+  sentence in any document. That costs nothing while every buffer is per-call, and it stops being free
+  the moment anything is reused — **including the pool itself**, because decision 4 makes it
+  engine-wide and an engine-wide pool touched from two threads is a data race with or without buffer
+  reuse. Proposal to settle in sub-step 5: **a table and its cursors are single-threaded; an engine may
+  be shared only for opening tables.** That is the C library's own posture (`E4EXPR.C:87-135`
+  serialises expression evaluation through one global critical section) and it is the cheapest contract
+  that makes the pool safe.
 - **Default pool size.** The C sizes from `memStartBlock`/`memMaxBlock`. A block count with a documented
   default is the obvious shape; what the default *is* wants a measurement across table sizes that this
   step does not take. Note the interaction with the mode: with `WhenExclusive` and no exclusive opens,

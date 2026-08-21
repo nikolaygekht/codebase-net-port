@@ -157,3 +157,73 @@ AND THE ELEPHANT, CORROBORATED WITHOUT BORROWING THE AUDIT'S NUMBERS
   marks TagCursor.Current as "keeps the key: yes". That is true of the caller
   outside, and it missed that the cursor itself uses Current five times to
   compare and discard.
+
+===========================================================================
+8. THE DENOMINATOR NOBODY HAD MEASURED: HOW MUCH OF A DESCENT IS ALLOCATION
+
+  The question that produced this section: compare-in-place removed ~1.2 KB
+  per seek and bought 20% of a RAM-backed descent, but what SHARE of the
+  descent is allocation at all? Nobody knew, because 2.6 KB per seek was
+  still being allocated after the change.
+
+  Fourth arm, identical to the library's in-place descent except that the
+  block is read into ONE REUSED byte[512] instead of a fresh one per read:
+
+  tag      arm                                    time      allocated
+  T_NAME   key copied per comparison            690.3 ns      3 860 B
+  T_NAME   the library, compare in place        553.2 ns      2 664 B
+  T_NAME   audit's hand-inlined loop            477.1 ns      2 664 B
+  T_NAME   in place + block buffer reused       339.7 ns        296 B
+
+  ALLOCATION IS ~40% OF A CACHED DESCENT -- 213 of 553 ns, which is MORE than
+  the whole compare-in-place win (137 ns). Allocation per seek falls 9x, and
+  the descent is 1.63x faster than the library's current path and 1.40x
+  faster than the hand-inlined loop we could not reach.
+
+  T_AMT was multimodal in this run (StdDev 61 ns, and its in-place arm moved
+  683 -> 830 ns between runs). Not leaned on. T_NAME is the clean signal, and
+  the allocation counts are exact on both.
+
+  Note the arms are not additive with section 6's: removing the per-comparison
+  copies made the per-read buffer a LARGER share of what remains, which is
+  why it has to be measured after them and not predicted from them.
+
+WHY THIS IS NOT A FOOTNOTE
+
+  DESIGN.md puts the byte[512] outside the cache's scope, in an Open question
+  that CONFLATES TWO DIFFERENT JOBS:
+
+    hard: hand out the POOL's array. Needs pinning or refcounting, because a
+          LeafBlock keeps its array for its whole life and a TagCursor keeps
+          blocks across calls. Rightly deferred.
+    easy: let the CALLER reuse its own buffer instead of allocating per read.
+          Needs only what a cursor already guarantees -- about 3 of the 5
+          reads per seek are branch blocks, read then searched then descended
+          then discarded. Two buffers per cursor (one for the descent path,
+          one for the leaf it is parked on) replace 5 allocations per seek.
+
+  Deferring the hard one deferred the easy one with it. The easy one is worth
+  ~40% of a cached descent, which is the same order as everything else in this
+  step put together.
+
+AND A DECISION THE PORT HAS NEVER MADE
+
+  There is NO documented threading contract: no locks, no [ThreadStatic], no
+  statement in any document. That is fine while every buffer is per-call, and
+  it stops being fine the moment anything is reused -- including the cache
+  itself, because DESIGN.md decision 4 makes the pool ENGINE-WIDE, and an
+  engine-wide pool touched from two threads is a data race with or without
+  buffer reuse.
+
+  Worth being precise about the risk, because it is easy to name the wrong
+  one: the danger of reusing a block buffer is NOT primarily threading, it is
+  OBJECT LIFETIME WITHIN ONE THREAD. LeafBlock rebuilds keys out of the array
+  it was handed, so overwriting that array under a live LeafBlock corrupts
+  reads on the same thread. A per-thread buffer does not fix that; a lifetime
+  rule does, and per-thread only closes the extra hole that sharing one buffer
+  between threads would open.
+
+  So the cache step owes two things it was not going to write down:
+    - what the threading contract IS (proposal: a Table and its cursors are
+      single-threaded, an engine may be shared only for opening tables), and
+    - caller-side buffer reuse, sized by the numbers above.

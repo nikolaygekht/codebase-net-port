@@ -153,6 +153,58 @@ public class RamDescentBenchmarks
     }
 
     /// <summary>
+    /// The library's descent again, with the per-block buffer reused instead of allocated.
+    /// </summary>
+    /// <returns>The sum of the record numbers found, which must equal the other variants'.</returns>
+    /// <remarks>
+    /// This exists to answer a question the other arms cannot: **what share of a descent is
+    /// allocation at all?** Compare-in-place removed about 1.2 KB per seek and bought 20 per cent of
+    /// a RAM-backed descent, but 2.6 KB per seek is still allocated after it — mostly one
+    /// [c]byte[512][/c] per block read, because [c]IRandomAccessSource.Read[/c] fills a buffer the
+    /// caller owns and [c]NodeReader[/c] makes a fresh one every time.
+    ///
+    /// A descent holds one block live at a time, so for a measurement a single buffer is enough. This
+    /// is **not** a proposal: a real pooled block needs a lifetime rule, because a [c]LeafBlock[/c]
+    /// keeps its array and a cursor keeps blocks across calls
+    /// (009-performance-audit/DESIGN.md, Open questions). It prices the thing that rule would buy.
+    /// </remarks>
+    [Benchmark(OperationsPerInvoke = Queries, Description = "descent, in place + block buffer reused")]
+    public long InPlaceReusedBuffer()
+    {
+        long sum = 0;
+        byte[] block = new byte[BlockAddressing.StandardBlockSize];
+        BlockAddressing addressing = BlockAddressing.Standard;
+
+        for (int q = 0; q < Queries; q++)
+        {
+            keys[q].CopyTo(buffer, 0);
+            KeySearch search = KeySearch.Into(buffer, keyLength, keyLength, pad);
+            uint node = root;
+
+            for (;;)
+            {
+                source.Read(addressing.OffsetOf(node), block);
+                NodeHeader header = NodeHeader.Parse(block, node);
+
+                if (header.IsLeaf)
+                {
+                    LeafBlock leaf = LeafBlock.Parse(block, header, keyLength, pad, node);
+
+                    if (leaf.Seek(search, out int at))
+                        sum += leaf.PackedAt(at).Record;
+
+                    break;
+                }
+
+                BranchBlock branch = BranchBlock.Parse(block, header, keyLength, node);
+                node = branch.ChildAt(branch.Seek(search));
+            }
+        }
+
+        return sum;
+    }
+
+    /// <summary>
     /// The same descent with the audit's own compare-in-place loop, rebuilt here verbatim.
     /// </summary>
     /// <returns>The sum of the record numbers found, which must equal the other variants'.</returns>

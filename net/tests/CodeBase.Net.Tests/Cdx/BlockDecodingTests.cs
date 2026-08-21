@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using AwesomeAssertions;
 using CodeBase.Net.Cdx;
+using CodeBase.Net.IO;
 using Xunit;
 
 namespace CodeBase.Net.Tests.Cdx;
@@ -223,7 +224,7 @@ public sealed class BlockDecodingTests
         byte[] block = LeafGeometryBlock(recordBits: 16, dupBits: 8, trailBits: 8, infoLength: 4);
         BinaryPrimitives.WriteInt16LittleEndian(block.AsSpan(2), 200);
 
-        Action act = () => LeafBlock.Parse(block, NodeHeader.Parse(block, 1024), 8, 0x20, 1024);
+        Action act = () => LeafBlock.Parse(new Block(block), NodeHeader.Parse(block, 1024), 8, 0x20, 1024);
 
         act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Index);
     }
@@ -240,7 +241,7 @@ public sealed class BlockDecodingTests
         for (int b = 0; b < 4; b++)
             block[LeafGeometry.InfoArrayOffset + b] = (byte)(packed >> (b * 8));
 
-        LeafBlock leaf = LeafBlock.Parse(block, NodeHeader.Parse(block, 1024), keyLength: 8, 0x20, 1024);
+        LeafBlock leaf = LeafBlock.Parse(new Block(block), NodeHeader.Parse(block, 1024), keyLength: 8, 0x20, 1024);
 
         Action act = () => leaf.EntryAt(0);
 
@@ -275,7 +276,7 @@ public sealed class BlockDecodingTests
         BinaryPrimitives.WriteInt16LittleEndian(block, 1);
         BinaryPrimitives.WriteInt16LittleEndian(block.AsSpan(2), 60);
 
-        Action act = () => BranchBlock.Parse(block, NodeHeader.Parse(block, 1024), keyLength: 40, 1024);
+        Action act = () => BranchBlock.Parse(new Block(block), NodeHeader.Parse(block, 1024), keyLength: 40, 1024);
 
         act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Index);
     }
@@ -301,14 +302,14 @@ public sealed class BlockDecodingTests
         byte[] block = image[IndexImage.FirstBlock..(IndexImage.FirstBlock + IndexImage.BlockSize)];
         IndexHeader header = IndexHeader.Parse(image, "an image");
 
-        return LeafBlock.Parse(block, NodeHeader.Parse(block, 1024), header.KeyLength, padByte, 1024);
+        return LeafBlock.Parse(new Block(block), NodeHeader.Parse(block, 1024), header.KeyLength, padByte, 1024);
     }
 
     private static BranchBlock ReadBranch(byte[] image, int keyLength)
     {
         byte[] block = image[IndexImage.FirstBlock..(IndexImage.FirstBlock + IndexImage.BlockSize)];
 
-        return BranchBlock.Parse(block, NodeHeader.Parse(block, 1024), keyLength, 1024);
+        return BranchBlock.Parse(new Block(block), NodeHeader.Parse(block, 1024), keyLength, 1024);
     }
 
     private static string Key(LeafBlock leaf, int index) =>

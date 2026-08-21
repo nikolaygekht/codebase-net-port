@@ -163,7 +163,7 @@ internal sealed class IndexFileReader : IDisposable
             // The entry's "record number" is the node of the tag's own 1024-byte header. Reading it
             // through the same parse as the file header is what makes a tag a tag.
             IndexHeader tagHeader = IndexHeader.Parse(
-                nodes.ReadHeader(entry.Record),
+                nodes.ReadHeader(entry.Record).Span,
                 $"tag {name} of {fileName}");
 
             tags.Add(new CdxTag(name, tagHeader, padByteFor, nodes));

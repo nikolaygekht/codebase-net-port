@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using CodeBase.Net.IO;
 
 namespace CodeBase.Net.Cdx;
 
@@ -21,11 +22,11 @@ internal sealed class BranchBlock
     /// <summary>The bytes each entry adds to the key: a record number and a child node.</summary>
     private const int PointerSize = 8;
 
-    private readonly byte[] block;
+    private readonly Block block;
     private readonly int keyLength;
     private readonly int entrySize;
 
-    private BranchBlock(byte[] block, NodeHeader header, int keyLength)
+    private BranchBlock(Block block, NodeHeader header, int keyLength)
     {
         this.block = block;
         this.keyLength = keyLength;
@@ -42,7 +43,7 @@ internal sealed class BranchBlock
     /// <summary>
     /// Reads an interior block.
     /// </summary>
-    /// <param name="block">The block, its whole length.</param>
+    /// <param name="block">The block, which knows its own length.</param>
     /// <param name="header">The block's already-decoded common header.</param>
     /// <param name="keyLength">The tag's key length.</param>
     /// <param name="node">The node the block came from, for messages.</param>
@@ -51,7 +52,7 @@ internal sealed class BranchBlock
     /// The entries would not fit the block, which means the key count and the key length disagree
     /// with each other.
     /// </exception>
-    public static BranchBlock Parse(byte[] block, NodeHeader header, int keyLength, uint node)
+    public static BranchBlock Parse(Block block, NodeHeader header, int keyLength, uint node)
     {
         long end = NodeHeader.Size + ((long)header.KeyCount * (keyLength + PointerSize));
         if (end > block.Length)

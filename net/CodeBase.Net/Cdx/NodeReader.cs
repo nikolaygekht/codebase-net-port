@@ -44,18 +44,18 @@ internal sealed class NodeReader
     /// Reads the block a node number refers to.
     /// </summary>
     /// <param name="node">The node number, from a header or a sibling or child pointer.</param>
-    /// <returns>The block's bytes, a fresh array the caller owns.</returns>
+    /// <returns>The block, over a fresh array the caller owns.</returns>
     /// <exception cref="CodeBaseException">
     /// The node is not a block reference, the block would lie past the end of the file, or the file
     /// gave fewer bytes than a block.
     /// </exception>
-    public byte[] Read(uint node) => ReadAt(node, addressing.BlockSize, "block");
+    public Block Read(uint node) => ReadAt(node, addressing.BlockSize, "block");
 
     /// <summary>
     /// Reads the tag header a node number refers to.
     /// </summary>
     /// <param name="node">The node number, as the tag directory records it.</param>
-    /// <returns>The header's bytes, a fresh array the caller owns.</returns>
+    /// <returns>The header, over a fresh array the caller owns.</returns>
     /// <exception cref="CodeBaseException">
     /// The node is not a block reference, the header would lie past the end of the file, or the file
     /// gave fewer bytes than a header.
@@ -65,9 +65,9 @@ internal sealed class NodeReader
     /// that a directory pointing outside the file is refused as a corrupt index rather than reported as
     /// a short read of something.
     /// </remarks>
-    public byte[] ReadHeader(uint node) => ReadAt(node, IndexHeader.Size, "tag header");
+    public Block ReadHeader(uint node) => ReadAt(node, IndexHeader.Size, "tag header");
 
-    private byte[] ReadAt(uint node, int length, string what)
+    private Block ReadAt(uint node, int length, string what)
     {
         long offset = addressing.OffsetOf(node);
 
@@ -79,6 +79,6 @@ internal sealed class NodeReader
                 $"end of a {source.Length}-byte index file.");
         }
 
-        return source.ReadExactly(offset, length, $"index node {node}", ErrorCode.Index);
+        return new Block(source.ReadExactly(offset, length, $"index node {node}", ErrorCode.Index));
     }
 }

@@ -1,3 +1,5 @@
+using CodeBase.Net.IO;
+
 namespace CodeBase.Net.Cdx;
 
 /// <summary>
@@ -80,8 +82,8 @@ internal sealed class CdxTag
     /// <exception cref="CodeBaseException">The block cannot be read or contradicts itself.</exception>
     public TreeBlock ReadBlock(uint node)
     {
-        byte[] block = nodes.Read(node);
-        NodeHeader header = NodeHeader.Parse(block, node);
+        Block block = nodes.Read(node);
+        NodeHeader header = NodeHeader.Parse(block.Span, node);
 
         return header.IsLeaf
             ? new TreeBlock(node, header, LeafBlock.Parse(block, header, KeyLength, PadByte, node), null)

@@ -1,3 +1,5 @@
+using CodeBase.Net.IO;
+
 namespace CodeBase.Net.Cdx;
 
 /// <summary>
@@ -16,7 +18,7 @@ namespace CodeBase.Net.Cdx;
 /// </summary>
 internal sealed class LeafBlock
 {
-    private readonly byte[] block;
+    private readonly Block block;
     private readonly int keyLength;
     private readonly byte padByte;
     private readonly uint node;
@@ -28,7 +30,7 @@ internal sealed class LeafBlock
     /// <summary>Where the next entry's stored bytes end, counting down from the block's end.</summary>
     private int textEnd;
 
-    private LeafBlock(byte[] block, NodeHeader header, LeafGeometry geometry, int keyLength, byte padByte, uint node)
+    private LeafBlock(Block block, NodeHeader header, LeafGeometry geometry, int keyLength, byte padByte, uint node)
     {
         this.block = block;
         this.keyLength = keyLength;
@@ -52,7 +54,7 @@ internal sealed class LeafBlock
     /// <summary>
     /// Reads a leaf block.
     /// </summary>
-    /// <param name="block">The block, its whole length.</param>
+    /// <param name="block">The block, which knows its own length.</param>
     /// <param name="header">The block's already-decoded common header.</param>
     /// <param name="keyLength">The tag's key length.</param>
     /// <param name="padByte">The byte a trailing-pad count stands for.</param>
@@ -62,9 +64,9 @@ internal sealed class LeafBlock
     /// The geometry is unreadable, or the entry array would not fit in the block alongside its key
     /// text.
     /// </exception>
-    public static LeafBlock Parse(byte[] block, NodeHeader header, int keyLength, byte padByte, uint node)
+    public static LeafBlock Parse(Block block, NodeHeader header, int keyLength, byte padByte, uint node)
     {
-        LeafGeometry geometry = LeafGeometry.Parse(block, node);
+        LeafGeometry geometry = LeafGeometry.Parse(block.Span, node);
 
         // The entry array and the key text grow towards each other, so the array alone overflowing
         // the block means the count and the geometry disagree. Checked before any entry is unpacked,
@@ -96,7 +98,7 @@ internal sealed class LeafBlock
     /// whatever was nearby.
     /// </exception>
     public IndexEntry EntryAt(int index) =>
-        new(KeyAt(index).ToArray(), Geometry.Unpack(block, index).Record);
+        new(KeyAt(index).ToArray(), Geometry.Unpack(block.Span, index).Record);
 
     /// <summary>
     /// Compares the key at a position against a search value, without copying it.
@@ -201,12 +203,12 @@ internal sealed class LeafBlock
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
 
-        return Geometry.Unpack(block, index);
+        return Geometry.Unpack(block.Span, index);
     }
 
     private void Build(int index)
     {
-        PackedEntry entry = Geometry.Unpack(block, index);
+        PackedEntry entry = Geometry.Unpack(block.Span, index);
         int stored = keyLength - entry.DupCount - entry.TrailCount;
 
         // A negative count is how index corruption shows up here, and the C library treats it the same

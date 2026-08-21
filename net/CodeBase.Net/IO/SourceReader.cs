@@ -31,22 +31,49 @@ internal static class SourceReader
         ErrorCode code = ErrorCode.Data)
     {
         byte[] buffer = new byte[count];
+
+        source.ReadExactly(offset, buffer, what, code);
+
+        return buffer;
+    }
+    /// <summary>
+    /// Reads exactly as many bytes as a buffer has room for, into that buffer.
+    /// </summary>
+    /// <param name="source">The file to read.</param>
+    /// <param name="offset">Where to read from.</param>
+    /// <param name="buffer">Where to put them; its length is how many are wanted.</param>
+    /// <param name="what">What is being read, for the message when it cannot be.</param>
+    /// <param name="code">The error code to report a short read as.</param>
+    /// <exception cref="CodeBaseException">
+    /// The file gave fewer bytes than were asked for. A short read is never quietly padded, for the
+    /// same reason as the array-returning form above.
+    /// </exception>
+    /// <remarks>
+    /// The form that allocates nothing, and the one to prefer: a caller reading a fixed small header
+    /// can hand it a [c]stackalloc[/c] span, and a caller reading a block can hand it a buffer it
+    /// keeps or rents. The array-returning overload is this one plus an allocation.
+    /// </remarks>
+    public static void ReadExactly(
+        this IRandomAccessSource source,
+        long offset,
+        Span<byte> buffer,
+        string what,
+        ErrorCode code = ErrorCode.Data)
+    {
         int read = 0;
 
-        while (read < count)
+        while (read < buffer.Length)
         {
-            int step = source.Read(offset + read, buffer.AsSpan(read));
+            int step = source.Read(offset + read, buffer[read..]);
             if (step <= 0)
             {
                 throw new CodeBaseException(
                     code,
-                    $"Reading the {what} needed {count} bytes at offset {offset} but the file gave " +
-                    $"{read}.");
+                    $"Reading the {what} needed {buffer.Length} bytes at offset {offset} but the file " +
+                    $"gave {read}.");
             }
 
             read += step;
         }
-
-        return buffer;
     }
 }

@@ -437,6 +437,40 @@ changes shape.
     on locality: the upper levels of a tree sit near the start of the file and share a window, while
     leaves are scattered.
 
+    **Several pools of one fixed size each, not one pool with size logic** — and following the
+    allocations rather than the file kinds cuts it down further. Every per-read allocation in the
+    library goes through **one** place, `SourceReader.ReadExactly` (`IO/SourceReader.cs:33`,
+    `new byte[count]`), and its callers are not equal:
+
+    | path | allocates | measured |
+    |---|---|---|
+    | CDX, `NodeReader.Read` | a `byte[512]` per block | **2 664 B/seek** — the whole problem |
+    | DBF record | **nothing.** `RecordReader` never calls `ReadExactly`; it reads into a buffer it owns via `source.Read(offset, span)` | **0 B** for `Go(n)` + `Skip(1)` |
+    | FPT, `MemoReader` | a `byte[8]` per block header, plus the payload | not in any benchmark yet |
+    | headers at open | once per file | irrelevant |
+
+    So a pool per open table for record buffers is **already done** — that is why `Go(n)`-then-`Skip(1)`
+    measures zero — and the memo case splits in two: the 8-byte block header is scratch, while the
+    payload is an **owned result** handed out of `GetMemoBytes` at an arbitrary size (a memo can run to
+    megabytes, so no fixed pool bounds it). Pooling that would change an ownership contract rather than
+    reuse a buffer, which is a different question and not this one.
+
+    Two things that make the remainder smaller:
+
+    - **No generic is needed.** Everything is `byte[]`; only the *size* differs, and a size is a
+      runtime value, not a type. One `BufferPool` class with the size as a constructor argument and
+      several *instances* avoids the duplication a generic would, and a generic would only buy
+      compile-time distinction between pools that nothing needs.
+    - **An overload of `ReadExactly` taking `Span<byte>` removes the need for most pools.** What forces
+      the heap today is that it *returns* `byte[]`. Given a span, the small fixed-size reads — an
+      8-byte memo block header, a 12-byte node header — become `stackalloc`, and the cheapest
+      allocation is the one that never happens. A pool is then only wanted where the buffer must be
+      **held**: the index block a `LeafBlock` keeps.
+
+    Which reduces the whole thing to **one `BufferPool` per index file**, whose single size is that
+    file's block size — fixed for the file's life, 512 in practice, and therefore no size logic
+    anywhere — plus the span overload.
+
     Two consequences to keep in view: the exact-size invariant disappears (an oversized buffer is
     correct by construction, so `ArrayPool<byte>.Shared` becomes admissible after all — it was out only
     while `block.Length` was the truth), and the residency unit becomes the *window*, so eviction

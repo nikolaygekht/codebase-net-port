@@ -1,5 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.IO;
 using CodeBase.Net.TestUtils;
 
 namespace CodeBase.Net.Benchmarks;
@@ -36,6 +37,12 @@ public class ReadPathBenchmarks
     /// </summary>
     private const int QueryStride = 3571;
 
+    /// <summary>
+    /// Whether the engine keeps blocks between reads, so every arm is measured both ways.
+    /// </summary>
+    [Params(BlockCacheMode.Off, BlockCacheMode.Always)]
+    public BlockCacheMode Cache { get; set; } = BlockCacheMode.Off;
+
     private CodeBaseEngine engine = null!;
     private Table table = null!;
     private Tag byName = null!;
@@ -56,7 +63,7 @@ public class ReadPathBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        engine = new CodeBaseEngine();
+        engine = new CodeBaseEngine { BlockCache = Cache };
         table = engine.OpenTable(Corpus.BenchmarkPathOf("PERF10K.DBF"));
 
         byName = table.Tags["T_NAME"];

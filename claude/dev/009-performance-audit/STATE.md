@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 to 4
+**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 to 5
 of seven are done
-**Current sub-step:** [`PLAN.md`](PLAN.md) step 5, wiring the cache up. Not begun.
+**Current sub-step:** [`PLAN.md`](PLAN.md) step 6, `Table.Refresh()` and the `LOCKING` hooks. Not begun.
 
 ## Done so far
 
@@ -29,8 +29,9 @@ The remediation:
       [`results-padded-comparison.txt`](results-padded-comparison.txt)
 - [x] 4 — `Block`, `BlockPriority`, `IBlockResidency`, `BlockResidency`, `BlockPool` — proved with no
       source attached — [`results-residency-and-pool.txt`](results-residency-and-pool.txt)
-- [ ] 5 — wire the cache up: `BlockCacheMode`, `CachingSourceFactory`, `DropCachedBlocks()`, and the
-      **layer-5 2× speed-up gate** (reads, wall clock)
+- [x] 5 — the cache wired up: `BlockCacheMode`, `BlockCache`, `CachingRandomAccessSource`,
+      `CachingSourceFactory`, `DropCachedBlocks()`, and the **layer-5 2× gate** —
+      [`results-block-cache.txt`](results-block-cache.txt)
 - [ ] 6 — `Table.Refresh()` and the `Invalidate` / `Flush` hooks §3.7 will call
 
 - [ ] 7 — the threading contract in the docs, and the `Interlocked` detector that makes a violation
@@ -253,6 +254,46 @@ one — about 90 ns either way. P2 was worth doing: it is free, it is measured, 
 the allocation on the hot path. But **it is not where the time is, and P1 is.** `results-compare-in-place.txt`
 §3 has the arithmetic; the design table is left as written, because it records what the audit believed
 when it was written.
+
+### Sub-step 5, done 2026-08-21
+
+**The cache works, and it delivers a third of what the audit predicted on a seek — for a reason that is
+not the cache's.** Numbers in [`results-block-cache.txt`](results-block-cache.txt).
+
+| | Off | **Always** | audit said |
+|---|---|---|---|
+| `Go(n)` then `Skip(1)`, per pair | 1 969 ns | **86 ns — 23.0×** | 23.4× ✔ |
+| tag walk, per record | 1 206 ns | **162 ns — 7.4×** | 23.4× |
+| seek `C(20)` | 9 386 ns | **4 400 ns — 2.13×** | 11.6× |
+
+**Where the seek's missing 5× went.** A cached seek costs 4 400 ns and the index descent inside it is
+~530 ns from RAM, so **~3.9 µs of a cached seek is CPU in the `Table` layer above the tree** — string
+encoding, the search buffer, the at-or-after protocol, the record read and its decode. Nothing has ever
+measured that layer. The audit priced a seek as descent plus I/O; the layer between them is the biggest
+single share once the I/O is gone. `Go(n)`-then-`Skip(1)` hitting 23.0× is the control that makes this
+reading solid: same I/O, almost none of that layer, lands on the audit's number.
+
+**So P1 is real and delivered** — 7.4× to 23× wherever the work is I/O — **and the next thing worth
+measuring is the `Table` layer, not the cache.**
+
+**The gate has no clock on a seek, and that is a measurement rather than a convenience.** At 2.13× a 2×
+floor would sit inside noise of its own threshold. The floor is not lowered: *what is measured* changed
+instead. A seek is gated on its **read count** — exact, and unbounded because a cached seek storm
+reaches the file zero times — while the clock is applied to the walk (7.4×) and `Go`+`Skip` (23×), where
+the cache's win is large. The timed assertions exist for the one signal a read count cannot give: the
+day syscalls get cheap enough that caching stops paying, and that is equally visible in a walk.
+
+**Allocation did not move** — 2 792 B per seek either way. The cache removes the syscall, not the
+`byte[512]` per read, which is the deferred caller-side-buffer half and **now the largest single item
+left in the read path**.
+
+**The bug the design caught before it shipped**, worth keeping because it is this step's whole risk: the
+first cut kept the window map in the per-file source, so a slot retired for one file was a slot another
+file still believed was its own — silently serving the wrong file's bytes. The map lives in the shared
+cache, where eviction removes its key in the same breath, which is also where the reference keeps it.
+`TwoFilesSharingAPoolAreNeverServedEachOthersBytes` is that case, on a pool of one slot.
+
+**1318 tests** green (752 + 566), up 72.
 
 ## A defect found on the way, and deliberately not fixed here
 

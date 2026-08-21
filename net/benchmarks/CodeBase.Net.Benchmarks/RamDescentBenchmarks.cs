@@ -107,8 +107,8 @@ public class RamDescentBenchmarks
 
             for (;;)
             {
-                byte[] block = nodes.Read(node);
-                NodeHeader header = NodeHeader.Parse(block, node);
+                Block block = nodes.Read(node);
+                NodeHeader header = NodeHeader.Parse(block.Span, node);
 
                 if (header.IsLeaf)
                 {
@@ -172,7 +172,8 @@ public class RamDescentBenchmarks
     public long InPlaceReusedBuffer()
     {
         long sum = 0;
-        byte[] block = new byte[BlockAddressing.StandardBlockSize];
+        byte[] buffer = new byte[BlockAddressing.StandardBlockSize];
+        Block block = new(buffer);
         BlockAddressing addressing = BlockAddressing.Standard;
 
         for (int q = 0; q < Queries; q++)
@@ -183,8 +184,8 @@ public class RamDescentBenchmarks
 
             for (;;)
             {
-                source.Read(addressing.OffsetOf(node), block);
-                NodeHeader header = NodeHeader.Parse(block, node);
+                source.Read(addressing.OffsetOf(node), block.Writable);
+                NodeHeader header = NodeHeader.Parse(block.Span, node);
 
                 if (header.IsLeaf)
                 {
@@ -232,8 +233,8 @@ public class RamDescentBenchmarks
 
             for (;;)
             {
-                byte[] block = nodes.Read(node);
-                NodeHeader header = NodeHeader.Parse(block, node);
+                Block block = nodes.Read(node);
+                NodeHeader header = NodeHeader.Parse(block.Span, node);
 
                 if (header.IsLeaf)
                 {
@@ -243,7 +244,7 @@ public class RamDescentBenchmarks
 
                     for (int i = 0; i < leaf.Count; i++)
                     {
-                        PackedEntry entry = geometry.Unpack(block, i);
+                        PackedEntry entry = geometry.Unpack(block.Span, i);
                         int stored = keyLength - entry.DupCount - entry.TrailCount;
                         textEnd -= stored;
 
@@ -306,8 +307,8 @@ public class RamDescentBenchmarks
 
             for (;;)
             {
-                byte[] block = nodes.Read(node);
-                NodeHeader header = NodeHeader.Parse(block, node);
+                Block block = nodes.Read(node);
+                NodeHeader header = NodeHeader.Parse(block.Span, node);
 
                 if (header.IsLeaf)
                 {

@@ -1,0 +1,82 @@
+009-performance-audit -- sub-step 5, the block cache
+
+Run 2026-08-21, natively on Windows, Release, over net/corpus/benchmark/PERF10K.*.
+Same benchmark as every earlier sub-step, now parameterised by cache mode.
+
+1. WHAT THE CACHE BUYS
+
+  operation                        Off        Always     ratio
+  tag walk, per record          1 206 ns      162 ns      7.4x
+  Go(n) then Skip(1), per pair   1 969 ns       86 ns     23.0x
+  seek, C(20), 4 levels          9 386 ns    4 400 ns      2.13x
+  seek, short C(20), padded      7 996 ns    4 281 ns      1.87x
+  seek, N(12,2), 3 levels        7 522 ns    3 667 ns      2.05x
+
+  Reads reaching the file, counted at the source: a cached seek storm and a
+  cached walk both reach it ZERO times after the first pass.
+
+  Allocation does not move: 2 792 B per seek either way. The cache removes the
+  syscall, not the byte[512] that NodeReader allocates for each read to be
+  copied into -- that is the deferred half recorded in DESIGN.md (caller-side
+  buffer reuse), and it is now the largest single item left in the read path.
+
+2. AGAINST WHAT THE AUDIT PREDICTED
+
+  SUMMARY.md said 11.6x on a seek and 23.4x on a walk.
+
+    Go(n) then Skip(1)   23.0x   -- matches 23.4x almost exactly
+    tag walk              7.4x   -- a third of the prediction
+    seek                  2.13x  -- a fifth of it
+
+  THE SHORTFALL IS NOT THE CACHE'S. A cached seek costs 4 400 ns; the index
+  descent inside it costs about 530 ns from RAM (results-compare-in-place.txt
+  section 8). So roughly 3.9 us of a cached seek is CPU in the Table layer ABOVE
+  the tree -- string encoding, the search buffer, the at-or-after protocol, the
+  record read and its decode -- and nothing has ever measured it. The audit
+  measured a descent and priced a seek as descent plus I/O; the layer between
+  them turns out to be the biggest single share of a cached seek.
+
+  Go(n)-then-Skip(1) reaching 23x is the control that makes this reading solid:
+  it is the same I/O with almost none of that layer, and it lands on the
+  audit's number.
+
+  So P1 is real and delivered -- 7.4x to 23x where the work is I/O -- and the
+  next thing worth measuring is not the cache but the Table layer.
+
+3. THE GATE, AND WHY THE CLOCK IS NOT ON A SEEK
+
+  Four assertions in CodeBase.Net.Tests.Performance.BlockCacheSpeedupTests:
+
+    reads, seek storm     >= 2x   (actually unbounded: zero reads cached)
+    reads, tag walk       >= 2x   (likewise)
+    wall clock, walk      >= 2x   (7.4x Release, 11.6x Debug)
+    wall clock, Go+Skip   >= 2x   (23x)
+
+  There is deliberately NO timed assertion on a seek storm. At 2.13x a 2x floor
+  would sit inside noise of its own threshold and flake. THE FLOOR IS NOT
+  LOWERED TO FIT -- what is measured changes instead: a seek's win is gated by
+  its read count, which is exact and unbounded, and the clock is applied where
+  the cache's win is large. The timed assertions exist for the one signal a read
+  count cannot give -- the day syscalls get cheap enough that caching them stops
+  paying -- and that signal is equally visible in a walk.
+
+  Method, unchanged from sub-step 3: warm by wall clock never by pass count,
+  compare minima not means, run both orderings, and name all three causes in the
+  failure message so a red is triaged rather than fixed.
+
+4. CORRECTNESS
+
+  1318 tests green (752 + 566), up 72 across sub-step 5. The cache's own gate:
+
+    CachedReadGoldenTests    cached vs uncached over every table, record, field,
+                             memo, tag walk and seek of the corpus -- 38 tests
+    CachingSourceTests       18 component tests over a counting fake
+    BlockCacheModeTests      the three-valued policy as a truth table, including
+                             WhenExclusive proved against a fake that claims to
+                             be exclusive -- which no real file can do yet
+
+  And the bug the design caught before it shipped: the first cut kept the window
+  map in the per-file source, so a slot retired for one file was a slot another
+  file still believed was its own -- silently serving the wrong file's bytes. The
+  map lives in the shared cache, where eviction removes its key in the same
+  breath. TwoFilesSharingAPoolAreNeverServedEachOthersBytes is that case.

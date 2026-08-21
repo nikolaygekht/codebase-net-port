@@ -361,6 +361,35 @@ changes shape.
   The risk to name correctly: it is **object lifetime within one thread**, not threading. Overwriting a
   buffer under a live `LeafBlock` corrupts reads on the same thread, and a per-thread buffer does not
   fix that — a lifetime rule does.
+
+  **Settled 2026-08-21: the lifetime rule is the pool itself, and it answers the hard question too.**
+  If the problem is lifetime, then rent and return *is* the answer — it makes ownership explicit
+  instead of leaving it to whoever happens to hold the array. With one clause added to the pool's
+  contract, **a rented block cannot be evicted until it is returned**, the hard question stops needing
+  reference counting: the pin *is* the rule, the owner is exactly one, and eviction only ever considers
+  what nobody holds. The copy on a hit disappears with it — the audit priced a hit at a hash lookup
+  plus a 512-byte `memcpy`, and zero is cheaper than 0.002 µs.
+
+  Two boundaries this has to respect, both found before writing any of it:
+
+  - **The pool hands out buffers of exactly `BlockSize`.** `block.Length` is load-bearing: a leaf's
+    keys grow *downwards from the end of the block*, so `LeafBlock` takes `textEnd = block.Length`
+    (`LeafBlock.cs:40`, `:143`) and both `Parse` methods bound-check against it. A buffer that is
+    merely *at least* as large as asked — which is all `ArrayPool<byte>.Shared` promises — would shift
+    the base every key is rebuilt from and produce wrong keys with no exception anywhere. That rules
+    `ArrayPool` out and makes the exact-size invariant a layer-1 test.
+  - **Rent and return do not reach DBF records.** A record is not block-aligned and routinely straddles
+    two blocks, so that path needs assembly into one contiguous buffer — copy semantics, which is what
+    `IRandomAccessSource.Read` already is. And the cache still has to sit at the source, because 96% of
+    a walk's reads are DBF (see above). So renting is for **index blocks through `NodeReader`**, while
+    the record path gets a *reused* buffer rather than a rented one. Two mechanisms, each where it
+    belongs, rather than one stretched over both.
+
+  Failure modes, named so the tests can aim at them: a **forgotten return** leaves a block pinned
+  forever, which costs cache capacity and not correctness, and is caught by a counter; a **double
+  return or a use after return** corrupts reads, and needs a guard that is active in `Debug`. Both are
+  provable at layer 1 with no file anywhere near them. **ADR candidate**, and it supersedes the "hand
+  out the pool's array needs pinning or reference counting" framing above.
 - **What the threading contract is.** The port has never stated one: no locks, no `[ThreadStatic]`, no
   sentence in any document. That costs nothing while every buffer is per-call, and it stops being free
   the moment anything is reused — **including the pool itself**, because decision 4 makes it

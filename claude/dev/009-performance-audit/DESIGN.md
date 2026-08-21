@@ -494,10 +494,30 @@ changes shape.
   sentence in any document. That costs nothing while every buffer is per-call, and it stops being free
   the moment anything is reused — **including the pool itself**, because decision 4 makes it
   engine-wide and an engine-wide pool touched from two threads is a data race with or without buffer
-  reuse. Proposal to settle in sub-step 5: **a table and its cursors are single-threaded; an engine may
-  be shared only for opening tables.** That is the C library's own posture (`E4EXPR.C:87-135`
-  serialises expression evaluation through one global critical section) and it is the cheapest contract
-  that makes the pool safe.
+  reuse.
+
+  **The contract is "not concurrently", not "one thread".** Those are different, and only the second is
+  impossible to ask for: with `async`, a continuation resumes on whatever pool thread is free, so any
+  API demanding thread affinity is unusable in ordinary modern code. What this port actually needs is
+  that **no two operations run against one table at the same time** — before an `await` on thread A,
+  after it on thread B, never both at once — and the task machinery supplies the barrier that makes A's
+  writes visible to B. That is exactly ADO.NET's contract for `DbConnection` and `DbCommand`, and
+  `Stream`'s, so it is the mainstream shape for a data-access API rather than a concession.
+
+  Two consequences:
+
+  - **Nothing may be thread-affine.** No `[ThreadStatic]`, no thread-local pool: renting a buffer on
+    one thread and returning it on another is *normal* under `async`, and a thread-local pool corrupts
+    silently when it happens. The per-index-file pool satisfies this with no locking at all, because
+    only that file's readers touch it and "do not use a table concurrently" already covers its index.
+  - **The engine-wide residency budget is not covered by it.** Two tables opened from one engine and
+    queried in parallel is a perfectly ordinary thing to do and the contract above does not forbid it,
+    so shared residency needs a lock, or per-table budgets (losing what decision 4 wanted), or
+    striping. A lock on a hit is a dictionary lookup plus ~20 ns against a ~500 ns descent — percentage
+    points, so **measure it in sub-step 5** rather than choosing now.
+
+  The source itself is not the problem: `RandomAccess.Read` is positional and safe on one handle
+  concurrently. What is unsafe is our own mutable state — buffers, cursor position, pool.
 - **Default pool size.** The C sizes from `memStartBlock`/`memMaxBlock`. A block count with a documented
   default is the obvious shape; what the default *is* wants a measurement across table sizes that this
   step does not take. Note the interaction with the mode: with `WhenExclusive` and no exclusive opens,

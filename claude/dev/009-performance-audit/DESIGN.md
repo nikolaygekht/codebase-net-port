@@ -382,12 +382,27 @@ changes shape.
     So an engine-wide pool holding one buffer size would break silently on an index declaring 1024,
     and the choice — a pool per file, or one pool with a bucket per size — has to be made rather than
     defaulted into. `NodeReader` already carries the `addressing` that knows the answer.
-  - **And the buffers are exactly that size, never merely at least it.** `block.Length` is load-bearing: a leaf's
-    keys grow *downwards from the end of the block*, so `LeafBlock` takes `textEnd = block.Length`
-    (`LeafBlock.cs:40`, `:143`) and both `Parse` methods bound-check against it. A buffer that is
-    merely *at least* as large as asked — which is all `ArrayPool<byte>.Shared` promises — would shift
-    the base every key is rebuilt from and produce wrong keys with no exception anywhere. That rules
-    `ArrayPool` out and makes the exact-size invariant a layer-1 test.
+  - **And the real fragility is narrower than "exact size", so fix it at the root instead.** Exactly
+    **two lines** tie anything to the array's length: `textEnd = block.Length` in `LeafBlock`'s
+    constructor and again in its rewind (`LeafBlock.cs:40`, `:143`), because a leaf's key text grows
+    *downwards from the end of the block*. The other twelve uses of `block.Length` — both `Parse`
+    methods, `LeafGeometry`, `NodeHeader` — are bound checks, which an oversized array makes *weaker*
+    (it would accept a corrupt block) but not wrong.
+
+    It breaks in one direction only. A buffer **smaller** than the file's block fails loudly, because
+    `NodeReader.ReadAt` cannot fill it. A buffer **larger** starts `textEnd` past the real end of the
+    block and rebuilds every key from the wrong base — **silently**. So a pool sized to "the largest
+    block anyone might declare" is precisely the dangerous shape, and there is no such largest anyway:
+    `Resolve` accepts any multiple of 512 up to `int.MaxValue`, and the 1024 cap is on the
+    *multiplier*.
+
+    Which makes the root fix cheaper than a size-keyed pool: **stop using `arr.Length` as the block
+    size** — thread the length through, or hand out a slice of exactly `blockSize`. Then an oversized
+    buffer is harmless, one pool of one size serves every file, buckets become unnecessary, and even
+    `ArrayPool<byte>.Shared` is admissible. `ArrayPool` is out only for as long as `block.Length` is
+    treated as the truth. Nothing hands out an oversized array today — `NodeReader` allocates exactly
+    `length` — so this is a trap rather than a live defect, and sub-step 4 should close it while it is
+    still free to close.
   - **Rent and return do not reach DBF records.** A record is not block-aligned and routinely straddles
     two blocks, so that path needs assembly into one contiguous buffer — copy semantics, which is what
     `IRandomAccessSource.Read` already is. And the cache still has to sit at the source, because 96% of

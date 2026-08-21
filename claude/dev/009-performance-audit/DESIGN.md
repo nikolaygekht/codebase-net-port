@@ -516,6 +516,31 @@ changes shape.
     striping. A lock on a hit is a dictionary lookup plus ~20 ns against a ~500 ns descent — percentage
     points, so **measure it in sub-step 5** rather than choosing now.
 
+  **And it binds a group of calls, not a call — so the lock is the caller's, not ours.** The cursor
+  *is* the protocol: `Seek(x)`, `SeekNext()`, `GetString(f)` mean something only because the position
+  survives between them. An internal lock would make each call atomic and the sequence still wrong —
+  another thread's `Seek` landing between the first two hands the reader someone else's record, with
+  every individual call behaving correctly. So an internal lock here is not merely insufficient, it is
+  **harmful**: it trades a torn buffer, which is visible, for a wrong record set, which is this
+  project's worst outcome by its own ground rule. The lock therefore belongs to the caller, at the
+  granularity of its own unit of work — ADO.NET again, which puts no lock inside `DbCommand`.
+
+  **Where there is no protocol, an internal lock is the right answer.** Engine-shared residency has no
+  cross-call semantics — "give me block X", "take block Y back" are self-contained — so a lock or
+  striping inside it is both correct and sufficient. That is the whole split:
+
+  | state | synchronised by |
+  |---|---|
+  | a table's cursor, position and buffers | **the caller**, around a group of calls — a contract, not code |
+  | residency and pools shared across an engine | **us**, internally, because each operation stands alone |
+
+  **And since it cannot be made safe, make misuse loud.** The ground rule says a wrong record set is
+  far worse than a slow one, so a cheap detector earns its place: an `Interlocked` flag taken on entry
+  to a public operation and cleared on exit, so a second operation arriving while the first is still in
+  flight **throws** instead of returning someone else's record. Not a lock and not protection —
+  diagnosis. Cost is one uncontended CAS, on the order of 5 ns: nothing against a 9 µs file-backed
+  seek, a few per cent of a cached one, so measure it and keep it to `Debug` only if it shows.
+
   The source itself is not the problem: `RandomAccess.Read` is positional and safe on one handle
   concurrently. What is unsafe is our own mutable state — buffers, cursor position, pool.
 - **Default pool size.** The C sizes from `memStartBlock`/`memMaxBlock`. A block count with a documented

@@ -254,6 +254,20 @@ the allocation on the hot path. But **it is not where the time is, and P1 is.** 
 §3 has the arithmetic; the design table is left as written, because it records what the audit believed
 when it was written.
 
+## A defect found on the way, and deliberately not fixed here
+
+**`Seek(string)` on a tag whose keys are not character does not refuse — it reinterprets.** Written up
+in [`DEFECT-seek-string-on-a-non-character-tag.md`](DEFECT-seek-string-on-a-non-character-tag.md).
+The serious row: on a numeric tag the string's bytes are read as a numeric field's text, unparseable
+text becomes **0.0**, and the seek **silently looks for the key of zero**. No exception, a plausible
+answer, the wrong key — which `CLAUDE.md` calls worse than any slowness.
+
+Found because sub-step 5's equivalence test pointed a string seek at every tag of every corpus table
+for the first time. **Present with the cache off**, so it is not the cache's. Left for its own step: it
+is a behaviour change, and this step's gate is that nothing a file decodes to may change. The
+equivalence test pins the current behaviour against the *cache* altering it without blessing it as
+correct.
+
 ## Blockers
 
 None. One open decision that is **not** blocking, recorded in the root `STATE.md` §3: whether

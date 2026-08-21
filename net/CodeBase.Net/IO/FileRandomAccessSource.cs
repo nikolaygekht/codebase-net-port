@@ -8,7 +8,7 @@ namespace CodeBase.Net.IO;
 /// The only place in this library that opens a file. Everything above it works through the
 /// interface, which is what lets the rest be tested without a disk.
 /// </summary>
-internal sealed class FileRandomAccessSource : IRandomAccessSource
+internal sealed class FileRandomAccessSource : IRandomAccessSource, IExclusiveAccess
 {
     private readonly SafeFileHandle handle;
 
@@ -23,6 +23,14 @@ internal sealed class FileRandomAccessSource : IRandomAccessSource
         // these files. Locking arrives with the capability that needs it.
         handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
     }
+
+    /// <inheritdoc/>
+    /// <value>
+    /// Always false: the handle above is opened [c]FileShare.ReadWrite[/c], so another process may be
+    /// writing at any moment. It becomes answerable when locking gives this library a way to exclude
+    /// one, and the cache's default mode starts caching by itself when it does.
+    /// </value>
+    public bool ExcludesOtherWriters => false;
 
     /// <inheritdoc/>
     public long Length => RandomAccess.GetLength(handle);

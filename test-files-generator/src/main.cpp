@@ -58,6 +58,10 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseCdxColl( &cb, outDir );
    if ( rc == 0 ) rc = caseCdxTime( &cb, outDir );
 
+   /* Last, and not part of the corpus proper: the benchmark table, into
+    * <outDir>\benchmark, with no dump. */
+   if ( rc == 0 ) rc = casePerf10k( &cb, outDir );
+
    code4close( &cb );
    code4initUndo( &cb );
 

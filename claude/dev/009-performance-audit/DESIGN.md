@@ -10,8 +10,9 @@ about it. Filed here rather than under a new number because it remediates *this*
 
 **Make the read path fast enough for `QUERY` to drive, by caching file blocks and by not copying a key
 for every comparison** — verified by a benchmark project *in the solution* that reports before and
-after on a committed table, with **every existing test still green and no golden expectation or corpus
-file changed**.
+after on a committed table, **and by a gate in the suite that fails if enabling the cache stops being
+worth at least 2×**, with **every existing test still green and no golden expectation or corpus file
+changed**.
 
 That last clause is the gate. This step may not alter what a well-formed file decodes to, and the
 audit's own measurements are the only thing that says it worked.
@@ -299,7 +300,10 @@ changes shape.
   seam at all.
 - **A read counter** is the one new observable: the tests need to prove a *hit did not reach the file*,
   and that is an interaction which genuinely is the requirement (`DEV_APPROACH.md` §4). A counting
-  in-memory source, not a mock verification, keeps it at layer 2.
+  in-memory source, not a mock verification, keeps it at layer 2. The same counting decorator composes over
+  a **file** source through the factory seam, which is what lets the performance layer count the reads a
+  real `PERF10K` seek storm issues with the cache on and off — so the 2× read-ratio gate needs no seam
+  that the layer-2 tests were not already going to build.
 
 ## Decisions this design makes
 
@@ -326,6 +330,14 @@ changes shape.
 7. **The benchmark uses BenchmarkDotNet**, which is already in the stack list unused — chosen
    specifically because it handles warm-up and tiered JIT, the trap that made this audit's own first
    RAM-backed measurement wrong by 4× (`ANALYSIS.md` §8).
+8. **The speed-up itself is gated in the suite, at a 2× floor** — reads, allocation and wall clock, cache
+   `Off` against `Always` on `PERF10K` (`PLAN.md` §Tests layer 5). A cache that is perfectly correct and
+   never hits passes every other gate this step has, and so does a machine on which syscalls have become
+   cheap enough that the whole optimization is pointless; those are the two states worth being told
+   about. The floor is a tripwire well below the measured 11.6× / 23.4×, and the two deterministic
+   measures carry the weight so the timed one can be opted out of without losing regression cover.
+   **ADR candidate**, small but worth recording: it is the first performance gate in the project, and the
+   precedent `QUERY` will reuse when it has to prove a bitmap beats a scan.
 
 ## Open questions
 

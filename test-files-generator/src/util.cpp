@@ -74,7 +74,7 @@ static int freezeDateStamp( const char *path )
    return 0;
 }
 
-int finish( CODE4 *cb, DATA4 *data, const char *outDir, const char *fileName )
+int finishUndumped( CODE4 *cb, DATA4 *data, const char *outDir, const char *fileName )
 {
    char path[520];
 
@@ -82,8 +82,15 @@ int finish( CODE4 *cb, DATA4 *data, const char *outDir, const char *fileName )
       return fail( cb, "d4close" );
 
    sprintf( path, "%s\\%s", outDir, fileName );
-   if ( freezeDateStamp( path ) != 0 )
-      return 1;
+   return freezeDateStamp( path );
+}
+
+int finish( CODE4 *cb, DATA4 *data, const char *outDir, const char *fileName )
+{
+   int rc = finishUndumped( cb, data, outDir, fileName );
+
+   if ( rc != 0 )
+      return rc;
 
    return dumpTable( cb, outDir, fileName );
 }

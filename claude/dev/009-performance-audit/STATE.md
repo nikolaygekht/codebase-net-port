@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — the audit is closed, its remediation is designed and planned and **not
-started**
-**Current sub-step:** [`PLAN.md`](PLAN.md) step 1, not begun. **No `.cs` file has been opened.**
+**Status:** in progress — the audit is closed and its remediation is **under way**: sub-step 1 of six
+is done
+**Current sub-step:** [`PLAN.md`](PLAN.md) step 2, compare in place. Not begun.
 
 ## Done so far
 
@@ -20,14 +20,38 @@ The audit itself:
 
 The remediation:
 
-- [ ] 1 — benchmark project + `PERF10K` generator case, committed as **benchmark data, not a gate**
-- [ ] 2 — compare in place (`LeafBlock.CompareAt`, `BranchBlock.ChildAt`, span compare in `Seek`)
+- [x] 1 — benchmark project + `PERF10K` generator case, committed as **benchmark data, not a gate** —
+      baseline in [`results-benchmark-baseline.txt`](results-benchmark-baseline.txt)
+- [ ] 2 — compare in place (`LeafBlock.CompareAt`, `BranchBlock.ChildAt`, span compare in `Seek`),
+      with the layer-5 allocation ceiling as its gate
 - [ ] 3 — the padded comparison: measure, then fix or write down that it did not matter
 - [ ] 4 — `BlockResidency` + `BlockPool`, proved with no source attached
-- [ ] 5 — wire the cache up: `BlockCacheMode`, `CachingSourceFactory`, `DropCachedBlocks()`
+- [ ] 5 — wire the cache up: `BlockCacheMode`, `CachingSourceFactory`, `DropCachedBlocks()`, and the
+      **layer-5 2× speed-up gate** (reads, wall clock)
 - [ ] 6 — `Table.Refresh()` and the `Invalidate` / `Flush` hooks §3.7 will call
 
 **Stoppable after 3** with all the CPU work done and the cache still owed.
+
+### Sub-step 1, done 2026-08-21
+
+`net/benchmarks/CodeBase.Net.Benchmarks` is in the solution on BenchmarkDotNet, and
+`net/corpus/benchmark/PERF10K.DBF` + `.cdx` (610 456 + 304 640 bytes) are generated and published.
+`dotnet test` is green at **1179 tests, 528 golden** — up exactly the two new layout tests, with no
+golden expectation touched and the rest of the corpus regenerating **byte-identical**.
+
+The baseline, run natively on Windows because that is where the audit's figures were taken:
+
+| operation | benchmark | audit | allocated |
+|---|---|---|---|
+| tag walk, per record | **1.148 µs** | 1.05 µs | 129 B |
+| seek, `C(20)`, 4 levels | **9.238 µs** | 7.84 µs | **3 956 B** |
+| seek, `N(12,2)`, 3 levels | **7.662 µs** | 7.22 µs | **3 808 B** |
+| `Go(n)` then `Skip(1)`, per pair | **1.913 µs** | *not taken* | 0 B |
+
+Within run-to-run variation of the audit's own numbers, which is what makes it a baseline rather than
+a new measurement. **The allocation column is new and is what sub-step 2 aims at**: `ANALYSIS.md` §6
+attributes 1 292–1 744 B of the ~3 900 B per seek to the key copied per comparison, so the layer-5
+ceiling has a concrete number to be set below.
 
 ## Notes for the next session
 
@@ -35,23 +59,54 @@ The remediation:
   everything are that the cache decorates `IRandomAccessSource` (not `NodeReader`, because a walk's
   reads are 96% DBF) and that it is **optional on the reference's own three-valued policy**, defaulting
   to `WhenExclusive`.
+- **Run the benchmark on Windows, not from WSL.** Same files, same code, 2026-08-21: **194 µs** per
+  walked record and **1.58 ms** per seek through `/mnt/d`, against **9.2 µs** per seek natively. That is
+  the filesystem bridge and none of it is the code — which is *why* layer 5 asserts a ratio and never an
+  absolute figure. `FOR-DEVELOPERS.md` has the `cmd.exe` one-liner.
 - **The measurement harness already exists** and is committed under [`harness/`](harness/);
   [`METHOD.md`](METHOD.md) has the command to lay it back out into the gitignored
-  `experiments/performance-1-experiment/`. Sub-step 1 turns it into a real benchmark project — it is a
-  starting point, not something to reinvent.
+  `experiments/performance-1-experiment/`. Sub-step 1 lifted `PERF10K`'s field and tag shapes from its
+  `perf.cpp gen` — deliberately, so the numbers stay comparable.
 - **Warm up by wall clock, never by pass count.** This audit's own first RAM-backed measurement was 4×
   wrong because five passes never gave the JIT time to reach tier-1 ([`ANALYSIS.md`](ANALYSIS.md) §8).
   BenchmarkDotNet is chosen for exactly this reason. The standing check: a figure that moves when only
   its *position* moves is measuring the runtime, not the code.
 - **`EntryAt`'s copy is load-bearing** — `IndexGoldenTests.cs:88` accumulates 3 364 keys across cursor
   moves. Sub-step 2 is additive and must leave `EntryAt` alone.
+- **The speed-up is gated, at 2×** — `PLAN.md` §Tests layer 5, added 2026-08-21 at the user's request.
+  Three assertions on `PERF10K` with the cache `Off` against `Always`: reads down ≥ 2× and allocation
+  under a ceiling (both exact, no clock), and wall clock down ≥ 2× (best-of-N minima, both orderings).
+  The reason it exists: **every other gate in this step passes on a cache that is perfectly correct and
+  never hits**, and none of them notices if syscalls get cheap enough that the optimization stops paying.
+  If the timed one flakes it gets a trait, **never a lower threshold**.
 - **Nothing here has an ADR yet.** `DESIGN.md` marks the candidates; `PLAN.md` step 5 writes them. If
   the design survives execution unchanged they are transcription; if it does not, they record what
   actually happened, which is the point.
 
 ## Deviations from the plan
 
-None — execution has not started.
+**1. The benchmark table is `net/corpus/benchmark/`, not `net/corpus/`.** The plan said to commit
+`PERF10K` into the corpus. It cannot go in the corpus *root*: `Corpus.TableNames` discovers tables by
+enumerating that directory and **twelve golden classes iterate what it finds**, with
+`CorpusLayoutTests.Corpus_HoldsExactlyTheDocumentedTables` asserting the exact set and
+`Corpus_PairsEveryTableWithADump` requiring a dump for each. A dumpless benchmark table there breaks
+both. `TableNamesIn` is not recursive, so a subdirectory is invisible to discovery; the benchmark
+reaches it through the new `Corpus.BenchmarkPathOf`, and two new layout tests pin the arrangement —
+the files exist, and the dump does not.
+
+**2. `casePerf10k` needed a dumpless tail.** `finish()` is close + freeze-date-stamp + write-dump;
+the benchmark case wants the first two only, so `util.cpp` now has `finishUndumped()` and `finish()`
+is written in terms of it. No other case changes.
+
+**3. The benchmark host registers an encoding provider.** `PERF10K` names no code page and the
+library reads an unmarked table as cp437 (the C library's own default), which no runtime supplies
+unregistered — so `GetString`, which is how the query sets are built, threw at `[GlobalSetup]`. The
+benchmark is a host application, so it does the host's part (ADR-17), through a `[ModuleInitializer]`
+rather than `Main`: BenchmarkDotNet runs each benchmark in a **child process** whose entry point is
+its own generated code, so this assembly's `Main` never executes there.
+
+**4. `SonarQube.Analysis.xml` needed no change.** The plan listed it. `**/*.Benchmarks/**` is already
+in `sonar.coverage.exclusions` and `net/corpus/**` already covers the new subdirectory.
 
 ## Blockers
 

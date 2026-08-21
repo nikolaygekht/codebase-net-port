@@ -1,19 +1,17 @@
 # Project state
 
-**Updated:** 2026-08-19 · the tree is **clean**, and everything is committed and **pushed** to `main` —
-including step 008's three commits, which had been waiting (their messages say `007-seek-by-value`, the
-name the folder carried when they were written). `net/` is untouched — **no `.cs` file was opened this
-session** — so **1177 tests, 526 golden** still stands.
+**Updated:** 2026-08-21 · the tree is **clean**; everything is committed to `main` and **not pushed**.
+§1 to §3 below still describe the state step 008 left and are a session-end update behind.
 **Active step:** [`009-performance-audit`](claude/dev/009-performance-audit/) — its audit is
 **[closed](claude/dev/009-performance-audit/SUMMARY.md)** and its remediation is
 [designed](claude/dev/009-performance-audit/DESIGN.md),
-[planned](claude/dev/009-performance-audit/PLAN.md) and **not started**; the live sub-step is named in
+[planned](claude/dev/009-performance-audit/PLAN.md) and **in progress**; the live sub-step is named in
 [its own `STATE.md`](claude/dev/009-performance-audit/STATE.md).
 [`008-seek-by-value`](claude/dev/008-seek-by-value/) is
 **[closed](claude/dev/008-seek-by-value/SUMMARY.md)**: a table can be asked where a value is, and
 **no navigation path refuses any more** — ADR-34 closed the last one.
 **`COLLATION` is done, `CDX-READ` is done, and risk R2 is retired.**
-**Next session starts at `PLAN.md` sub-step 1** — the benchmark project — of six, none executed. Step **010, `EXPR`**
+**Next session starts at `PLAN.md` sub-step 2** — compare in place — of six, one executed. Step **010, `EXPR`**
 is [designed](claude/dev/010-expr/DESIGN.md) and follows it. **The performance pass now has numbers
 instead of guesses**, and the block cache is measured to be worth an order of magnitude here too.
 
@@ -355,7 +353,10 @@ starting `WRITE` in six months will read a closed audit's design folder, so the 
 the capability that owes it, and a capability is not done until its row there is done.
 
 The rule is unchanged and now has teeth: **correctness first, and no optimization without a measurement
-and a gate that still passes.** A cache that serves a stale block is a wrong record set — which is why
+and a gate that still passes** — and as of 2026-08-21 the plan gates the *speed-up itself*, not only the
+correctness: `PLAN.md` §Tests **layer 5** fails the suite if enabling the cache stops being worth **2×**
+(reads and allocation exactly, wall clock best-of-N), because every other gate in the step passes on a
+cache that is correct and never hits. A cache that serves a stale block is a wrong record set — which is why
 the default is the reference's, and why the eviction rule is a pure class proved before it ever serves a
 read.
 

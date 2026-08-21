@@ -14,6 +14,16 @@ public static class Corpus
     private const string DirectoryName = "corpus";
 
     /// <summary>
+    /// Subdirectory of the corpus holding benchmark workloads rather than expectations.
+    ///
+    /// A subdirectory and not the corpus root, because [c]TableNames[/c] discovery below is not
+    /// recursive. A benchmark table has no dump, so a data-driven golden test that found one would
+    /// fail on the missing expectation, and the corpus layout test that pins the documented set would
+    /// fail too. Keeping the workload one level down means neither has to learn about it.
+    /// </summary>
+    private const string BenchmarkDirectoryName = "benchmark";
+
+    /// <summary>
     /// Directories the upward search will examine but never rise above.
     ///
     /// Without a stop, a missing corpus turns into a scan of every ancestor up to the filesystem
@@ -40,6 +50,29 @@ public static class Corpus
     /// asserting this set against the cases the corpus is documented to hold.
     /// </summary>
     public static IReadOnlyList<string> TableNames => LazyTableNames.Value;
+
+    /// <summary>
+    /// Absolute path of the directory holding benchmark data.
+    /// </summary>
+    public static string BenchmarkRoot => Path.Combine(Root, BenchmarkDirectoryName);
+
+    /// <summary>
+    /// Full path of a benchmark data file, whose existence is checked here rather than at first read.
+    /// </summary>
+    /// <param name="fileName">File name including extension, for example [c]PERF10K.DBF[/c].</param>
+    public static string BenchmarkPathOf(string fileName)
+    {
+        string path = Path.Combine(BenchmarkRoot, fileName);
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException(
+                $"'{fileName}' is not in the benchmark data at '{BenchmarkRoot}'. Regenerate with " +
+                "test-files-generator and publish it with copy-corpus.bat.",
+                path);
+        }
+
+        return path;
+    }
 
     /// <summary>
     /// Full path of a corpus file, whose existence is checked here rather than at first read.

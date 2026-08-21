@@ -21,6 +21,8 @@ them. **Building or testing CodeBase.NET never compiles or runs C.** See ADR-01 
 |------|----------|
 | `net/` | Everything .NET — `net/CodeBase.Net/` (the library), `net/tests/`, and `net/corpus/` |
 | `net/corpus/` | Checked-in golden `DBF`/`CDX`/`FPT` files with their expected dumps — see its [README](net/corpus/README.md) |
+| `net/corpus/benchmark/` | Benchmark **workloads**, not expectations: the 10 000-record `PERF10K` table with no dump. One directory down because corpus discovery is not recursive |
+| `net/benchmarks/` | `CodeBase.Net.Benchmarks` — the read path's numbers, on BenchmarkDotNet. Builds with the solution; `dotnet test` neither builds nor runs it |
 | `test-files-generator/` | Windows/MSVC tool that drives the original C library to produce the corpus — see its [README](test-files-generator/README.md). Not part of the solution, not a test dependency |
 | `original/source/` | The original CodeBase C source. **Read-only reference — never modified** |
 | `original/examples/` | Original C examples and real sample files. Supplementary test input only |
@@ -57,10 +59,11 @@ dotnet build   net/CodeBase.Net.sln
 dotnet test    net/CodeBase.Net.sln
 ```
 
-Four projects: `CodeBase.Net` (the library — **no package references**, deliberately, ADR-17),
-`CodeBase.Net.Tests` (layers 1-3), `CodeBase.Net.Golden` (layer 4, against `net/corpus/`), and
+Five projects: `CodeBase.Net` (the library — **no package references**, deliberately, ADR-17),
+`CodeBase.Net.Tests` (layers 1-3), `CodeBase.Net.Golden` (layer 4, against `net/corpus/`),
 `CodeBase.Net.TestUtils`, a plain library holding the test infrastructure both test projects share
-— the corpus locator and the in-memory boundary fakes. Settings common to all four are in
+— the corpus locator and the in-memory boundary fakes — and `CodeBase.Net.Benchmarks`, which asserts
+nothing and is described under [Benchmarks](#benchmarks) below. Settings common to all five are in
 `net/Directory.Build.props`, including `TreatWarningsAsErrors`.
 
 Two things that will bite if you change them without knowing why. The solution is the **classic
@@ -127,6 +130,34 @@ dotnet test net/CodeBase.Net.sln --collect "XPlat Code Coverage" \
 VSTest features, which is how `dotnet test` runs xUnit v3 by default — if a project is ever switched
 to Microsoft.Testing.Platform mode, these flags stop producing files and Sonar silently loses both
 coverage and results.
+
+## Benchmarks
+
+```bash
+cd net/benchmarks/CodeBase.Net.Benchmarks
+dotnet run -c Release                       # the whole read-path baseline
+dotnet run -c Release -- --filter *Seek*    # or one of them
+```
+
+Four measurements — a tag-order walk, a seek storm over a `C(20)` tag and over an `N(12,2)` tag, and
+`Go(n)` followed by `Skip(1)` — over `net/corpus/benchmark/PERF10K.DBF`, the 10 000-record table step
+009's audit measured. Each reports **per operation**, and each returns a checksum, so a benchmark that
+got faster while reading less is visible as such rather than as an improvement.
+
+The project **asserts nothing** and is not a test project: it carries no test SDK, so `dotnet test`
+neither builds nor runs it. It is Release-by-default because BenchmarkDotNet refuses to measure a
+Debug build.
+
+**Two things to know before comparing a number with another number:**
+
+- **Run it where the files are local.** Under WSL, `/mnt/…` is a filesystem bridge and a 512-byte
+  read costs far more than a native one, which dominates every figure here. The audit's numbers were
+  taken on Windows; a WSL run measures the bridge. Use the Windows SDK from WSL if that is where you
+  are — `cmd.exe /c "cd /d D:\path\net\benchmarks\CodeBase.Net.Benchmarks && dotnet run -c Release"`.
+- **A figure that moves when only its position moves is measuring the runtime, not the code.** That
+  mistake made this project's first performance measurement wrong by 4×
+  (`claude/dev/009-performance-audit/ANALYSIS.md` §8), and it is why BenchmarkDotNet is used rather
+  than a stopwatch.
 
 ## Code quality — SonarQube
 

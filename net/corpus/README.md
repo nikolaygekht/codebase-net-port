@@ -30,6 +30,30 @@ turns out to be untested, add a generator case and regenerate.
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **Index, collation.** cp1252, one `C(20)` field indexed twice — machine (`keyLen` 20, pad `0x20`) and `GENERAL` (`keyLen` 40, pad `0x00`) — over accented text and the `œ`/`ß`/`þ` expansions. See below. |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
 
+## Benchmark data — `benchmark/`
+
+`benchmark/PERF10K.DBF` + `benchmark/PERF10K.cdx` are a **workload, not an expectation**: 10 000
+records, a `C(20)` tag four levels deep (`T_NAME`) and an `N(12,2)` tag three levels deep (`T_AMT`).
+They exist so the read path can be measured against a table large enough to matter — `CDXDEEP`'s 55
+leaves cannot make a block cache evict anything — and they are the table step 009's performance audit
+took its figures from, so a number printed today is comparable with the ones in
+[`claude/dev/009-performance-audit/SUMMARY.md`](../../claude/dev/009-performance-audit/SUMMARY.md).
+
+**It has no `.dump.txt`, and it must not acquire one.** Nothing asserts against its bytes, only
+against how fast they are read. A dump would be a multi-megabyte expectation nobody reads, and an
+invitation to start asserting against a table whose whole purpose is to be large. Two tests in
+`CorpusLayoutTests` pin that: the files exist, and the dump does not.
+
+**It is one directory down for a mechanical reason.** `Corpus.TableNames` discovers tables by
+enumerating this directory, non-recursively, and twelve golden test classes iterate what it finds. A
+dumpless table in the corpus root would be swept into all of them. The subdirectory keeps it out of
+their way, and the benchmark reaches it through `Corpus.BenchmarkPathOf` instead.
+
+The field and tag shapes, the row count and the scrambling stride are fixed by that audit's
+measurement rather than free to tidy: change them and its numbers stop being a baseline.
+
+## Record counts
+
 The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
 records, and a wide key needs fewer of them.

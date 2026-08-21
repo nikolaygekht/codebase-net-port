@@ -41,6 +41,23 @@ for %%X in (DBF fpt cdx IDX dump.txt) do (
    )
 )
 
+REM  The benchmark table is a workload, not an expectation: it has no dump, and
+REM  it lives in a subdirectory because net\corpus is discovered
+REM  non-recursively (CodeBase.Net.TestUtils Corpus.TableNames), so a dumpless
+REM  table in the corpus root would be swept into every data-driven golden test.
+if exist "%SRC%\benchmark\*.DBF" (
+   if not exist "%DEST%\benchmark" mkdir "%DEST%\benchmark"
+   for %%X in (DBF cdx) do (
+      if exist "%SRC%\benchmark\*.%%X" (
+         copy /y "%SRC%\benchmark\*.%%X" "%DEST%\benchmark\" >nul || (
+            echo [copy-corpus] ERROR: copy of benchmark\*.%%X failed
+            exit /b 1
+         )
+         for %%F in ("%SRC%\benchmark\*.%%X") do echo [copy-corpus]      benchmark\%%~nxF
+      )
+   )
+)
+
 echo [copy-corpus] OK
 endlocal
 exit /b 0

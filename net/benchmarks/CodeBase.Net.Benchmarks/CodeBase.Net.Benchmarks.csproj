@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The read path's numbers. Not a test project: it asserts nothing, and `dotnet test` neither
+    builds nor runs it, because it carries no test SDK.
+
+    Step 009's audit measured the port from a throwaway harness outside the solution, which made
+    its figures unrepeatable — this project exists so the next measurement is a command anyone can
+    run. What it measures is the workload in net/corpus/benchmark, and the numbers to compare
+    against are in claude/dev/009-performance-audit/SUMMARY.md.
+
+    BenchmarkDotNet rather than a stopwatch, deliberately: the audit's own first RAM-backed
+    measurement was 4x wrong because it warmed up by pass count instead of wall clock and never let
+    the JIT reach tier 1 (ANALYSIS.md section 8).
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>CodeBase.Net.Benchmarks</RootNamespace>
+    <AssemblyName>CodeBase.Net.Benchmarks</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+
+    <!--
+      BenchmarkDotNet refuses to run a Debug build, and rightly so. This makes the default
+      `dotnet run` a Release run, so the obvious command is also the correct one.
+    -->
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.4" />
+
+    <!--
+      PERF10K names no code page, and the library reads an unmarked table as cp437 — the C
+      library's own default — which no .NET runtime supplies without a provider. Registering one is
+      a process-wide side effect belonging to the host application (ADR-17), and a
+      benchmark executable is that host, so it does the host's part — see EncodingProviders.cs.
+    -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CodeBase.Net\CodeBase.Net.csproj" />
+
+    <!--
+      For Corpus, which is the one place that knows where the checked-in data sits
+      (DEV_APPROACH.md section 4). TestUtils is a plain library with no test packages, so this
+      reference drags nothing test-shaped into the benchmark.
+    -->
+    <ProjectReference Include="..\..\tests\CodeBase.Net.TestUtils\CodeBase.Net.TestUtils.csproj" />
+  </ItemGroup>
+
+</Project>

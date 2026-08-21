@@ -79,4 +79,27 @@ public sealed class CorpusLayoutTests
     {
         Corpus.ReadAllBytes("VFPNULL.DBF").Should().HaveCountGreaterThan(32);
     }
+
+    [Fact]
+    public void BenchmarkData_IsPresentAndOutsideTheCorpusProper()
+    {
+        // PERF10K is a workload, not an expectation, and the two must not be confused. It sits one
+        // directory down because discovery above is not recursive, so it stays out of every
+        // data-driven golden test; that is what lets it exist with no dump at all.
+        File.Exists(Path.Combine(Corpus.BenchmarkRoot, "PERF10K.DBF")).Should().BeTrue();
+        File.Exists(Path.Combine(Corpus.BenchmarkRoot, "PERF10K.cdx")).Should().BeTrue();
+
+        Corpus.TableNames.Should().NotContain("PERF10K");
+    }
+
+    [Fact]
+    public void BenchmarkData_HasNoDump()
+    {
+        // Asserted, not merely omitted. A later hand adding a dump would put a multi-megabyte
+        // expectation in the repository that nothing reads, and would invite assertions against a
+        // table whose whole purpose is to be large — so the absence is pinned here rather than left
+        // to a comment in the generator.
+        File.Exists(Path.Combine(Corpus.BenchmarkRoot, "PERF10K.dump.txt")).Should().BeFalse();
+        File.Exists(Path.Combine(Corpus.Root, "PERF10K.dump.txt")).Should().BeFalse();
+    }
 }

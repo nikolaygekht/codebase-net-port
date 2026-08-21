@@ -42,6 +42,16 @@ void assignText( FIELD4 *field, const TEXTBYTES *text );
  * then write <NAME>.dump.txt beside it. Returns 0 on success. */
 int finish( CODE4 *cb, DATA4 *data, const char *outDir, const char *fileName );
 
+/* The same tail without the dump, for a *benchmark* case: close the table and
+ * freeze its header date stamp, and write no <NAME>.dump.txt.
+ *
+ * A dump is an expected value, and nothing asserts against a benchmark table's
+ * bytes — only against how fast they are read. Writing one anyway would put a
+ * 3 MB expectation in the repository that no test reads, and would invite a
+ * later hand to start asserting on a table whose whole purpose is that it is
+ * large. Returns 0 on success. */
+int finishUndumped( CODE4 *cb, DATA4 *data, const char *outDir, const char *fileName );
+
 /* Escape a byte run into C-ish text: printable ASCII verbatim, everything else
  * as \xHH, wrapped in double quotes. Shared by both dump writers so a key and a
  * field value are escaped by the same rules — the port has one unescaper. */

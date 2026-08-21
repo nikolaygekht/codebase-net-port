@@ -1,0 +1,48 @@
+009-performance-audit -- sub-step 1 baseline
+
+Run 2026-08-21, natively on Windows (the audit's own platform), over
+net/corpus/benchmark/PERF10K.DBF + .cdx. Uncached: no block cache exists yet.
+
+  dotnet run -c Release   in net/benchmarks/CodeBase.Net.Benchmarks
+
+BenchmarkDotNet v0.15.4, Windows 11 (10.0.26200.9168)
+AMD Ryzen 9 9950X 4.30GHz, 1 CPU, 32 logical and 16 physical cores
+.NET SDK 10.0.302
+  [Host]     : .NET 8.0.29 (8.0.29, 8.0.2926.32403), X64 RyuJIT x86-64-v4
+  DefaultJob : .NET 8.0.29 (8.0.29, 8.0.2926.32403), X64 RyuJIT x86-64-v4
+
+
+| Method                                        | Mean     | Error     | StdDev    | Gen0   | Allocated |
+|---------------------------------------------- |---------:|----------:|----------:|-------:|----------:|
+| 'tag walk, C(20) tag, per record'             | 1.148 us | 0.0199 us | 0.0166 us | 0.0063 |     129 B |
+| 'seek, C(20) key, 4 levels'                   | 9.238 us | 0.1129 us | 0.1056 us | 0.2333 |    3956 B |
+| 'seek, N(12,2) key, 3 levels'                 | 7.662 us | 0.0531 us | 0.0497 us | 0.2143 |    3808 B |
+| 'Go(n) then Skip(1), natural order, per pair' | 1.913 us | 0.0075 us | 0.0062 us |      - |         - |
+
+// * Hints *
+Outliers
+  ReadPathBenchmarks.'tag walk, C(20) tag, per record': Default             -> 4 outliers were removed (1.25 us..1.29 us)
+  ReadPathBenchmarks.'Go(n) then Skip(1), natural order, per pair': Default -> 2 outliers were removed (1.95 us, 2.05 us)
+
+
+Against the audit's figures for the same operations (SUMMARY.md):
+
+  operation                    benchmark   audit   delta
+  tag walk, per record          1.148 us   1.05 us   +9%
+  seek, C(20), 4 levels         9.238 us   7.84 us  +18%
+  seek, N(12,2), 3 levels       7.662 us   7.22 us   +6%
+  Go(n) then Skip(1), per pair  1.913 us    --      new
+
+The audit measured the same port on the same table, through a harness that
+read its queries from files rather than deriving them; these are the same
+figures to within run-to-run variation, which is what makes this a baseline
+and not a new measurement.
+
+New here, and what sub-step 2 is aimed at: allocation per seek --
+3 956 B on the character tag, 3 808 B on the numeric one. ANALYSIS.md 6
+attributes 1 292-1 744 B of that to the key copied per comparison and
+2 144 B to the byte[512] per block read.
+
+For comparison, and the reason no absolute threshold can be a gate: the
+identical run from WSL against /mnt/d reports 194 us per walked record and
+1.58 ms per seek. That is the filesystem bridge, not the code.

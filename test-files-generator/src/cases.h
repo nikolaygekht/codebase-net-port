@@ -29,4 +29,9 @@ int caseIdxOne ( CODE4 *cb, const char *outDir );   /* IDXONE.DBF  — 0x30 + CD
 int caseCdxColl( CODE4 *cb, const char *outDir );   /* CDXCOLL.DBF — 0x30 + CDX, machine and GENERAL collation */
 int caseCdxTime( CODE4 *cb, const char *outDir );   /* CDXTIME.DBF — 0x30 + CDX, datetime keys and the fox flag bitmap */
 
+/* The one benchmark case: a workload, not an expectation. It writes into a
+ * `benchmark` subdirectory of the output and has no dump, because nothing
+ * asserts against its bytes — see case-perf10k.cpp. */
+int casePerf10k( CODE4 *cb, const char *outDir );   /* benchmark\PERF10K.DBF — 0x30 + CDX, 10 000 records */
+
 #endif /* GEN_CASES_H */

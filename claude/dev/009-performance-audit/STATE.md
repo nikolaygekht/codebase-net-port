@@ -180,6 +180,65 @@ tests; ignoring pins reddens 7, including the randomised run, which found it una
 golden suite green** — which is the plan's own prediction for a sub-step that wires nothing up, and
 means these layer-1 tests are the only thing standing behind this code until sub-step 5.
 
+## For tomorrow: the two things that keep the step open
+
+### 1. Find where the cache path got dirty — the chain to read
+
+A cache hit costs **~730 ns per 512-byte window** against ~10 ns for the same copy out of a plain
+array, with identical allocation and identical work either side
+([`results-before-closing.txt`](results-before-closing.txt) §1). Everything between
+`CachingRandomAccessSource.Read` entering and leaving is where it hides — arms 0a and 0 of
+`SeekLayersBenchmarks` differ in nothing else.
+
+The path from `Seek` to the bytes, in order:
+
+| # | where | what it does |
+|---|---|---|
+| 1 | `Table.Seek(string)` — `Table.cs:609` | entry |
+| 2 | `Table.Search` — `Table.cs:725` | `TextEncoding.GetBytes(value)` |
+| 3 | `TableTagCursor.SearchFor` — `Dbf/TableTagCursor.cs:93` | copies into its buffer, pads to key width, `KeySearch.Into` |
+| 4 | `Table.Exact` — `Table.cs:728` | |
+| 5 | `TableTagCursor.SeekAtOrAfter` — `Dbf/TableTagCursor.cs:190` | |
+| 6 | `TagCursor.Seek` — `Cdx/TagCursor.cs:173` → `SeekFirstAtOrAbove` — `:353` | the descent loop |
+| 7 | `CdxTag.ReadBlock` — `Cdx/CdxTag.cs:83` | **once per level** |
+| 8 | `NodeReader.Read` — `Cdx/NodeReader.cs:52` → `ReadAt` — `:70` | |
+| 9 | `SourceReader.ReadExactly(…, int count, …)` — `IO/SourceReader.cs:26` | **allocates `new byte[512]`** |
+| 10 | `SourceReader.ReadExactly(…, Span<byte>, …)` — `IO/SourceReader.cs:56` | loops until the buffer is full |
+| 11 | **`CachingRandomAccessSource.Read` — `IO/CachingRandomAccessSource.cs:55`** | **the suspect region starts here** |
+| 12 | `BlockCache.TryHold` — `IO/BlockCache.cs:112` → `HoldWhileLocked` — `:121` | `lock`, dictionary lookup; on a hit `BlockPool.Claim` + `Touch`; on a miss `TryClaim` → `BlockResidency` → `fill` |
+| 13 | `BlockPool.At` — `IO/BlockPool.cs:125` → `Block.AsSpan` → `CopyTo` | **the 512-byte copy** |
+| 14 | `BlockCache.Release` | a **second** `lock` per window |
+| — | back up: `NodeHeader.Parse`, `LeafBlock.Parse`/`BranchBlock.Parse`, `LeafBlock.Seek`→`CompareAt`→`KeyAt`→`Build`, `BranchBlock.Seek`/`ChildAt` | measured as cheap: arm 0a does all of it in 545 ns |
+| 15 | `Table.Fetch` — `Table.cs:1205` → `RecordReader.Read` — `Dbf/RecordReader.cs:51` | the record, through the same source and so the same path |
+
+**Where I would look first**, in order of suspicion: two `lock` acquisitions per window (12 and 14);
+whether `ReadExactly`'s loop at 10 ever goes round more than once, which it would if the cached source
+ever returns short for a full-width aligned read; and whether a supposed hit is actually a miss on some
+windows, which nothing currently reports — `BlockCache` counts `Hits` and `Misses` but nothing prints
+them.
+
+**Why it matters enough to hold the step open:** if a hit can be made to cost ~50 ns, a cached seek
+goes from 4.3 µs to about 0.8, and the audit's predicted **11.6×** stops being disproved and becomes
+reachable.
+
+### 2. Data for stressing the cache
+
+Yes — the point is to make **eviction actually happen**, because nothing measured so far has evicted
+anything: PERF10K is ~1 788 windows and the pool defaults to 2 048, so every figure in this step was
+taken with the whole working set resident. The policy — five LRU lists in the reference's priority
+order — has therefore never been exercised, and there is no evidence for or against it.
+
+Two ways, and they are not equivalent:
+
+- **Shrink the pool.** Free, already wired: `CODEBASE_BENCHMARK_CACHE_BLOCKS` on
+  `ReadPathBenchmarks`. It makes eviction happen, but with a small pool over a small file, so the
+  hot-to-cold ratio is not a real one.
+- **A workload larger than a realistic pool** — a new generator case. Honest, and it costs a Windows
+  generator run and committed data.
+
+Start with the first tomorrow, because it is free and it answers whether the policy moves the number at
+all. Only build the second if it does.
+
 ## Notes for the next session
 
 - **Start at `PLAN.md` step 1.** Read [`DESIGN.md`](DESIGN.md) first; the two decisions that shape

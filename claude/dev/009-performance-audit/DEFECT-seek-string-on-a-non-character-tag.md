@@ -66,15 +66,29 @@ Raised in review: *a function that answers `0.0` for everything it cannot parse 
 scenarios are not covered by testing at all.* That is the sharper version of this defect and it is
 about the suite, not about one branch.
 
-**Where the swallowing is, and where it is not a bug.** `FoxNumeric.ToDouble` returns `0.0` when the
-text does not parse (`Dbf/FoxNumeric.cs:37-44`). On the **read** path that is almost certainly right: a
-blank numeric field reads as zero in xBase, the corpus witnesses it, and the port matches the C library
-bit for bit there (`FoxNumericGoldenTests.ToDouble_MatchesTheCLibraryBitForBit`). **So the fix is not to
-make `ToDouble` throw** — that would break behaviour the corpus proves. The fix is that the *seek* path
-must not route a caller's string through a function whose job is reading a field's bytes.
+**Where the swallowing is.** `FoxNumeric.ToDouble` returns `0.0` when the text does not parse
+(`Dbf/FoxNumeric.cs:37-44`).
+
+> **Correction, 2026-08-21.** This note first said that making `ToDouble` refuse "would break behaviour
+> the corpus proves". That is wrong, and checking made it worse rather than better: **the corpus
+> witnesses nothing whatever about the fallback.** Every numeric value in it is a well-formed number
+> with leading spaces — the nearest thing to a blank is `"       0.000"` in `VFPTYPE`, which is a
+> *written* zero — and **there is no all-blank numeric field anywhere in the corpus**. So neither the
+> junk case nor the blank case is witnessed, no test would notice the fallback changing in either
+> direction, and it is a guess with nothing standing behind it. `FoxNumericGoldenTests` would not even
+> catch a blank one if it existed: it skips values whose dump carries no number
+> (`value.Number is null`).
+
+The fix is still that the *seek* path must not route a caller's string through a function whose job is
+reading a field's bytes — but the reason is that they are different kinds of input, not that the
+fallback is proved.
 
 **What is genuinely uncovered.**
 
+- **There is no blank numeric field in the corpus at all**, which is a gap of its own and not an
+  exotic one: blank is the state of every field of a record `d4blank` has just prepared, so it is the
+  *default* state in xBase rather than an edge case. It belongs with the twelve corpus gaps
+  `PORTING-PLAN.md` §6.3 already names.
 - **`FoxNumeric` has no layer-1 tests at all.** There is no `FoxNumericTests.cs`; it is exercised only
   through the corpus, on values the generator wrote — which are all valid. `DEV_APPROACH.md` §4 says in
   as many words that layer 4 must not be the only thing standing, and here it is: *"The corpus is a
@@ -104,8 +118,9 @@ malformed, so nothing exercises them, and a wrong answer looks like an answer.
    who want it becomes an extension method later, outside the library's own contract.
 2. **Layer-1 tests for `FoxNumeric`**, pinning what unparseable, over-long, over-precise and
    sign-only text answer — as a *decision recorded*, not as a discovery.
-3. **A generator case with a malformed numeric field**, so the C library's answer stops being unknown.
-   That is the only way to settle whether `0.0` is faithful or merely convenient, and it is the same
-   move the project already makes for every other format question.
+3. **A generator case with a blank numeric field and a malformed one**, so the C library's answer stops
+   being unknown for either. That is the only way to settle whether `0.0` is faithful or merely
+   convenient, and it is the same move the project already makes for every other format question. The
+   blank one is the more urgent of the two, because blank is what an appended record starts as.
 4. **A pass for the rest of the shape**: every place a parse or a lookup resolves to a default rather
    than refusing, checked for whether the default is witnessed or assumed.

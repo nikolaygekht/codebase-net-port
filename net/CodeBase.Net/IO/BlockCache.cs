@@ -24,10 +24,25 @@ internal delegate int FillWindow(long start, Span<byte> into);
 ///
 /// The budget is therefore the engine's, not the file's — one table's index, memo and data compete for
 /// the same slots, as they do in the reference, rather than each getting a pool of its own.
+///
+/// **This is the one class in the library that locks, and being shared is exactly why.** A table and
+/// its cursors must not be used by two threads at once, and that contract belongs to the caller — but
+/// it says nothing about two *different* tables of one engine, which is an ordinary thing to do in
+/// parallel and which meets here. Every operation below is self-contained, with no state a caller
+/// carries between calls, so a lock inside is both correct and sufficient; there is no protocol for it
+/// to make atomic-but-wrong, which is the trap a lock inside [c]Table[/c] would be.
+///
+/// **The lock is held across the fill as well**, so two threads reading different files serialise on
+/// each other's misses. That is deliberate for now and not an oversight: once the cache is warm a fill
+/// is rare, which is the whole point of it, so splitting the lock would be optimising a path the cache
+/// exists to eliminate. It gets split when a measurement says to.
 /// </summary>
 internal sealed class BlockCache
 {
     private readonly BlockPool pool;
+
+    /// <summary>What every operation here holds, because the pool below is shared between files.</summary>
+    private readonly object gate = new();
 
     /// <summary>Where each held window lives.</summary>
     private readonly Dictionary<WindowKey, Window> held = [];
@@ -65,7 +80,13 @@ internal sealed class BlockCache
     /// inherit the windows of the one before it — the same reason the reference salts its hash per
     /// file rather than by name.
     /// </remarks>
-    public int NewOwner() => ++owners;
+    public int NewOwner()
+    {
+        lock (gate)
+        {
+            return ++owners;
+        }
+    }
 
     /// <summary>
     /// Serves a window, reading it in if it is not held.
@@ -91,8 +112,15 @@ internal sealed class BlockCache
     public bool TryHold(
         int owner, long start, BlockPriority priority, FillWindow fill, out int slot, out int valid)
     {
-        WindowKey key = new(owner, start);
+        lock (gate)
+        {
+            return HoldWhileLocked(new WindowKey(owner, start), priority, fill, out slot, out valid);
+        }
+    }
 
+    private bool HoldWhileLocked(
+        WindowKey key, BlockPriority priority, FillWindow fill, out int slot, out int valid)
+    {
         if (held.TryGetValue(key, out Window found))
         {
             pool.Claim(found.Slot);
@@ -118,7 +146,7 @@ internal sealed class BlockCache
         int read;
         try
         {
-            read = fill(start, pool.At(slot).Writable);
+            read = fill(key.Start, pool.At(slot).Writable);
         }
         catch
         {
@@ -154,13 +182,19 @@ internal sealed class BlockCache
     /// </summary>
     /// <param name="slot">Which slot.</param>
     /// <returns>The window's block.</returns>
-    public Block At(int slot) => pool.At(slot);
+    public Block At(int slot) => pool.At(slot);   // the buffer reference itself never moves
 
     /// <summary>
     /// Gives up a claim taken by <see cref="TryHold"/>.
     /// </summary>
     /// <param name="slot">Which slot.</param>
-    public void Release(int slot) => pool.Release(slot);
+    public void Release(int slot)
+    {
+        lock (gate)
+        {
+            pool.Release(slot);
+        }
+    }
 
     /// <summary>
     /// Forgets every window of one file.
@@ -173,6 +207,14 @@ internal sealed class BlockCache
     /// practice" is not a guarantee.
     /// </remarks>
     public int Invalidate(int owner)
+    {
+        lock (gate)
+        {
+            return InvalidateWhileLocked(owner);
+        }
+    }
+
+    private int InvalidateWhileLocked(int owner)
     {
         List<WindowKey> dropping = [.. held.Keys.Where(key => key.Owner == owner)];
         int dropped = 0;
@@ -206,8 +248,11 @@ internal sealed class BlockCache
     {
         int dropped = 0;
 
-        foreach (int owner in held.Keys.Select(key => key.Owner).Distinct().ToArray())
-            dropped += Invalidate(owner);
+        lock (gate)
+        {
+            foreach (int owner in held.Keys.Select(key => key.Owner).Distinct().ToArray())
+                dropped += InvalidateWhileLocked(owner);
+        }
 
         return dropped;
     }

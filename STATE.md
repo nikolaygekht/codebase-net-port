@@ -11,7 +11,7 @@
 **[closed](claude/dev/008-seek-by-value/SUMMARY.md)**: a table can be asked where a value is, and
 **no navigation path refuses any more** — ADR-34 closed the last one.
 **`COLLATION` is done, `CDX-READ` is done, and risk R2 is retired.**
-**Next session starts at `PLAN.md` sub-step 7** — the threading contract and its detector — of seven, six executed. Step **010, `EXPR`**
+**All seven sub-steps of `PLAN.md` are executed**; what remains is closing the step — its ADR entries, `SUMMARY.md` and `PORTING-PLAN.md` §5. Step **010, `EXPR`**
 is [designed](claude/dev/010-expr/DESIGN.md) and follows it. **The performance pass now has numbers
 instead of guesses**, and the block cache is measured to be worth an order of magnitude here too.
 

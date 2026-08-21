@@ -19,6 +19,23 @@ namespace CodeBase.Net;
 ///
 /// Closing a table closes the files it opened. Closing the engine that opened it does the same, so
 /// a caller that keeps the engine in a using statement cannot leak a handle by forgetting a table.
+///
+/// **One operation at a time, and the caller's to enforce.** A table is not thread-safe, and the unit
+/// that has to be serialised is not a call but a **sequence** of them: the cursor is the protocol, so
+/// [c]Seek[/c] then [c]SeekNext[/c] then [c]GetString[/c] mean something only because the position
+/// survives between them. A lock inside each method would make every call atomic and leave the sequence
+/// wrong — another thread's [c]Seek[/c] landing between the first two hands the reader someone else's
+/// record while every individual call behaves correctly — which is why there is none. Serialise around
+/// your own unit of work, exactly as with a database connection.
+///
+/// **Moving between threads is fine; being in two at once is not.** What is forbidden is *concurrency*,
+/// not *thread affinity*: an [c]await[/c] resuming on another pool thread is ordinary and safe, because
+/// only one operation is in flight and the task machinery orders the writes. Breaking the rule is
+/// **reported rather than tolerated** — a second operation entering while one is still running throws,
+/// so a missing lock shows up as an exception instead of a plausible-looking wrong record.
+///
+/// Two *different* tables of one engine may be used in parallel. What they share is the engine's block
+/// cache, and that is synchronised internally because its operations are self-contained.
 /// </summary>
 public sealed class Table : IDisposable
 {
@@ -31,6 +48,17 @@ public sealed class Table : IDisposable
     private readonly byte[] blankRecord;
     private readonly MemoReader? memoReader;
     private readonly Dictionary<Tag, TableTagCursor> tagCursors = [];
+
+    /// <summary>
+    /// The managed thread id of whoever is in the middle of an operation, or zero when idle.
+    /// </summary>
+    /// <remarks>
+    /// Diagnosis, not protection. The caller's lock is the protection; this is what tells them it is
+    /// missing, by turning a torn read into an exception instead of a record that looks right. It is a
+    /// single uncontended interlocked exchange per operation, which is nothing against a read.
+    /// </remarks>
+    private int owner;
+    private int depth;
     private Encoding? textEncoding;
     private TableTagCursor? selected;
     private bool closed;
@@ -254,7 +282,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public GoResult Go(int recordNumber)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         selected?.ForgetSearch();
         ArgumentOutOfRangeException.ThrowIfLessThan(recordNumber, 1);
 
@@ -279,7 +307,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public GoResult Top()
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         selected?.ForgetSearch();
 
         if (selected is not null)
@@ -305,7 +333,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public GoResult Bottom()
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         selected?.ForgetSearch();
 
         if (selected is not null)
@@ -340,7 +368,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public SkipResult Skip(int count)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
 
         if (position.Number < 1)
         {
@@ -401,7 +429,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public void SelectTag(Tag? tag)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         selected?.ForgetSearch();
 
         selected = tag is null ? null : CursorFor(tag);
@@ -421,7 +449,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public GoResult GoFirstIndexed(Tag tag)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return Reached(CursorFor(tag).First(RecordCount, out int record), record);
     }
 
@@ -434,7 +462,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public GoResult GoLastIndexed(Tag tag)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return Reached(CursorFor(tag).Last(RecordCount, out int record), record);
     }
 
@@ -526,7 +554,7 @@ public sealed class Table : IDisposable
     /// </summary>
     private GoResult StepIndexed(Tag tag, int count)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
 
         TableTagCursor cursor = CursorFor(tag);
 
@@ -687,7 +715,7 @@ public sealed class Table : IDisposable
 
     private TableTagCursor Seeking()
     {
-        EnsureOpen();
+        using Hold hold = Enter();
 
         return selected ?? throw new CodeBaseException(
             ErrorCode.Info,
@@ -852,7 +880,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public byte[] GetRawBytes(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.Bytes(record, field).ToArray();
     }
 
@@ -876,7 +904,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public string GetString(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         FieldValueDecoder.RefuseIfBinary(field);
 
         // Decoding recovers as much as the code page allows and never throws: a character the field
@@ -895,7 +923,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public bool GetBoolean(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.Boolean(record, field);
     }
 
@@ -908,7 +936,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public int GetInt32(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.Int32(record, field);
     }
 
@@ -924,7 +952,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public double GetDouble(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.Double(record, field);
     }
 
@@ -937,7 +965,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public decimal GetDecimal(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.Decimal(record, field);
     }
 
@@ -950,7 +978,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public DateOnly? GetDate(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.Date(record, field);
     }
 
@@ -963,7 +991,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public DateTime? GetDateTime(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.DateTime(record, field);
     }
 
@@ -979,7 +1007,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public int GetMemoBlock(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
         return FieldValueDecoder.MemoBlock(record, field);
     }
 
@@ -1060,7 +1088,7 @@ public sealed class Table : IDisposable
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public bool IsNull(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
 
         if (field.NullBit is not int bit || NullFlags is not FieldDefinition flags)
             return false;
@@ -1087,7 +1115,7 @@ public sealed class Table : IDisposable
     /// </remarks>
     public int DropCachedBlocks()
     {
-        EnsureOpen();
+        using Hold hold = Enter();
 
         int dropped = Dropped(opened.Data) + Dropped(opened.Memo) + (opened.Index?.Invalidate() ?? 0);
 
@@ -1120,7 +1148,7 @@ public sealed class Table : IDisposable
     /// </remarks>
     public void Refresh()
     {
-        EnsureOpen();
+        using Hold hold = Enter();
 
         DropCachedBlocks();
 
@@ -1150,7 +1178,7 @@ public sealed class Table : IDisposable
     /// </summary>
     private MemoEntry ReadMemo(FieldDefinition field)
     {
-        EnsureOpen();
+        using Hold hold = Enter();
 
         int block = FieldValueDecoder.MemoBlock(record, field);
         if (block <= MemoReference.None)
@@ -1192,5 +1220,57 @@ public sealed class Table : IDisposable
     /// <summary>
     /// Refuses to work on a table whose files have been closed.
     /// </summary>
+    /// <summary>
+    /// Claims this table for the current operation, refusing a second one already in flight.
+    /// </summary>
+    /// <returns>A hold to dispose when the operation ends.</returns>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    /// <exception cref="CodeBaseException">Another thread is in the middle of an operation.</exception>
+    /// <remarks>
+    /// **A detector and not a lock.** It cannot make concurrent use safe — the cursor is a protocol
+    /// spanning several calls, so nothing inside one call could — and it does not try. What it does is
+    /// turn the failure from a plausible-looking wrong record into an exception, which is the trade the
+    /// ground rule about wrong record sets asks for.
+    ///
+    /// Re-entrant for the thread that holds it, because operations here legitimately call one another —
+    /// [c]Refresh[/c] calls [c]DropCachedBlocks[/c] — while a *different* thread arriving is exactly
+    /// what is being reported. And being a detector rather than a mutex, it may miss a racer that
+    /// arrives in the same instant; it is a smoke alarm, not a fire door.
+    /// </remarks>
+    private Hold Enter()
+    {
+        ObjectDisposedException.ThrowIf(closed, this);
+
+        int me = Environment.CurrentManagedThreadId;
+        int holder = Interlocked.CompareExchange(ref owner, me, 0);
+
+        if (holder != 0 && holder != me)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Info,
+                $"This table is already in the middle of an operation on thread {holder}, and a table " +
+                "is not safe to use from two threads at once. What has to be serialised is a sequence " +
+                "of calls and not a single one, because the cursor carries between them, so the lock " +
+                "belongs around your own unit of work. Moving a table between threads is fine; being " +
+                "in two of them at once is not.");
+        }
+
+        depth++;
+        return new Hold(this);
+    }
+
     private void EnsureOpen() => ObjectDisposedException.ThrowIf(closed, this);
+
+    /// <summary>
+    /// Releases the claim <see cref="Enter"/> took.
+    /// </summary>
+    private readonly struct Hold(Table table) : IDisposable
+    {
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            if (--table.depth == 0)
+                Volatile.Write(ref table.owner, 0);
+        }
+    }
 }

@@ -6,9 +6,16 @@ Phase 3 and 5 of [`DEV_APPROACH.md`](../../DEV_APPROACH.md). The design is [`DES
 public surface; the cache is 4–6 and carries the ADR. If the step has to end early, it ends after 3 with
 a `SUMMARY.md` saying the cache is still owed.
 
-**Sub-step 7 is independent of all of them** and can be taken whenever — it needs nothing the cache
-builds, and the cache does not need it. It is here because the cache's design is what forced the
-question; `ANALYSIS.md` §11 records how.
+**Sub-step 7 has two halves and they are not the same kind of work.** 7a closes a race that exists
+today, in code the cache added; 7b documents a contract and makes breaking it loud. Only 7b is
+independent of the cache — 7a is about the cache. `ANALYSIS.md` §11 records how the question arose and
+why the split falls where it does.
+
+**Three things called "locking" are in play here and only one of them is this step's.** The caller's lock
+around a group of calls is a *contract* and nothing is built for it (7b). The lock inside shared
+residency is ours and is 7a. **File locking — `d4lock`, byte-range locks, the Visual FoxPro interop — is
+the `LOCKING` capability**, P3, with its own gate (a two-process interop test) and the port's highest
+interop risk (R3); `DESIGN.md` says at length why it is not folded in here.
 
 **One ordering question is still open**, raised 2026-08-21 and not decided: whether sub-step 3 moves
 *after* 5, so the padded comparison is measured in the cached world where a descent's CPU is visible
@@ -80,7 +87,8 @@ corpus blocks (a round-trip invariant, allowed by §4); the cache is asserted ag
 
 | **6** | **`Table.Refresh()`, and the hooks `LOCKING` will call.** `d4refresh` semantics without the lock branch: reset memo state, drop this table's cached blocks, re-read the current record in place. The cache's `Invalidate(source)` / `Flush(source)` entry points exist as such rather than as private helpers, so §3.7's "flush before unlock, invalidate after lock" has something to call. | Suite green; a layer-2 test writes behind the cache's back and proves the change is invisible before `Refresh()` and visible after; `Refresh()` leaves the cursor on the same record. |
 
-| **7** | **Make concurrent misuse loud, and write the contract down.** The threading contract stated in the public XML docs — *not thread-safe; do not run two operations against one table at once; moving between threads, as an `await` does, is fine* — plus the detector that enforces the diagnosis: an `Interlocked` flag taken on entry to a public `Table` operation and cleared on exit, so a second operation arriving while the first is in flight **throws** rather than returning someone else's record. Not a lock and not protection: the caller's own lock is the protection, and this is what tells them it is missing. **Independent of the cache** — it needs nothing from sub-steps 4 to 6 and could land before them. | A layer-3 test drives two overlapping operations and gets a `CodeBaseException` instead of a record; the whole suite stays green, because a correct caller never trips it; and the benchmark says what the flag costs, so the decision to keep it out of `Release` or not is measured rather than assumed. |
+| **7a** | **The lock that is ours.** The engine's shared residency — `BlockCache` over `BlockPool` — has no synchronisation at all today, and the contract in 7b does not cover it: two tables opened from one engine and queried in parallel is an ordinary thing to do, and it races. Each of the cache's operations is self-contained, so a lock inside it is both correct and sufficient (`ANALYSIS.md` §11). Simplest form first — one lock per operation, the file read included — with the serialisation it costs documented and measured rather than pre-optimised away; fills are rare once the cache is warm, which is the argument for not splitting the lock until a number says to. | A stress test runs two tables of one engine from several threads and requires every reader's results to equal what one thread alone reads; the benchmark says what the lock costs on a cached seek. |
+| **7b** | **Make concurrent misuse loud, and write the contract down.** The threading contract stated in the public XML docs — *not thread-safe; do not run two operations against one table at once; moving between threads, as an `await` does, is fine* — plus the detector that enforces the diagnosis: an `Interlocked` flag taken on entry to a public `Table` operation and cleared on exit, so a second operation arriving while the first is in flight **throws** rather than returning someone else's record. Not a lock and not protection: the caller's own lock is the protection, and this is what tells them it is missing. **Independent of the cache** — it needs nothing from sub-steps 4 to 6 and could land before them. | A layer-3 test drives two overlapping operations and gets a `CodeBaseException` instead of a record; the whole suite stays green, because a correct caller never trips it; and the benchmark says what the flag costs, so the decision to keep it out of `Release` or not is measured rather than assumed. |
 
 Sub-step 4 before 5 is deliberate: the part that can be *wrong* gets built and proved with no file
 anywhere near it, and only then does it start serving real reads.

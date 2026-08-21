@@ -1,0 +1,96 @@
+009-performance-audit -- sub-step 7, the lock that is ours and the detector
+
+Two halves, and they are different kinds of work. 7a closes a race that existed
+in code the cache added. 7b documents a contract and makes breaking it loud.
+
+===========================================================================
+7a. THE LOCK INSIDE SHARED RESIDENCY
+
+  Before this, the library contained NO SYNCHRONISATION OF ANY KIND, and the
+  engine's BlockCache/BlockPool is shared by every file the engine opens. The
+  contract "do not use a TABLE concurrently" does not cover it: two tables
+  opened from one engine and queried in parallel is an ordinary thing to do, and
+  it raced.
+
+  Each of the cache's operations is self-contained -- "give me this window",
+  "take it back", "forget this file's" -- with no state a caller carries between
+  calls. So a lock inside is correct AND sufficient, which is exactly what a lock
+  inside Table would not be. ANALYSIS.md 11 had already drawn that line.
+
+  SIMPLEST FORM FIRST: one lock per operation, the file read included. Two
+  threads missing on different files therefore serialise on each other's reads.
+  That is deliberate: once the cache is warm a fill is rare -- which is the whole
+  point of it -- so splitting the lock would be optimising the path the cache
+  exists to remove. It gets split when a measurement says to.
+
+  WHAT IT COSTS. Compared against the pre-lock run of the same benchmark:
+
+    operation (Always)        before      after     delta
+    tag walk, per record       162 ns    159.5 ns   -1.5%
+    seek, C(20)              4 400 ns  4 099.8 ns   -7%
+    seek, N(12,2)            3 667 ns  3 502.6 ns   -4.5%
+    Go(n) then Skip(1)          86 ns    103.9 ns   +21%
+
+  Read that carefully. The UNCACHED numbers moved too, and downwards: seek 9 386
+  -> 8 458, walk 1 206 -> 1 074. So this machine ran ~10% faster in this process
+  than in the last one, and that variance swamps almost everything. The one
+  figure that moves AGAINST the trend is Go(n)-then-Skip(1): it got dearer while
+  everything else got cheaper.
+
+  That reads as about 9 ns per cached window service -- an uncontended lock
+  acquisition -- which is 18 ns of a 104 ns Go+Skip pair (17%), roughly 45 ns of
+  a 4 100 ns seek (1%), and invisible in a walk. Splitting the lock would not
+  reduce it, because what was measured is the acquisition and not the
+  serialisation; removing it would need a lock-free hit path, which is a much
+  larger change than 1% of a seek justifies. Recorded, not optimised.
+
+  THE PROOF IT IS NEEDED. Removing the lock and running
+  SharedCacheConcurrencyTests fails BOTH tests in 462 ms -- immediately and
+  every time, not occasionally. The race is real, reachable and cheap to
+  provoke; the tests are not decorative.
+
+  Those tests are a stress test and not a proof, and they say so: they cannot
+  show the absence of a race. What they do is fail loudly on the ones actually
+  reachable, with a 16-window cache so that eviction -- where the shared
+  bookkeeping is written -- happens constantly.
+
+===========================================================================
+7b. THE CONTRACT, AND THE DETECTOR THAT REPORTS BREAKING IT
+
+  Written into Table's own documentation: one operation at a time, the caller's
+  to enforce, around a SEQUENCE of calls and not a single one -- because the
+  cursor is the protocol. Moving between threads is fine; being in two at once
+  is not. That is ADO.NET's contract for DbConnection, and it is what async
+  actually needs.
+
+  THE DETECTOR: an interlocked claim on entry to each of Table's 22 entry
+  points, released on exit. A second thread arriving while one is in flight gets
+  a CodeBaseException instead of somebody else's record.
+
+  It is NOT a lock and does not pretend to be:
+
+    it cannot make concurrent use safe, because the protocol spans calls and
+    nothing inside one call could serialise that;
+
+    it is re-entrant for the thread holding it, because operations here call
+    each other -- Refresh calls DropCachedBlocks -- and a detector that counted
+    entries without knowing whose they were would refuse the library's own call;
+
+    it may miss a racer arriving in the same instant. A smoke alarm, not a fire
+    door.
+
+  Why bother at all: CLAUDE.md's ground rule. A wrong record set is worse than
+  anything else this library can do, and a missing caller lock produces exactly
+  that -- silently, with every individual call behaving correctly. Turning it
+  into an exception is the trade that rule asks for.
+
+  MUTATION: making the detector never fire reddens
+  ASecondOperationArrivingMidFlightIsRefused and nothing else -- and nothing
+  else SHOULD redden, because a correct caller never trips it.
+
+  The test that makes "mid-flight" a place rather than a hope: a source that
+  blocks inside a read, armed only after the table is open, so the intruding
+  thread arrives at a known point instead of a lucky one.
+
+===========================================================================
+  1331 tests green (765 + 566), up 6 across the sub-step.

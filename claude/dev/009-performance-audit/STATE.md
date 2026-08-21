@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 to 6
-of seven are done
-**Current sub-step:** [`PLAN.md`](PLAN.md) step 7, the threading contract and its detector. Not begun.
+**Status:** in progress — **every sub-step is done**; what is left is closing the step: the ADR entries
+`PLAN.md` promised, `SUMMARY.md`, and `PORTING-PLAN.md` §5
+**Current sub-step:** none. Sub-steps 1 to 7 are complete.
 
 ## Done so far
 
@@ -36,8 +36,8 @@ The remediation:
       [`results-refresh.txt`](results-refresh.txt). `Flush` waits for `WRITE`, because nothing is dirty
       yet
 
-- [ ] 7 — the threading contract in the docs, and the `Interlocked` detector that makes a violation
-      throw instead of returning someone else's record (independent of 4–6)
+- [x] 7a — the lock inside shared residency, which closed a real race — and 7b, the threading contract
+      with its detector — [`results-concurrency.txt`](results-concurrency.txt)
 
 **Stoppable after 3** with all the CPU work done and the cache still owed — **and that is where we
 are.**
@@ -324,6 +324,32 @@ times, and the same step after forgetting must read it. And only the *index* fil
 a tag-order walk visits scattered records, so the record window misses regardless.
 
 **1325 tests** green (759 + 566).
+
+### Sub-step 7, done 2026-08-21
+
+**It had two halves, and the first one closed a race that existed.** Before it, the library contained
+**no synchronisation of any kind**, and the engine's cache is shared by every file it opens — which the
+contract "do not use a *table* concurrently" does not cover, because two tables of one engine queried in
+parallel is ordinary. Removing the lock again makes `SharedCacheConcurrencyTests` fail **both** tests in
+462 ms, every time: the race was real, reachable and cheap to provoke.
+
+**What the lock costs, and how to read it.** Against the pre-lock run: `Go(n)`+`Skip(1)` went 86 → 104 ns
+while *everything else got cheaper*, uncached included (seek 9 386 → 8 458). The machine was ~10% faster
+in that process, and that variance swamps almost everything — so the one figure moving *against* the
+trend is the signal: **~9 ns per cached window service**, an uncontended acquisition. 17% of a `Go`+`Skip`
+pair, ~1% of a seek, invisible in a walk. Splitting the lock would not reduce it (what was measured is
+the acquisition, not the serialisation), so it is recorded rather than optimised.
+
+**The detector is not a lock and says so**: interlocked claim on each of `Table`'s 22 entry points,
+re-entrant for the holding thread because `Refresh` calls `DropCachedBlocks`, and able to miss a racer
+arriving in the same instant. A smoke alarm, not a fire door — and worth having only because of the
+ground rule: a missing caller lock otherwise produces a wrong record set silently, with every individual
+call behaving correctly.
+
+The test that makes "mid-flight" a place rather than a hope: a source that **blocks inside a read**,
+armed only after the table is open, so the intruding thread arrives at a known point.
+
+**1331 tests** green (765 + 566).
 
 ## A defect found on the way, and deliberately not fixed here
 

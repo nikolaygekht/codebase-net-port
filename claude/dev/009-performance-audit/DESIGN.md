@@ -420,6 +420,23 @@ changes shape.
     pinned to the block size. Bigger windows then mean fewer, larger reads, which is the direction the
     audit's syscall counting points in.
 
+    **What sizes actually occur, since the pool's shape should follow the files and not the format's
+    permissions:**
+
+    | | in practice | source |
+    |---|---|---|
+    | CDX tree block | **always 512** | the S4FOX `i4create` branch writes no `codeBaseNote`, no `blockSize`, no `multiplier`; the `blockChunks = memSizeBlock/512` line that would make it 1024 is in the `#else /* S4FOX else */` branch, the build this port ignores (`i4create.c:1237`). All five corpus indexes are 512 |
+    | FPT memo block | **multiples of 512, default 512** | `blockSize = c4->memSizeMemo` (`m4create.c:68`), rounded up to a multiple of 512 when it is not one (`m4create.c:45-46`), max 512×63 = 32256, and 16384 under `E4MISC`. **Caveat:** Visual FoxPro's own default for a new table is 64, which is a *read* case with no citation in this repository — verify against a real VFP file rather than trusting this line |
+    | DBF | **no blocks at all** | a `recordLength` from the header, aligned to nothing, and routinely wider than any window — straddling is required regardless |
+
+    So a non-512 index is permitted, honoured on read, and effectively never met. **Which turns the
+    window size into a free parameter rather than a compromise:** since every real block is 512, a 4 KB
+    window holds eight of them and one read serves a whole cluster. Whether that pays is a *hypothesis
+    to measure in sub-step 5*, not a conclusion — a bigger window trades read amplification for fewer
+    misses, and the audit priced a read at 1.18–1.21 µs largely independent of its size, so it depends
+    on locality: the upper levels of a tree sit near the start of the file and share a window, while
+    leaves are scattered.
+
     Two consequences to keep in view: the exact-size invariant disappears (an oversized buffer is
     correct by construction, so `ArrayPool<byte>.Shared` becomes admissible after all — it was out only
     while `block.Length` was the truth), and the residency unit becomes the *window*, so eviction

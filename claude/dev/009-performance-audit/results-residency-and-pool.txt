@@ -1,0 +1,92 @@
+009-performance-audit -- sub-step 4, the eviction rule and the pool
+
+Nothing is wired up: no source, no keying, no caller. What lands is the part
+that can be WRONG rather than slow, proved with no file, no disk and no clock.
+
+1. WHAT WAS PORTED, AND WHAT WAS DEFERRED BEHIND A SEAM
+
+  The reference's policy is a good deal more than five LRU lists
+  (o4opt.c:903-1000, o4opt.c:1017-1028):
+
+    kept   the FIVE LISTS, and the order a victim is looked for in --
+           other, dbfLo, indexLo, dbfHi, indexHi, which is prio[0]..prio[4] at
+           D4OPT.C:324-328. That order IS the property: a table scan gives up
+           its own blocks before it touches the index tree, and the tree's
+           interior nodes go last of all.
+    kept   the lists as intrusive doubly-linked chains over arrays, so admit,
+           touch and choose are each a few writes. NOT simplified to a scan:
+           at ~1800 slots a scan per miss would cost more than the cache saves.
+    kept   pinning -- the one rule here that is about correctness.
+    kept   interior-vs-leaf classification, which the reference reaches by
+           sniffing the block's bytes (b4dataLeaf, o4opt.c:1096-1120) and this
+           port takes from the caller, who has just parsed the header.
+
+    deferred  availability marking with its priority counting system and the
+              `selected` protocol; list normalisation by average length;
+              per-block hitCount/readTime/accessTime scoring; promotion of a
+              data block from dbfLo to dbfHi by hit rate.
+
+  WHY THE DEFERRED HALF IS BEHIND AN INTERFACE AND NOT JUST OMITTED: those are
+  speed heuristics -- they change which block is given up, never what a read
+  returns -- and speed is the only reason this step exists, so writing them off
+  by assertion would be exactly the mistake this step keeps catching itself in.
+  IBlockResidency is the seam the faithful policy arrives through, and the two
+  get MEASURED against each other. It is an interface because a second
+  implementation is planned, not in case one is.
+
+  NOT built: a factory. With one implementation a factory is the speculative
+  half; the constructor already takes an IBlockResidency, so the choice is one
+  line whenever the second exists.
+
+2. WHAT LANDED
+
+  IO/BlockPriority.cs    the five, in the reference's search order
+  IO/IBlockResidency.cs  the seam: Admit, Touch, Pin, Unpin, Forget,
+                         TryFindFree, TryChooseVictim
+  IO/BlockResidency.cs   five intrusive LRU lists, O(1) per operation
+  IO/BlockPool.cs        Capacity buffers of one size, allocated once;
+                         TryClaim / At / Touch / Claim / Release / Drop
+
+  Pins are COUNTED, not a flag, and that corrects something said earlier in
+  this step: "the owner is exactly one, so no refcount". Two cursors on one tag
+  can sit on the same block and each holds it in its own right, so the count is
+  needed. It is not a general reference-counting scheme -- only the answer to
+  "is anybody still in there".
+
+  One size per pool and no size logic anywhere: a block size is fixed for the
+  file it belongs to. Block carries the length beside the buffer regardless, so
+  an oversized buffer would be correct -- a safety net, not a licence to mix.
+
+3. THE GATE
+
+  dotnet test green at 1246 tests (718 + 528), up 39: 21 residency, 18 pool.
+  No golden expectation changed, and no behaviour changed anywhere, because
+  nothing calls any of this yet.
+
+  Among them, two that are not cases but attacks:
+
+    TheInvariantsSurviveThousandsOfRandomOperations -- 20 000 random
+    operations at a fixed seed, checking after every one that no victim is
+    pinned, no victim is empty, the resident count matches, and a victim exists
+    whenever anything unpinned is resident. Cases prove the rules somebody
+    thought of; this looks for the interleavings nobody did.
+
+    ServingBlocksAllocatesNothing -- 1000 claim/touch/release cycles must
+    allocate exactly ZERO bytes. That is what the pool is for, and it is
+    measured rather than asserted.
+
+4. MUTATIONS (DEV_APPROACH.md 4, restored from a checksummed copy)
+
+  search the priority lists from the highest downwards
+    -> 3 tests: VictimsComeOutInTheReferencesPriorityOrder,
+       ATableScanCannotEvictTheIndexTree, AnIndexBlockSurvivesAScanOverData-
+       Blocks. Exactly the plan's prediction, "the layer-1 eviction tests only".
+
+  ignore pins when choosing a victim
+    -> 7 tests, including the randomised run, which caught it on its own. This
+       is the mutation that would be a wrong record set in production.
+
+  BOTH LEFT THE GOLDEN SUITE GREEN, and that is not a gap -- it is the plan's
+  own prediction for a sub-step that wires nothing up. It does mean these
+  layer-1 tests are the ONLY thing standing behind this code until sub-step 5
+  gives it a caller.

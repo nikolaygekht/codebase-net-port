@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1, 2 and
-3 of seven are done
-**Current sub-step:** [`PLAN.md`](PLAN.md) step 4, `BlockResidency` and `BufferPool`. Not begun.
+**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 to 4
+of seven are done
+**Current sub-step:** [`PLAN.md`](PLAN.md) step 5, wiring the cache up. Not begun.
 
 ## Done so far
 
@@ -27,7 +27,8 @@ The remediation:
       [`results-compare-in-place.txt`](results-compare-in-place.txt)
 - [x] 3 — the padded comparison: measured at 2.34×, and fixed —
       [`results-padded-comparison.txt`](results-padded-comparison.txt)
-- [ ] 4 — `BlockResidency` + `BlockPool`, proved with no source attached
+- [x] 4 — `Block`, `BlockPriority`, `IBlockResidency`, `BlockResidency`, `BlockPool` — proved with no
+      source attached — [`results-residency-and-pool.txt`](results-residency-and-pool.txt)
 - [ ] 5 — wire the cache up: `BlockCacheMode`, `CachingSourceFactory`, `DropCachedBlocks()`, and the
       **layer-5 2× speed-up gate** (reads, wall clock)
 - [ ] 6 — `Table.Refresh()` and the `Invalidate` / `Flush` hooks §3.7 will call
@@ -141,6 +142,40 @@ no allocation, no contract change. The narrow cases keep the loop and need it.
 **Mutation:** comparing only the content bytes reddens 6 seek goldens and 2 `KeySearchTests`. Worth
 separating two things — **the corpus does test this rule** (those goldens are landings checked against
 the C library); what was missing was a *measurement*, not a test.
+
+### Sub-step 4, done 2026-08-21
+
+**Nothing is wired up, by design.** What landed is the part that can be *wrong* rather than slow:
+`IO/Block.cs`, `BlockPriority`, `IBlockResidency`, `BlockResidency` (five intrusive LRU lists, O(1) per
+operation) and `BlockPool` (buffers of one size, allocated once, claim/release). Details in
+[`results-residency-and-pool.txt`](results-residency-and-pool.txt).
+
+**The reference's order is taken verbatim and it is citable**: `other`, `dataLow`, `indexLow`,
+`dataHigh`, `indexHigh` — `prio[0]`…`prio[4]` at **`D4OPT.C:324-328`**, found only after searching
+case-insensitively, which is the mixed-case-filename trap `CLAUDE.md` warns about. That order *is* the
+property: a table scan cannot evict the index tree.
+
+**The heuristics are deferred behind `IBlockResidency`, not written off** — availability marking with
+its priority counting system, list normalisation by average length, hit-count and access-time scoring,
+dbfLo→dbfHi promotion. They change which block is given up, never what a read returns; and since speed
+is the only reason this step exists, "probably not worth it" is not a finding. The second
+implementation is planned and the two get measured against each other. **No factory**: with one
+implementation that is the speculative half, and the constructor already takes the interface.
+
+**A correction to something said earlier in this step.** I claimed rent/return needs no refcount
+because "the owner is exactly one". Wrong: two cursors on one tag can sit on the same block, so **pins
+are counted**. Small, bounded by parked readers, and not a general refcounting scheme — but it is a
+count.
+
+`dotnet test` green at **1246 tests** (718 + 528), up 39. Two of them are attacks rather than cases: a
+**20 000-operation randomised run** at a fixed seed checking the invariants after every operation, and
+`ServingBlocksAllocatesNothing`, which requires 1000 claim/touch/release cycles to allocate **exactly
+zero** bytes.
+
+**Mutations, both localised as the plan predicted:** reversing the priority scan reddens exactly 3
+tests; ignoring pins reddens 7, including the randomised run, which found it unaided. **Both left the
+golden suite green** — which is the plan's own prediction for a sub-step that wires nothing up, and
+means these layer-1 tests are the only thing standing behind this code until sub-step 5.
 
 ## Notes for the next session
 

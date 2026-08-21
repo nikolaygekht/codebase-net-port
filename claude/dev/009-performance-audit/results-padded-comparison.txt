@@ -1,0 +1,99 @@
+009-performance-audit -- sub-step 3, the padded comparison
+
+The plan said: measure first, then fix or write down that it did not matter.
+It mattered, and the fix turned out cheaper than the plan expected.
+
+1. WHAT THE BRANCH IS, AND WHY IT WAS NEVER MEASURED
+
+  KeySearch.Compare has two rules. A value with no trailing pad is a PREFIX and
+  is compared with SequenceCompareTo, which is vectorized. A value that carried
+  trailing pad stands for the WHOLE KEY, and that path was a byte-at-a-time
+  loop rebuilding the comparand as it went:
+
+      byte mine = i < Length ? value[i] : padByte ;
+
+  Every query in the audit filled its key exactly -- PERF10K's names are 20
+  characters in a C(20) field, by deliberate design of that case -- so
+  content == length, ComparesPadded was false, and the scalar branch was never
+  entered by any measurement. It is not an exotic branch: a real
+  Seek("SMITH") takes it, because TableTagCursor.SearchFor sets
+  length = into.Length for a non-prefix character value and FILLS THE REST OF
+  THE BUFFER WITH THE PAD BYTE (Dbf/TableTagCursor.cs:89-92).
+
+2. THE MEASUREMENT (Windows, 20-byte keys, 256 comparisons per invocation)
+
+  prefix rule, SequenceCompareTo                    2.592 ns
+  padded rule, scalar loop (was)                    6.052 ns   2.34x
+  padded rule, the library now                      2.770 ns
+  padded rule, whole-buffer compare (hand-written)  2.389 ns
+
+  So the padded rule cost 2.34x the prefix rule for the same twenty bytes, and
+  the fix takes it to within 0.4 ns of a hand-written floor -- what is left is
+  KeySearch's own overhead and nothing more. 3.28 ns saved per comparison, and
+  a four-level character seek makes about 21 of them: ~69 ns per seek.
+
+3. THE FIX IS NOT WHAT THE PLAN EXPECTED, AND IS BETTER
+
+  PLAN.md and DESIGN.md both proposed "build the comparand to key width once
+  per search", and DESIGN.md flagged the problem with it: Into BORROWS the
+  caller's buffer and documents that the caller must not write to it, so
+  writing pad into it needs either a widened contract or a buffer the search
+  owns -- one allocation per search being an acceptable trade, twenty-one not.
+
+  None of that is necessary. THE BUFFER ALREADY HOLDS THE PADDED COMPARAND:
+  SearchFor filled it, and Into found the pad by STRIPPING it, so every byte
+  from Length to the original width is exactly the pad byte the loop was
+  synthesizing. Remembering the original width is enough:
+
+      if (paddedWidth == keyLength && key.Length >= keyLength)
+          return key[..keyLength].SequenceCompareTo(value.AsSpan(0, keyLength));
+
+  No write, no allocation, no contract change, one new int field. The narrow
+  cases keep the loop, and they need it: a caller that filled fewer bytes than
+  the key length has no pad stored past its own width, and a stored key
+  shorter than the key length must be compared over what there is.
+
+4. THE GATE
+
+  dotnet test green at 1197 tests, no golden expectation changed.
+
+  MUTATION (DEV_APPROACH.md 4, restored from a checksummed copy): make the fast
+  path compare only the content bytes, dropping the pad from the comparison.
+
+    -> 6 seek goldens (Seek_LandsWhereTheCLibraryLanded,
+       SeekExact_FindsEveryEntryTheTagHolds, SeekNext_WalksTheRunTheCLibrary-
+       Walked, SeekLastThenPrevious_IsSeekThenNextReversed,
+       SeekAtOrBefore_AndSeekLandOnAdjacentEntriesOrBracketTheRun,
+       SeekAtOrAfter_AValueNoRecordHolds_LandsOnTheNextOneUpAndSaysSo)
+       and 2 KeySearchTests (For_AValueWithTrailingPadStandsForTheWholeKey,
+       For_ThePadByteIsTheTagsOwnAndNotAlwaysASpace).
+
+  WORTH SEPARATING TWO THINGS: the corpus DOES exercise the padded rule -- the
+  goldens above are landings checked against the C library's own. What was
+  missing was a measurement of it, not a test of it. "Never measured" and
+  "never tested" are different gaps and this branch had only the first.
+
+5. WHERE IT SHOWS AND WHERE IT DOES NOT
+
+  ~69 ns against a RAM-backed descent of ~530 ns is ~13%. Against a file-backed
+  seek of 9 189 ns it is 0.8%, which is the same story as sub-step 2: while a
+  seek is five read syscalls, nothing done to the descent's CPU is visible.
+  Both of these land when P1 does.
+
+  End to end after the fix, with the new short-value arm the plan asked for:
+
+    tag walk, per record                     1.190 us     129 B
+    seek, C(20) full key                     9.136 us   2 760 B
+    seek, short C(20) value, padded rule     8.106 us   2 752 B
+    seek, N(12,2)                            7.533 us   2 128 B
+    Go(n) then Skip(1), per pair             2.004 us       0 B
+
+  READ THE SHORT ARM CAREFULLY: it is FASTER than the full-key arm, and that is
+  not the rule being cheaper -- it is less work. A short value finds nothing, so
+  the seek never reads the record. 9.136 - 8.106 = 1.03 us, which is one record
+  read and matches the audit's measured 1.18-1.21 us per read. The two arms are
+  therefore NOT comparable with each other; the short one is a baseline for
+  future changes to this rule and proof the branch is exercised at all.
+
+  Allocation confirms the other half of sub-step 2 as well: 2 760 B and 2 128 B
+  per seek, down the 48 and 32 bytes that TagCursor.MatchesHere removed.

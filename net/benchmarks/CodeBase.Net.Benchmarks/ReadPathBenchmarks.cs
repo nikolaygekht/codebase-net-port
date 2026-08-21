@@ -42,6 +42,7 @@ public class ReadPathBenchmarks
     private Tag byAmount = null!;
     private FieldDefinition id = null!;
     private string[] names = null!;
+    private string[] shortNames = null!;
     private double[] amounts = null!;
     private int[] recordNumbers = null!;
 
@@ -83,6 +84,7 @@ public class ReadPathBenchmarks
             throw new InvalidOperationException($"PERF10K holds {keys.Count} records, expected {Records}.");
 
         names = new string[Queries];
+        shortNames = new string[Queries];
         amounts = new double[Queries];
         recordNumbers = new int[Queries];
 
@@ -90,6 +92,7 @@ public class ReadPathBenchmarks
         {
             int scrambled = (i * QueryStride) % Queries;
             names[i] = keys[scrambled];
+            shortNames[i] = keys[scrambled][..12];
             amounts[i] = values[scrambled];
             recordNumbers[i] = scrambled + 1;      // record numbers are one-based
         }
@@ -138,6 +141,32 @@ public class ReadPathBenchmarks
         for (int i = 0; i < Queries; i++)
         {
             if (table.Seek(names[i]) == GoResult.Ok)
+                checksum += table.GetInt32(id);
+        }
+
+        return checksum;
+    }
+
+    /// <summary>
+    /// Seeks with values narrower than the key, which is the comparison rule the audit never measured.
+    /// </summary>
+    /// <returns>The sum of the ID field over every record found.</returns>
+    /// <remarks>
+    /// A non-prefix character value is padded out to the key width before the search runs
+    /// ([c]TableTagCursor.SearchFor[/c]), so a short value takes [c]KeySearch[/c]'s padded rule — the
+    /// one every query in the audit avoided, because PERF10K's names fill their field exactly. These
+    /// values are the first twelve bytes of stored names, so they find nothing: the padded rule runs
+    /// over the whole key width either way, and a miss is a real workload the audit measured too.
+    /// </remarks>
+    [Benchmark(OperationsPerInvoke = Queries, Description = "seek, short C(20) value, padded rule")]
+    public long SeekShortCharacter()
+    {
+        long checksum = 0;
+
+        table.SelectTag(byName);
+        for (int i = 0; i < Queries; i++)
+        {
+            if (table.Seek(shortNames[i]) == GoResult.Ok)
                 checksum += table.GetInt32(id);
         }
 

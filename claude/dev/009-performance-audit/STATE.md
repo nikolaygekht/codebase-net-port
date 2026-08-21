@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1 and 2
-of six are done
-**Current sub-step:** [`PLAN.md`](PLAN.md) step 3, the padded comparison. Not begun.
+**Status:** in progress — the audit is closed and its remediation is **under way**: sub-steps 1, 2 and
+3 of seven are done
+**Current sub-step:** [`PLAN.md`](PLAN.md) step 4, `BlockResidency` and `BufferPool`. Not begun.
 
 ## Done so far
 
@@ -25,13 +25,18 @@ The remediation:
 - [x] 2 — compare in place (`LeafBlock.CompareAt`, `BranchBlock.ChildAt`, span compare in `Seek`),
       with the layer-5 allocation ceiling as its gate —
       [`results-compare-in-place.txt`](results-compare-in-place.txt)
-- [ ] 3 — the padded comparison: measure, then fix or write down that it did not matter
+- [x] 3 — the padded comparison: measured at 2.34×, and fixed —
+      [`results-padded-comparison.txt`](results-padded-comparison.txt)
 - [ ] 4 — `BlockResidency` + `BlockPool`, proved with no source attached
 - [ ] 5 — wire the cache up: `BlockCacheMode`, `CachingSourceFactory`, `DropCachedBlocks()`, and the
       **layer-5 2× speed-up gate** (reads, wall clock)
 - [ ] 6 — `Table.Refresh()` and the `Invalidate` / `Flush` hooks §3.7 will call
 
-**Stoppable after 3** with all the CPU work done and the cache still owed.
+- [ ] 7 — the threading contract in the docs, and the `Interlocked` detector that makes a violation
+      throw instead of returning someone else's record (independent of 4–6)
+
+**Stoppable after 3** with all the CPU work done and the cache still owed — **and that is where we
+are.**
 
 ### Sub-step 1, done 2026-08-21
 
@@ -109,6 +114,33 @@ true of the caller outside, and it missed the cursor's own five compare-and-disc
 `DupCount` reddens the equivalence test, 52 goldens and the find-guard; `ChildAt` reading the record
 number reddens the equivalence test, 36 seek/cursor tests and 53 goldens. Restored from checksummed
 copies, never from `git` (`DEV_APPROACH.md` §4).
+
+### Sub-step 3, done 2026-08-21
+
+**It mattered, and the fix was cheaper than the plan expected.** Full numbers in
+[`results-padded-comparison.txt`](results-padded-comparison.txt).
+
+| rule, 20 bytes, per comparison | ns |
+|---|---|
+| prefix, `SequenceCompareTo` | 2.592 |
+| **padded, scalar loop (was)** | **6.052** — 2.34× |
+| **padded, the library now** | **2.770** |
+| padded, hand-written floor | 2.389 |
+
+3.28 ns saved per comparison, ~21 comparisons per character seek, so **~69 ns a seek** — ~13% of a
+RAM-backed descent and 0.8% of a file-backed one, the same shape as sub-step 2.
+
+**The plan proposed the wrong fix and `DESIGN.md` had already spotted why it was awkward**: "build the
+comparand to key width once per search" runs into `Into` *borrowing* the caller's buffer, so writing
+pad into it needs a widened contract or a buffer the search owns. None of that is needed — **the buffer
+already holds the padded comparand.** `SearchFor` fills it (`TableTagCursor.cs:89-92`) and `Into` finds
+the pad by *stripping* it, so every byte from `Length` to the original width is exactly the pad the
+loop was synthesizing. Remembering the original width is the whole change: one `int` field, no write,
+no allocation, no contract change. The narrow cases keep the loop and need it.
+
+**Mutation:** comparing only the content bytes reddens 6 seek goldens and 2 `KeySearchTests`. Worth
+separating two things — **the corpus does test this rule** (those goldens are landings checked against
+the C library); what was missing was a *measurement*, not a test.
 
 ## Notes for the next session
 

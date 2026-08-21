@@ -20,6 +20,8 @@ internal static class Program
         {
             BenchmarkRunner.Run<ReadPathBenchmarks>();
             BenchmarkRunner.Run<DescentBenchmarks>();
+            BenchmarkRunner.Run<RamDescentBenchmarks>();
+            BenchmarkRunner.Run<KeyComparisonBenchmarks>();
         }
         else
         {

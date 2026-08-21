@@ -28,11 +28,22 @@ internal readonly struct KeySearch
     private readonly byte padByte;
     private readonly int keyLength;
 
-    private KeySearch(byte[] value, int length, int keyLength, byte padByte, bool comparesPadded)
+    /// <summary>
+    /// How many bytes of the buffer the caller filled, pad included.
+    /// </summary>
+    /// <value>
+    /// [c]Length[/c] with its trailing pad put back. When this is the key length the buffer already
+    /// holds the comparand a padded comparison needs, which is what lets that comparison be one
+    /// vectorized call instead of a loop — see [c]Compare[/c].
+    /// </value>
+    private readonly int paddedWidth;
+
+    private KeySearch(byte[] value, int length, int keyLength, byte padByte, bool comparesPadded, int paddedWidth)
     {
         this.value = value;
         this.padByte = padByte;
         this.keyLength = keyLength;
+        this.paddedWidth = paddedWidth;
         Length = length;
         ComparesPadded = comparesPadded;
     }
@@ -109,7 +120,8 @@ internal readonly struct KeySearch
             allPad ? length : content,
             keyLength,
             padByte,
-            comparesPadded: content < length);
+            comparesPadded: content < length,
+            paddedWidth: length);
     }
 
     /// <summary>
@@ -133,7 +145,18 @@ internal readonly struct KeySearch
                 : key.SequenceCompareTo(Bytes);
         }
 
-        // The pad bytes take part, so the comparison runs the whole width of the key.
+        // The pad bytes take part, so the comparison runs the whole width of the key — and where the
+        // caller filled the buffer to that width, the comparand is already sitting in it. Into found
+        // the pad by stripping it, so every byte from Length to paddedWidth is the pad byte the loop
+        // below would synthesize; comparing the buffer whole is the same answer in one vectorized
+        // call. Measured at 5.898 ns against 2.069 ns per comparison, which is ~80 ns of a 21-key
+        // seek (claude/dev/009-performance-audit/results-padded-comparison.txt).
+        if (paddedWidth == keyLength && key.Length >= keyLength)
+            return key[..keyLength].SequenceCompareTo(value.AsSpan(0, keyLength));
+
+        // The narrow cases keep the loop, because the buffer does not hold what they need: a caller
+        // that filled fewer bytes than the key length has no pad stored past its own width, and a
+        // stored key shorter than the key length must be compared over what there is.
         int width = Math.Min(key.Length, keyLength);
 
         for (int i = 0; i < width; i++)
@@ -193,7 +216,7 @@ internal readonly struct KeySearch
             {
                 next[i]++;
                 incremented = new KeySearch(
-                    next, next.Length, keyLength, padByte, comparesPadded: false);
+                    next, next.Length, keyLength, padByte, comparesPadded: false, paddedWidth: next.Length);
                 return true;
             }
 

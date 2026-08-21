@@ -11,7 +11,7 @@
 **[closed](claude/dev/008-seek-by-value/SUMMARY.md)**: a table can be asked where a value is, and
 **no navigation path refuses any more** — ADR-34 closed the last one.
 **`COLLATION` is done, `CDX-READ` is done, and risk R2 is retired.**
-**Next session starts at `PLAN.md` sub-step 3** — the padded comparison — of six, two executed. Step **010, `EXPR`**
+**Next session starts at `PLAN.md` sub-step 4** — `BlockResidency` and `BufferPool` — of seven, three executed. Step **010, `EXPR`**
 is [designed](claude/dev/010-expr/DESIGN.md) and follows it. **The performance pass now has numbers
 instead of guesses**, and the block cache is measured to be worth an order of magnitude here too.
 

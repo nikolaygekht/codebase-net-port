@@ -25,6 +25,16 @@ internal sealed class MemoReader
     /// </value>
     private const uint MaximumLength = 0x7FFFFFF0;
 
+    /// <summary>
+    /// The declared payload length above which the file is asked whether it really holds that much.
+    /// </summary>
+    /// <remarks>
+    /// Not a limit on a memo entry: a longer one is read, it is only checked against the file first.
+    /// The value is a balance and nothing more — large enough that no ordinary entry pays a syscall,
+    /// small enough that a buffer allocated for a corrupt claim and then thrown away costs nothing.
+    /// </remarks>
+    private const uint LengthWorthAsking = 64 * 1024;
+
     private readonly IRandomAccessSource source;
     private readonly int blockSize;
     private readonly bool mayHaveCompressedMemos;
@@ -80,14 +90,10 @@ internal sealed class MemoReader
 
         long offset = OffsetOf(blockNumber);
 
-        if (offset < 0 || offset > source.Length - MemoBlockHeader.Size)
-        {
-            throw new CodeBaseException(
-                ErrorCode.Data,
-                $"{what} refers to memo block {blockNumber}, whose header would be at offset " +
-                $"{offset} of a file {source.Length} bytes long.");
-        }
-
+        // A block past the end of the file is caught by the header read failing, not by asking the file
+        // its length first: that question is a syscall and this method is on the memo path for every
+        // field access (ADR-35, and results-length-syscall.txt section 7 for what it cost here). The
+        // header is a fixed few bytes, so nothing is sized from the file before the read.
         MemoBlockHeader header = MemoBlockHeader.Parse(ReadBlockHeader(offset, blockNumber));
 
         if (header.Type == MemoType.Compressed)
@@ -103,7 +109,14 @@ internal sealed class MemoReader
                     : "The table does not declare compressed memos, so this entry is unexpected."));
         }
 
-        if (header.Length > MaximumLength || header.Length > source.Length - offset - MemoBlockHeader.Size)
+        // Unlike the header, the payload's size comes out of the file and sizes an allocation, so it
+        // cannot simply be left to the read: a corrupt header claiming half a gigabyte would have the
+        // buffer allocated before the read came up short. A claim small enough that a wasted buffer
+        // costs nothing is left to the read; only a claim big enough to matter is worth the syscall
+        // that refuses it.
+        if (header.Length > MaximumLength ||
+            (header.Length > LengthWorthAsking &&
+             header.Length > source.Length - offset - MemoBlockHeader.Size))
         {
             throw new CodeBaseException(
                 ErrorCode.Data,
@@ -160,8 +173,9 @@ internal sealed class MemoReader
         {
             throw new CodeBaseException(
                 ErrorCode.Data,
-                $"Reading memo block {blockNumber} needed {failure.Needed} bytes at offset " +
-                $"{failure.Offset} but the file gave {failure.Got}.",
+                $"Memo block {blockNumber} declares {failure.Needed} bytes at offset " +
+                $"{failure.Offset} and the file gave {failure.Got}. The memo file is shorter than " +
+                "its entries claim.",
                 failure);
         }
     }

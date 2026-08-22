@@ -1033,6 +1033,19 @@ than before the attempt. Nothing is padded — a short read has never been allow
 guarantee is the same. Removing the translating `catch` reddens **four** tests, up from one before,
 because the short-read path is now the only path and more cases run through it.
 
-**Where the same defect remains**, each owed its own measurement: `NodeReader.BlockCount` (consulted
-per leaf-chain crossing, ~25% of a cached walk) and `MemoReader` (twice per memo read, ~1.7 µs per
-memo field).
+**Applied at the other two sites the same day**, each measured separately:
+
+- **`NodeReader.BlockCount`**, consulted per leaf-chain crossing. Here the bound *cannot* go — it is
+  007-audit-glm's cycle guard, and a run of empty blocks is legitimate and can be long, so a constant
+  will not do. What moved is **when** it is asked: deferred until a run passes 64 blocks, then read
+  once. Cached walk 156 → 111 ns.
+- **`MemoReader`**, twice per read. The header check goes outright. **The payload check stays**, and
+  that exception is the useful part of this ADR: its length comes out of the file and it *sizes an
+  allocation*, so leaving it to the read would let a corrupt header claiming half a gigabyte allocate
+  half a gigabyte before failing. The file is asked only above 64 KB, where the syscall is worth
+  paying. Memo read 3 329 → 343 ns — **the memo path was 90% metadata syscall**, and nothing had ever
+  measured it.
+
+**The rule this generalises to**, since it is the part worth remembering: *let the read be the
+refusal — unless the value being checked sizes an allocation.* A fixed-size read can fail safely; one
+whose length the file supplies cannot.

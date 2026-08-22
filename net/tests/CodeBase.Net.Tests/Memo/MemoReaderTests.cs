@@ -211,6 +211,44 @@ public sealed class MemoReaderTests
     /// <summary>
     /// Builds a memo file holding one entry at the given block.
     /// </summary>
+    [Trait("Layer", "Performance")]
+    [Fact]
+    public void Read_OfALargeClaimInASmallFile_IsRefusedWithoutAllocatingIt()
+    {
+        // The reason the payload's length is checked against the file at all, rather than left to the
+        // read the way the header is (ADR-35). A length that comes out of the file sizes an
+        // allocation: SourceReader allocates before it reads, so a corrupt header claiming a quarter
+        // of a gigabyte would have the buffer taken and thrown away. Below the threshold that is
+        // nothing and the read refuses it; above it, this must not happen at all.
+        //
+        // The assertion is on bytes allocated, not on the message, because both routes now refuse
+        // with the same sentence -- and the whole point of the check is what it avoids doing, which
+        // no message can show.
+        const uint Claim = 256 * 1024 * 1024;
+
+        byte[] image = new byte[1024];
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(512), (uint)MemoType.Text);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(516), Claim);
+
+        MemoReader reader = new(new InMemorySource(image), 512, false);
+
+        Action act = () => reader.Read(1, "a field");
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Data);
+
+        // Measured on a second call, so the exception machinery's own one-off costs are not charged to
+        // the refusal. A generous ceiling on purpose: it has to separate "a few kilobytes of message"
+        // from "a quarter of a gigabyte", and nothing in between is interesting.
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        act.Should().Throw<CodeBaseException>();
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        allocated.Should().BeLessThan(
+            1024 * 1024,
+            "refusing a {0}-byte claim must not begin by allocating {0} bytes",
+            Claim);
+    }
+
     private static byte[] Image(
         int block, byte[] payload, MemoType type = MemoType.Text, int blockSize = 512)
     {

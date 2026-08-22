@@ -11,6 +11,8 @@
 `RandomAccess.GetLength` per block read, four per descent with the cache warm, 87% of its cost
 (**ADR-35**, [`results-length-syscall.txt`](claude/dev/009-performance-audit/results-length-syscall.txt)).
 A cached seek is **732 ns** against 3 885, and **the audit's predicted 11.6× for the block cache is met**.
+The same call was in two more places: a cached walk is **114 ns** against 146, and **a memo read 343 ns
+against 3 329 — the memo path was 90% metadata syscall and had never been measured at all**.
 Against the C library the port is **~1.85× on CPU-bound work and at parity or better when the work is
 I/O**, and a seek is **5.41×** a plain `Go`+`Skip` where the C's own ratio is 5.84×.
 [`008-seek-by-value`](claude/dev/008-seek-by-value/) is

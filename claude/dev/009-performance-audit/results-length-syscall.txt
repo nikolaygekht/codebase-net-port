@@ -183,22 +183,91 @@ explained away". This is the explanation. It was not the cache.
   layer", both wrong). This is the third and it is left open.
 
 ===========================================================================
-7. STILL OWED -- THE SAME DEFECT, TWO MORE PLACES
+7. THE SAME DEFECT, THE OTHER TWO PLACES -- DONE, same day
 
-  NodeReader.BlockCount (Cdx/NodeReader.cs:41) is source.Length / BlockSize, and
-  StepPhysical consults it on every leaf-chain crossing. A cached walk still
-  makes 0.043 Length queries per record -- one per ~23 records -- which at
-  ~850 ns is ~37 ns of its 145, about a QUARTER of a cached walk.
+  NodeReader.ReadAt was one of three sites. The other two are fixed the same way
+  and measured separately, which is why they were not folded into section 4.
 
-  MemoReader (Memo/MemoReader.cs:83, :106) asks TWICE per memo read, so every
-  memo field costs ~1 700 ns of metadata syscall. Nothing has ever measured the
-  memo path.
+  NodeReader.BlockCount (source.Length / BlockSize) is consulted by
+  TagCursor.StepPhysical on every leaf-chain crossing, so a cached walk asked
+  0.043 times per record -- once per ~23 records, one leaf's worth of keys.
 
-  Both are the same fix. Neither is done here, so that each gets its own
-  before-and-after rather than being folded into this one.
+  THE BOUND COULD NOT SIMPLY GO. It is the cycle guard 007-audit-glm added: a
+  run of empty blocks is legitimate and can be long, so the bound cannot be a
+  constant, and the file's own block count is the only honest one. What moved is
+  WHEN it is asked. A crossing normally visits one block, so the question is
+  deferred until the run passes EmptyRunBeforeAskingTheFile (64) and then asked
+  once, into a local. The bound is unchanged; a pathological chain pays one
+  syscall for an answer it is about to need.
 
-  AND THE ITEM THIS PROMOTES. The byte[512] allocated per block read
-  (SourceReader.cs:33) was ~1.5% of a 3 927 ns cached descent and is ~10-20% of
-  a 445 ns one. Handing out the cache's pinned window instead of copying into a
-  fresh array would remove that allocation AND the 14 ns/window copy. It is now
-  the largest remaining item after the leaf scan.
+  MemoReader asked twice per read -- once before the header (:83) and once before
+  the payload (:106). The header check goes outright: it is a fixed few bytes, so
+  the read failing is the refusal, exactly as in NodeReader.
+
+  THE PAYLOAD CHECK STAYS, AND THAT IS THE INTERESTING HALF. Its length comes out
+  of the file and it SIZES AN ALLOCATION -- SourceReader.ReadExactly does
+  new byte[count] before reading -- so leaving it to the read would let a corrupt
+  header claiming half a gigabyte allocate half a gigabyte and then fail. The
+  MaximumLength cap (0x7FFFFFF0) was never the whole guard. So the file is asked
+  only when the claim is big enough to matter: under LengthWorthAsking (64 KB) a
+  wasted buffer costs nothing and the read refuses it, above it the syscall is
+  worth paying. No ordinary memo entry asks.
+
+  SAME SESSION, SAME MACHINE, CodeBase.Net.Profiling:
+
+    arm                       before                  after            ratio
+    walk, per record      156 ns / 0.043 Length   111 ns / 0.000      1.41x
+    memo read           3 329 ns / 3.612 Length   343 ns / 0.000      9.7x
+
+  BenchmarkDotNet on the walk: cached 146.4 -> 114.2 ns, uncached 1 179 -> 1 134.
+
+  THE MEMO PATH WAS 90% METADATA SYSCALL and nobody knew, because nothing had
+  ever measured it -- there is no memo benchmark, and the profiling driver's memo
+  arm was written for this. 3.612 Length queries per read is two reads per record
+  (GetMemoLength then GetMemoBytes), two queries each, averaged down by the
+  records whose memo is absent and read nothing.
+
+  AND THE THRESHOLD GOT THE TEST IT NEEDED. Nothing covered a claim above
+  LengthWorthAsking and below MaximumLength -- the band the new check owns -- and
+  the first mutation tried (an off-by-one on the cap) reddened nothing, because
+  the length clause caught it anyway. So
+  Read_OfALargeClaimInASmallFile_IsRefusedWithoutAllocatingIt asserts on BYTES
+  ALLOCATED and not on the message: both routes now refuse with the same
+  sentence, and what the check exists to avoid is doing the allocation at all,
+  which no message can show. Raising the threshold so the file is never asked
+  reddens it with 268 535 416 bytes allocated against a 1 MB ceiling. 1333 tests.
+
+  ONE TEST MESSAGE CHANGED, no test behaviour did.
+  Read_OfAPayloadRunningPastTheEndOfTheFile_IsRefused asserts "*shorter than its
+  entries claim*" on a 1 000-byte claim -- which is now under the threshold, so
+  the read refuses it rather than the pre-check. Same outcome, same ErrorCode,
+  different sentence, so ReadPayload's catch says the sentence. The test is
+  untouched, which is the check that this is a wording move and not a behaviour
+  one.
+
+===========================================================================
+8. WHERE THIS LEAVES THE COMPARISON WITH THE C
+
+  Section 5's port figures were taken before section 7's two fixes. Cached, with
+  the walk updated:
+
+    cached                   C        port     port/C
+    seek C(20)           397 ns    731.9 ns    1.84x
+    Go+Skip per pair      68 ns    135.4 ns    1.99x
+    tag walk per record   80 ns    114.2 ns    1.43x   (was 1.83x)
+
+  The seek and Go+Skip figures stand: neither path touches BlockCount or the memo
+  reader. The C has no memo scenario to compare against, so the 9.7x is measured
+  against this port's own past and nothing else.
+
+===========================================================================
+9. STILL OWED, AND WHAT THIS PROMOTES
+
+  The byte[512] allocated per block read (IO/SourceReader.cs:33) was ~1.5% of a
+  3 927 ns cached descent and is ~10-20% of a 445 ns one. Handing out the cache's
+  pinned window instead of copying into a fresh array would remove that
+  allocation AND the 14 ns/window copy. It is now the largest remaining item
+  after the leaf scan, and the leaf scan is ~148 ns of the 388 ns code floor --
+  the bit-unpacking, which is where ~2x the C is expected to be spent and is.
+
+  Unexplained and open: the cached Go+Skip movement in section 6.

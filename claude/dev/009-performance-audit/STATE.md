@@ -237,19 +237,30 @@ wrong; this one is recorded open.
 
 ## Still open
 
-### 1. The same defect, two more places
+### 1. The item sub-step 8 promotes
 
-`NodeReader.ReadAt` is fixed (sub-step 8); the same call remains in two places, each owed its own
-before-and-after rather than being folded into that one:
+All three `Length` sites are fixed. `NodeReader.BlockCount` and `MemoReader` landed the same day —
+[`results-length-syscall.txt`](results-length-syscall.txt) §7:
 
-- **`NodeReader.BlockCount`** — `Cdx/NodeReader.cs:41` is `source.Length / BlockSize`, and
-  `StepPhysical` consults it on every leaf-chain crossing. A cached walk still makes **0.043 `Length`
-  queries per record** — one per ~23 records — which at ~850 ns is ~37 ns of its 145 ns, about **a
-  quarter of a cached walk**.
-- **`MemoReader`** — `Memo/MemoReader.cs:83` and `:106` ask **twice per memo read**, so every memo
-  field costs ~1 700 ns of metadata syscall. **Nothing has ever measured the memo path.**
+| | before | after | |
+|---|---|---|---|
+| tag walk, per record | 156 ns / 0.043 `Length` | **111 ns / 0.000** | 1.41× |
+| **memo read** | 3 329 ns / 3.612 `Length` | **343 ns / 0.000** | **9.7×** |
 
-**And the item sub-step 8 promotes.** The `byte[512]` allocated per block read (`IO/SourceReader.cs:33`)
+**The memo path was 90% metadata syscall** and nobody knew, because nothing had ever measured it. The
+driver's `memo` arm was written for this.
+
+**1333 tests** green, up one: nothing covered a payload claim in the band the new threshold owns, and
+the first mutation attempted — an off-by-one on the allocation cap — reddened nothing because the other
+clause caught it. The test that replaced it asserts on **bytes allocated**, since both routes refuse
+with the same sentence and what the check avoids is the allocation itself. Raising the threshold so the
+file is never asked reddens it with 268 535 416 bytes against a 1 MB ceiling.
+
+Two things worth carrying: the walk's cycle bound **stays the file's own block count** — only *when* it
+is asked moved, deferred past a 64-block run — and the memo **payload** check stays, because its length
+comes out of the file and sizes an allocation, so only claims under 64 KB are left to the read.
+
+**And so:** the `byte[512]` allocated per block read (`IO/SourceReader.cs:33`)
 was ~1.5% of a 3 927 ns cached descent and is ~10–20% of a 445 ns one. Handing out the cache's pinned
 window instead of copying into a fresh array removes that allocation *and* the 14 ns/window copy, and
 it is now the largest remaining item after the leaf scan — which is itself ~148 ns of the 388 ns code

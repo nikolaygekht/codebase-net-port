@@ -28,6 +28,17 @@ internal sealed class TagCursor
     /// </summary>
     private const int MaxDepth = 32;
 
+    /// <summary>
+    /// How many blocks a leaf chain may pass through before the file is asked how many it holds.
+    /// </summary>
+    /// <remarks>
+    /// Not the bound — the bound is the file's own block count, and a chain exceeding it has a cycle.
+    /// This is only how long a run of empty blocks is allowed to be before that costs a syscall. A
+    /// normal crossing visits one block, so the file is never asked; a genuinely long run of empty
+    /// blocks pays once for a question it is about to need the answer to.
+    /// </remarks>
+    private const int EmptyRunBeforeAskingTheFile = 64;
+
     private TreeBlock block;
     private int index;
 
@@ -499,18 +510,31 @@ internal sealed class TagCursor
         // it (CDX-FORMAT.md section 14, item 10).
         uint node = sibling;
         long visited = 0;
+        long blocksInFile = -1;
 
         while (true)
         {
             // A run of empty blocks is legitimate and can be long, so the bound cannot be a constant.
             // What it can be is the file itself: a chain that visits more blocks than the file holds
             // has come back to one it already saw, whatever the shape of the loop.
-            if (++visited > tag.BlockCount)
+            //
+            // Asking the file how many blocks it holds is a syscall, though, and a crossing normally
+            // visits exactly one block -- so the question is deferred until the run is long enough to
+            // be suspicious, and then asked once. The bound is still the file's own size; only the
+            // moment it is read has moved. Before this, a cached walk spent about a quarter of its
+            // time here (claude/dev/009-performance-audit/results-length-syscall.txt section 7).
+            if (++visited > EmptyRunBeforeAskingTheFile)
             {
-                throw new CodeBaseException(
-                    ErrorCode.Index,
-                    $"The leaf chain of tag {tag.Name} passed through more than {tag.BlockCount} " +
-                    $"blocks without finding a key, so it has a cycle at node {node}.");
+                if (blocksInFile < 0)
+                    blocksInFile = tag.BlockCount;
+
+                if (visited > blocksInFile)
+                {
+                    throw new CodeBaseException(
+                        ErrorCode.Index,
+                        $"The leaf chain of tag {tag.Name} passed through more than {blocksInFile} " +
+                        $"blocks without finding a key, so it has a cycle at node {node}.");
+                }
             }
 
             TreeBlock candidate = tag.ReadBlock(node);

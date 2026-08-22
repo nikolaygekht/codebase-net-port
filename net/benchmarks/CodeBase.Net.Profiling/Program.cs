@@ -47,6 +47,7 @@ internal static class Program
             case "array-descent": return Descent(cached: false, seconds);
             case "seek": return ThroughTheTable(seconds, walk: false);
             case "walk": return ThroughTheTable(seconds, walk: true);
+            case "memo": return Memo(seconds);
             default:
                 Console.Error.WriteLine($"There is no arm called '{arm}'.");
                 Usage();
@@ -63,6 +64,7 @@ internal static class Program
         Console.WriteLine("  array-descent                the same descent, the whole file in one array");
         Console.WriteLine("  seek                         Table.Seek end to end, cache on");
         Console.WriteLine("  walk                         a tag-order walk, cache on");
+        Console.WriteLine("  memo                         reading a memo field, cache on");
         Console.WriteLine();
         Console.WriteLine("The pair to compare is cached-descent against array-descent: identical work,");
         Console.WriteLine("differing only in where the bytes are copied from.");
@@ -182,6 +184,57 @@ internal static class Program
 
         Report(outcome, files);
         return 0;
+    }
+
+    /// <summary>
+    /// Reads a memo field over and over, cache on.
+    /// </summary>
+    /// <param name="seconds">How long to keep going.</param>
+    /// <returns>Zero.</returns>
+    /// <remarks>
+    /// The memo path had never been measured at all. VFPMEMO rather than PERF10K because the benchmark
+    /// table has no memo field; the table is small, so what this measures is the cost of one memo read
+    /// and not a working set.
+    /// </remarks>
+    private static int Memo(int seconds)
+    {
+        CountingFileSystem files = new();
+
+        using CodeBaseEngine engine = new(files, FileSystem.Instance)
+        {
+            BlockCache = BlockCacheMode.Always,
+            DefaultEncoding = Encoding.Latin1,
+        };
+
+        using Table table = engine.OpenTable(Corpus.PathOf("VFPMEMO.DBF"));
+        FieldDefinition memo = table.Fields.First(field => field.Type == 'M');
+
+        Console.WriteLine($"reading {table.RecordCount} records of VFPMEMO.DBF, field {memo.Name}");
+
+        Outcome outcome = Run(seconds, () => OneMemoPass(table, memo), files, null);
+
+        Report(outcome, files);
+        return 0;
+    }
+
+    private static long OneMemoPass(Table table, FieldDefinition memo)
+    {
+        long bytes = 0;
+        int reads = 0;
+
+        while (reads < Queries)
+        {
+            for (GoResult go = table.Top(); go == GoResult.Ok && reads < Queries; reads++)
+            {
+                bytes += table.GetMemoLength(memo);
+                bytes += table.GetMemoBytes(memo).Length;
+
+                if (table.Skip(1) != SkipResult.Moved)
+                    break;
+            }
+        }
+
+        return bytes;
     }
 
     private static long OneSeekPass(Table table, string[] values)

@@ -4,9 +4,10 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **every sub-step is done**; what is left is closing the step: the ADR entries
-`PLAN.md` promised, `SUMMARY.md`, and `PORTING-PLAN.md` §5
-**Current sub-step:** none. Sub-steps 1 to 7 are complete.
+**Status:** in progress — **sub-steps 1 to 8 are done**; what is left is closing the step: `SUMMARY.md`,
+and the two remaining `Length` sites named at the end of
+[`results-length-syscall.txt`](results-length-syscall.txt) §7
+**Current sub-step:** none. **ADR-35 is written**; the other ADR candidates `PLAN.md` promised are not.
 
 ## Done so far
 
@@ -38,6 +39,8 @@ The remediation:
 
 - [x] 7a — the lock inside shared residency, which closed a real race — and 7b, the threading contract
       with its detector — [`results-concurrency.txt`](results-concurrency.txt)
+- [x] 8 — **the `Length` syscall: the 730 ns explained, and it was never the cache** — ADR-35,
+      [`results-length-syscall.txt`](results-length-syscall.txt)
 
 **Stoppable after 3** with all the CPU work done and the cache still owed — **and that is where we
 are.**
@@ -180,59 +183,78 @@ tests; ignoring pins reddens 7, including the randomised run, which found it una
 golden suite green** — which is the plan's own prediction for a sub-step that wires nothing up, and
 means these layer-1 tests are the only thing standing behind this code until sub-step 5.
 
-## For tomorrow: the two things that keep the step open
+### Sub-step 8, done 2026-08-22
 
-### 1. Find where the cache path got dirty — the chain to read
+**The 730 ns was four metadata syscalls per descent, and the block cache was innocent.**
+`NodeReader.ReadAt` bounds-checked every block read against `source.Length` — a live
+`RandomAccess.GetLength` that `CachingRandomAccessSource` forwards straight to the file, because the
+cache caches *reads*. Full account in [`results-length-syscall.txt`](results-length-syscall.txt); the
+decision and the two rejected alternatives in **ADR-35**.
 
-A cache hit costs **~730 ns per 512-byte window** against ~10 ns for the same copy out of a plain
-array, with identical allocation and identical work either side
-([`results-before-closing.txt`](results-before-closing.txt) §1). Everything between
-`CachingRandomAccessSource.Read` entering and leaving is where it hides — arms 0a and 0 of
-`SeekLayersBenchmarks` differ in nothing else.
+| BenchmarkDotNet, same session, Ryzen 9 9950X | before | after | |
+|---|---|---|---|
+| seek `C(20)`, cache `Off` | 9 024.2 ns | **5 636.8 ns** | 1.60× |
+| seek `C(20)`, cache `Always` | 3 885.4 ns | **731.9 ns** | **5.31×** |
+| index descent alone (`CodeBase.Net.Profiling`) | 3 927 ns | **445 ns** | **8.8×** |
+| `Go`+`Skip`, `Off` — the control | 2 004.0 ns | 1 980.6 ns | unchanged ✔ |
 
-The path from `Seek` to the bytes, in order:
+**The cache's hit path costs 14 ns per window**, not 730 — a cached descent now sits 57 ns above the
+no-syscall floor. **The audit's predicted 11.6× is met**: 12.8× against sub-step 5's uncached 9 386 ns,
+7.7× against today's. It had stood at 2.13× since sub-step 5.
 
-| # | where | what it does |
+**The uncached path gained 1.60× too**, which is why a cached `Length` was rejected — it would have
+helped only `Always`, and today's default caches nothing. ADR-35 has the staleness argument as well.
+
+**No test changed**, which is the evidence the guarantee is unchanged; the mutation that removes the
+translating `catch` reddens **four** tests, up from one, because the short-read path is now the only
+path. **1332 tests** green (766 + 566), up 1 — an index-node short read, which nothing covered.
+
+**What found it was counting, not timing.** `CodeBase.Net.Profiling` is a new single-process driver
+(BenchmarkDotNet runs each benchmark in a child process, so a profiler attached to it watches the
+harness) and it prints what no benchmark printed: reads, **`Length` queries** and cache hits per
+operation. `4.000` `Length` queries and `0.000` reads per descent named the mechanism in one run. VS
+instrumentation confirmed the counts and was useless for the time, inflating the run 10× with the bias
+falling on call-heavy code — `ReadOnlySpan.get_Item` reached its top-functions list.
+
+**And the C library now has the control the audit skipped.** `harness/perf.cpp` has a `go-skip`
+scenario, so "how much slower is a seek than a plain positioning" has a reference answer:
+
+| seek ÷ go | C | port |
 |---|---|---|
-| 1 | `Table.Seek(string)` — `Table.cs:609` | entry |
-| 2 | `Table.Search` — `Table.cs:725` | `TextEncoding.GetBytes(value)` |
-| 3 | `TableTagCursor.SearchFor` — `Dbf/TableTagCursor.cs:93` | copies into its buffer, pads to key width, `KeySearch.Into` |
-| 4 | `Table.Exact` — `Table.cs:728` | |
-| 5 | `TableTagCursor.SeekAtOrAfter` — `Dbf/TableTagCursor.cs:190` | |
-| 6 | `TagCursor.Seek` — `Cdx/TagCursor.cs:173` → `SeekFirstAtOrAbove` — `:353` | the descent loop |
-| 7 | `CdxTag.ReadBlock` — `Cdx/CdxTag.cs:83` | **once per level** |
-| 8 | `NodeReader.Read` — `Cdx/NodeReader.cs:52` → `ReadAt` — `:70` | |
-| 9 | `SourceReader.ReadExactly(…, int count, …)` — `IO/SourceReader.cs:26` | **allocates `new byte[512]`** |
-| 10 | `SourceReader.ReadExactly(…, Span<byte>, …)` — `IO/SourceReader.cs:56` | loops until the buffer is full |
-| 11 | **`CachingRandomAccessSource.Read` — `IO/CachingRandomAccessSource.cs:55`** | **the suspect region starts here** |
-| 12 | `BlockCache.TryHold` — `IO/BlockCache.cs:112` → `HoldWhileLocked` — `:121` | `lock`, dictionary lookup; on a hit `BlockPool.Claim` + `Touch`; on a miss `TryClaim` → `BlockResidency` → `fill` |
-| 13 | `BlockPool.At` — `IO/BlockPool.cs:125` → `Block.AsSpan` → `CopyTo` | **the 512-byte copy** |
-| 14 | `BlockCache.Release` | a **second** `lock` per window |
-| — | back up: `NodeHeader.Parse`, `LeafBlock.Parse`/`BranchBlock.Parse`, `LeafBlock.Seek`→`CompareAt`→`KeyAt`→`Build`, `BranchBlock.Seek`/`ChildAt` | measured as cheap: arm 0a does all of it in 545 ns |
-| 15 | `Table.Fetch` — `Table.cs:1205` → `RecordReader.Read` — `Dbf/RecordReader.cs:51` | the record, through the same source and so the same path |
+| cached | 5.84× | **5.41×** |
+| uncached | 2.29× | 2.85× |
 
-**The search is narrower than it was**, because two measured figures rule most of it out:
+**~5.4× is the shape of the operation, not a port cost** — before this fix the port's ratio was 51×.
+Standing against the C: **~1.85× on CPU-bound work** (seek 1.84×, `Go`+`Skip` 1.99×, walk 1.83× —
+consistent across three unrelated operations), and **parity or better when the work is I/O** (uncached
+seek 1.01×, `Go`+`Skip` 0.81×, walk 0.47×). This **supersedes the audit's "port cached" column**, which
+came from a `byte[]` standing in for a perfect cache rather than from `BlockCache`.
 
-| | walk / `Go(n)` | index descent |
-|---|---|---|
-| read size | 61 bytes | 512 bytes |
-| destination | a reused buffer | a **fresh `byte[512]`** from `ReadExactly` |
-| cost of a hit | **under 160 ns** | **~730 ns** |
+**One thing left unexplained on purpose.** Cached `Go`+`Skip` measured 117.5 ns before and 135.4 ns
+after, same session, tiny error bars, with the uncached control unmoved — and that arm never calls
+`NodeReader`. §6 of the results file has it. This step has twice explained a shortfall away and been
+wrong; this one is recorded open.
 
-A full-pool walk costs 160 ns a record and that *is* a hit — so the hit path is **not** uniformly
-expensive, and "a cache hit costs 730 ns" is too broad a reading. Whatever it is lives in the size, or
-in the path **step 9 → 10 → 11** and not in step 12's bookkeeping, which the walk exercises just as
-hard.
+## Still open
 
-**First thing to check:** whether the fill loop in `SourceReader.cs:56` goes round more than once for a
-512-byte read of a 512-aligned window. It would if the cached source ever answered short, and every
-extra turn is another `TryHold`, two lock acquisitions and a `Release`. After that: the two locks per
-window (12 and 14), and whether some supposed hits are misses — `BlockCache` counts `Hits` and
-`Misses` and nothing ever prints them.
+### 1. The same defect, two more places
 
-**Why it matters enough to hold the step open:** if a hit can be made to cost ~50 ns, a cached seek
-goes from 4.3 µs to about 0.8, and the audit's predicted **11.6×** stops being disproved and becomes
-reachable.
+`NodeReader.ReadAt` is fixed (sub-step 8); the same call remains in two places, each owed its own
+before-and-after rather than being folded into that one:
+
+- **`NodeReader.BlockCount`** — `Cdx/NodeReader.cs:41` is `source.Length / BlockSize`, and
+  `StepPhysical` consults it on every leaf-chain crossing. A cached walk still makes **0.043 `Length`
+  queries per record** — one per ~23 records — which at ~850 ns is ~37 ns of its 145 ns, about **a
+  quarter of a cached walk**.
+- **`MemoReader`** — `Memo/MemoReader.cs:83` and `:106` ask **twice per memo read**, so every memo
+  field costs ~1 700 ns of metadata syscall. **Nothing has ever measured the memo path.**
+
+**And the item sub-step 8 promotes.** The `byte[512]` allocated per block read (`IO/SourceReader.cs:33`)
+was ~1.5% of a 3 927 ns cached descent and is ~10–20% of a 445 ns one. Handing out the cache's pinned
+window instead of copying into a fresh array removes that allocation *and* the 14 ns/window copy, and
+it is now the largest remaining item after the leaf scan — which is itself ~148 ns of the 388 ns code
+floor, and is the bit-unpacking, so ~2× the C is where it should be.
+
 
 ### 2. Data for stressing the cache
 

@@ -65,13 +65,13 @@ internal sealed class DbfOpener
 
         try
         {
-            DbfHeader header = DbfHeader.Parse(data.ReadExactly(0, DbfHeader.Size, "header"));
+            DbfHeader header = DbfHeader.Parse(ReadTableHeader(data));
             CheckAgainstFileLength(header, data.Length);
 
             IDbfFormatVariant variant = IDbfFormatVariant.Resolve(header.Version);
 
             IReadOnlyList<FieldDescriptor> descriptors = FieldDescriptorTable.Parse(
-                data.ReadExactly(DbfHeader.Size, header.HeaderLength - DbfHeader.Size, "field descriptors"),
+                ReadFieldDescriptors(data, header),
                 header.Flags.UsesLongFieldNames);
 
             ResolvedFields fields = FieldResolver.Resolve(descriptors, variant, header.RecordLength);
@@ -80,7 +80,7 @@ internal sealed class DbfOpener
             if (variant.HasMemo(header.TableFlags))
             {
                 memo = OpenMemo(path);
-                memoHeader = MemoFileHeader.Parse(memo.ReadExactly(0, MemoFileHeader.Size, "memo file header"));
+                memoHeader = MemoFileHeader.Parse(ReadMemoFileHeader(memo));
             }
 
             // The index is opened last, and only when the header says there is one. A table that
@@ -99,6 +99,75 @@ internal sealed class DbfOpener
             memo?.Dispose();
             data.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Reads the fixed part of a table's header.
+    /// </summary>
+    /// <param name="data">The table file.</param>
+    /// <returns>The header's bytes.</returns>
+    /// <exception cref="CodeBaseException">The file is shorter than a header.</exception>
+    private static byte[] ReadTableHeader(IRandomAccessSource data)
+    {
+        try
+        {
+            return data.ReadExactly(0, DbfHeader.Size);
+        }
+        catch (ShortReadException failure)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"Reading the table header needed {failure.Needed} bytes but the file gave " +
+                $"{failure.Got}.",
+                failure);
+        }
+    }
+
+    /// <summary>
+    /// Reads the field descriptors that follow a table's header.
+    /// </summary>
+    /// <param name="data">The table file.</param>
+    /// <param name="header">The header, which says how far the descriptors run.</param>
+    /// <returns>The descriptors' bytes.</returns>
+    /// <exception cref="CodeBaseException">
+    /// The file is shorter than the header says its descriptors are.
+    /// </exception>
+    private static byte[] ReadFieldDescriptors(IRandomAccessSource data, DbfHeader header)
+    {
+        try
+        {
+            return data.ReadExactly(DbfHeader.Size, header.HeaderLength - DbfHeader.Size);
+        }
+        catch (ShortReadException failure)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"Reading the field descriptors needed {failure.Needed} bytes at offset " +
+                $"{failure.Offset} but the file gave {failure.Got}.",
+                failure);
+        }
+    }
+
+    /// <summary>
+    /// Reads the header of the memo file beside a table.
+    /// </summary>
+    /// <param name="memo">The memo file.</param>
+    /// <returns>The header's bytes.</returns>
+    /// <exception cref="CodeBaseException">The memo file is shorter than a header.</exception>
+    private static byte[] ReadMemoFileHeader(IRandomAccessSource memo)
+    {
+        try
+        {
+            return memo.ReadExactly(0, MemoFileHeader.Size);
+        }
+        catch (ShortReadException failure)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"Reading the memo file header needed {failure.Needed} bytes but the file gave " +
+                $"{failure.Got}.",
+                failure);
         }
     }
 

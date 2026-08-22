@@ -565,13 +565,16 @@ memo, VFP9 varchar semantics (§2.3).
 
 **Read this before starting `WRITE`, `LOCKING` or `TRANS`.** The block cache
 ([`dev/009-performance-audit/DESIGN.md`](dev/009-performance-audit/DESIGN.md)) sits
-under every read in the library, decorating `IRandomAccessSource`. It is measured at **11.6× on a seek
-and 23.4× on a tag walk**, and its failure mode is **a wrong record set** — the one outcome this project
-ranks above being slow. Each capability below therefore owes it something specific, and these are
-obligations rather than reminders: a capability is not done until its row here is done.
+under every read in the library, decorating `IRandomAccessSource`. **It is built, and measured at
+12.8× on a seek and 8.1× on a tag walk** — a cache hit costs 14 ns per 512-byte window
+([`dev/009-performance-audit/results-length-syscall.txt`](dev/009-performance-audit/results-length-syscall.txt)).
+Its failure mode is **a wrong record set** — the one outcome this project ranks above being slow. Each
+capability below therefore owes it something specific, and these are obligations rather than reminders:
+a capability is not done until its row here is done.
 
-*(If the cache has not been built yet, every row is vacuous — but check it off deliberately rather than
-by omission.)*
+*(The rows are **not** vacuous any more: the cache exists, `Invalidate` is real at four levels, and
+`Flush` is deliberately unbuilt because nothing is dirty in a read-only library — it is the write path's
+first job.)*
 
 | Capability | Owes the cache |
 |---|---|

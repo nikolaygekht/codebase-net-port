@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A single-process driver for an external profiler.
+
+    Why it exists rather than reusing CodeBase.Net.Benchmarks: BenchmarkDotNet compiles and launches
+    a CHILD PROCESS per benchmark, so a profiler attached to the launched project profiles the
+    harness and never sees the descent. This runs one arm, in one process, in a steady-state loop
+    for as long as it is asked to, which is what a sampling or instrumenting profiler needs.
+
+    It measures nothing anyone should quote. BenchmarkDotNet remains the source of every number in
+    claude/dev/009-performance-audit — this prints a rough rate so a run can be sanity-checked, and
+    the counters that no benchmark ever prints: cache hits, cache misses, and reads that reached the
+    file. Those are exact and are the point.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>CodeBase.Net.Profiling</RootNamespace>
+    <AssemblyName>CodeBase.Net.Profiling</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+
+    <!-- Release by default, so the obvious command profiles optimised code. -->
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+
+    <!-- A profiler needs symbols for frames inside the library, in Release as well as Debug. -->
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CodeBase.Net\CodeBase.Net.csproj" />
+
+    <!-- For Corpus, the one place that knows where the checked-in data sits. -->
+    <ProjectReference Include="..\..\tests\CodeBase.Net.TestUtils\CodeBase.Net.TestUtils.csproj" />
+  </ItemGroup>
+
+</Project>

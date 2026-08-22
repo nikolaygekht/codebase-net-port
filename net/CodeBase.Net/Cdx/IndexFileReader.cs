@@ -81,9 +81,7 @@ internal sealed class IndexFileReader : IDisposable
 
         try
         {
-            IndexHeader header = IndexHeader.Parse(
-                source.ReadExactly(0, IndexHeader.Size, $"the header of {fileName}", ErrorCode.Index),
-                fileName);
+            IndexHeader header = IndexHeader.Parse(ReadFileHeader(source, fileName), fileName);
 
             NodeReader nodes = new(source, header.Addressing);
 
@@ -107,6 +105,29 @@ internal sealed class IndexFileReader : IDisposable
             // A caller that gets an exception should not also get an open file handle to clean up.
             source.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Reads the bytes of an index file's own header.
+    /// </summary>
+    /// <param name="source">The index file.</param>
+    /// <param name="fileName">Its name, for the message when it is too short to have a header.</param>
+    /// <returns>The header's bytes.</returns>
+    /// <exception cref="CodeBaseException">The file is shorter than a header.</exception>
+    private static byte[] ReadFileHeader(IRandomAccessSource source, string fileName)
+    {
+        try
+        {
+            return source.ReadExactly(0, IndexHeader.Size);
+        }
+        catch (ShortReadException failure)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Index,
+                $"Reading the header of {fileName} needed {failure.Needed} bytes but the file gave " +
+                $"{failure.Got}.",
+                failure);
         }
     }
 

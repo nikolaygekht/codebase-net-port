@@ -36,6 +36,13 @@ disk.
 | `name-miss` | seek a value that does not exist, land on the neighbour | `T_NAME` |
 | `amount-hit` | seek a number that exists | `T_AMT` |
 | `tag-walk` | read all 10 000 records in tag order | `T_NAME` |
+| `go-skip` | `d4go` to a record number then `d4skip(1)`, 10 000 pairs | none — natural order |
+
+**`go-skip` was added 2026-08-22**, in sub-step 8, and is the control the audit should have taken: it
+touches no index at all, so it is what a seek has to be divided by before "a seek is slow" means
+anything. Its record sequence is `(i * 3571) % 10000 + 1` — the same permutation, stride and one-based
+convention as the port's `Go(n)`-then-`Skip(1)` benchmark — so both sides touch the same records in the
+same order. Results in [`results-length-syscall.txt`](results-length-syscall.txt) §5.
 
 `tag-walk` is not a seek scenario. It is collected because suspect P4 wanted a number and it costs
 nothing beside the others.

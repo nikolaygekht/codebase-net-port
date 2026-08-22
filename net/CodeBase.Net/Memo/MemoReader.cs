@@ -88,8 +88,7 @@ internal sealed class MemoReader
                 $"{offset} of a file {source.Length} bytes long.");
         }
 
-        MemoBlockHeader header = MemoBlockHeader.Parse(
-            source.ReadExactly(offset, MemoBlockHeader.Size, $"the header of memo block {blockNumber}"));
+        MemoBlockHeader header = MemoBlockHeader.Parse(ReadBlockHeader(offset, blockNumber));
 
         if (header.Type == MemoType.Compressed)
         {
@@ -115,9 +114,55 @@ internal sealed class MemoReader
 
         byte[] payload = header.Length == 0
             ? []
-            : source.ReadExactly(
-                offset + MemoBlockHeader.Size, (int)header.Length, $"memo block {blockNumber}");
+            : ReadPayload(offset + MemoBlockHeader.Size, (int)header.Length, blockNumber);
 
         return new MemoEntry(header.Type, payload);
+    }
+
+    /// <summary>
+    /// Reads the header that starts a memo block.
+    /// </summary>
+    /// <param name="offset">Where the block begins.</param>
+    /// <param name="blockNumber">Which block, for the message when it is not all there.</param>
+    /// <returns>The header's bytes.</returns>
+    /// <exception cref="CodeBaseException">The file ends inside the header.</exception>
+    private byte[] ReadBlockHeader(long offset, int blockNumber)
+    {
+        try
+        {
+            return source.ReadExactly(offset, MemoBlockHeader.Size);
+        }
+        catch (ShortReadException failure)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"Reading the header of memo block {blockNumber} needed {failure.Needed} bytes at " +
+                $"offset {failure.Offset} but the file gave {failure.Got}.",
+                failure);
+        }
+    }
+
+    /// <summary>
+    /// Reads the bytes a memo block's header says follow it.
+    /// </summary>
+    /// <param name="offset">Where the payload begins.</param>
+    /// <param name="length">How long the header says it is.</param>
+    /// <param name="blockNumber">Which block, for the message when it is not all there.</param>
+    /// <returns>The payload.</returns>
+    /// <exception cref="CodeBaseException">The file ends inside the payload.</exception>
+    private byte[] ReadPayload(long offset, int length, int blockNumber)
+    {
+        try
+        {
+            return source.ReadExactly(offset, length);
+        }
+        catch (ShortReadException failure)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"Reading memo block {blockNumber} needed {failure.Needed} bytes at offset " +
+                $"{failure.Offset} but the file gave {failure.Got}.",
+                failure);
+        }
     }
 }

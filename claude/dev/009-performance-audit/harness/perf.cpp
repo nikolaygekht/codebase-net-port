@@ -412,6 +412,34 @@ static long long passWalk( DATA4 *data, FIELD4 *id )
    return sum;
 }
 
+/* d4go to a record number, then one step on: the "simple go" the port has a
+ * baseline for and this harness did not. Natural record order, no tag selected,
+ * so it reads records and never touches the index -- which is what makes it the
+ * control for every seek figure beside it.
+ *
+ * The record sequence is the same permutation the port's Go(n)-then-Skip(1)
+ * benchmark uses, QSTRIDE over ROWS, one-based, so both sides touch the same
+ * records in the same order and the two numbers are comparable. */
+static long long passGoThenSkip( DATA4 *data, FIELD4 *id )
+{
+   long long sum = 0;
+   int i;
+
+   for ( i = 0; i < QUERIES; i++ )
+   {
+      int rec = ( i * QSTRIDE ) % ROWS + 1;   /* record numbers are one-based */
+
+      if ( d4go( data, rec ) != r4success )
+         continue;
+
+      sum += f4long( id );
+      if ( d4skip( data, 1 ) == r4success )
+         sum += f4long( id );
+   }
+
+   return sum;
+}
+
 static int bench( CODE4 *cb, const char *dir, int reps, int optimized )
 {
    char path[520];
@@ -528,6 +556,23 @@ static int bench( CODE4 *cb, const char *dir, int reps, int optimized )
    passWalk( data, id );
    ioAround( &ioR1, &ioB1 );
    report( "tag-walk", ROWS, checksum, ms, reps, ioR1 - ioR0, ioB1 - ioB0 );
+
+   /* --- and the control the audit never took: go to a record and step one on,
+    *     in natural order, so a seek can be compared with a plain positioning. --- */
+   d4tagSelect( data, 0 );
+   for ( r = 0; r < WARMUPS; r++ ) checksum = passGoThenSkip( data, id );
+   for ( r = 0; r < reps; r++ )
+   {
+      double t0 = nowMs();
+      long long c = passGoThenSkip( data, id );
+      ms[r] = nowMs() - t0;
+      if ( c != checksum ) { d4close( data ); fprintf( stderr, "ERROR: unstable checksum\n" ); return 1; }
+   }
+   /* one extra untimed pass, measured for read operations rather than time */
+   ioAround( &ioR0, &ioB0 );
+   passGoThenSkip( data, id );
+   ioAround( &ioR1, &ioB1 );
+   report( "go-skip", QUERIES, checksum, ms, reps, ioR1 - ioR0, ioB1 - ioB0 );
 
    if ( d4close( data ) < 0 )
       return fail( cb, "d4close" );

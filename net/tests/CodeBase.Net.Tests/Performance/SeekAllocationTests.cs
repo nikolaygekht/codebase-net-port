@@ -15,6 +15,8 @@ namespace CodeBase.Net.Tests.Performance;
 /// key was copied once per comparison — a cost that gets quietly re-added by anyone who reaches for
 /// [c]EntryAt[/c] inside a descent, because doing so breaks no correctness test anywhere. That is the
 /// whole reason this file exists: the mistake it guards against is invisible to every other layer.
+/// The same is true of a message formatted on the way down into a read: it is discarded on every read
+/// that succeeds, and no other test can see it happen.
 ///
 /// Deliberately a ceiling and not an equality. It is a tripwire for a regression most of a kilobyte
 /// wide, not a pin on an implementation detail: adding a field to a search value must not fail a
@@ -35,25 +37,27 @@ public sealed class SeekAllocationTests
     /// <summary>
     /// Bytes a seek over the four-level character tag may allocate.
     ///
-    /// It sits between two measurements, both in
+    /// Three measurements sit behind it, the first two in
     /// claude/dev/009-performance-audit/results-compare-in-place.txt: **3 956** bytes per seek while
-    /// every compared key was copied, and **2 760** once they were not. 3 200 leaves the current
-    /// figure 14 per cent of room and still sits 19 per cent below the copying one, so it catches
-    /// that regression and tolerates ordinary change.
+    /// every compared key was copied, **2 760** once they were not, and **2 568** once the shared
+    /// reader stopped being handed a description of what it was reading. 2 700 leaves the current
+    /// figure five per cent of room, which is enough because there is no variance to leave room for:
+    /// Debug and Release measure the same bytes, and so does every machine. That is the property that
+    /// makes this a gate rather than a benchmark.
     ///
-    /// Debug and Release measure the same 2 808 bytes, which is the property that makes this a gate
-    /// rather than a benchmark: allocation does not depend on the build, the machine, or the
-    /// filesystem.
+    /// It is deliberately tight enough to catch the smaller of the two regressions it guards. A
+    /// per-comparison key copy would add most of a kilobyte and be caught by any ceiling; formatting
+    /// a message per block read costs 56 bytes a level and would fit under a looser one.
     /// </summary>
-    private const long CharacterSeekCeiling = 3200;
+    private const long CharacterSeekCeiling = 2700;
 
     /// <summary>
     /// Bytes a seek over the three-level numeric tag may allocate, on the same reasoning.
     ///
     /// Its own number because its tree is a level shallower and its key less than half the width, so
-    /// it copied less to begin with: 3 808 bytes before, 2 128 after.
+    /// it copied less to begin with: 3 808 bytes, then 2 128, now **1 984**.
     /// </summary>
-    private const long NumericSeekCeiling = 2600;
+    private const long NumericSeekCeiling = 2100;
 
     [Fact]
     public void ASeekOverACharacterTagStaysUnderItsCeiling()

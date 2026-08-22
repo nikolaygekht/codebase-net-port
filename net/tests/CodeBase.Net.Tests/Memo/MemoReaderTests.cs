@@ -186,7 +186,7 @@ public sealed class MemoReaderTests
     [Fact]
     public void Read_OfAShortReadingFile_IsADataError()
     {
-        // The shared reader now takes its error code from the caller so that an index can say
+        // The shared reader reports a short read and each caller classifies it, so an index can say
         // ErrorCode.Index. A memo keeps saying Data, deliberately: there is no memo-specific code,
         // and a memo file is part of the data side of the table.
         MemoReader reader = new(

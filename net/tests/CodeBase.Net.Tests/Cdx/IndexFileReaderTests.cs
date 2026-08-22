@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using CodeBase.Net.Cdx;
+using CodeBase.Net.IO;
 using CodeBase.Net.TestUtils;
 using Xunit;
 
@@ -220,8 +221,8 @@ public sealed class IndexFileReaderTests
     {
         // A header of zeros is a plausible-looking header, so a read that returns less than it was
         // asked for has to fail rather than leave the rest zero. It is an index error, not a data
-        // one: the shared reader takes the code from its caller so a truncated index is classified
-        // the way the rest of the index path classifies its failures.
+        // one: the shared reader reports a short read and the index path catches it, so a truncated
+        // index is classified the way the rest of that path classifies its failures.
         Action act = () => IndexFileReader.Open(
             new FaultySource(4096, FaultySource.Fault.ShortRead),
             "PEOPLE.cdx",
@@ -249,6 +250,52 @@ public sealed class IndexFileReaderTests
         Action act = () => IndexFileReader.Open(new InMemorySource(new byte[600]), "PEOPLE.cdx", Spaces);
 
         act.Should().Throw<CodeBaseException>();
+    }
+
+    [Trait("Layer", "Fault")]
+    [Fact]
+    public void Read_ANodeTheFileIsTooShortToHoldIsRefusedAsAnIndexError()
+    {
+        // The bounds check above this one uses the length the file claims, so a file that overstates
+        // its own length is the one way a node read reaches the end of the bytes. Nothing may be
+        // padded with zeros: a block of zeros parses as a leaf with no keys, which reads as a tag
+        // that has lost its records rather than as a corrupt file.
+        byte[] image = IndexImage.SingleTag(8, IndexImage.NodeOf(0))
+            .WithLeaf(8, [("ALPHA", 1)])
+            .Build();
+
+        using IndexFileReader index = Open(image, "PEOPLE.IDX");
+        using OverstatedSource lying = new(image, claimed: image.Length + 4096);
+        CdxTag tag = new(
+            "T", index.Tags[0].Header, Spaces, new NodeReader(lying, index.Tags[0].Header.Addressing));
+
+        // The first block past the last one the image holds. A node number is a byte offset here, so
+        // this is the end of the file exactly, and the bounds check above passes only because the
+        // source overstates its length.
+        Action act = () => tag.ReadBlock(IndexImage.NodeOf(1));
+
+        act.Should().Throw<CodeBaseException>()
+            .Where(e => e.Code == ErrorCode.Index)
+            .Which.Should().NotBeOfType<ShortReadException>(
+                "a short read is translated on the way up, never handed to a caller raw");
+    }
+
+    /// <summary>A file that claims to be longer than the bytes it has.</summary>
+    private sealed class OverstatedSource : IRandomAccessSource
+    {
+        private readonly InMemorySource real;
+
+        public OverstatedSource(byte[] bytes, long claimed)
+        {
+            real = new InMemorySource(bytes);
+            Length = claimed;
+        }
+
+        public long Length { get; }
+
+        public int Read(long offset, Span<byte> buffer) => real.Read(offset, buffer);
+
+        public void Dispose() => real.Dispose();
     }
 
     private static IndexFileReader Open(byte[] image, string fileName) =>

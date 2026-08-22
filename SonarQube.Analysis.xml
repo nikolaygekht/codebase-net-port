@@ -40,13 +40,15 @@
     **/TestResults/**
   </Property>
 
-  <!-- Benchmarks are real code but are not meant to be covered by tests. Test
+  <!-- Benchmarks and the profiling driver are real code but are not meant to be
+       covered by tests. Test
        projects themselves are detected and excluded by the scanner — but
        CodeBase.Net.TestUtils is a plain library holding shared test
        infrastructure, so the scanner sees production code and would count it
        against coverage. -->
   <Property Name="sonar.coverage.exclusions">
     **/*.Benchmarks/**,
+    **/*.Profiling/**,
     **/*.TestUtils/**
   </Property>
 

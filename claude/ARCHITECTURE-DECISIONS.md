@@ -984,3 +984,55 @@ generator would need to be taught to walk and record. Until then the divergence 
 
 **Consequence.** `Table.NotInTag` is gone and no navigation path refuses any more. `CDX-READ` owes
 `EXPR` exactly one thing: typing a key expression that is not a bare field name (ADR-28).
+
+## ADR-35 — A block read is bounds-checked by failing, not by asking the file its length first · accepted
+
+**Context.** `NodeReader.ReadAt` refused a node past the end of the file by comparing against
+`source.Length` before reading. That reads well and it cost 87% of a cached index descent.
+`IRandomAccessSource.Length` is not a field: `FileRandomAccessSource` answers it with
+`RandomAccess.GetLength(handle)`, a metadata syscall, and `CachingRandomAccessSource` forwards it
+straight through because the block cache caches *reads*. So a four-level descent made **four metadata
+syscalls with the cache fully warm** — on the one path the cache exists to make syscall-free — at
+~850 ns each on NTFS. Measured three ways in
+[`results-length-syscall.txt`](dev/009-performance-audit/results-length-syscall.txt).
+
+The audit could not have found it. It counted syscalls with `GetProcessIoCounters`, which counts
+reads; a `GetLength` is not a read, so its "5 reads per character seek" was complete and still missed
+four calls per descent. The cost surfaced instead as the unexplained "a cache hit costs ~730 ns" in
+`results-before-closing.txt` §1, where the cache was wrongly the prime suspect.
+
+**Decision.** Drop the check. Read, and let a read that cannot be satisfied be the refusal —
+`SourceReader` already raises `ShortReadException` for exactly that, and `ReadAt`'s `catch` asks
+`source.Length` *there*, where a syscall costs nothing because the call is already throwing. The
+message keeps the node, the offset and the file's length, and gains what actually arrived.
+
+**This is the reference's own design.** `tfile4blockRead` computes the position and reads
+(`i4tag.c:185`) with no length check anywhere, because a read that comes up short already reports
+itself (`file4readError`, `f4file.c:2141`). The eager check was a port addition, not a port of
+anything.
+
+**Rejected — caching the length in `CachingRandomAccessSource`.** The obvious fix, and worse in two
+ways. It would help only `BlockCacheMode.Always`, leaving the shipped default (`WhenExclusive`, which
+today caches nothing) paying four metadata syscalls on top of its four reads; the measured 1.60×
+improvement to the **uncached** seek would not have happened. And it would raise a staleness question
+— the file is opened `FileShare.ReadWrite`, so a remembered length can be wrong, and a stale one
+refuses a node another process just appended, turning data into an error. Not asking is never wrong.
+
+**Rejected — keeping the check and reading the length once per `NodeReader`.** Same staleness
+question, and it would apply with the cache off, where nothing has opted into anything.
+
+**What it was worth**, same session, BenchmarkDotNet, Ryzen 9 9950X: cached seek `C(20)`
+3 885 → **732 ns**, uncached 9 024 → **5 637 ns**, the index descent 3 927 → **445 ns**. The block
+cache's hit path is **14 ns per window**, not the 730 it was accused of, and the audit's predicted
+**11.6×** for the cache is met for the first time — it had stood at 2.13× since sub-step 5.
+
+**Consequence for the safety argument, stated plainly because it is the reason to hesitate.** The
+refusal is now one step later: a corrupt node number is caught when its bytes fail to arrive rather
+than before the attempt. Nothing is padded — a short read has never been allowed to become zeros
+(`ShortReadException`) — and no test changed to accommodate this, which is the evidence that the
+guarantee is the same. Removing the translating `catch` reddens **four** tests, up from one before,
+because the short-read path is now the only path and more cases run through it.
+
+**Where the same defect remains**, each owed its own measurement: `NodeReader.BlockCount` (consulted
+per leaf-chain crossing, ~25% of a cached walk) and `MemoReader` (twice per memo read, ~1.7 µs per
+memo field).

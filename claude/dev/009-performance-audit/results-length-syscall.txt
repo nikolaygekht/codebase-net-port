@@ -1,0 +1,204 @@
+009-performance-audit -- the 730 ns, found and removed, 2026-08-22
+
+The step held open on one unexplained figure: a cache hit costing ~730 ns per
+512-byte window against ~10 for an array copy, recorded in
+results-before-closing.txt section 1 as "measured and unexplained rather than
+explained away". This is the explanation. It was not the cache.
+
+===========================================================================
+1. WHAT IT WAS
+
+  NodeReader.ReadAt bounds-checked every block read against source.Length:
+
+      if ( offset + length > source.Length ) throw ...
+
+  IRandomAccessSource.Length is not a field. FileRandomAccessSource answers it
+  with RandomAccess.GetLength(handle) -- a live metadata syscall -- and
+  CachingRandomAccessSource forwards it straight through, because the block
+  cache caches READS. So a four-level descent made FOUR metadata syscalls with
+  the cache fully warm, on the path the cache exists to make syscall-free.
+
+  InMemorySource.Length is a field, which is the only reason the array-backed
+  arm ever looked fast. Arms 0a and 0 of SeekLayersBenchmarks differed in
+  exactly this and nobody knew it.
+
+  WHY THE AUDIT COULD NOT HAVE SEEN IT. It counted syscalls with
+  GetProcessIoCounters, which counts reads. A GetLength is not a read. The
+  "5 reads per character seek" figure was complete and still missed four calls
+  per descent.
+
+===========================================================================
+2. HOW IT WAS FOUND
+
+  CodeBase.Net.Profiling, a new single-process driver (net/benchmarks/), because
+  BenchmarkDotNet compiles and launches a child process per benchmark and a
+  profiler attached to it watches the harness. The driver prints what no
+  benchmark printed: cache hits, cache misses, and reads AND Length queries that
+  reached the file.
+
+  The first run, on WSL, said it outright:
+
+    arm                          ns/descent   reads   Length queries   hits
+    array-descent                       388       0                0     --
+    cached-descent                  693 930       0            4.000  4.000
+    cached-descent-fixedlength          520       0                0  4.000
+
+  693 930 / 4 = 173 us per query, against the 171.6 us FilesystemBenchmarks had
+  already measured for a 9p operation (results-before-closing.txt section 4).
+  The mechanism identified itself.
+
+  VS instrumentation confirmed the count independently and was useless for the
+  time, inflating the run 10x (37 037 ns/descent) with the bias falling on
+  call-heavy code: ReadOnlySpan.get_Item reached the top functions list, a frame
+  that does not exist in optimised code. Its call counts were exact and worth
+  having -- 4 NodeReader.Read, 3 BranchBlock.Seek, 1 LeafBlock.Seek per descent,
+  every multiplicity exactly N, so NO HIDDEN LOOP anywhere.
+
+===========================================================================
+3. THE FIX, AND WHY NOT A CACHED LENGTH
+
+  The eager check is gone. A node past the end of the file is caught by the read
+  failing, and the catch -- which already existed, from the ShortReadException
+  change earlier the same session -- asks source.Length there, where a syscall
+  costs nothing because the call is already throwing. The message is unchanged
+  in substance and now also names what arrived.
+
+  THE REFERENCE DOES THE SAME. tfile4blockRead computes the position and reads
+  (i4tag.c:185) with no length check anywhere, because a read that cannot be
+  satisfied already reports itself (file4readError, f4file.c:2141).
+
+  Caching the length in CachingRandomAccessSource was considered and rejected:
+  it would help only BlockCacheMode.Always, leaving today's default paying four
+  metadata syscalls on top of its four reads, and it would raise a staleness
+  question (the file is opened FileShare.ReadWrite) that not asking never has.
+  ADR-35 records it.
+
+===========================================================================
+4. WHAT IT WAS WORTH -- SAME SESSION, SAME MACHINE, BenchmarkDotNet
+
+  Windows 11, AMD Ryzen 9 9950X, .NET 8.0.30 x64, Release, PERF10K.
+
+    ReadPathBenchmarks                  before        after     ratio
+    seek C(20), cache Off            9 024.2 ns   5 636.8 ns    1.60x
+    seek C(20), cache Always         3 885.4 ns     731.9 ns    5.31x
+    Go(n)+Skip(1), Off (control)     2 004.0 ns   1 980.6 ns    unchanged
+    Go(n)+Skip(1), Always              117.5 ns     135.4 ns    SEE SECTION 6
+
+  THE UNCACHED PATH GAINS TOO -- 1.60x -- which a cached length could not have
+  done. 9 024 - 5 637 = 3 387 ns over four calls, ~850 ns each.
+
+  The driver's own arms, Windows:
+
+    arm                          before        after
+    cached-descent            3 927 ns      445 ns     8.8x
+    Length queries/descent       4.000      0.000
+    array-descent (control)     379 ns      388 ns     unchanged
+
+  A cached descent now sits 57 ns above the no-syscall floor, so THE BLOCK
+  CACHE'S HIT PATH COSTS 14 ns PER WINDOW. results-before-closing.txt section 1
+  guessed "a hit at ~50 ns would put a cached seek near 0.8 us and the audit's
+  predicted 11.6x within reach". The hit is 14 ns and the cached seek is 732 ns.
+
+  Against the uncached seek, a cached seek is now 7.7x (5 637 / 732), and
+  against the pre-cache 9 386 ns recorded in sub-step 5, 12.8x. THE AUDIT'S
+  11.6x IS MET. It had stood at 2.13x since sub-step 5.
+
+===========================================================================
+5. AGAINST THE C LIBRARY, INCLUDING THE CONTROL THE AUDIT NEVER TOOK
+
+  The audit measured no go-then-skip on the C side -- STATE.md recorded it as
+  "not taken" -- so "how much slower is a seek than a plain positioning" had no
+  reference answer. harness/perf.cpp now has a go-skip scenario using the same
+  QSTRIDE permutation over the same ROWS, one-based, so both sides touch the
+  same records in the same order.
+
+  C, same machine, same table, 9 reps:
+
+    scenario                        plain        opt (code4optStart)
+    name-hit  seek C(20)          5.572 us      0.397 us
+    go-skip   d4go + d4skip(1)    2.434 us      0.068 us
+    tag-walk  per record          2.511 us      0.080 us
+
+  SEEK DIVIDED BY GO -- the question:
+
+                      C        port
+    uncached       2.29x       2.85x
+    cached         5.84x       5.41x
+
+  So ~5.4x IS THE SHAPE OF THE OPERATION AND NOT A PORT COST: four levels of
+  descent and search against one offset computation and one record read. The
+  port's ratio is now marginally better than the reference's. Before this fix it
+  was 51x.
+
+  ABSOLUTE STANDING:
+
+    cached                   C        port     port/C
+    seek C(20)           397 ns    731.9 ns    1.84x
+    Go+Skip per pair      68 ns    135.4 ns    1.99x
+    tag walk per record   80 ns    146.4 ns    1.83x
+
+    uncached                 C        port     port/C
+    seek C(20)          5.572 us   5.637 us    1.01x   parity
+    Go+Skip per pair    2.434 us   1.981 us    0.81x   port faster
+    tag walk per record 2.511 us   1.179 us    0.47x   port 2.1x faster
+
+  Two readings, and the second is the one to quote when someone asks how this
+  port compares:
+
+  WHEN THE WORK IS I/O THE PORT MATCHES OR BEATS THE C, because both pay the
+  same OS read and the port issues fewer of them. WHEN THE WORK IS CPU IT COSTS
+  A CONSISTENT ~1.85x, across three unrelated operations -- and the consistency
+  is what makes the figure credible rather than a coincidence of one benchmark.
+  ~2x for managed code over C is in line with expectation, and where it is spent
+  is exactly where it should be: LeafBlock.Seek's bit-unpacking is ~148 ns of
+  the 388 ns code floor, the largest single item, and it is the most
+  bitwise-heavy code in the library.
+
+  THIS SUPERSEDES the audit's "port cached" column (0.68 us seek, 0.045 us
+  walk). Those came from swapping IRandomAccessSource for a byte[] -- a perfect
+  cache, which is the array-descent arm -- not the real BlockCache, and were
+  never comparable to the C's opt figures.
+
+  CAVEATS. One session, one machine, one table shape. The C builds x86
+  (build-c.bat, vcvars32) and the port runs x64; that is the audit's own setup,
+  so these numbers are consistent with what is on file, but the comparison is
+  not apples to apples on word size.
+
+===========================================================================
+6. ONE THING NOT EXPLAINED, RECORDED RATHER THAN SMOOTHED OVER
+
+  Cached Go(n)+Skip(1) measured 117.5 ns before the fix and 135.4 ns after, in
+  the same session, with errors of 0.38 and 0.82 ns. The uncached control did
+  not move (2 004.0 -> 1 980.6). That arm walks in NATURAL RECORD ORDER and never
+  calls NodeReader, so this change should not be able to reach it.
+
+  Either it is code-layout or JIT fallout, or the model of that arm is wrong. It
+  is 15% of a 135 ns figure and it changes the port's seek-to-go ratio from
+  5.41x to 6.23x -- which flips "marginally better than the C" into "marginally
+  worse", without changing the conclusion that both are ~6x. It wants its own
+  look before either ratio is quoted as settled.
+
+  This step has twice caught itself explaining a shortfall away instead of
+  running it down (sub-step 2's 1.7-1.9x, sub-step 5's "3.9 us in the Table
+  layer", both wrong). This is the third and it is left open.
+
+===========================================================================
+7. STILL OWED -- THE SAME DEFECT, TWO MORE PLACES
+
+  NodeReader.BlockCount (Cdx/NodeReader.cs:41) is source.Length / BlockSize, and
+  StepPhysical consults it on every leaf-chain crossing. A cached walk still
+  makes 0.043 Length queries per record -- one per ~23 records -- which at
+  ~850 ns is ~37 ns of its 145, about a QUARTER of a cached walk.
+
+  MemoReader (Memo/MemoReader.cs:83, :106) asks TWICE per memo read, so every
+  memo field costs ~1 700 ns of metadata syscall. Nothing has ever measured the
+  memo path.
+
+  Both are the same fix. Neither is done here, so that each gets its own
+  before-and-after rather than being folded into this one.
+
+  AND THE ITEM THIS PROMOTES. The byte[512] allocated per block read
+  (SourceReader.cs:33) was ~1.5% of a 3 927 ns cached descent and is ~10-20% of
+  a 445 ns one. Handing out the cache's pinned window instead of copying into a
+  fresh array would remove that allocation AND the 14 ns/window copy. It is now
+  the largest remaining item after the leaf scan.

@@ -29,6 +29,11 @@
       Seams). It asserts nothing, so it cannot turn an internal into a promise.
     -->
     <InternalsVisibleTo Include="CodeBase.Net.Benchmarks" />
+    <!--
+      The profiling driver runs the same block-layer loop the benchmark does, in one process, so an
+      external profiler can watch it. It asserts nothing either.
+    -->
+    <InternalsVisibleTo Include="CodeBase.Net.Profiling" />
     <!-- Moq builds proxies of the internal boundary interfaces from a generated assembly. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>

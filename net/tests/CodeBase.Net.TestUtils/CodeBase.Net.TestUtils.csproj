@@ -28,6 +28,7 @@
     <InternalsVisibleTo Include="CodeBase.Net.Tests" />
     <InternalsVisibleTo Include="CodeBase.Net.Golden" />
     <InternalsVisibleTo Include="CodeBase.Net.Benchmarks" />
+    <InternalsVisibleTo Include="CodeBase.Net.Profiling" />
   </ItemGroup>
 
 </Project>

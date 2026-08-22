@@ -1,12 +1,18 @@
 # Project state
 
-**Updated:** 2026-08-21 · the tree is **clean**; everything is committed to `main` and **not pushed**.
-§1 to §3 below still describe the state step 008 left and are a session-end update behind.
+**Updated:** 2026-08-22 · the tree is **clean**; everything is committed to `main` and **not pushed**.
+§1 to §3 below still describe the state step 008 left and are two session-end updates behind.
 **Active step:** [`009-performance-audit`](claude/dev/009-performance-audit/) — its audit is
 **[closed](claude/dev/009-performance-audit/SUMMARY.md)** and its remediation is
 [designed](claude/dev/009-performance-audit/DESIGN.md),
 [planned](claude/dev/009-performance-audit/PLAN.md) and **in progress**; the live sub-step is named in
 [its own `STATE.md`](claude/dev/009-performance-audit/STATE.md).
+**Sub-step 8 found the 730 ns the step was held open on, and it was never the cache**: a
+`RandomAccess.GetLength` per block read, four per descent with the cache warm, 87% of its cost
+(**ADR-35**, [`results-length-syscall.txt`](claude/dev/009-performance-audit/results-length-syscall.txt)).
+A cached seek is **732 ns** against 3 885, and **the audit's predicted 11.6× for the block cache is met**.
+Against the C library the port is **~1.85× on CPU-bound work and at parity or better when the work is
+I/O**, and a seek is **5.41×** a plain `Go`+`Skip` where the C's own ratio is 5.84×.
 [`008-seek-by-value`](claude/dev/008-seek-by-value/) is
 **[closed](claude/dev/008-seek-by-value/SUMMARY.md)**: a table can be asked where a value is, and
 **no navigation path refuses any more** — ADR-34 closed the last one.

@@ -22,7 +22,7 @@ them. **Building or testing CodeBase.NET never compiles or runs C.** See ADR-01 
 | `net/` | Everything .NET — `net/CodeBase.Net/` (the library), `net/tests/`, and `net/corpus/` |
 | `net/corpus/` | Checked-in golden `DBF`/`CDX`/`FPT` files with their expected dumps — see its [README](net/corpus/README.md) |
 | `net/corpus/benchmark/` | Benchmark **workloads**, not expectations: the 10 000-record `PERF10K` table with no dump. One directory down because corpus discovery is not recursive |
-| `net/benchmarks/` | `CodeBase.Net.Benchmarks` — the read path's numbers, on BenchmarkDotNet. Builds with the solution; `dotnet test` neither builds nor runs it |
+| `net/benchmarks/` | `CodeBase.Net.Benchmarks` — the read path's numbers, on BenchmarkDotNet — and `CodeBase.Net.Profiling`, a single-process driver for an external profiler. Both build with the solution; `dotnet test` neither builds nor runs either |
 | `test-files-generator/` | Windows/MSVC tool that drives the original C library to produce the corpus — see its [README](test-files-generator/README.md). Not part of the solution, not a test dependency |
 | `original/source/` | The original CodeBase C source. **Read-only reference — never modified** |
 | `original/examples/` | Original C examples and real sample files. Supplementary test input only |
@@ -158,6 +158,38 @@ Debug build.
   mistake made this project's first performance measurement wrong by 4×
   (`claude/dev/009-performance-audit/ANALYSIS.md` §8), and it is why BenchmarkDotNet is used rather
   than a stopwatch.
+
+## Profiling
+
+BenchmarkDotNet compiles and launches a **child process per benchmark**, so a profiler attached to
+`CodeBase.Net.Benchmarks` profiles the harness and never sees the read path. `CodeBase.Net.Profiling`
+exists for that: one process, one arm, a steady-state loop for as long as it is asked to run.
+
+```bash
+cd net/benchmarks/CodeBase.Net.Profiling
+dotnet run -c Release -- cached-descent 30              # the arm to profile, seconds to run
+dotnet run -c Release -- --help                         # the arms
+```
+
+| arm | what it runs |
+|---|---|
+| `cached-descent` | the index descent with blocks served by the block cache |
+| `cached-descent-fixedlength` | the same, with the file asked its length once instead of per read |
+| `array-descent` | the same descent with the whole index file in one `byte[]` |
+| `seek` | `Table.Seek` end to end, cache on |
+| `walk` | a tag-order walk, cache on |
+
+The pair to compare is **`cached-descent` against `array-descent`**: identical work, differing only in
+where the bytes come from.
+
+It prints a rough rate — **BenchmarkDotNet remains the authority on every published number** — and
+three counters no benchmark prints: cache hits, cache misses, and **reads and `Length` queries that
+reached the file**. Those are exact, and they are the reason it exists. A `Length` query is not a read,
+so it never appeared in the audit's `GetProcessIoCounters` figures.
+
+For Visual Studio: set `CodeBase.Net.Profiling` as the startup project, Release, put the arm and a
+duration in **Debug → command-line arguments**, and use **Debug → Performance Profiler**. Instrument
+`CodeBase.Net.dll` as well as the driver, or the frames that matter are collapsed into one call.
 
 ## Code quality — SonarQube
 

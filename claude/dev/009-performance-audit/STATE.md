@@ -4,10 +4,10 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 to 8 are done**; what is left is closing the step: `SUMMARY.md`,
-and the two remaining `Length` sites named at the end of
-[`results-length-syscall.txt`](results-length-syscall.txt) §7
-**Current sub-step:** none. **ADR-35 is written**; the other ADR candidates `PLAN.md` promised are not.
+**Status:** in progress — **sub-steps 1 to 8 are done** and [`SUMMARY.md`](SUMMARY.md) now covers both
+halves of the step. What is left is **deciding the ADR candidates** `DESIGN.md` marks; ADR-35 is the only
+one written.
+**Current sub-step:** none.
 
 ## Done so far
 

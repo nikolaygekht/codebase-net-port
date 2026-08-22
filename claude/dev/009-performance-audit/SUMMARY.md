@@ -1,8 +1,16 @@
 # 009-performance-audit — summary
 
-**Closed 2026-08-19.** The first measurement of anything in this port. Filed under a step number
-because it settles four of the performance pass's named suspects and reorders the rest — but it opened
-no capability, `PORTING-PLAN.md` §5 gained no row, and **not one line of `net/` changed**.
+**The step has two halves, and this document covers both.**
+
+**The audit closed 2026-08-19** — everything down to "What changed in the repository" is that, left as
+written, because it is the record of what was known then. It opened no capability and changed not one
+line of `net/`.
+
+**The remediation ran 2026-08-21 to 2026-08-22** and is [its own section
+below](#the-remediation--2026-08-21-to-2026-08-22). It changed `net/` substantially, met the audit's
+headline prediction, and **overturned three of the audit's own numbers** — flagged inline where they
+appear. Its status: eight sub-steps executed, ADR-35 written, the remaining ADR candidates still to be
+decided.
 
 Until now every performance property of the port was a guess: `STATE.md` §3 opened the performance
 pass with "nothing has ever been measured". This replaces the guesses with numbers on the one path
@@ -66,6 +74,11 @@ the two libraries reached the same records, in the same order, and read a field 
 managed port against 32-bit `/O2` C doing bit-unpacking, that is a respectable baseline. It is *not*
 the thing to fix first.
 
+> **Superseded 2026-08-22.** Part of that 1.4× was four metadata syscalls per descent, not managed-code
+> cost. Uncached, the port is now at **parity** with the C on a seek (1.01×) and faster on a walk and a
+> `Go`+`Skip`. Cached — where the comparison is purely CPU — it is a consistent **~1.85×**. See
+> [`results-length-syscall.txt`](results-length-syscall.txt) §5 and §8.
+
 **2. The block cache is worth 14×, and it dominates everything else on the list.** `c-opt` does the
 identical work — same checksums — at 0.40 µs/seek against `c`'s 5.77 (numeric: 0.76 against 5.14, a
 smaller 6.8×). The C's advantage over this port today is 1.4×; the advantage available *from caching
@@ -93,6 +106,11 @@ not re-scan leaves, allocates 129 bytes/op, which brackets the cost to descent a
 suspects — `NodeReader.ReadAt`'s fresh `byte[512]` per block (P1's allocation half) and
 `LeafBlock.EntryAt`'s key copy per comparison (P2) — plausibly account for all of it, but splitting it
 is a profiler's job and worth doing before either fix.
+
+> **Attributed and reduced.** Both suspects were real. The per-comparison key copy came out in sub-step
+> 2 (−29% to −43%) and the discarded message string in sub-step 8 (−56 bytes per block read), taking a
+> character seek from **3 956 to 2 568 bytes**, gated by `SeekAllocationTests`. The `byte[512]` per
+> block read is still there and is now the largest single item left.
 
 **4. P4 is not a problem.** "A record read per position, with no reuse" was suspect 4. Measured,
 `CodeBase.Net` walks a tag **2.45× faster than the C library does**. That removes P4 from the list and
@@ -143,6 +161,10 @@ Named rather than left to look examined:
   in the stack list. [`harness/`](harness/) is a documented instrument, not a gate: nothing in
   `dotnet test` runs it, and nothing in `net/` depends on it.
 
+  > **Built in sub-step 1**, as `net/benchmarks/CodeBase.Net.Benchmarks`, joined in sub-step 8 by
+  > `CodeBase.Net.Profiling`. And the harness gained the control the audit never took: a `go-skip`
+  > scenario, so a seek has something to be divided by.
+
 ## What changed in the repository
 
 Nothing in `net/`. Only this folder, plus `STATE.md` §3, where the performance pass is re-ordered
@@ -153,3 +175,115 @@ The harness was built and run in `experiments/performance-1-experiment/`, which 
 610 KB table, query sets and build outputs do not belong in the repository. [`harness/`](harness/) holds
 the sources alone, so the measurement can be rebuilt from what is committed. See
 [`METHOD.md`](METHOD.md).
+
+---
+
+# The remediation — 2026-08-21 to 2026-08-22
+
+Eight sub-steps against [`DESIGN.md`](DESIGN.md) and [`PLAN.md`](PLAN.md). The per-sub-step account,
+with the mutations and the deviations, is [`STATE.md`](STATE.md); the results files it links are the
+raw numbers. What follows is what someone reading this in six months needs.
+
+## What the port can do now that it could not
+
+**The block cache exists**, decorating `IRandomAccessSource` so one pool serves a table's data, index
+and memo alike — which is where the reference caches and the only place that catches a walk, whose reads
+are 96% DBF. It is optional on the reference's own three-valued policy (`Off` / `WhenExclusive` /
+`Always`, defaulting to `WhenExclusive`), and **today's default caches nothing**, because no file this
+port opens excludes other writers yet. It starts caching by itself when `LOCKING` adds deny modes.
+
+**`Table.Refresh()` and `DropCachedBlocks()` exist**, with `Invalidate` at four levels, so
+`LOCKING-TRANSACTIONS.md` §3.7's "flush before unlock, invalidate after lock" has something to call.
+`Flush` is deliberately unbuilt: nothing is dirty in a read-only library.
+
+**The library has a threading contract and says so**, plus a detector that turns a missing caller lock
+into an exception rather than a wrong record set. And it has its first lock — inside `BlockCache`,
+because the engine's pool is shared and two tables of one engine queried in parallel is ordinary. That
+race was real: removing the lock fails `SharedCacheConcurrencyTests` in 462 ms, every time.
+
+**Performance can be measured and re-measured by anyone.** `net/benchmarks/CodeBase.Net.Benchmarks` on
+BenchmarkDotNet over the committed `PERF10K`, and `CodeBase.Net.Profiling` — a single-process driver an
+external profiler can watch, which prints reads, `Length` queries and cache hits per operation.
+
+## The numbers
+
+BenchmarkDotNet, Windows 11, Ryzen 9 9950X, .NET 8.0.30 x64, Release, over `PERF10K`. "Start" is
+sub-step 1's baseline; "end" is 2026-08-22.
+
+| per operation | start, cache `Off` | end, cache `Off` | end, cache `Always` |
+|---|---|---|---|
+| seek, `C(20)`, 4 levels | 9 238 ns | **5 637 ns** | **732 ns** |
+| tag walk, per record | 1 148 ns | **1 134 ns** | **114 ns** |
+| `Go(n)` then `Skip(1)`, per pair | 1 913 ns | **1 981 ns** | **135 ns** |
+| seek, allocated | 3 956 B | **2 568 B** | 2 568 B |
+
+**A cached seek is 12.8× the uncached seek the step started from, which meets the audit's predicted
+11.6×.** It had stood at 2.13× from sub-step 5 until sub-step 8 found why.
+
+Against the C library, on the same machine and table, with the `go-skip` control the audit never took:
+
+| | C | port | |
+|---|---|---|---|
+| cached seek | 397 ns | 732 ns | 1.84× |
+| cached walk, per record | 80 ns | 114 ns | 1.43× |
+| cached `Go`+`Skip`, per pair | 68 ns | 135 ns | 1.99× |
+| uncached seek | 5.572 µs | 5.637 µs | **1.01× — parity** |
+| uncached walk, per record | 2.511 µs | 1.179 µs | **0.47× — port faster** |
+| **seek ÷ its own `Go`+`Skip`, cached** | **5.84×** | **5.41×** | |
+
+**When the work is I/O the port matches or beats the C; when it is CPU it costs a consistent ~1.85×**,
+across three unrelated operations. And **a seek costs ~5.4× a plain positioning in both
+implementations** — that ratio is the shape of the operation, not a port cost.
+
+Where the ~1.85× is spent is where it should be: `LeafBlock.Seek` is ~148 ns of the 388 ns code floor,
+the largest single item, and it is the bit-unpacking — a leaf cannot be binary-searched, so every key
+passed is rebuilt from its duplicate prefix and trail count.
+
+## The four things worth carrying forward
+
+**1. The largest cost in the read path was not on anybody's list.** Every gate in `PLAN.md` passed at
+sub-step 7 and the step was still wrong about where its time went — for the third time, after sub-step
+2's comparison work and sub-step 5's "3.9 µs in the `Table` layer". The actual answer was a
+`RandomAccess.GetLength` per block read, four per descent with the cache fully warm, 87% of a cached
+descent (**ADR-35**, [`results-length-syscall.txt`](results-length-syscall.txt)). The audit's
+`GetProcessIoCounters` method could not see it, because a metadata call is not a read.
+
+**What found it was measuring counts, not time.** A gate that asserts a ratio cannot notice that the
+quantity it is dividing is the wrong one. `4.000 Length queries and 0.000 reads per descent` named the
+mechanism in a single run.
+
+**2. Two of the three memo/index `Length` sites were worse than the one that was hunted.** The memo path
+was **90% metadata syscall** — 3 329 → 343 ns per read — and had never been measured at all, because
+there is no memo benchmark. A cached walk was ~25% the same call.
+
+**3. The rule the fix generalises to:** *let the read be the refusal — unless the value being checked
+sizes an allocation.* A fixed-size block read can fail safely; a memo payload whose length the file
+supplies cannot, because the buffer is allocated before the read. That exception is why `MemoReader`
+keeps a check `NodeReader` dropped.
+
+**4. Sub-step ordering earned its keep, and so did mutation.** `BlockResidency` and `BlockPool` were
+built and proved with no file anywhere near them, and the design caught the step's whole risk before it
+shipped — a first cut kept the window map per file, so a slot retired for one file was a slot another
+file still believed was its own. Mutation caught three vacuous or wrong tests, including one in
+sub-step 8 that passed with the code under test deleted.
+
+## What this step does not settle
+
+- **Eviction has never been exercised by a realistic workload.** `PERF10K` is ~1 788 windows against a
+  2 048-window pool, so nothing was ever evicted. Forced small pools show a **walk is worse than no
+  cache at all** under pressure — the cache-hostile shape by definition. That points at a *missing*
+  mechanism, scan resistance and read-ahead (`opt4fileReadSpBuffer`), not a wrong policy, and judging
+  simple against faithful needs the second `IBlockResidency` and a workload larger than a real pool.
+- **The `byte[512]` per block read remains**, and sub-step 8 promoted it: ~1.5% of the old cached
+  descent, ~10–20% of the new one. Handing out the cache's pinned window removes the allocation *and*
+  the 14 ns/window copy. Largest remaining item after the leaf scan.
+- **One unexplained movement, recorded rather than smoothed over.** Cached `Go`+`Skip` went 117.5 →
+  135.4 ns across sub-step 8, same session, uncached control unmoved, on an arm that never calls
+  `NodeReader`. [`results-length-syscall.txt`](results-length-syscall.txt) §6. Judged not worth chasing
+  now.
+- **A defect found on the way and deliberately not fixed here:** `Seek(string)` on a non-character tag
+  reinterprets instead of refusing, and unparseable text becomes the key of zero
+  ([`DEFECT-seek-string-on-a-non-character-tag.md`](DEFECT-seek-string-on-a-non-character-tag.md)). It is
+  a behaviour change and this step's gate was that nothing a file decodes to may change.
+- **`P6` and `P7` are still unjudged.** P7 was implemented and changes the comparison count by nothing
+  on unique keys; both need a duplicate-heavy corpus tag.

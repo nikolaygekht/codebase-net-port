@@ -107,3 +107,62 @@ overturned a conclusion this step had already written down.
   FLOOR. Retargeting the timed assertions onto the walk and Go+Skip in sub-step 5
   was not a convenience; it was necessary, and for a better reason than the one
   given at the time.
+
+===========================================================================
+3. (DONE) A CACHE SMALLER THAN THE WORKING SET
+
+  No new API was needed: CodeBaseEngine.BlockCacheBlocks has been public since
+  sub-step 5, and ReadPathBenchmarks already honoured
+  CODEBASE_BENCHMARK_CACHE_BLOCKS. PERF10K is ~1 788 windows.
+
+  Windows, D:, Always, per operation:
+
+    operation                    2048 (fits)   512 (29%)   128 (7%)   Off
+    tag walk, per record            160 ns      1 151 ns   1 334 ns  1 074 ns
+    Go(n) then Skip(1), per pair    104 ns        845 ns   1 330 ns  1 901 ns
+    seek, C(20)                   4 100 ns      5 456 ns   5 658 ns  8 458 ns
+    seek, N(12,2)                 3 503 ns      4 659 ns   4 627 ns  6 921 ns
+
+  UNDER PRESSURE A WALK IS WORSE THAN NO CACHE AT ALL -- 1 151 and 1 334 against
+  1 074 uncached. A walk touches every record once in tag order, which is the
+  cache-hostile shape by definition: it pays for bookkeeping and eviction and
+  still reads. Seeks keep gaining but far less, 1.55x and 1.49x against 2.06x.
+
+  128 against 512 barely differs for seeks (5 658 vs 5 456): once it is
+  thrashing, thrashing harder costs little more.
+
+  WHAT THIS DOES AND DOES NOT SAY ABOUT THE POLICY. It does not say the five-LRU
+  policy is bad -- no recency policy survives a pure scan, and the reference's
+  heuristics would not either. The priority split protects the index FROM a
+  scan; nothing protects a scan from itself. What the numbers point at is a
+  MISSING MECHANISM rather than a wrong one: scan resistance, and read-ahead for
+  sequential runs (opt4fileReadSpBuffer, which ANALYSIS.md 1 noted and this port
+  did not take). Judging simple against faithful still needs the second
+  implementation behind IBlockResidency and a workload larger than a realistic
+  pool; a small pool over a small file is not that.
+
+===========================================================================
+5. AND A SHARPER CLUE FOR THE 730 ns
+
+  Two measured figures that look contradictory and are not:
+
+    full pool, tag walk        160 ns per record  -- and that is a HIT
+    SeekLayers, index descent  730 ns per window  -- also a hit
+
+  So a hit is not uniformly expensive, and section 1's reading -- "a cache hit
+  costs ~730 ns" -- is too broad. What differs:
+
+                        walk / Go(n)          index descent
+    read size           61 bytes              512 bytes
+    destination         a reused buffer       a FRESH byte[512] from ReadExactly
+    cost of the hit     under 160 ns          about 730 ns
+
+  The expense is therefore NOT the cache's hit path in general -- if it were,
+  the walk would be slow too. It is somewhere in the size, or in the path
+  NodeReader.ReadAt -> SourceReader.ReadExactly(count) -> the Span overload ->
+  CachingRandomAccessSource.Read.
+
+  FIRST THING TO CHECK TOMORROW: whether the fill loop in SourceReader.cs:56
+  goes round more than once for a 512-byte read of a 512-aligned window. It
+  would if the cached source ever answered short, and every extra turn is
+  another pass through TryHold, two lock acquisitions and a Release.

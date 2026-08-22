@@ -211,11 +211,24 @@ The path from `Seek` to the bytes, in order:
 | — | back up: `NodeHeader.Parse`, `LeafBlock.Parse`/`BranchBlock.Parse`, `LeafBlock.Seek`→`CompareAt`→`KeyAt`→`Build`, `BranchBlock.Seek`/`ChildAt` | measured as cheap: arm 0a does all of it in 545 ns |
 | 15 | `Table.Fetch` — `Table.cs:1205` → `RecordReader.Read` — `Dbf/RecordReader.cs:51` | the record, through the same source and so the same path |
 
-**Where I would look first**, in order of suspicion: two `lock` acquisitions per window (12 and 14);
-whether `ReadExactly`'s loop at 10 ever goes round more than once, which it would if the cached source
-ever returns short for a full-width aligned read; and whether a supposed hit is actually a miss on some
-windows, which nothing currently reports — `BlockCache` counts `Hits` and `Misses` but nothing prints
-them.
+**The search is narrower than it was**, because two measured figures rule most of it out:
+
+| | walk / `Go(n)` | index descent |
+|---|---|---|
+| read size | 61 bytes | 512 bytes |
+| destination | a reused buffer | a **fresh `byte[512]`** from `ReadExactly` |
+| cost of a hit | **under 160 ns** | **~730 ns** |
+
+A full-pool walk costs 160 ns a record and that *is* a hit — so the hit path is **not** uniformly
+expensive, and "a cache hit costs 730 ns" is too broad a reading. Whatever it is lives in the size, or
+in the path **step 9 → 10 → 11** and not in step 12's bookkeeping, which the walk exercises just as
+hard.
+
+**First thing to check:** whether the fill loop in `SourceReader.cs:56` goes round more than once for a
+512-byte read of a 512-aligned window. It would if the cached source ever answered short, and every
+extra turn is another `TryHold`, two lock acquisitions and a `Release`. After that: the two locks per
+window (12 and 14), and whether some supposed hits are misses — `BlockCache` counts `Hits` and
+`Misses` and nothing ever prints them.
 
 **Why it matters enough to hold the step open:** if a hit can be made to cost ~50 ns, a cached seek
 goes from 4.3 µs to about 0.8, and the audit's predicted **11.6×** stops being disproved and becomes
@@ -236,8 +249,24 @@ Two ways, and they are not equivalent:
 - **A workload larger than a realistic pool** — a new generator case. Honest, and it costs a Windows
   generator run and committed data.
 
-Start with the first tomorrow, because it is free and it answers whether the policy moves the number at
-all. Only build the second if it does.
+**Done, 2026-08-21** — no new API was needed, `BlockCacheBlocks` has been public since sub-step 5. Full
+table in [`results-before-closing.txt`](results-before-closing.txt) §3. The headline:
+
+| | 2048 (fits) | 512 | 128 | `Off` |
+|---|---|---|---|---|
+| tag walk, per record | 160 ns | **1 151** | **1 334** | **1 074** |
+| `Go`+`Skip`, per pair | 104 ns | 845 | 1 330 | 1 901 |
+| seek `C(20)` | 4 100 ns | 5 456 | 5 658 | 8 458 |
+
+**Under pressure a walk is worse than no cache at all.** A walk touches every record once in tag order,
+which is the cache-hostile shape by definition: it pays for bookkeeping and eviction and still reads.
+Seeks keep gaining, at 1.55× and 1.49× instead of 2.06×.
+
+That is **not** a verdict on the policy — no recency policy survives a pure scan and the reference's
+heuristics would not either. The priority split protects the index *from* a scan; nothing protects a
+scan from itself. It points at a **missing mechanism**: scan resistance, and read-ahead for sequential
+runs (`opt4fileReadSpBuffer`, which `ANALYSIS.md` §1 noted and this port did not take). Judging simple
+against faithful still needs the second implementation and a workload larger than a realistic pool.
 
 ## Notes for the next session
 

@@ -1049,3 +1049,304 @@ because the short-read path is now the only path and more cases run through it.
 **The rule this generalises to**, since it is the part worth remembering: *let the read be the
 refusal — unless the value being checked sizes an allocation.* A fixed-size read can fail safely; one
 whose length the file supplies cannot.
+
+## ADR-36 — The block cache decorates `IRandomAccessSource`, and one pool serves the whole engine · accepted
+
+**Context.** Step 009's audit priced a block cache at **11.6×** on a seek and **23.4×** on a walk, and
+the obvious place to put one is `NodeReader` — the index is where the tree descent reads, and an index
+cache needs to know nothing about records.
+
+**It is the wrong place, and the audit's own counting says so.** A tag walk issues **1.044 reads per
+record, of which 1.000 is the record itself** and 0.044 is a leaf. An index-only cache would leave the
+walk essentially untouched, and the walk is the 23.4× — the biggest number in the audit, and the one
+`QUERY` depends on, because a bitmap build seeks one end of a range and then *walks*.
+
+**Decision.** The cache is a **decorator on `IRandomAccessSource`**, composed in through
+`IRandomAccessSourceFactory`. `RecordReader`, `NodeReader` and `MemoReader` already read through that
+one interface, so all three are served and **nothing in `Cdx/` or `Dbf/` changed shape to get it**.
+
+**This is where the reference caches.** `file4readInternal` (`f4file.c:2017-2093`) branches on
+`f4->doBuffer` *below* both the index and the DBF code, so `opt4fileRead` serves tag blocks and record
+bytes out of the same pool. The port's layering is the same layering.
+
+**And the pool is engine-wide, not per file** — one budget across a table's data, index and memo, as
+`CODE4` does. A per-file pool would give a table with three files three budgets, and would make the
+budget a function of how many companion files a table happens to have rather than of how much memory
+the caller meant to spend.
+
+**Rejected — a cache inside `NodeReader`.** Simpler, narrower, needs no policy, and it buys the
+smaller half of the win. It is the alternative a reader will re-propose, which is why the read counts
+are recorded here rather than only in the analysis.
+
+**Rejected — the window map living in the per-file source.** The first cut did this and it was a
+silent-corruption bug: a slot retired for one file was a slot another file still believed was its own,
+so a hit served the wrong file's bytes. The map lives in the shared cache, where eviction removes its
+key in the same breath — which is also where the reference keeps it.
+`TwoFilesSharingAPoolAreNeverServedEachOthersBytes` runs it on a pool of one slot.
+
+**Consequence.** DBF records are not block-aligned (`32 + headerLen + n × recordLength`), so a record
+read routinely spans two windows and the decorator loops over the windows a request touches, exactly
+as `opt4fileRead` does. A request larger than the whole pool falls through to the wrapped source
+rather than evicting everything.
+
+**What it delivered**, measured on `PERF10K`: `Go(n)`-then-`Skip(1)` 1 969 → **86 ns (23.0×)** against
+the audit's predicted 23.4×.
+
+**What it does not do**, and this is now the largest remaining item in the read path:
+`IRandomAccessSource.Read` copies into a caller-owned span by contract — as does `opt4fileRead` — so
+the `byte[512]` `SourceReader.ReadExactly` allocates per block read (`IO/SourceReader.cs:33`) survives
+the cache. It was ~1.5% of a 3 927 ns cached descent and is ~10–20% of the 445 ns one ADR-35 left.
+Handing out a pinned slice of the cache's own window instead removes that allocation *and* the 14 ns
+per-window copy, and it is deliberately **not** built here: it needs a lifetime rule, because a
+`LeafBlock` holds its block for life and a `TagCursor` holds blocks across calls. `DESIGN.md`'s Open
+questions work that design out — rent-and-return with the window as the residency unit — and it is
+recorded there as a plan rather than here as a decision, on purpose. **One correction belongs with it:
+pins are counted.** Earlier in the step I wrote that rent/return needs no refcount because "the owner
+is exactly one"; two cursors on one tag can sit on the same block, so it is a count — small, bounded
+by parked readers, but a count.
+
+## ADR-37 — The cache is optional, on the reference's three-valued policy, and defaults to caching nothing · accepted
+
+**Context.** A cached block is stale the moment another process writes the file, and DBF files are
+classically shared — `FileRandomAccessSource` opens `FileShare.ReadWrite` because these files are
+normally open elsewhere. A stale block is a **wrong record set**, which this project's ground rule
+puts above any slowness. So the cache needs a policy, and the reference already has one.
+
+**Decision.** Port `OPT4OFF` / `OPT4EXCLUSIVE` / `OPT4ALL` as `BlockCacheMode.Off` /
+`WhenExclusive` / `Always` on `CodeBaseEngine`, **defaulting to `WhenExclusive`** — which caches a
+file only when it was opened excluding other writers:
+
+```c
+if ( optFlag == -1 )              /* OPT4EXCLUSIVE -- the shipped default */
+   optFlag = ( file->lowAccessMode != OPEN4DENY_NONE ) ? 1 : 0 ;   /* f4opt.c:492-501 */
+```
+
+**`OPT4EXCLUSIVE` is a safety rule, not a convenience default.** Caching only what we have excluded
+other writers from makes staleness *impossible* rather than merely unlikely. That is why the reference
+ships that value, and **risk R6 names this exact hazard** — "read caching on unlocked files can mix
+old/new bytes; default to no unsafe read-opt on shared files". This is R6's mitigation, ported rather
+than invented.
+
+**What it means today, stated plainly because it looks like a bug.** No file this port opens is
+exclusive — an access mode is `LOCKING`'s to introduce — so **the shipped default caches nothing**, and
+every benchmark and gate in step 009 had to ask for `Always` explicitly. That is not the default
+failing; it is the default being the same guarantee the library gave before the cache existed. When
+`LOCKING` adds deny modes, **the default starts caching by itself**, for the files where it is provably
+safe, with no API change.
+
+**The decision is per file at open time**, as in the C (`file4optimizeLow` runs from the open path), so
+changing the mode affects files opened afterwards and not files already open. The property documents
+that rather than leaving it to be discovered.
+
+**The seam that answers "was it opened exclusive" is its own interface.** `IExclusiveAccess`, not a
+third member on `IRandomAccessSource`: that interface is two members wide so a test can stand a byte
+array in for a file in three lines, and a third member would be paid for by every fake in the suite
+while mattering to exactly one caller. A source that does not implement it is treated as shared, which
+is the safe answer — and a fake that *claims* to be exclusive is what makes the policy testable years
+before `LOCKING` exists.
+
+**Rejected — a boolean, on or off.** It loses the only interesting value. A caller who switches a
+boolean on gets staleness on shared files with no way to say "cache where it is provably safe", and the
+day `LOCKING` lands nothing starts working by itself.
+
+**Rejected — defaulting to `Always` on the grounds that the library is read-only.** Read-only is this
+port's state, not the file's: another process writing a DBF this library is reading is the ordinary
+case, not the exotic one.
+
+**Rejected — detecting other writers.** The reference does not, and it is not detectable. Its answer
+is that **currency has always been the caller's responsibility, expressed through locks**, and the
+cache inherits that contract — `d4refresh` (`D4FRESH.C:130-148`) recognises exactly three situations in
+which a cached block is known good: we hold a write lock, we hold a read lock, or the file was not
+opened shared.
+
+**Consequence.** `Always` on a shared file can serve stale blocks, as `OPT4ALL` can, and this port has
+no locks at all yet — so a caller choosing `Always` has no lock to make it safe and must be told so in
+the property's own documentation. What makes it defensible meanwhile is the invalidation surface
+(ADR-38). The C's per-read `opt->forceCurrent`, which makes a *hit* re-read from disk
+(`o4opt.c:1575-1585`), waits for `LOCKING` along with the lock-driven trust branch — at which point the
+rule generalises rather than changes: trust the cache while a lock is held or the file is non-shared,
+refresh otherwise.
+
+## ADR-38 — The invalidation surface ships with the cache, and a block lives in two places · accepted
+
+**Context.** Without a way to discard what it holds, `Always` is a one-way door: a long-running reader
+that chooses speed can never get currency back short of closing the table. That is a worse API than a
+slow one. The C has the operations already, they need no locking, and they are cheap.
+
+**Decision.** Ship them with the cache, not after it — `code4optSuspend` as
+`CodeBaseEngine.DropCachedBlocks()`, `d4freeBlocks` (`d4index.c:29`) as `Table.DropCachedBlocks()`, and
+`d4refresh` (`D4FRESH.C:130-175`) as `Table.Refresh()`. Underneath, `Invalidate` exists at four levels
+— `BlockCache.Invalidate(owner)` and `InvalidateAll()`, `CachingRandomAccessSource.Invalidate()`, and
+the two public methods — so `LOCKING-TRANSACTIONS.md` §3.7's **flush before unlock, invalidate after
+lock** has something to call and **the cache does not get redesigned to accept it**. Building the seam
+now costs nothing; discovering it later costs a rewrite of the thing whose failure mode is a wrong
+record set.
+
+**`Flush` is deliberately unbuilt.** Nothing is dirty in a read-only library, so a `Flush` today would
+be a method whose body is a comment. It is the write path's first job, and `PORTING-PLAN.md` §5's
+cross-capability obligation table is where that is recorded.
+
+**And dropping blocks has two halves, which contradicts a document.** `ANALYSIS.md` §9 says this port
+needs only one invalidation point because it "re-descends from the root every time". That was true when
+a cursor held nothing between calls and **stopped being true when `TagCursor` began keeping its
+block**. Blocks live in two places: the engine's pool, and the block a **parked tag cursor** is sitting
+on — its own copy, because `NodeReader` allocates per read and the cache copies into it. Dropping only
+the pool would leave an indexed walk on stale bytes while the record path read fresh ones, which is
+worse than dropping neither. `Table.DropCachedBlocks()` therefore invalidates the pool *and* calls
+`ForgetBlocks()` on every parked cursor. **The C has the same two levels** — `tfile4upToRoot` keeps a
+per-tag path of `B4BLOCK`s above the cache, and `d4freeBlocks` exists to clear both. The analysis note
+is wrong, the code is right, and this entry is where that is recorded.
+
+**One deviation from the design, in `Refresh`.** `DESIGN.md` item 4 said it would reset the memo cache
+for every memo field (`f4memoReset`). There is no such cache: `MemoReader` keeps no state between
+calls, so there is nothing to reset. `Refresh` drops blocks, forgets the cursors' blocks, and re-reads
+the current record in place. When a write path gives memo values somewhere to be held, that is where
+resetting them belongs.
+
+**Rejected — `Refresh()` skipping the work when nothing can have changed**, which is what the C does by
+testing its locks. This library holds no locks, so it always does the work: slower and honest. That
+branch arrives with `LOCKING` rather than being guessed at now.
+
+**Consequence.** `Refresh()` is meaningful even with the cache off, because the record re-read is real
+— but it is **not a promise of currency** and cannot be one until locking exists. It says "forget what
+you saw"; another process may write between the call and the next read. The XML docs say exactly that.
+
+## ADR-39 — Eviction is a pure class in the reference's priority order · accepted
+
+**Context.** Eviction is the part of a cache that can be *wrong* rather than merely slow, and the
+reference's policy is not one LRU: `OPT4` keeps five separate lists (`d4data.h:661-671`) and scans them
+in a fixed order.
+
+**Decision.** `BlockResidency` is a **pure class** behind `IBlockResidency` — the slots, their
+priorities and five intrusive LRU lists, O(1) per operation, with no I/O and no clock — and the scan
+order is taken verbatim from the reference: `other`, `dataLow`, `indexLow`, `dataHigh`, `indexHigh`,
+which is `prio[0]`…`prio[4]` at **`D4OPT.C:324-328`**. (Found only by searching case-insensitively,
+which is the mixed-case-filename trap `CLAUDE.md` warns about.)
+
+**The order *is* the property**: a table scan cannot evict the index tree. A single LRU sized to a
+working set fails exactly when `QUERY` needs it most — a full scan running beside thousands of tag
+seeks. Pure means it can be driven exhaustively at memory speed, which is what a **20 000-operation
+randomised run** at a fixed seed does, checking the invariants after every operation;
+`ServingBlocksAllocatesNothing` requires 1000 claim/touch/release cycles to allocate exactly zero
+bytes. Reversing the priority scan reddens exactly 3 tests; ignoring pins reddens 7, including the
+randomised run, which found it unaided.
+
+**Rejected — a single LRU.** See above; it is the failure mode the split exists to prevent.
+
+**Rejected — a factory for `IBlockResidency`.** With one implementation that is the speculative half.
+The constructor already takes the interface, which is all the seam a second implementation needs.
+
+**Deferred, not written off — the reference's heuristics**: availability marking with its priority
+counting, list normalisation by average length, hit-count and access-time scoring, dbfLo→dbfHi
+promotion. They change which block is given up, never what a read returns. Since speed is the only
+reason step 009 exists, "probably not worth it" is not a finding — the second implementation is planned
+and the two get measured against each other, which is what `IBlockResidency` is for.
+
+**What the measurements can and cannot say about it.** **Nothing in step 009 ever evicted anything**:
+`PERF10K` is ~1 788 windows against a 2 048-block default pool, so every figure in the step was taken
+with the whole working set resident. Shrinking the pool (`results-before-closing.txt` §3) showed that
+**under pressure a walk is worse than no cache at all** — 1 151 ns at 512 blocks and 1 334 at 128,
+against 1 074 uncached — while seeks keep gaining at 1.55× and 1.49× instead of 2.06×. That is not a
+verdict on this policy: no recency policy survives a pure scan and the reference's heuristics would not
+either. The priority split protects the index *from* a scan; nothing protects a scan from itself. It
+points at a **missing mechanism** — scan resistance, and read-ahead for sequential runs
+(`opt4fileReadSpBuffer`, which `ANALYSIS.md` §1 noted and this port did not take). Judging simple
+against faithful still needs the second implementation *and* a workload larger than a realistic pool; a
+small pool over a small file is not that.
+
+## ADR-40 — The speed-up itself is gated, at 2×, and on read counts wherever a clock cannot carry it · accepted
+
+**Context.** Every other gate in step 009 passes on a cache that is perfectly correct and **never
+hits** — and so does a machine on which syscalls have become cheap enough that the whole optimization
+is pointless. Those are the two states worth being told about, and no correctness test can see either.
+
+**Decision.** `BlockCacheSpeedupTests` asserts the *improvement*, cache `Off` against `Always` on
+`PERF10K`, at a **2× floor** — a tripwire well below the measured win, not a target. It is the first
+performance gate in the project and the precedent `QUERY` will reuse when it has to prove a bitmap
+beats a scan.
+
+**Amended by what happened: the deterministic measures carry the weight, and the seek is gated on read
+counts rather than on a clock.** The plan said reads, allocation *and* wall clock. Two things moved it:
+
+- At sub-step 5 a cached seek was 2.13× an uncached one, so a 2× floor would have sat **inside noise of
+  its own threshold**. The floor was not lowered — *what is measured* changed instead. A seek is gated
+  on its **read count**, which is exact and unbounded because a cached seek storm reaches the file zero
+  times, while the clock is applied to the walk and to `Go`+`Skip`, where the cache's win is large
+  (7.4× and 23.0×).
+- Then `FilesystemBenchmarks` measured the same reads on four filesystems, and **on ext4 the seek ratio
+  was 1.80× — already under the floor** (`results-before-closing.txt` §4), because a hit costs the same
+  59–74 ns everywhere while the read it avoids ranges from 400 ns on NVMe to 171 µs through the WSL 9p
+  bridge. So retargeting the seek was not a convenience; it was necessary, and for a better reason than
+  the one given at the time. (That 1.80× was measured *before* ADR-35 removed the metadata syscall and
+  has not been re-taken on ext4; the point stands either way — the ratio is a property of the
+  filesystem, not of the cache.)
+
+**Rejected — lowering the floor when a timed assertion is close.** If a timed assertion flakes it gets
+a trait and is opted out of; the threshold does not move, and the deterministic assertions keep the
+regression cover. A gate that is tuned to pass is not a gate.
+
+**Rejected — no performance gate at all**, on the reasoning that benchmarks belong in a benchmark
+project. `net/benchmarks/` exists and is where the numbers are taken; what it cannot do is fail a build
+when the optimization silently stops paying, which is the whole point.
+
+**Consequence.** The timed assertions use best-of-N minima in both orderings and never an absolute
+figure — which is also why the benchmark must be run natively on Windows and not through `/mnt/d`,
+where the same seek costs 1.58 ms instead of 9.2 µs. The ratio is the only portable claim.
+
+**Postscript worth recording, since it vindicates the design of the gate rather than the number.** The
+seek's 2.13× was not the cache underperforming: ADR-35 found four metadata syscalls per descent, and a
+cached seek went 3 885 → **732 ns**, taking the ratio to 7.7×. The gate that could not measure it with
+a clock still held the line with a read count.
+
+## ADR-41 — Concurrent use of a table is the caller's to serialise; the library locks only what has no protocol · accepted
+
+**Context.** Before step 009 the library contained **no synchronisation of any kind** and had never
+stated a threading contract — no locks, no `[ThreadStatic]`, not a sentence in any document. That costs
+nothing while every buffer is per-call, and it stopped being free the moment the cache made a pool
+shared across an engine (ADR-36).
+
+**Decision — the contract is "not concurrently", not "one thread".** No two operations may run against
+one `Table` at the same time; before an `await` on thread A and after it on thread B is fine, because
+the task machinery supplies the barrier. Thread *affinity* is the one thing a modern API cannot ask
+for — a continuation resumes on whatever pool thread is free — and this is exactly ADO.NET's contract
+for `DbConnection` and `DbCommand`, and `Stream`'s. Nothing may therefore be thread-affine: renting a
+buffer on one thread and returning it on another is normal under `async`, so no thread-local pools.
+
+**And the split follows from what has a protocol and what does not:**
+
+| state | synchronised by |
+|---|---|
+| a table's cursor, position and buffers | **the caller**, around its own unit of work — a contract, not code |
+| residency and pools shared across an engine | **us**, internally, because each operation stands alone |
+
+**Rejected — an internal lock per `Table` call.** Not merely insufficient: **harmful**. The cursor *is*
+the protocol — `Seek(x)`, `SeekNext()`, `GetString(f)` mean something only because the position survives
+between them — so a lock making each call atomic leaves the sequence wrong, with another thread's
+`Seek` landing between the first two and every individual call behaving correctly. It would trade a
+torn buffer, which is visible, for a wrong record set, which is this project's worst outcome by its own
+ground rule.
+
+**The library's first lock is inside `BlockCache`, and it closed a race that existed.** Engine-shared
+residency has no cross-call semantics — "give me block X", "take block Y back" are self-contained — so a
+lock there is both correct and sufficient. And it is needed: the contract above does not cover **two
+tables of one engine queried in parallel**, which is an ordinary thing to do. Removing the lock makes
+both `SharedCacheConcurrencyTests` fail in 462 ms, every time — the race was real, reachable and cheap
+to provoke. It costs **~9 ns per cached window service**, an uncontended acquisition: 17% of a `Go`+`Skip`
+pair, ~1% of a seek, invisible in a walk. Splitting it would not reduce that, because what was measured
+is the acquisition and not serialisation, so it is recorded rather than optimised.
+
+**And since the caller's half cannot be made safe, misuse is made loud.** `Table.Enter()` takes an
+`Interlocked` claim on each of the 22 public entry points, so a second operation arriving while the
+first is in flight **throws** instead of returning someone else's record. It is re-entrant for the
+holding thread, because operations here legitimately call one another — `Refresh` calls
+`DropCachedBlocks` — and it can miss a racer arriving in the same instant.
+
+**It is a smoke alarm, not a fire door, and that has to be said in the docs or it will be read as
+protection.** It earns its place only because of the ground rule: a missing caller lock otherwise
+produces a wrong record set silently, with every individual call behaving correctly. The test that
+makes "mid-flight" a place rather than a hope is a source that **blocks inside a read**, armed only
+after the table is open, so the intruding thread arrives at a known point.
+
+**Consequence.** The contract is stated in the public XML docs, and the source itself was never the
+problem — `RandomAccess.Read` is positional and safe on one handle concurrently. What is unsafe is this
+library's own mutable state: buffers, cursor position, pool.

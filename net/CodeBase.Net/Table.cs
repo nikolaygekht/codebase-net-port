@@ -1218,9 +1218,6 @@ public sealed class Table : IDisposable
     }
 
     /// <summary>
-    /// Refuses to work on a table whose files have been closed.
-    /// </summary>
-    /// <summary>
     /// Claims this table for the current operation, refusing a second one already in flight.
     /// </summary>
     /// <returns>A hold to dispose when the operation ends.</returns>
@@ -1259,6 +1256,10 @@ public sealed class Table : IDisposable
         return new Hold(this);
     }
 
+    /// <summary>
+    /// Refuses to work on a table whose files have been closed.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     private void EnsureOpen() => ObjectDisposedException.ThrowIf(closed, this);
 
     /// <summary>

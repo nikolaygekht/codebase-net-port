@@ -9,8 +9,8 @@ line of `net/`.
 **The remediation ran 2026-08-21 to 2026-08-22** and is [its own section
 below](#the-remediation--2026-08-21-to-2026-08-22). It changed `net/` substantially, met the audit's
 headline prediction, and **overturned three of the audit's own numbers** — flagged inline where they
-appear. Its status: eight sub-steps executed, ADR-35 written, the remaining ADR candidates still to be
-decided.
+appear. Its status: **eight sub-steps executed and the decisions recorded — ADR-35 to ADR-41**, written
+2026-08-27 and listed [below](#the-decisions-this-step-recorded).
 
 Until now every performance property of the port was a guess: `STATE.md` §3 opened the performance
 pass with "nothing has ever been measured". This replaces the guesses with numbers on the one path
@@ -89,6 +89,11 @@ most; it is now measured to matter more than the rest of the list combined.** It
 on the ADR `STATE.md` §3 already calls for — where a cache shared by several cursors over one tag
 lives, and how it stays coherent — because a cache that serves a stale block is a wrong record set, and
 this port's first rule is that a wrong record set is far worse than a slow one.
+
+> **Written 2026-08-27** as **ADR-36** (where the cache lives), **ADR-37** (the policy that keeps it
+> coherent) and **ADR-38** (the invalidation surface). The answer to "where a cache shared by several
+> cursors over one tag lives" turned out to have a second half the audit did not anticipate — a parked
+> cursor holds its own copy of a block — which is ADR-38's subject.
 
 > **Confirmed and quantified by [`ANALYSIS.md`](ANALYSIS.md).** The 14× is entirely **read syscalls
 > avoided**: the C spends 5.16 of its 5.56 µs (93%) inside them, at a measured 1.18–1.21 µs each, where a
@@ -238,6 +243,33 @@ implementations** — that ratio is the shape of the operation, not a port cost.
 Where the ~1.85× is spent is where it should be: `LeafBlock.Seek` is ~148 ns of the 388 ns code floor,
 the largest single item, and it is the bit-unpacking — a leaf cannot be binary-searched, so every key
 passed is rebuilt from its duplicate prefix and trail count.
+
+## The decisions this step recorded
+
+Seven entries, and the design did **not** survive execution unchanged — which is why they were worth
+writing rather than transcribing.
+
+| ADR | What it settles |
+|---|---|
+| **ADR-35** | A block read is bounds-checked by failing, not by asking the file its length first — sub-step 8, and the largest single win in the step |
+| **ADR-36** | The cache decorates `IRandomAccessSource`, not `NodeReader`, and one pool serves the whole engine |
+| **ADR-37** | The cache is optional on the reference's three-valued policy and **defaults to caching nothing** — a safety rule, and risk R6's mitigation |
+| **ADR-38** | The invalidation surface ships with the cache; **a block lives in two places**, which contradicts `ANALYSIS.md` §9 |
+| **ADR-39** | Eviction is a pure class in the reference's priority order, with the heuristics deferred behind `IBlockResidency` |
+| **ADR-40** | The speed-up itself is gated at 2×, on read counts wherever a clock cannot carry it |
+| **ADR-41** | Concurrent use of a table is the caller's to serialise; the library locks only what has no protocol |
+
+**Three places the design changed under execution**, each recorded in the entry rather than smoothed
+over: dropping blocks turned out to have two halves (ADR-38), `Refresh` has no memo cache to reset
+because `MemoReader` keeps no state (ADR-38), and the 2× gate had to be retargeted onto read counts
+because 2.13× sat inside its own noise — and because on ext4 the seek ratio was already 1.80×, under
+the floor (ADR-40).
+
+**Two candidates deliberately did not become entries.** The engine-wide pool is one sentence inside
+ADR-36 rather than an entry of its own; and **rent-and-return with the window as the residency unit is
+deferred**, because it describes the zero-copy design that was *not* built — writing it now would
+document a plan, not a decision. It belongs with the pinned-window change, and ADR-36's consequence
+names it as the largest remaining read-path item so it cannot be lost.
 
 ## The four things worth carrying forward
 

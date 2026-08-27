@@ -4,36 +4,29 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 to 8 are done** and [`SUMMARY.md`](SUMMARY.md) now covers both
-halves of the step. What is left is **deciding the ADR candidates** `DESIGN.md` marks; ADR-35 is the only
-one written.
+**Status:** in progress — **sub-steps 1 to 8 are done**, [`SUMMARY.md`](SUMMARY.md) covers both halves
+of the step, and **the eight ADR candidates are decided** (2026-08-27). What is left is the closeout:
+`SUMMARY.md`'s ADR pointers, [`claude/dev/README.md`](../README.md) and the root
+[`STATE.md`](../../../STATE.md).
 **Current sub-step:** none.
 
-## FIRST THING NEXT SESSION — decide these eight, then close the step
+## The eight candidates, decided 2026-08-27
 
-Nothing else is owed before 009 closes. The candidates are marked in
-[`DESIGN.md`](DESIGN.md) "Decisions this design makes" and its Open questions; `PLAN.md` step 5 promised
-them and only **ADR-35** was written. The recommendation column is a proposal to accept, reject or
-amend — **not** a decision already taken.
+Six entries written, one folded, one deferred — the recommendations were accepted as tabulated.
 
-| # | Candidate | `DESIGN.md` | Recommended |
-|---|---|---|---|
-| 1 | **The cache decorates `IRandomAccessSource`, not `NodeReader`** — a walk's reads are 96% DBF, so an index-only cache misses the whole win, and it is where the C caches (`file4readInternal`, below both layers) | decision 1 | **write** — load-bearing, cited, and the rejected alternative is the one a reader will re-propose |
-| 2 | **Optional, on the reference's three-valued policy** — `Off`/`WhenExclusive`/`Always`, default `WhenExclusive`, which caches nothing today and starts by itself when `LOCKING` adds deny modes (`f4opt.c:492-501`) | decision 2, "the important one" | **write** — a *safety* decision (risk R6), it explains a default that looks like a bug, and `LOCKING` needs the reasoning |
-| 3 | **The invalidation surface ships with the cache** — `DropCachedBlocks()`, `Table.Refresh()`, `Invalidate` at four levels, `Flush` deliberately unbuilt. **Include what sub-step 6 found:** blocks live in *two* places, the pool and a parked cursor's own copy, which **contradicts `ANALYSIS.md` §9** | decision 3 | **write** — a contradiction of a document needs a durable home |
-| 4 | **The pool is engine-wide, not per file** — one budget across a table's data, index and memo, as `CODE4` does | decision 4 | **fold into 1 or 2** — real but one sentence, not an entry |
-| 5 | **Eviction is a pure class with the C's priority order** — `other`, `dataLow`, `indexLow`, `dataHigh`, `indexHigh` (`D4OPT.C:324-328`); the order *is* the property, since a table scan cannot evict the index tree | decision 5 | **write, small** — citable, and the second `IBlockResidency` is still planned, so an ADR is where that comparison lands |
-| 6 | **The 2× speed-up gate** — the first performance gate in the project and the precedent `QUERY` reuses. **Amend by what happened:** the seek's timed assertion was retargeted to *read counts* because 2.13× sat inside its own noise, and on ext4 the seek ratio was already **1.80×, under the floor** (`results-before-closing.txt` §4) | decision 8 | **write, amended** |
-| 7 | **Rent-and-return, and the window as the residency unit** — oversized buffers become admissible so `ArrayPool` re-enters; eviction retires a window and every slice must be returned first | Open questions | **defer** — it describes the zero-copy design that **was not built**. Writing it now documents a plan, not a decision. It belongs with the pinned-window change |
-| 8 | **The threading contract, the detector, and the library's first lock** — the contract in the public XML docs; an interlocked claim per `Table` entry point that is *a smoke alarm, not a fire door*; and the lock inside `BlockCache`, because the engine's pool is shared and two tables of one engine in parallel is ordinary. That race was real — removing the lock fails `SharedCacheConcurrencyTests` in 462 ms | Open questions | **write — the second most important**, or "not protection" gets read as protection |
+| # | Candidate | Outcome |
+|---|---|---|
+| 1 | The cache decorates `IRandomAccessSource`, not `NodeReader` | **ADR-36**, with candidate 4 folded in |
+| 2 | Optional, on the reference's three-valued policy | **ADR-37** |
+| 3 | The invalidation surface ships with the cache | **ADR-38** — carries the `ANALYSIS.md` §9 contradiction and `Refresh`'s memo deviation |
+| 4 | The pool is engine-wide, not per file | **folded into ADR-36** |
+| 5 | Eviction is a pure class in the C's priority order | **ADR-39** — carries what the pressure run can and cannot say |
+| 6 | The 2× speed-up gate | **ADR-40**, amended: read counts for the seek, and ext4's 1.80× |
+| 7 | Rent-and-return, the window as the residency unit | **deferred** — it is a design not built; `DESIGN.md`'s Open questions hold it, and ADR-36's consequence names it as the largest remaining read-path item and carries the pins-are-counted correction |
+| 8 | The threading contract, the detector, and the first lock | **ADR-41** |
 
-**Not ADRs, deliberately:** `EntryAt` keeping its copy (a local shape decision, `ANALYSIS.md` §6, and
-`DESIGN.md` decision 6 already says so), BenchmarkDotNet as the instrument (decision 7), and sub-step 3's
-padded-comparison fix.
-
-**One correction to fold into whichever entry covers the pool.** Earlier in this step I wrote that
-rent/return needs no refcount because "the owner is exactly one". **Wrong:** two cursors on one tag can
-sit on the same block, so **pins are counted** — small, bounded by parked readers, but a count.
+**Still not ADRs, as decided:** `EntryAt` keeping its copy (`ANALYSIS.md` §6, `DESIGN.md` decision 6),
+BenchmarkDotNet as the instrument (decision 7), and sub-step 3's padded-comparison fix.
 
 ## Done so far
 
@@ -329,10 +322,10 @@ against faithful still needs the second implementation and a workload larger tha
 
 ## Notes for the next session
 
-- **Start at `PLAN.md` step 1.** Read [`DESIGN.md`](DESIGN.md) first; the two decisions that shape
-  everything are that the cache decorates `IRandomAccessSource` (not `NodeReader`, because a walk's
-  reads are 96% DBF) and that it is **optional on the reference's own three-valued policy**, defaulting
-  to `WhenExclusive`.
+- **The two decisions that shape everything are now ADR-36 and ADR-37**: the cache decorates
+  `IRandomAccessSource` (not `NodeReader`, because a walk's reads are 96% DBF) and it is **optional on
+  the reference's own three-valued policy**, defaulting to `WhenExclusive` — which caches nothing until
+  `LOCKING` adds deny modes. [`DESIGN.md`](DESIGN.md) is still the place the reasoning was worked out.
 - **Run the benchmark on Windows, not from WSL.** Same files, same code, 2026-08-21: **194 µs** per
   walked record and **1.58 ms** per seek through `/mnt/d`, against **9.2 µs** per seek natively. That is
   the filesystem bridge and none of it is the code — which is *why* layer 5 asserts a ratio and never an
@@ -353,9 +346,10 @@ against faithful still needs the second implementation and a workload larger tha
   The reason it exists: **every other gate in this step passes on a cache that is perfectly correct and
   never hits**, and none of them notices if syscalls get cheap enough that the optimization stops paying.
   If the timed one flakes it gets a trait, **never a lower threshold**.
-- **Nothing here has an ADR yet.** `DESIGN.md` marks the candidates; `PLAN.md` step 5 writes them. If
-  the design survives execution unchanged they are transcription; if it does not, they record what
-  actually happened, which is the point.
+- **The ADRs are written — ADR-36 to ADR-41**, and the design did *not* survive execution unchanged in
+  three places, which is why they were worth writing rather than transcribing: dropping blocks turned
+  out to have two halves (ADR-38), `Refresh` has no memo cache to reset (ADR-38), and the 2× gate had to
+  be retargeted onto read counts (ADR-40).
 
 ## Deviations from the plan
 

@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-08-27 · the tree is **clean**; everything is committed to `main` and **not pushed**.
+**Updated:** 2026-08-27 · the tree is **clean**; everything is committed to `main` and **pushed**.
 **Step [`009-performance-audit`](claude/dev/009-performance-audit/) is closed** — both halves, the audit
 and its remediation, with the decisions recorded as **ADR-35 to ADR-41**. It opened no capability and
 adds no row to `PORTING-PLAN.md` §5; what it changed is that **the read path is fast enough for `QUERY`

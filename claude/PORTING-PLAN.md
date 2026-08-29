@@ -102,7 +102,9 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself.
 - Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs).
-- Full VFP9 varchar/varbinary null-bit semantics.
+- Full VFP9 varchar/varbinary null-bit semantics. (`V`/`Q`/`W` were parked on there being no live
+  VFP; ADR-44 removes that obstacle — a table with those fields is item 4 of its run order. Still
+  LATER: the obstacle was never the only reason.)
 - `largeFileOffset` mode for C#-to-C# >2 GB files (documented as VFP-incompatible).
 
 ---
@@ -661,6 +663,18 @@ field to **4 bytes** whatever length is asked for (`d4create.c:1620-1622`), and 
 reaches `r4floatBin`** — the value has to be written through `f4assignPtr`, or the field silently
 holds decimal text.
 
+**Two generators, and the second one's output is fenced off.** Everything above is written by the C
+library. Since **ADR-44** a second offline oracle is authorised — **Visual FoxPro 9**, in a VM — for
+the cases CodeBase *cannot* produce: an index whose tags use the thirteen functions it refuses
+(ADR-43), code-page marks beyond its five constants (ADR-19), a VFP 9 `0x32` table with a memo,
+`V`/`Q`/`W` fields, native auto-increment (ADR-11), a DBC backlink, and a tree built by
+insert-and-split with a non-empty free list. Its scripts are `test-files-generator/vfp/` and its
+output lands in **`net/corpus/vfp/`**, which `Corpus.TableNames` does not sweep (it is not
+recursive): those tables have no C-written `<NAME>.dump.txt`, so the gates that want them name them.
+VFP witnesses only **a value it computes** and **the bytes it writes** — never CodeBase's internals,
+and never a CodeBase extension VFP cannot write. As of 2026-08-29 the first script exists and has not
+been run; nothing is in `net/corpus/vfp/` yet.
+
 **Named gaps, from the 002–005 audit (2026-08-13).** These are paths the generator *can* produce and was
 never taught — unlike the corrupt-file guards, which are layer 3 because no valid file can express them.
 Tracked here rather than in a step folder, because corpus contents are this document's to own. Full
@@ -674,9 +688,9 @@ disposition in `claude/dev/007-audit-glm/REMEDIATION-PLAN.md` §5.2.
 | A **CDX block size** other than 512, and a multiplier above one | `codeBaseNote` extension; unit-tested at `IndexHeaderTests:229`, no golden case |
 | **`keyLen` above 240**, with the 16-bit compression counters that go with it | Currently refused; the refusal itself is ungated |
 | A **multi-block tag directory** (roughly 40+ tags) | The directory's own chaining is never exercised |
-| A tree built by **insert-and-split** rather than the bulk path | Every case appends then `INDEX ON`; only `CDXCOLL`'s second tag uses `i4tagAdd`. Different free-list state |
-| A non-empty **free list** | Only a delete path fills it; the reader tolerates a 0-key non-root block untested |
-| A **VFP 9 (`0x32`) table with a memo** | Not merely uncovered — `LegacyVariant.cs:10-15` *reproduces a C library defect* here (the memo file is not opened). A case would pin the reproduction |
+| A tree built by **insert-and-split** rather than the bulk path | Every case appends then `INDEX ON`; only `CDXCOLL`'s second tag uses `i4tagAdd`. Different free-list state. **Route: the VFP oracle** (ADR-44) — VFP produces this shape by ordinary use |
+| A non-empty **free list** | Only a delete path fills it; the reader tolerates a 0-key non-root block untested. **Route: the VFP oracle** (ADR-44) |
+| A **VFP 9 (`0x32`) table with a memo** | Not merely uncovered — `LegacyVariant.cs:10-15` *reproduces a C library defect* here (the memo file is not opened). A case would pin the reproduction. **Route: the VFP oracle** (ADR-44), since CodeBase does not write `0x32` |
 | `SeekExact` on a **descending tag's duplicate run** | Unit-only; no descending tag has duplicate keys |
 | `SeekNext` across a **branch boundary** | Unit-only; `CDXDEEP`'s duplicate runs stay within one leaf level |
 | `SeekNext` against the reference on **numeric/date/currency** tags | Needs the value-to-key transforms — gated only once `COLLATION` lands |
@@ -706,7 +720,7 @@ something different. Never use it for keys, indexes, or memos.
 | R5 | **Expression quirks leaking into index keys** — `STR()`/`DTOS()`/`TTOC()` text formatting, rounding, `*`-overflow; prefix `=`; divide-by-zero→0; blank-date propagation | Keys differ by a byte → silent seek failures | Medium | Port §7 of `EXPRESSIONS.md` bit-exactly; `c4dtoa45` behavior recovered empirically from generated output; `EXPR` expression + re-derived-key gate |
 | R6 | **Torn reads under I/O optimization** — read caching on unlocked files can mix old/new bytes; write caching unsafe without record lock | Wrong data returned to app | Medium | Preserve flush-before-unlock / invalidate-after-lock ordering (`LOCKING-TRANSACTIONS.md` §3.7); default to no unsafe read-opt on shared files; document the hazard. **Designed 2026-08-19**: the cache is optional on the reference's own three-valued policy, defaulting to `WhenExclusive` — which caches only files opened excluding other writers and therefore caches *nothing* until `LOCKING` exists. `WRITE`, `LOCKING` and `TRANS` each owe it something concrete: **§5's cross-capability obligation table** |
 | R7 | **`flags4dateTimeFlags` ULP bitset** transcription error | datetime keys off by 1 ULP → seek equality breaks silently | Medium | Copy the 10 802-byte table verbatim; `COLLATION` gate covers many seconds-of-day; unit test the bit-extraction against generated key bytes |
-| R8 | **Missing C bodies** (`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4atoCurrency`, `code4initLow` defaults, `code4logOpen`) absent from the source drop | Numeric/currency text + defaults + log format guessed wrong | Medium | Recover behavior empirically from generated output; adopt documented Sequiter defaults; treat as `[UNVERIFIED]` and gate against corpus bytes |
+| R8 | **Missing C bodies** (`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4atoCurrency`, `code4initLow` defaults, `code4logOpen`) absent from the source drop | Numeric/currency text + defaults + log format guessed wrong | Medium | Recover behavior empirically from generated output; adopt documented Sequiter defaults; treat as `[UNVERIFIED]` and gate against corpus bytes. **Partly closed 2026-08-28**: `STR`'s rounding and `*` overflow are witnessed (`EXPRESSIONS.md` §7.1). The residue — whether VFP agrees — is what the **VFP oracle** (ADR-44) is pointed at |
 | R9 | **0x31 → 0x30 version normalization / skip-byte-0 header rewrite** done naively | 0x31 files silently downgraded; extensions lost | Low | Replicate the "never rewrite byte 0" write windows (`DBF-FORMAT.md` §2.5); round-trip test on 0x31 files |
 | R10 | **CDX shared-write root-swap (`tfile4swap`) & version-counter races** | Multi-writer index corruption | Low (v1 can restrict to exclusive) | Implement retry-from-root on inconsistency; consider exclusive-only CDX writes in v1; `LOCKING` gate |
 | R11 | **Spec claims not adversarially re-verified** (see §9) | Building on a wrong spec fact | Medium | `CORPUS` spot-check pass against generated bytes; every capability gate is itself a spec check against real bytes |

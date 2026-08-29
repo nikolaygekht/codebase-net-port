@@ -532,6 +532,18 @@ shift = max(0, trimmedLen − n) at runtime (e4functi.c:2832-2843; e4parse.c:156
   `CCYYMMDD` and has no such dependence. **Any recorded `CTOD` value is therefore only true within the
   century it was generated in**, which is why `CDXEXPR.expr.dump.txt` records `dateFormat` and
   `century` in its header.
+
+* **VFP does not agree: it has a rollover pivot where CodeBase has none.** `SET CENTURY TO nCentury
+  ROLLOVER nYear` maps a two-digit year `yy` to `nCentury + 1` when `yy < nYear` and to `nCentury`
+  when `yy >= nYear` — inclusive at the rollover itself. **Witnessed twice** in
+  `corpus/vfp/VFPFVAL.vfp.dump.txt`: pinned at `ROLLOVER 29`, `CTOD("01/15/00")` is 2000 while
+  `CTOD("01/15/29")` is **1929**; and in the earlier unpinned run on the same 2026 clock, the
+  boundary sat at 76 — `01/15/70` → 2070, `01/15/99` → 1999 — so **VFP's default rollover is the
+  machine's year + 50, mod 100**, and an unpinned VFP run is not reproducible across calendar years.
+  The divergence is not the pivot's position but its existence: on a 2026 clock CodeBase resolves
+  *every* two-digit year to 20xx (`year / 100`, no pivot), so `CTOD("01/15/99")` is 2099 in CodeBase
+  and 1999 in VFP. This is what ADR-42's explicit date policy exists to make a caller's choice
+  rather than a host's; `vfpfunc.prg` pins `SET CENTURY TO 19 ROLLOVER 29` and dumps it.
 * TTOC(x,1): 14 chars `CCYYMMDDHHMMSS`; from r4dateTime the time part is decomposed from
   milliseconds (e4functi.c:846-876); from date types the time is `"000000"` (e4functi.c:821-827).
 
@@ -636,8 +648,10 @@ computed; for `>` the flag (stored in `p1` as 0/1) is 1 iff `len(a) > len(b)`; f
 `len(a) < len(b)` (e4parse.c:780-824). Runtime:
 
 * `=`  : `!memcmp(a, b, i1)` — **compares only the common prefix**, so `"AAAA" = "AAA"` and
-  `"AAA" = "AAAA"` are both true (e4functi.c:1007-1027; documented divergence from VFP, where only
-  the second is true with SET EXACT OFF — e4parse.c:59-62).
+  `"AAA" = "AAAA"` are both true (e4functi.c:1007-1027). Divergence from VFP, where with SET EXACT
+  OFF the comparison runs to the end of the **right** operand: only `"AAAA" = "AAA"` is true.
+  Witnessed in `corpus/vfp/VFPFVAL.vfp.dump.txt`, and the **reverse** of the direction the source's
+  own note gives at e4parse.c:59-62 — that note is wrong about the compatibility target (ADR-45).
 * `<>`/`#` : `memcmp(a,b,i1) != 0` (e4functi.c:2315-2336).
 * `>` : memcmp on i1; if equal prefix, result = p1 flag (longer left wins) (e4functi.c:1479-1512).
 * `<` : symmetric (e4functi.c:1884-1916). `>=`/`<=` are negations of `<`/`>`
@@ -690,6 +704,42 @@ type error that changes length, **but it cannot separate the five 8-byte types f
 `r4currency` and `r4dateTime` respectively and **all six have `keyLen=8`**, while their §9.3
 transforms differ. A wrong result type among those is invisible to the length check; a wrong result
 length on a string is caught immediately.
+
+**Witnessed in `corpus/vfp/VFPFUNC.cdx`, for the functions CodeBase refuses** — VFP's own answers,
+read out of the tag headers it wrote (18 tags over a `C(20)` and an `N(12,3)`):
+
+| stored expression | `keyLen` | `typeCode` |
+|---|---|---|
+| `ABS`, `INT`, `ROUND`, `MOD`, `MIN`, `MAX`, `SQRT`, `SIGN`, `LEN`, `AT`, `ASC` over the numeric | **8** | 0x60 |
+| `LOWER(k_text)`, `PROPER(k_text)`, `TRIM(k_text)`, `UPPER(k_text)` | **20** | 0x60 |
+| `REPLICATE(k_text,2)` | **40** | 0x60 |
+| `STR(k_num,12,3)` | **12** | 0x60 |
+| `STRTRAN(k_text,"A","BB")` | **20** | 0x60 |
+
+**VFP sizes a key the same way**: by result type for the numerics, by the operand's width for the
+length-preserving string functions, by the multiplier for `REPLICATE` and by the width argument for
+`STR`. ADR-43's named risk therefore does not materialise — a port that computes these lengths from
+the operand computes what a VFP-written header holds.
+
+**`STRTRAN` is the exception, and it fails at build time rather than at parse time.** Its result
+length is value-dependent, and VFP sizes it at the **operand's** width (20) rather than at the
+longest possible result. That is not a refusal: the tag header is written, and the build then fails
+on the first record whose result does not fit — `STRTRAN("ABCDEFGHIJKLMNOPQRST","A","BB")` is 21
+bytes into a 20-byte key. The error is `Error building key for index …`, and the tag does not appear
+in `TAGCOUNT()`.
+
+Two consequences for *reading* a VFP-written CDX, both witnessed in the same file:
+
+- **A failed `INDEX ON` leaves its three blocks behind.** `VFPFUNC.cdx` is 57 blocks: three for the
+  tag directory and three per tag for **eighteen** tags, though only **seventeen** are reachable.
+  The refused `STRTRAN` tag's header, expression area and root block are all still there, with a
+  plausible `keyLen` and a live `root` pointer, and only the tag directory says it is not a tag.
+  **Enumerate tags through the directory, never by scanning for header blocks.**
+- **VFP lower-cases identifiers in the stored expression text.** The script indexed on
+  `ABS(K_NUM)`; the header holds `ABS(k_num)`, and the tag names in the directory are lower-cased
+  too, while `KEY()` and `TAG()` hand them back upper-cased. Function names keep their case and
+  string literals are untouched. A parser reading a stored expression must match field names
+  case-insensitively.
 
 ### 9.2 Key generation — `expr4key` (E4EXPR.C:755-770) → `expr4keyConvert` (E4EXPR.C:777-812)
 
@@ -841,6 +891,8 @@ Selected by exactly one of S4FOX / S4CLIPPER / S4MDX / S4NDX at build time.
    from this source drop** (declared d4declar.h:1888-1899, 224-225; no defining translation unit
    present). Their exact rounding, overflow (`*` fill) and clipping behavior must be recovered from
    the CodeBase DLL, the docs, or empirically from VFP — STR()-based index keys depend on it.
+   **"Empirically from VFP" is now reachable (ADR-44):** `test-files-generator/vfp/vfpfunc.prg`
+   carries the `STR`, `STRZERO` and `VAL` rows with CodeBase's recorded answer noted beside each.
 2. **[CLOSED — the picture is 8 characters, witnessed through `T_DTOC`'s key length, §7.3.]**
    **Default `dateFormat` value** is initialized outside this drop; DTOC()-based key lengths depend
    on it (key len = picture length, e4parse.c:500-509).
@@ -856,10 +908,15 @@ Selected by exactly one of S4FOX / S4CLIPPER / S4MDX / S4NDX at build time.
 6. **Known engine≠VFP divergences** documented in the source (e4parse.c:35-63): prefix `=`
    comparison symmetry, TRIM vs `$`/comparisons, DTOC(x,1) laxness, TTOC only in index form —
    decide whether the port replicates CodeBase behavior (for CDX interop, yes for key-affecting
-   ones) or fixes toward VFP.
+   ones) or fixes toward VFP. **ADR-43 settles the rule** (CodeBase governs what we
+   *write*, because it is the gated one) and **ADR-44 supplies the observation**: the prefix-`=` rows
+   are in `vfpfunc.prg`'s `exact-on` group, under both settings of `SET EXACT`. The two are not
+   symmetric — a divergence that changes what we *read* from a VFP-written file is a defect whichever
+   engine we prefer.
 7. **Thread-safety**: the C engine serializes all expression evaluation through one global critical
    section (E4EXPR.C:87-135); the port should use per-evaluation state, but beware calc re-entrancy
    (e4functi.c:3089-3107) when doing so.
 8. `expr4currency()` returning constant 0 in FOX builds (E4EXPR.C:852-872) looks intentional but
    surprising; verify against a real VFP CDX with a `numDoub` expression over currency fields
-   before assuming the `t4dblToCurFox` path is dead.
+   before assuming the `t4dblToCurFox` path is dead. **A real VFP CDX is now producible
+   (ADR-44)**; the first script carries no such tag, so this wants a row adding to it.

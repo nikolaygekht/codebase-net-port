@@ -1,8 +1,9 @@
 # 010-expr — state
 
-**Updated:** 2026-08-28 · **sub-step 1 of 8 is done.** The step is designed
-([`DESIGN.md`](DESIGN.md)), planned ([`PLAN.md`](PLAN.md)) and has its oracle in the corpus. **No C#
-of the expression engine exists.**
+**Updated:** 2026-08-29 · **sub-step 1 of 8 is done, and sub-step 5b now has its oracle too.** The
+step is designed ([`DESIGN.md`](DESIGN.md)), planned ([`PLAN.md`](PLAN.md)) and has both oracles in
+the corpus. **No C# of the expression engine exists.** The **second oracle** (Visual FoxPro 9 in a
+VM, **ADR-44**) has been **run**, and its output is committed in `net/corpus/vfp/`.
 
 ## Where the sub-steps stand
 
@@ -13,7 +14,7 @@ of the expression engine exists.**
 | 3 | Function table + parser | not started |
 | 4 | Types and overload resolution | not started |
 | 5 | Evaluator: kernels and null semantics | not started — *the stop point* |
-| 5b | The VFP-only functions (ADR-43) | not started |
+| 5b | The VFP-only functions (ADR-43) | not started — **its oracle is run and committed**: `net/corpus/vfp/`, from `test-files-generator/vfp/vfpfunc.prg` |
 | 6 | The text-formatting family | not started |
 | 7 | Axis B in full — key time | not started |
 | 8 | Wire into the tag path | not started |
@@ -34,11 +35,46 @@ dump, assert against the dump.
 | `[field expressions]` | 49 cases × 16 records | yes |
 | `[clock-dependent expressions]` | `DATE()`, `TIME()` — **shape only, no value** | type/length/nodes only |
 | `[rejections]` | 18 strings CodeBase refuses | yes |
-| `[vfp-only]` | 13 names VFP has and CodeBase does not | **no — the port accepts these (ADR-43)** |
+| `[vfp-only]` | 13 names VFP has and CodeBase does not | **no — the port accepts these (ADR-43)**, and VFP is their oracle (ADR-44) |
 
 Each expression also carries its **compiled node array**: per node the row index of `v4functions`
 that overload resolution chose. That is the resolution gate, and it is what turns "a missing overload
 row silently selects its neighbour" into a mismatched integer.
+
+## The second oracle, for sub-step 5b
+
+ADR-43 accepts thirteen functions CodeBase refuses, and nothing in `net/corpus/` can gate them — the
+generator *is* CodeBase. **ADR-44** settles that: Visual FoxPro 9 is a second offline oracle, under
+ADR-01's discipline (generate offline, commit the output, never let the build run it), and its
+scripts live in [`test-files-generator/vfp/`](../../../test-files-generator/vfp/README.md) with the
+output published into **`net/corpus/vfp/`** — a subdirectory, because `Corpus.TableNames` is not
+recursive and these tables have no C-written dump beside them.
+
+`vfpfunc.prg` **was run on 2026-08-29** and its output is committed: `VFPFUNC.DBF` + `.CDX` with
+18 tag groups (the thirteen `[vfp-only]` names in this dump's order, plus `PROPER` and `STRTRAN` for
+the per-function *length* rule, `TRIM` and `STR` as divergence probes, and `UPPER` as a control) and
+`VFPFVAL.DBF`, 77 constant expressions whose results are stored in fields of their own type.
+
+**The `.DBF`/`.cdx` are the oracle, not the text dumps beside them.** Forced rather than chosen: the
+C library cannot dump a VFP-built CDX, because opening a tag parses its expression
+(`i4ntag.c:1390-1395`), so a tag over `LOWER(…)` never opens. It proved to matter — the key lengths
+below are read out of the tag headers, and VFP does not expose them through any function.
+
+**What it answered, and what it changed:**
+
+- **`T_STRTRN`.** VFP sizes a value-dependent result at the **operand's** width (20), writes the tag
+  header, and then fails at *build* time on the first row whose result does not fit. `DESIGN.md`'s
+  key-length rules can therefore keep computing from the operand. The refused tag's three blocks stay
+  in the file, so **the tag directory is the only authority on which tags exist**.
+- **`T_VTRIM` does not diverge**: `TRIM(k_text)` keys to 20, the source width, as CodeBase does. The
+  reading hazard ADR-43 could not settle is not there.
+- **`STR` agrees** on all four midpoint probes, closing ADR-43's open question.
+- **`STRZERO` is not a VFP function at all**, which is why two `VFPFVAL` rows are refusals.
+- **Two divergences are now decided, as ADR-45**: prefix `=` (and it runs the **opposite** way from
+  what `e4parse.c:59-62` says, which `DESIGN.md` Decision 8 had repeated — corrected in place), and
+  the century pivot, where VFP has a rollover and CodeBase has none.
+
+Sub-steps 2-5 never waited on it, and still do not.
 
 ## Two things owed to the corpus
 
@@ -64,6 +100,10 @@ a wrong kernel and a wrong transform cannot cancel. The mutations that prove the
 
 **ADR-42** — the engine takes an explicit date policy, defaulting to invariant.
 **ADR-43** — Visual FoxPro's functions are supported, though CodeBase has none of them.
+**ADR-44** — Visual FoxPro 9 is the second offline oracle, in its own frozen corner (supersedes
+ADR-04, unblocks ADR-11).
+**ADR-45** — prefix `=` and division by zero replicate CodeBase; the oracle also corrects what the
+source says VFP does.
 
 Decisions 1, 3, 5 and 8 of `DESIGN.md` remain ADR candidates for step close, following step 009's
 pattern of writing them at closeout.

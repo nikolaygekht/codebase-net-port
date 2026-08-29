@@ -1,0 +1,94 @@
+# CodeBase.NET corpus VFP value oracle
+# Written by test-files-generator/vfp/vfpfunc.prg in Visual FoxPro 9.
+# Do not edit by hand; re-run the script in the VM instead.
+#
+# VFPFVAL.DBF IS THE ORACLE. A numeric result is stored in RESD, a
+# Double, and the text below is a formatting of it -- if the two ever
+# disagree the field wins. RESLEN carries the true length of a
+# character result, because the C(80) field pads.
+table        VFPFVAL.DBF
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1251
+collate      MACHINE
+century      OFF
+rollover     29
+count        77
+
+[values]
+  main       ABS(-1)                        -> 1.000000000000   (display only, RESD is the bits)
+  main       INT(1.5)                       -> 1.000000000000   (display only, RESD is the bits)
+  main       ROUND(1.5,0)                   -> 2.000000000000   (display only, RESD is the bits)
+  main       MOD(5,3)                       -> 2.000000000000   (display only, RESD is the bits)
+  main       MIN(1,2)                       -> 1.000000000000   (display only, RESD is the bits)
+  main       MAX(1,2)                       -> 2.000000000000   (display only, RESD is the bits)
+  main       SQRT(4)                        -> 2.000000000000   (display only, RESD is the bits)
+  main       SIGN(-3)                       -> -1.000000000000   (display only, RESD is the bits)
+  main       LEN("AB")                      -> 2.000000000000   (display only, RESD is the bits)
+  main       AT("B","AB")                   -> 2.000000000000   (display only, RESD is the bits)
+  main       ASC("A")                       -> 65.000000000000   (display only, RESD is the bits)
+  main       LOWER("AB")                    -> "ab" len=2
+  main       REPLICATE("A",3)               -> "AAA" len=3
+  main       INT(-1.5)                      -> -1.000000000000   (display only, RESD is the bits)
+  main       INT(-0.5)                      -> 0.000000000000   (display only, RESD is the bits)
+  main       ROUND(2.5,0)                   -> 3.000000000000   (display only, RESD is the bits)   ; half up or half even
+  main       ROUND(-2.5,0)                  -> -3.000000000000   (display only, RESD is the bits)
+  main       ROUND(0.125,2)                 -> 0.130000000000   (display only, RESD is the bits)   ; the double is exact
+  main       ROUND(0.135,2)                 -> 0.140000000000   (display only, RESD is the bits)   ; the double is below
+  main       ROUND(12345.6789,3)            -> 12345.679000000000   (display only, RESD is the bits)
+  main       ROUND(1.5,-1)                  -> 0.000000000000   (display only, RESD is the bits)   ; negative places
+  main       MOD(-5,3)                      -> 1.000000000000   (display only, RESD is the bits)
+  main       MOD(5,-3)                      -> -1.000000000000   (display only, RESD is the bits)
+  main       MOD(-5,-3)                     -> -2.000000000000   (display only, RESD is the bits)
+  main       MOD(5.5,2)                     -> 1.500000000000   (display only, RESD is the bits)
+  main       SIGN(0)                        -> 0.000000000000   (display only, RESD is the bits)
+  main       SIGN(3)                        -> 1.000000000000   (display only, RESD is the bits)
+  main       SQRT(2)                        -> 1.414213562373   (display only, RESD is the bits)   ; irrational, all 52 bits
+  main       ABS(-0.001)                    -> 0.001000000000   (display only, RESD is the bits)
+  main       MIN("A","B")                   -> "A" len=1   ; the string overload
+  main       MAX("A","B")                   -> "B" len=1
+  main       MIN(1,2,3)                     -> 1.000000000000   (display only, RESD is the bits)   ; three parameters
+  main       AT("Z","AB")                   -> 0.000000000000   (display only, RESD is the bits)   ; not found
+  main       AT("B","ABAB",2)               -> 4.000000000000   (display only, RESD is the bits)   ; occurrence
+  main       LEN("")                        -> 0.000000000000   (display only, RESD is the bits)
+  main       LOWER("AB1c" + CHR(201))       -> "ab1c\xE9" len=5   ; above 0x7F
+  main       REPLICATE("AB",0)              -> "" len=0   ; zero copies
+  main       STR(2.5,10,0)                  -> "         3" len=10   ; cb: '         3'
+  main       STR(-2.5,10,0)                 -> "        -3" len=10   ; cb: '        -3'
+  main       STR(0.125,10,2)                -> "      0.13" len=10   ; cb: '      0.13'
+  main       STR(0.135,10,2)                -> "      0.14" len=10   ; cb: '      0.14'
+  main       STR(12345.6789,12,3)           -> "   12345.679" len=12   ; cb: '   12345.679'
+  main       STR(1,3,0)                     -> "  1" len=3   ; cb: '  1'
+  main       STR(123456,3,0)                -> "***" len=3   ; cb: '***' overflow
+  main       STRZERO(42,8)                  -> REFUSED: File 'strzero.prg' does not exist.   ; not a VFP function; cb: '00000042'
+  main       STRZERO(-42,8)                 -> REFUSED: File 'strzero.prg' does not exist.   ; not a VFP function; cb: '00000-42'
+  main       VAL("123.45")                  -> 123.450000000000   (display only, RESD is the bits)   ; cb: 123.45
+  main       VAL("not a number")            -> 0.000000000000   (display only, RESD is the bits)   ; cb: 0.0
+  main       VAL("")                        -> 0.000000000000   (display only, RESD is the bits)   ; cb: 0.0
+  main       UPPER("john smith")            -> "JOHN SMITH" len=10
+  main       TRIM("abc   ")                 -> "abc" len=3   ; cb: source width, NUL-padded
+  main       TRIM("   ")                    -> "" len=0   ; cb: three NULs
+  main       LTRIM("   abc")                -> "abc" len=3
+  main       ALLTRIM("  abc  ")             -> "abc" len=3
+  main       SUBSTR("ABCDEF",2,3)           -> "BCD" len=3
+  main       SUBSTR("ABCDEF",5,10)          -> "EF" len=2   ; past the end
+  main       LEFT("ABC",10)                 -> "ABC" len=3   ; cb: 'ABC', not padded
+  main       RIGHT("ABCDEF",3)              -> "DEF" len=3
+  main       PADL("X",5)                    -> "    X" len=5
+  main       PADR("X",5)                    -> "X    " len=5
+  main       SPACE(5)                       -> "     " len=5
+  main       CHR(65)                        -> "A" len=1
+  main       CHR(0)                         -> "\x00" len=1   ; a NUL is a byte
+  main       DTOS(CTOD("01/15/00"))         -> "20000115" len=8   ; cb reads the clock
+  main       DTOS(CTOD("01/15/29"))         -> "19290115" len=8
+  main       DTOS(CTOD("01/15/30"))         -> "19300115" len=8   ; the pivot, if there is one
+  main       DTOS(CTOD("01/15/50"))         -> "19500115" len=8
+  main       DTOS(CTOD("01/15/70"))         -> "19700115" len=8
+  main       DTOS(CTOD("01/15/99"))         -> "19990115" len=8
+  main       DTOC(CTOD("01/15/2000"))       -> "01/15/00" len=8   ; cb picture is 8 chars
+  main       DAY(CTOD("01/15/2000"))        -> 15.000000000000   (display only, RESD is the bits)
+  main       "AAA" = "AAAA"                 -> FALSE   ; cb: TRUE, prefix -- the diverging row
+  main       "AAAA" = "AAA"                 -> TRUE   ; cb: TRUE, prefix -- both engines agree here
+  exact-on   "AAA" = "AAAA"                 -> FALSE
+  exact-on   "AAAA" = "AAA"                 -> FALSE
+  century-on DTOC(CTOD("01/15/2000"))       -> "01/15/2000" len=10   ; picture length
+  century-on DTOS(CTOD("01/15/30"))         -> "19300115" len=8   ; the pivot again

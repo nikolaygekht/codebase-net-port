@@ -4,6 +4,9 @@ Checked-in reference files produced by the original Sequiter CodeBase C library,
 expected values dumped beside them. The C# port is tested against these; **building or
 testing CodeBase.NET never compiles or runs C**, and needs neither Windows nor MSVC.
 
+One exception, fenced off in [`vfp/`](#vfp-produced-cases--vfp): files produced by **Visual FoxPro
+9** rather than by CodeBase, for the cases CodeBase cannot write.
+
 Regenerate with [`test-files-generator/`](../../test-files-generator/README.md):
 
 ```bat
@@ -52,6 +55,45 @@ their way, and the benchmark reaches it through `Corpus.BenchmarkPathOf` instead
 
 The field and tag shapes, the row count and the scrambling stride are fixed by that audit's
 measurement rather than free to tidy: change them and its numbers stop being a baseline.
+
+## VFP-produced cases — `vfp/`
+
+**Two files landed on 2026-08-29**, from the first script; the rest of this section is the
+convention they follow.
+
+| Files | Covers |
+|---|---|
+| `VFPFUNC.DBF` + `.CDX` | 16 records and **18 tag groups, of which 17 are live tags** — one per function CodeBase refuses (ADR-43), plus `TRIM`, `STR` and `PROPER` as divergence probes and `UPPER` as a control. The tag headers carry VFP's own **key lengths**, which is what the case exists for; the eighteenth group is a tag whose build failed and whose blocks VFP left behind |
+| `VFPFVAL.DBF` | 77 constant expressions, each result stored in a field **of its own type**, so a numeric answer is the bits VFP computed rather than a formatting of them. `RESLEN` carries a character result's true length, because the `C(80)` field pads; `CBNOTE` carries CodeBase's answer beside VFP's |
+
+What they settled is in
+[`test-files-generator/vfp/README.md`](../../test-files-generator/vfp/README.md); the durable form is
+`specs/EXPRESSIONS.md` §9.1 and `specs/CDX-FORMAT.md` §3. **Both tables carry code-page mark `0xC9`
+(cp1251)**, the VM's own, where the rest of this corpus leaves byte 29 at `0x00` — ordering is
+unaffected under `MACHINE`, but case conversion above `0x7F` is that code page's.
+
+`vfp/` holds files produced by **Visual FoxPro 9**, in a VM, by the scripts in
+[`test-files-generator/vfp/`](../../test-files-generator/vfp/README.md) — **ADR-44**. They exist for
+the cases the C generator cannot produce, because that generator *is* CodeBase: an index whose tags
+use the thirteen functions CodeBase refuses (ADR-43), code-page marks beyond its five constants, a
+VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields, a DBC backlink, a tree built by insert-and-split.
+
+**Three things are different about them, and each is deliberate.**
+
+*The file is the expectation, not a dump beside it.* CodeBase cannot dump a VFP-built CDX at all —
+opening a tag parses its expression (`i4ntag.c:1390-1395`), so a tag over `LOWER(…)` never opens.
+The `*.vfp.dump.txt` files are provenance and review material, and say so wherever a number in them
+is a formatting of stored bits rather than the bits.
+
+*They carry VFP provenance, which the rest of this corpus explicitly does not* (see "Three things to
+know before comparing bytes"). A **trailing `0x1A`** is present, because VFP writes one on a `0x30`
+file and CodeBase does not — that byte is a reader-tolerance case, not a defect to normalise away.
+The header date stamp is frozen to `26-01-01` exactly as elsewhere (ADR-07), but the `.cdx`
+tag-directory version counter is VFP's own and may move between runs.
+
+*They are one directory down for the same mechanical reason as `benchmark/`*: `Corpus.TableNames`
+enumerates the corpus root non-recursively, and a table with no `<NAME>.dump.txt` beside it would be
+swept into every data-driven golden test. The gates that want these name them.
 
 ## Record counts
 

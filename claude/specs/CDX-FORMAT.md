@@ -165,6 +165,18 @@ The 10 bytes at 0x1F6..0x1FF are read/written as one group of 5 shorts starting 
 For the tag directory the expression area is written as 512 zero bytes ("no expression",
 r4reinde.c:1835) even though its `exprLen`/`filterLen` are 1.
 
+**What a VFP-written header holds differently** (witnessed in `corpus/vfp/VFPFUNC.cdx`, ADR-44): the
+layout is the same — 1024-byte header, expression text at 0x200 — but **VFP lower-cases the
+identifiers**. `INDEX ON ABS(K_NUM)` stores `ABS(k_num)`, and the tag names in the directory are
+lower-cased as well, while `KEY()` and `TAG()` return them upper-cased. Function names and string
+literals are untouched. Read a stored expression case-insensitively.
+
+**A tag whose build failed still occupies its blocks.** VFP writes the header, expression area and
+root before building keys, and a build error leaves all three in the file, unreferenced by the tag
+directory. `VFPFUNC.cdx` has eighteen such groups and seventeen live tags. **The tag directory is
+the only authority on which tags exist** — scanning the file for header-shaped blocks finds one that
+`TAGCOUNT()` does not.
+
 **Partial header rewrites during normal operation:**
 - Root pointer: when `rootWrite` is set, exactly 4 bytes (`header.root`) are written at the
   header offset (I4TAG.C:3405-3431).

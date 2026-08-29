@@ -95,6 +95,8 @@ go on reading the field as `r5guid` / `r5i2`, with the source comment admitting 
 implemented as a static character field of some type"*. There is therefore no reference behaviour to
 port and no oracle to gate against; the corpus method cannot reach them, and closing that gap needs
 the live VFP that ADR-04 defers. `PORTING-PLAN.md` §2.3 already parks them.
+**[Updated 2026-08-29 — ADR-44 supersedes ADR-04: a VFP 9 VM is available and a `V`/`Q`/`W` table is
+item 4 of its run order. The gap is now reachable; it is not yet closed, and §2.3 still parks them.]**
 
 ## 2. Overload resolution — where the 193 rows come from
 
@@ -524,7 +526,9 @@ refusal, on day one rather than at sub-step 5.
 row rather than failing, so partial coverage is a silent wrong key. *Rejected —* a keys-only subset:
 `QUERY` needs the filter vocabulary immediately, so the evaluator would be reopened within one step.
 
-**4. `STR` ships, gated empirically, rather than being refused pending a VFP VM** (ADR-04, ADR-11).
+**4. `STR` ships, gated empirically, rather than being refused pending a VFP VM** (ADR-04, ADR-11;
+ADR-44 has since made the VM real — `STR`'s rows are in `vfpfunc.prg`, which does not change this
+decision, only what can be said about the residue).
 The formatting kernel `c4dtoa45` is absent from this source drop (§14 risk 1); everything about `STR`
 is pinned except midpoint rounding, one corpus case answers it, and the summary states the claim as
 *matches every case the corpus holds* rather than *proved correct*. This is the route `FoxNumeric`
@@ -601,8 +605,9 @@ Both are §14 risk 6 — behaviours the source documents as CodeBase-not-VFP —
 **key- or record-set-affecting**, so silence is a decision either way.
 
 **8. Prefix `=` compares only the common prefix** (§8, `e4functi.c:1007-1027`): `"AAAA" = "AAA"` and
-`"AAA" = "AAAA"` are *both* true, where VFP with `SET EXACT OFF` makes only the second true
-(`e4parse.c:59-62`). Recommendation: **replicate CodeBase**, because a `FOR` filter's semantics decide
+`"AAA" = "AAAA"` are *both* true, where VFP with `SET EXACT OFF` makes only **the first** true — it
+compares to the end of the right operand. `e4parse.c:59-62` claims the other one, and the VFP oracle
+refutes it; see ADR-45. Recommendation: **replicate CodeBase**, because a `FOR` filter's semantics decide
 which records a tag contains and a stored index must agree with the engine that built it. It has a
 direct consequence for `QUERY`: `NAME = "SM"` is a **prefix range**, not an equality, and decomposing
 it as equality would silently lose records. *ADR candidate, and the one `QUERY` will lean on.*
@@ -709,6 +714,9 @@ how the dump parses it. Until a tag over that expression is tried, treat the res
   two engines share, "match CodeBase" and "match VFP" stop being obviously the same instruction. The
   corpus cannot answer it and ADR-04 defers the live VFP that could. Latent today, and it becomes a
   real question the moment a VFP-written index is read.
+  **[Answered 2026-08-29 — the run happened. `STR` agrees: VFP returns `3`, `-3`, `0.13` and `0.14`
+  for the four midpoint probes, so on this shared name the two instructions are the same one. `TRIM`
+  agrees on key length too. `=` does **not** agree, and that one is ADR-45.]**
 - **The rejection list cannot currently observe a tag-only refusal.** Every string is parsed with
   `tagPtr = 0`, so `e4tagExpr` (−510) never appears and `OTHER->K_TEXT` comes back as `e4fieldName`
   (−210) rather than as the tag refusal §2b describes. A second rejection pass with a real

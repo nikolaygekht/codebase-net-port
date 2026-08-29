@@ -1,16 +1,24 @@
 # Project state
 
-**Updated:** 2026-08-28 · the tree is **clean**; everything is committed to `main` and **pushed**.
+**Updated:** 2026-08-29 · **the tree is clean and nothing is pushed.** The VFP oracle — its scripts
+in `test-files-generator/vfp/`, its output in `net/corpus/vfp/` — is committed together with the
+documentation that names it, across `CLAUDE.md`, `FOR-DEVELOPERS.md`, `.gitignore`,
+`ARCHITECTURE-DECISIONS.md` (**ADR-44**, **ADR-45**), `PORTING-PLAN.md`, `specs/EXPRESSIONS.md`,
+`specs/CDX-FORMAT.md`, `net/corpus/README.md`, `dev/010-expr/` and this file. **The oracle has been
+run** and no `.cs` file was touched.
 **Step [`010-expr`](claude/dev/010-expr/) is under way and its first sub-step is done.** The step is
 designed *and* planned, and **the oracle exists**: `net/corpus/CDXEXPR.*` plus `FUNCTIONS.dump.txt`
 record what the C library's own parser and evaluator answer — 987 assertions in
 [`ORACLE-SUITE.txt`](claude/dev/010-expr/ORACLE-SUITE.txt). **No C# of the engine is written yet**,
 by design: sub-step 1 is the gate, and sub-steps 2-8 build against it.
-**The design changed shape twice this session, and both changes are recorded as ADRs.** The gate is
+**The design changed shape twice on 08-28, and both changes are recorded as ADRs.** The gate is
 now **two axes** — what a function *computes* (C#-authored semantics, tested over **constants**) and
 what a value *becomes on disk* (stored key bytes, driven from the C library's recorded value so the
 two can never cancel). And the engine takes an explicit date policy (**ADR-42**) and supports
-**Visual FoxPro's functions** although CodeBase has none of them (**ADR-43**).
+**Visual FoxPro's functions** although CodeBase has none of them (**ADR-43**). Since 08-29,
+**ADR-44** adds a **second offline oracle** — Visual FoxPro 9, in a VM — for what CodeBase cannot
+generate at all; **its first script has been run and its output is committed**, and **ADR-45**
+records the two divergences it decided.
 **The headline finding: the reference has no arithmetic function at all.** 35 named functions, whole
 numeric surface `+ - * / ** ^` — a key-building vocabulary, not an expression language. Beside it:
 `STR` rounds **half away from zero on the decimal digits**, `CTOD` reads the century **off the system
@@ -185,7 +193,14 @@ Beside them, `net/corpus/benchmark/PERF10K.DBF` + `.cdx` (610 456 + 304 640 byte
 table with a `C(20)` and an `N(12,2)` tag, **benchmark data and not a gate** — no `.dump.txt`, no golden
 test, and invisible to `Corpus.TableNames`, which is not recursive.
 
-Regeneration is byte-identical, index files included.
+And `net/corpus/vfp/` — **produced by Visual FoxPro 9, not by CodeBase** (ADR-44), one directory
+down for the same reason as `benchmark/`: `VFPFUNC.DBF` + `.CDX`, 16 records and **18 tag groups of
+which 17 are live tags**, one per function CodeBase refuses; and `VFPFVAL.DBF`, 77 constant
+expressions stored in fields of their own type. The **files** are the oracle — the C library cannot
+dump a VFP-built CDX at all — with `*.vfp.dump.txt` beside them as provenance.
+
+Regeneration is byte-identical, index files included; the VFP corner's `.cdx` version counter is the
+one exception, and is assert-and-mask.
 
 **Documentation:** seven format specs, the porting plan, the development approach and the decision
 log. `EXPRESSIONS.md` gained §5.1 (the 35-function set and the absence of arithmetic) and §7.7 (the
@@ -195,9 +210,61 @@ is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ---
 
-## 2. Last session (2026-08-28), and the three before it
+## 2. This session (2026-08-29), the one before it, and the three before that
 
-**Step 010's sub-step 1 landed: the expression oracle.** Three new generator files
+**A second oracle exists on paper: Visual FoxPro 9, in a VM the user can run `.prg` files in.**
+That makes ADR-04's premise false — it declined a VFP VM because none existed and the questions
+were few — so **ADR-44 supersedes it** and ADR-11 is unblocked though still open. VFP can witness
+exactly two things, a value it computes and the bytes it writes; CodeBase stays the only authority
+on its own internals (the rejection surface, the error codes, the compiled node arrays) and on the
+extensions VFP cannot write, so **ADR-23 is unaffected**.
+
+Written **and run** this session: `test-files-generator/vfp/vfpfunc.prg`, which builds
+`VFPFUNC.DBF` + `.CDX` with **18 tags** — one per VFP-only function, plus `TRIM`, `STR` and `PROPER`
+as divergence probes and `UPPER` as a control — and `VFPFVAL.DBF`, **77 constant expressions** whose
+results are stored in fields of their own type so a numeric answer is bits rather than decimal text.
+Its output is committed in **`net/corpus/vfp/`**, a subdirectory `Corpus.TableNames` does not sweep,
+published by `copy-vfp-corpus.bat`. Two decisions inside it are worth knowing: the DBF header stamp
+is frozen to `26-01-01` exactly as the C generator freezes it (ADR-07), and **the trailing `0x1A`
+that VFP writes and CodeBase does not is deliberately kept** — it is a reader-tolerance case the
+corpus never had.
+
+**What the second oracle answered, in the order it matters.** Full list in
+[`test-files-generator/vfp/README.md`](test-files-generator/vfp/README.md); the durable form is
+`specs/EXPRESSIONS.md` §9.1 and `specs/CDX-FORMAT.md` §3.
+
+- **ADR-43's named risk does not materialise.** Key lengths read out of the tag headers VFP wrote:
+  every numeric-returning function **8**; `LOWER`/`PROPER`/`TRIM`/`UPPER` over a `C(20)` **20**;
+  `REPLICATE(k_text,2)` **40**; `STR(k_num,12,3)` **12**. The same rule the port would compute.
+- **`STRTRAN` fails at build time, not parse time.** VFP sizes a value-dependent result at the
+  **operand's** width, writes the header, then errors on the first row that does not fit — and
+  **leaves the failed tag's three blocks in the file**, well-formed and unreferenced. So the tag
+  directory is the only authority on which tags exist; scanning for header blocks finds eighteen
+  where `TAGCOUNT()` says seventeen.
+- **`TRIM` does not diverge in length**, which was the one divergence that would have broken
+  *reading* a VFP-written tag. **`STR` rounding agrees**, closing ADR-43's own open question.
+- **The oracle overturned a document rather than confirming it, for the first time.** Prefix `=`
+  runs the **opposite** way from Sequiter's own comment at `e4parse.c:59-62`: VFP compares to the end
+  of the *right* operand, so `"AAAA" = "AAA"` is true and `"AAA" = "AAAA"` is false. That comment had
+  been repeated into `EXPRESSIONS.md` §8 and `DESIGN.md` Decision 8 on its authority; all three are
+  corrected, and **ADR-45** settles that the port replicates CodeBase (both true) — which makes
+  `NAME = "SM"` a **prefix range** for `QUERY`, not an equality.
+- **The century pivot is a second divergence of the same kind.** VFP has a rollover
+  (`yy < nYear` → `nCentury + 1`, inclusive at `nYear`); CodeBase has none at all. On a 2026 clock
+  `CTOD("01/15/99")` is **2099 in CodeBase and 1999 in VFP**. VFP's default rollover is the machine's
+  year + 50 mod 100, so the script now pins it — unpinned, those rows churn every January.
+- **Two incidentals worth knowing before reading the bytes:** VFP **lower-cases identifiers** in the
+  stored expression text (`INDEX ON ABS(K_NUM)` → `ABS(k_num)`) while `KEY()` returns them
+  upper-cased; and `STRZERO` is **not a VFP function**, so two `VFPFVAL` rows are refusals.
+- **One scope call, not a defect.** The VM's code page is **1251**, so these two tables carry mark
+  `0xC9` where the rest of the corpus carries `0x00`. `MACHINE` ordering is unaffected; case
+  conversion above `0x7F` is that code page's, and record 16 is the only row that reaches it.
+
+**Why the file is the artifact and the text dump is only provenance:** the C library cannot dump a
+VFP-built CDX at all. Opening a tag parses its expression (`i4ntag.c:1390-1395`), so a tag over
+`LOWER(…)` fails to open and the existing dumper never sees it.
+
+**Last session, 2026-08-28: step 010's sub-step 1 landed — the expression oracle.** Three new generator files
 (`dump-expr.h/.cpp`, `case-cdxexpr.cpp`), seven new corpus files, **no C# of the engine**. The
 existing corpus regenerates **byte-identical**; the only C# touched was five inventory assertions
 that the corpus's own policing fired on, plus one guard in `CachedReadGoldenTests` that skips tags
@@ -257,6 +324,19 @@ their content is step 008's; and `007-audit-glm/REMEDIATION-PLAN.md` §2.2 and �
 because it planned to measure before `COLLATION` and the reverse happened.
 
 ## 3. Next
+
+### The VFP oracle's second run, whenever it is convenient — it blocks nothing
+
+The first run is committed and its findings are recorded. Three probe rows were changed *after* it,
+so the script and the committed corpus disagree on three lines until someone re-runs
+`DO vfpfunc.prg` and `copy-vfp-corpus.bat`: the `CTOD` rows now straddle the pinned `ROLLOVER 29`
+(`01/15/28` and `01/15/29` replace `29`/`30`) so a single dump proves the rule that currently takes
+two runs to see. Nothing depends on it — the rule is already in `specs/EXPRESSIONS.md` §7.3.
+
+The runs ADR-44 authorises next are separate scripts, none written: code-page marks beyond
+CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields, native
+auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
+two being ADR-11's, which is unblocked but still open.
 
 ### Step 010 continues at sub-step 2 — where the next session starts
 

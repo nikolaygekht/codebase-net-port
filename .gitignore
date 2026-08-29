@@ -28,3 +28,7 @@ audit/
 
 # Local performance/scratch experiments -- never committed (see experiments/README.md)
 experiments/
+
+# The VFP oracle's raw output, before copy-vfp-corpus.bat publishes it (ADR-44).
+# bin/ and obj/ above cover the C generator; this one is not called bin.
+test-files-generator/vfp/out/

@@ -23,7 +23,9 @@ them. **Building or testing CodeBase.NET never compiles or runs C.** See ADR-01 
 | `net/corpus/` | Checked-in golden `DBF`/`CDX`/`FPT` files with their expected dumps — see its [README](net/corpus/README.md) |
 | `net/corpus/benchmark/` | Benchmark **workloads**, not expectations: the 10 000-record `PERF10K` table with no dump. One directory down because corpus discovery is not recursive |
 | `net/benchmarks/` | `CodeBase.Net.Benchmarks` — the read path's numbers, on BenchmarkDotNet — and `CodeBase.Net.Profiling`, a single-process driver for an external profiler. Both build with the solution; `dotnet test` neither builds nor runs either |
+| `net/corpus/vfp/` | Golden files produced by **Visual FoxPro 9**, not by the C library — the cases CodeBase cannot write (ADR-44). One directory down for the same reason as `benchmark/` |
 | `test-files-generator/` | Windows/MSVC tool that drives the original C library to produce the corpus — see its [README](test-files-generator/README.md). Not part of the solution, not a test dependency |
+| `test-files-generator/vfp/` | The VFP oracle: `.prg` scripts run by hand in a **VFP 9 VM**. Needs neither MSVC nor the C library — see its [README](test-files-generator/vfp/README.md) |
 | `original/source/` | The original CodeBase C source. **Read-only reference — never modified** |
 | `original/examples/` | Original C examples and real sample files. Supplementary test input only |
 | `claude/specs/` | Seven source-cited format specifications — authoritative for on-disk formats |
@@ -273,6 +275,32 @@ changing a case produces identical files (ADR-07).
 To add a case, write `test-files-generator/src/case-<name>.cpp`, declare it in `cases.h`, and call it
 from `main.cpp`. Utilities are shared; **test data is per-case on purpose**, so tuning one case
 cannot move another case's bytes.
+
+## Regenerating the VFP half of the corpus (a VFP 9 VM)
+
+A second, much smaller generator. It exists because the one above **is** CodeBase, and some corpus
+cases are about what CodeBase does *not* do — an index over the thirteen functions it refuses, a
+`0x32` table with a memo, code-page marks beyond its five constants. **ADR-44** has the rules and the
+run order.
+
+In the VM:
+
+```foxpro
+DO vfpfunc.prg                  && test-files-generator\vfp -> .\out\
+```
+
+then, on the Windows side:
+
+```bat
+cd test-files-generator\vfp
+copy-vfp-corpus.bat             :: publish -> ..\..\net\corpus\vfp\
+```
+
+Output is *nearly* byte-stable: the DBF header stamp is frozen exactly as the C generator freezes it
+(ADR-07), but the `.cdx` tag-directory version counter is VFP's own and may move between runs.
+
+**You do not need any of this to build or test the port.** The published files are checked in; the
+scripts are checked in for provenance.
 
 ## How work is organised
 

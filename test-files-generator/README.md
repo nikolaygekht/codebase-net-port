@@ -77,7 +77,8 @@ test-files-generator/
 │  ├─ dump.h/.cpp      shared: the <NAME>.dump.txt writer
 │  └─ dump-index.h/.cpp shared: the <NAME>.cdx.dump.txt writer
 ├─ obj/                intermediates + per-file compile logs   [gitignored]
-└─ bin/                testgen.exe, and bin\out\ default output [gitignored]
+├─ bin/                testgen.exe, and bin\out\ default output [gitignored]
+└─ vfp/                the VFP 9 oracle — a different engine, see below
 ```
 
 **Utilities are shared; test data is not.** Each `case-*.cpp` keeps its own row
@@ -88,6 +89,12 @@ retuning one case's data can never move another case's bytes.
 To add a case: write `src/case-<name>.cpp`, declare it in `src/cases.h`, and call
 it from `main.cpp`. `build-gen.bat` compiles every `.cpp` in `src\`, so the build
 needs no edit.
+
+**`vfp/` is a second generator, and not this one.** Everything above is CodeBase. The scripts in
+[`vfp/`](vfp/README.md) run in a **Visual FoxPro 9 VM** and produce the files CodeBase cannot write —
+starting with an index whose tags use the thirteen functions CodeBase refuses — into `net/corpus/vfp/`,
+which the data-driven golden tests do not sweep. It shares nothing with this build but the escaping
+rules and the frozen date stamp, both reproduced there so the two dumps can be diffed. See ADR-44.
 
 **Text outside ASCII is written as byte arrays, never as a source string
 literal** — what a literal becomes depends on the compiler's source and

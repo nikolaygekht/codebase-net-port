@@ -1,0 +1,88 @@
+# CodeBase.NET corpus VFP oracle dump
+# Written by test-files-generator/vfp/vfpfunc.prg in Visual FoxPro 9.
+# Do not edit by hand; re-run the script in the VM instead.
+# The .DBF and .cdx are the oracle. Numbers here are decimal text and
+# are for review only -- the stored bits are in the file.
+table        VFPFUNC.DBF
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+generated    08/29/26   (header stamp frozen to 26-01-01)
+codePage     1251
+collate      MACHINE
+century      OFF
+rollover     29
+dateFormat   AMERICAN
+exact        OFF
+null         OFF
+decimals     2
+numRecs      16
+
+[fields]
+  ID           type='I' len=4 dec=0
+  K_TEXT       type='C' len=20 dec=0
+  K_CITY       type='C' len=15 dec=0
+  K_NUM        type='N' len=12 dec=3
+  K_INT        type='I' len=4 dec=0
+  K_DBL        type='B' len=8 dec=6
+  K_DATE       type='D' len=8 dec=0
+  K_TS         type='T' len=8 dec=0
+  K_CUR        type='Y' len=8 dec=4
+  K_LOG        type='L' len=1 dec=0
+
+[records]
+  rec   1 K_TEXT="SMITH               " K_CITY="EDMONTON       " K_NUM=0.000 K_INT=7 K_DATE=20000116 K_LOG=F
+  rec   2 K_TEXT="SMITHSON            " K_CITY="CALGARY        " K_NUM=-9999999.999 K_INT=14 K_DATE=20000117 K_LOG=T
+  rec   3 K_TEXT="john smith          " K_CITY="TORONTO        " K_NUM=99999999.999 K_INT=-21 K_DATE=20000118 K_LOG=F
+  rec   4 K_TEXT="  leading blanks    " K_CITY="               " K_NUM=-0.001 K_INT=28 K_DATE=20000119 K_LOG=T
+  rec   5 K_TEXT="ABCDEFGHIJKLMNOPQRST" K_CITY="MONTREAL       " K_NUM=2.500 K_INT=35 K_DATE=20000120 K_LOG=F
+  rec   6 K_TEXT="                    " K_CITY="OTTAWA         " K_NUM=-2.500 K_INT=-42 K_DATE=20000121 K_LOG=T
+  rec   7 K_TEXT="                    " K_CITY="               " K_NUM=0.125 K_INT=49 K_DATE=20000122 K_LOG=F
+  rec   8 K_TEXT="123.45              " K_CITY="HALIFAX        " K_NUM=0.135 K_INT=56 K_DATE=20000123 K_LOG=T
+  rec   9 K_TEXT="not a number        " K_CITY="REGINA         " K_NUM=5.000 K_INT=-63 K_DATE=20000124 K_LOG=F
+  rec  10 K_TEXT="01/15/2000          " K_CITY="VICTORIA       " K_NUM=-5.000 K_INT=70 K_DATE=20000125 K_LOG=T
+  rec  11 K_TEXT="99/99/9999          " K_CITY="WINNIPEG       " K_NUM=3.000 K_INT=77 K_DATE=20000126 K_LOG=F
+  rec  12 K_TEXT="ZEBRA               " K_CITY="QUEBEC         " K_NUM=-3.000 K_INT=-84 K_DATE=20000127 K_LOG=T
+  rec  13 K_TEXT="AARDVARK            " K_CITY="LONDON         " K_NUM=1.500 K_INT=91 K_DATE=20000128 K_LOG=F
+  rec  14 K_TEXT="MIDDLE              " K_CITY="PARIS          " K_NUM=-1.500 K_INT=98 K_DATE=20000129 K_LOG=T
+  rec  15 K_TEXT="MIDDLE              " K_CITY="PARIS          " K_NUM=12345.679 K_INT=-105 K_DATE=20000130 K_LOG=F
+  rec  16 K_TEXT="\xC9\xE8                  " K_CITY="BERLIN         " K_NUM=-0.500 K_INT=112 K_DATE=20000131 K_LOG=T
+
+[tags]
+# keyLen is deliberately absent: VFP does not expose it, and the
+# tag header in VFPFUNC.cdx is the authority.
+  T_ABS      expr="ABS(K_NUM)" keyType='N'
+  T_INT      expr="INT(K_NUM)" keyType='N'
+  T_ROUND    expr="ROUND(K_NUM,1)" keyType='N'
+  T_MOD      expr="MOD(K_NUM,3)" keyType='N'
+  T_MIN      expr="MIN(K_NUM,100)" keyType='N'
+  T_MAX      expr="MAX(K_NUM,100)" keyType='N'
+  T_SQRT     expr="SQRT(ABS(K_NUM))" keyType='N'
+  T_SIGN     expr="SIGN(K_NUM)" keyType='N'
+  T_LEN      expr="LEN(K_TEXT)" keyType='N'
+  T_AT       expr="AT(\"A\",K_TEXT)" keyType='N'
+  T_ASC      expr="ASC(K_TEXT+\" \")" keyType='N'
+  T_LOWER    expr="LOWER(K_TEXT)" keyType='C'
+  T_REPL     expr="REPLICATE(K_TEXT,2)" keyType='C'
+  T_PROPER   expr="PROPER(K_TEXT)" keyType='C'
+  T_VTRIM    expr="TRIM(K_TEXT)" keyType='C'
+  T_VSTR     expr="STR(K_NUM,12,3)" keyType='C'
+  T_UPPER    expr="UPPER(K_TEXT)" keyType='C'
+
+[tag notes]
+  T_ABS      ABS(K_NUM)                     ; r4numDoub, no new key route | built
+  T_INT      INT(K_NUM)                     ; r4numDoub, truncation direction on both signs | built
+  T_ROUND    ROUND(K_NUM,1)                 ; r4numDoub, the rounding rule STR also raises | built
+  T_MOD      MOD(K_NUM,3)                   ; r4numDoub, sign of the result on a negative operand | built
+  T_MIN      MIN(K_NUM,100)                 ; r4numDoub | built
+  T_MAX      MAX(K_NUM,100)                 ; r4numDoub | built
+  T_SQRT     SQRT(ABS(K_NUM))               ; r4numDoub; ABS inside because SQRT of a negative raises | built
+  T_SIGN     SIGN(K_NUM)                    ; r4numDoub | built
+  T_LEN      LEN(K_TEXT)                    ; r4numDoub over a character operand | built
+  T_AT       AT("A",K_TEXT)                 ; r4numDoub, two character operands | built
+  T_ASC      ASC(K_TEXT+" ")                ; r4numDoub; the pad keeps ASC off an empty string, which raises | built
+  T_LOWER    LOWER(K_TEXT)                  ; r4str, result length is the operand's -- expect keyLen 20 | built
+  T_REPL     REPLICATE(K_TEXT,2)            ; r4str, result length is n x operand -- expect keyLen 40 | built
+  T_PROPER   PROPER(K_TEXT)                 ; r4str, beyond the thirteen; length should follow the operand | built
+  T_STRTRN   STRTRAN(K_TEXT,"A","BB")       ; r4str with a value-dependent length -- how does VFP size it? | REFUSED: Error building key for index "vfpfunc.cdx" tag "T_strtrn".
+  T_VTRIM    TRIM(K_TEXT)                   ; shared name; CodeBase returns source width NUL-padded | built
+  T_VSTR     STR(K_NUM,12,3)                ; shared name; CodeBase rounds half away from zero (ADR-43 open) | built
+  T_UPPER    UPPER(K_TEXT)                  ; shared name, the control row -- this one must agree | built

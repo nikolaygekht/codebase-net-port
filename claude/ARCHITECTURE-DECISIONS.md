@@ -53,7 +53,7 @@ for everyone else. Details in `test-files-generator/README.md`.
 a slow one, so any term that cannot be proven safe to optimize falls back to scanning, and the
 full-scan equivalence gate runs on every case, always (`PORTING-PLAN.md` §5 `QUERY`, risk R12).
 
-## ADR-04 — No Visual FoxPro VM, for now · accepted
+## ADR-04 — No Visual FoxPro VM, for now · superseded by ADR-44
 
 **Context.** VFP would be the better generator: it *is* the compatibility target, and CodeBase
 demonstrably differs from it — `flags[8]`, `autoIncrementVal`, the `0x31` overloading, and a
@@ -127,7 +127,9 @@ default. Real VFP tables normally carry an LDID, which also decides the default 
 
 ## ADR-11 — Questions only a live VFP can settle · open
 
-Deferred by ADR-04; batch them if a VM is ever built.
+Deferred by ADR-04; batch them if a VM is ever built. **A VM now exists — ADR-44**, which authorises
+these as item 4 of its run order. Still open: a VM being available is not the same as a script having
+answered them.
 
 - Does VFP distinguish tag `typeCode` `0x60` from `0xE0` as CodeBase does? (`CDX-FORMAT.md:672`)
 - Should the port also implement VFP's *native* auto-increment (per-field descriptor bytes 19-23),
@@ -1438,3 +1440,119 @@ failing on rows no dump can reach.
 "match VFP" stop being obviously the same instruction. We witnessed CodeBase's `STR` rounding half
 away from zero on the decimal digits; whether VFP's does the same is unknown, the corpus cannot
 answer it, and ADR-04 defers the live VFP that could.
+
+## ADR-44 — Visual FoxPro 9 is the second offline oracle, in its own frozen corner · accepted
+
+**Context.** ADR-04 declined a VFP VM because "VFP is not installed, would not start, and an XP VM is
+a large cost for a small number of open questions", and said to revisit **when a specific question
+needs it, batched**. Both halves of that premise have changed. A VFP 9 VM is available and `.prg`
+scripts can be run in it on request; and the questions are no longer few. ADR-43 supports functions
+CodeBase refuses and leaves *their key lengths and values* with no oracle at all; `EXPRESSIONS.md`
+§14 risk 1 says `c4dtoa45`'s behaviour must be recovered "empirically from VFP"; ADR-11 has been
+parked on exactly this since the beginning; and `PORTING-PLAN.md` §2.3 parks `V`/`Q`/`W` on it.
+
+**Decision.** Treat VFP 9 as a **second offline oracle under ADR-01's discipline**: it generates
+files and text offline, the output is committed, and **nothing in the build ever runs it**. Its
+scripts live in `test-files-generator/vfp/`, checked in beside the C generator; its output is
+published by `copy-vfp-corpus.bat` into **`net/corpus/vfp/`**, a subdirectory, which
+`Corpus.TableNames` does not see because it is not recursive — the same arrangement as `benchmark/`
+and for the same reason: these tables have no C-written `<NAME>.dump.txt`, so a data-driven golden
+test that swept them up would fail on their absence. Gates name them explicitly.
+
+**What VFP is allowed to be an oracle for**, and the line: VFP can witness exactly two things — **a
+value it computes** and **the bytes it writes**. It witnesses nothing about CodeBase's internals, so
+the parse-rejection surface, the error codes and the compiled node arrays stay the C generator's,
+and CodeBase extensions VFP cannot write (`0x31`, `keyLen > 240`, block sizes other than 512, the
+`'7'` datetime, `c4compress` memo) are unreachable from here. ADR-23 stays open regardless of this VM.
+
+**The order the runs are authorised in**, most valuable first, because each is a script and a case:
+
+1. **A CDX with tags over the VFP-only functions** — ADR-43's one real risk, and the arithmetic set's
+   only oracle. Written: `vfpfunc.prg`.
+2. **Code-page marks beyond CodeBase's five constants** — `DBF-FORMAT.md` §8.1's 26-mark table is
+   sourced to VFP's documentation (ADR-19) and witnessed at two marks.
+3. **A VFP 9 `0x32` table with a memo** — §6.3's gap where `LegacyVariant.cs:10-15` reproduces a C
+   library defect against no file.
+4. `V`/`Q`/`W` fields, native auto-increment (ADR-11), a DBC backlink, an insert-and-split tree with
+   a non-empty free list, and tag `typeCode` `0x60` vs `0xE0` (ADR-11).
+
+**Two rules that keep a VFP artifact honest.**
+
+*Provenance is recorded or the file is worthless.* Every script pins and dumps the `SET` state its
+output depends on — `COLLATE`, `CENTURY`, `DATE`, `EXACT`, `NULL`, `DECIMALS` and the current code
+page — plus `VERSION(1)`. `SET EXACT` is the subject of `010-expr/DESIGN.md` Decision 8 and the date
+settings are ADR-42's; a dump that does not say which way they were set answers nothing.
+
+*A shared name does not make VFP authoritative.* ADR-43 already settles that CodeBase's behaviour
+governs what this port **writes**, because that is the gated one. What VFP adds is the ability to
+**see the divergence**, and a divergence that affects **reading a VFP-written file** — a key length
+our parser computes that the file does not have — is a defect in the port whichever engine we
+prefer. That is why `vfpfunc.prg` carries `TRIM` and `STR` as probes and `UPPER` as a control.
+
+**Rejected — putting VFP output in `net/corpus/` proper.** Those files are byte-identical on
+regeneration, produced by one tool, and swept up automatically by name. VFP's are produced by a
+different engine on a different machine, and their `.cdx` version counter can move between runs;
+mixing them would either weaken the regeneration property or force every data-driven test to learn
+about exceptions. A subdirectory costs one line in each gate that wants them.
+
+**Rejected — having the C library dump a VFP-built CDX.** Opening a tag parses its expression
+(`i4ntag.c:1390-1395`), so a tag over `LOWER(…)` fails to open and the existing dumper never sees it
+— the very files this ADR exists to produce are the ones it cannot read. The artifact is therefore
+the **file itself**, read by the port's own gated reader, with the text dump as provenance rather
+than as the expectation.
+
+**Consequence for ADR-04 and ADR-11.** ADR-04 is superseded. ADR-11 stays open, because a VM being
+available is not the same as its questions being answered — but it is no longer blocked, and its two
+questions are items 4 above.
+
+## ADR-45 — Prefix `=` and division by zero replicate CodeBase; the oracle also corrects what the source says VFP does · accepted
+
+**Context.** `010-expr/DESIGN.md` listed two behaviours the source documents as CodeBase-not-VFP and
+called them decisions waiting on evidence, because both are record-set-affecting and silence decides
+them either way:
+
+- **Prefix `=` compares only the common prefix.** `e4parse.c:791-797` sets the comparison length
+  `i1` to the **shorter** of the two operands, and `e4equal` is `!u4memcmp(left, right, i1)`
+  (`e4functi.c:1007-1027`). So CodeBase makes `"AAAA" = "AAA"` and `"AAA" = "AAAA"` **both** true.
+- **Division by zero yields `0.0`, not an error** (row 102, `e4functi.c:753-756`).
+
+**Decision.** **Replicate CodeBase for both.** A `FOR` filter's semantics decide which records a tag
+contains, and a stored index must agree with the engine that built it — a port that evaluated `=`
+VFP's way would compute a different record set for a CDX this library itself wrote. Division by zero
+follows the same reasoning and raises nothing.
+
+**Consequence for `QUERY`.** `NAME = "SM"` is a **prefix range**, not an equality. The optimizer
+decomposes it as a range constraint on the tag; decomposing it as equality would silently drop
+`SMITH` and `SMITHSON`, which is the wrong-record-set failure the whole gate exists to prevent. This
+is the rule `QUERY` leans on, and the reason it is an ADR and not a code comment.
+
+**What the oracle corrected.** Sequiter's own note (`e4parse.c:59-62`) says that of the two, "only
+the 2nd returns 'TRUE' in FoxPro" — the 2nd being `"AAA" = "AAAA"`. `EXPRESSIONS.md` §8 and
+`DESIGN.md` Decision 8 both repeated it on that authority. **The first `vfpfunc.prg` run says the
+opposite.** VFP 9, `SET EXACT OFF`, MACHINE collation:
+
+```
+"AAA"  = "AAAA"  ->  FALSE          "AAAA" = "AAA"   ->  TRUE
+```
+
+and with `SET EXACT ON` both are false. VFP compares until the end of the **right** operand, so the
+match is the shorter-on-the-right case — which is also what VFP's own documentation says, and the
+reverse of the comment. Whether the comment was always wrong or describes FoxPro 2.x, it cannot
+describe the compatibility target, and the three documents are corrected to the witnessed direction.
+
+The *decision* is unchanged — the divergence is the same size and the same shape, and CodeBase still
+governs. What changes is which case diverges: CodeBase and VFP agree on `"AAAA" = "AAA"`, and differ
+on `"AAA" = "AAAA"`, where CodeBase's prefix rule matches and VFP's right-operand rule does not.
+This is the first thing the second oracle has overturned rather than confirmed, and it is exactly
+ADR-44's stated reason for having one.
+
+**Where this leaves ADR-43's shared names.** The same run carried `STR` and `TRIM` as probes with
+`UPPER` as the control. `STR` **agrees**: VFP returns `3`, `-3`, `0.13` and `0.14` for the four
+rounding probes, matching the C library's half-away-from-zero on the decimal digits, so ADR-43's
+sharpest open question closes with no divergence to carry. `TRIM` differs in *padding* rather than
+in value, which is a key-length question and belongs with the `.cdx` tag header, not here.
+
+**Rejected — following VFP because a VFP-written file might contain `=`.** It could, and this port
+will read it. But `=` inside a stored `FOR` filter is evaluated by whoever opens the table, and the
+port cannot be two engines at once; the choice is which one it is consistently. ADR-43 already
+settles that CodeBase governs behaviour and VFP governs bytes, and nothing here is a byte.

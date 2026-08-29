@@ -1350,3 +1350,91 @@ after the table is open, so the intruding thread arrives at a known point.
 **Consequence.** The contract is stated in the public XML docs, and the source itself was never the
 problem — `RandomAccess.Read` is positional and safe on one handle concurrently. What is unsafe is this
 library's own mutable state: buffers, cursor position, pool.
+
+---
+
+## ADR-42 — The expression engine takes an explicit date policy, defaulting to invariant · accepted
+
+**Context.** Step 010's corpus run found that what the reference calls a *language* is exactly two
+settings, and that it takes both implicitly. The `dateFormat` picture comes from a compile-time
+switch in `code4initLow` — `MM/DD/YY` by default and for `S4FRENCH`, `DD.MM.YY` for `S4GERMAN`,
+`YYYY-MM-DD` for `S4SWEDISH`/`S4FINNISH`, `DD-MM-YYYY` for `S4NORWEGIAN` (`C4CODE.C:1126`). And when
+the picture carries no century digits, `c4decode` reads the century **off the system clock**
+(`GetLocalTime`, `D4DATE.C:580-601`). **No locale API appears anywhere in the source** — no
+`GetLocaleInfo`, `setlocale` or `GetDateFormat` — so this is not localisation, it is two constants
+and a clock read.
+
+Witnessed in `CDXEXPR.expr.dump.txt`: with the default picture, `CTOD("01/15/00")` through
+`CTOD("01/15/99")` **all** resolve to 20xx in a 2026 run, so no twentieth-century date is reachable
+through `CTOD` at all; and `CTOD("01/15/2000")` is **2020**, because the 8-character picture consumes
+only `01/15/20`. `STOD` takes `CCYYMMDD` and has no such dependence.
+
+**Decision.** The engine takes an explicit `ExpressionOptions` — a picture and a century policy —
+defaulting to a `CCYYMMDD` picture with **no** century inference, so the clock-dependent path is
+unreachable unless a caller asks for it. Presets mirror the reference's five language builds. A
+two-digit year with no configured century is **refused**, never guessed.
+
+**Why.** It makes the non-deterministic path impossible by default rather than merely discouraged,
+and it is the shape of ADR-17: no ambient, host-dependent state read implicitly. Someone who wants
+CodeBase's behaviour opts in, and thereby accepts that `CTOD("01/15/99")` means 2099 today and 1999
+in 2101.
+
+**Consequence, and it is not fixable by a default.** `DTOC`'s key length *is* the picture length, so
+the picture is byte-affecting for stored keys — but a tag header records only the **length**.
+`MM/DD/YY` and `DD.MM.YY` are both 8 characters and give different bytes for the same date, so the
+picture **cannot be recovered from the file**, and the computed-versus-stored key-length check that
+`EXPRESSIONS.md` §9.1 relies on cannot detect a wrong choice. A German-built `DTOC` tag read under
+any 8-character picture yields wrong keys of the right length, silently. Therefore a **tag** whose
+expression is picture-dependent is **refused unless the picture is explicitly configured** — the
+shape of ADR-28's refusal — while a **filter** simply uses the configured picture.
+
+**Alternatives rejected.** *Replicate the reference's default silently* — it is ambiguous, clock-
+dependent, and would put a date bug in the library that only fires in 2101. *Use .NET
+`CultureInfo`* — the same objection as the collation tables (`CLAUDE.md`): a culture cannot reproduce
+stored bytes, and the picture is not a culture.
+
+---
+
+## ADR-43 — Visual FoxPro's functions are supported, though CodeBase has none of them · accepted
+
+**Context.** The reference has 35 named functions and **no arithmetic at all** — no `ABS`, `INT`,
+`ROUND`, `MOD`, `MIN`, `MAX`, `SQRT`, `SIGN`, and no `LOWER`, `LEN`, `AT`, `ASC` or `REPLICATE`
+(`EXPRESSIONS.md` §5.1, read off `v4functions` itself and gated by `CDXEXPR`'s `[vfp-only]` section,
+where all thirteen are refused with `e4unrecFunction`). Its whole numeric surface is `+ - * / ** ^`.
+It is a key-building vocabulary, not a general expression language.
+
+But **VFP has them, and a CDX written by VFP stores its tag expression as text in the tag header.**
+A VFP-built index can legitimately carry `LOWER(NAME)` or `ROUND(QTY,0)`.
+
+**Decision.** Support them. Three tiers: free in a **filter**, where nothing is written; supported
+when **reading** an existing tag; refused when **writing** a new one, which is `WRITE`'s call.
+
+**Why it is not the superset the front-end rule forbids.** `DESIGN.md` §2b's "never accept a
+superset" exists because a tag we *write* must be readable by the engines that will open it. That is
+an argument about writing, and about VFP as the authority; a function VFP has is readable by VFP.
+Refusing these is a hole in the stated compatibility target — "files VFP writes must be read
+correctly here" — not a safeguard. Accepting `-FIELD`, which neither engine parses, is still
+forbidden.
+
+**Why it is cheap.** **Key length and key bytes follow the result *type*, never the function**: §9.1
+switches on type and `expr4keyConvert` takes a key type. `ABS(X)` is `r4numDoub` → 8 bytes →
+`t4dblToFox`, a route `CDXEXPR`'s `T_VAL` tag already gates. Only the *value* is new, and values are
+C#-authored on axis A regardless.
+
+**Where the risk actually is.** String-returning functions, whose parse-time result *length* is
+per-function — `LOWER(C(20))` → 20, `REPLICATE("A",3)` → n × operand. The gate is the existing
+computed-versus-stored key length check, which for a VFP-written tag reads "we parsed this the way
+VFP did". Its blind spot, proved by the corpus: `T_NUM`, `T_DATE`, `T_VAL`, `T_CUR`, `T_TS` and
+`T_DTIME` are `r4num`, `r4date`, `r4numDoub`, `r4currency` and `r4dateTime` and **all six have
+`keyLen=8`**, while their transforms differ — so a wrong result *type* among those is invisible to a
+length check. Start with functions whose result type is unambiguous; the arithmetic set is.
+
+**Two rules.** On any name **both** engines define, CodeBase's behaviour is authoritative, because it
+is the gated one. And every VFP-only row is marked as such in the function table, so row coverage
+reports *oracle-gated*, *unreachable-by-construction* and *VFP-only* as three counts rather than
+failing on rows no dump can reach.
+
+**Open, and created by this decision.** For every name the two engines share, "match CodeBase" and
+"match VFP" stop being obviously the same instruction. We witnessed CodeBase's `STR` rounding half
+away from zero on the decimal digits; whether VFP's does the same is unknown, the corpus cannot
+answer it, and ADR-04 defers the live VFP that could.

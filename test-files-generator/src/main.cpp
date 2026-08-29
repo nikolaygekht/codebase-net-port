@@ -28,6 +28,7 @@
 #include <direct.h>
 
 #include "cases.h"
+#include "dump-expr.h"
 
 int main( int argc, char **argv )
 {
@@ -45,7 +46,13 @@ int main( int argc, char **argv )
    printf( "CodeBase test-file generator\n" );
    printf( "output: %s\n\n", outDir );
 
-   rc = caseDb3Type( &cb, outDir );
+   /* The reference library's own function table, printed from the array. It
+    * depends on no table and gates the port's transcription of it. */
+   printf( "FUNCTIONS.dump.txt (v4functions, %d rows) ... ", EXPR4NUM_FUNCTIONS );
+   rc = dumpFunctionTable( outDir );
+   printf( "%s\n", rc == 0 ? "ok" : "FAILED" );
+
+   if ( rc == 0 ) rc = caseDb3Type( &cb, outDir );
    if ( rc == 0 ) rc = caseVfpType( &cb, outDir );
    if ( rc == 0 ) rc = caseF2xMemo( &cb, outDir );
    if ( rc == 0 ) rc = caseVfpMemo( &cb, outDir );
@@ -57,6 +64,7 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseIdxOne ( &cb, outDir );
    if ( rc == 0 ) rc = caseCdxColl( &cb, outDir );
    if ( rc == 0 ) rc = caseCdxTime( &cb, outDir );
+   if ( rc == 0 ) rc = caseCdxExpr( &cb, outDir );
 
    /* Last, and not part of the corpus proper: the benchmark table, into
     * <outDir>\benchmark, with no dump. */

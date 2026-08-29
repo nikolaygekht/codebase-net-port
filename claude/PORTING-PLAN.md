@@ -309,7 +309,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
 | `CDX-READ` | CDX reading & navigation | **P1** | **done** — decode and traversal (004), seek by key bytes (005), tags on a `Table` (006), seek by value (008). Only a non-field key expression waits on `EXPR` | **R1** retired |
 | `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (008 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
-| `EXPR` | Expression engine (read subset) | **P1** | not started | R5 |
+| `EXPR` | Expression engine (read subset) | **P1** | **in progress** — designed and planned ([`010-expr`](dev/010-expr/)); sub-step 1 done: `CDXEXPR` + `FUNCTIONS.dump.txt` + the expression oracle are in the corpus, and no C# exists yet | R5 |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — spec unwritten | **R12**, R13 |
 | `WRITE` | Single-user write & round-trip | **P2** | not started — **owes the block cache, see §5's cross-capability obligation** | R4, R9, **R6** |
 | `LOCKING` | Locking & multi-user | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | R3, R10, **R6** |
@@ -652,7 +652,14 @@ signs and rounding; GENERAL-collated strings with accents, expansions, trailing 
 tags; unique/candidate tags; filtered tags; memos forcing FPT growth and compaction; leaf blocks
 driven to the widening/split boundary; **multi-level index trees** (for interior nodes); and record
 counts crossing `recNumLen` thresholds; deleted records; and a `0x31` CodeBase-extension case,
-labelled as non-VFP. **Done since:** code-page-marked tables, single-byte and multi-byte (ADR-18).
+labelled as non-VFP. **Done since:** code-page-marked tables, single-byte and multi-byte (ADR-18);
+and, in step 010, **the `H` binary-float field**, which was a silent hole — `FieldResolver` admitted
+it and `FieldValueDecoder` decoded it while no corpus case had one, so `r4floatBin` shipped
+completely ungated. `CDXEXPR` closes it, along with **deleted records** and a **tag over a nullable
+field** (the leading `0x80` indicator). Two cautions the case recorded: `d4create` forces an `H`
+field to **4 bytes** whatever length is asked for (`d4create.c:1620-1622`), and **no `f4assign*`
+reaches `r4floatBin`** — the value has to be written through `f4assignPtr`, or the field silently
+holds decimal text.
 
 **Named gaps, from the 002–005 audit (2026-08-13).** These are paths the generator *can* produce and was
 never taught — unlike the corrupt-file guards, which are layer 3 because no valid file can express them.

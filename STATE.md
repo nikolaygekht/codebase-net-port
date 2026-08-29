@@ -1,21 +1,22 @@
 # Project state
 
-**Updated:** 2026-08-27 · the tree is **clean**; everything is committed to `main` and **pushed**.
-**Step [`009-performance-audit`](claude/dev/009-performance-audit/) is closed** — both halves, the audit
-and its remediation, with the decisions recorded as **ADR-35 to ADR-41**. It opened no capability and
-adds no row to `PORTING-PLAN.md` §5; what it changed is that **the read path is fast enough for `QUERY`
-to drive, and measured rather than guessed at**.
-**The next session starts at step [`010-expr`](claude/dev/010-expr/)**, which is designed and not yet
-planned — or at `claude/specs/QUERY-OPTIMIZER.md`, which does not depend on it. §3 has both.
-**The step's own headline: the largest cost in the read path was on nobody's list.** A
-`RandomAccess.GetLength` per block read, four per descent with the cache fully warm, **87% of a cached
-descent** — invisible to the audit because a metadata call is not a read (**ADR-35**). A cached seek is
-**732 ns** against 3 885, and **the audit's predicted 11.6× for the block cache is met** after standing
-at 2.13×. The same call was ~25% of a cached walk and **90% of the memo path, which had never been
-measured at all**.
-Against the C library the port is **~1.85× on CPU-bound work and at parity or better when the work is
-I/O**, and a seek is **5.41×** a plain `Go`+`Skip` where the C's own ratio is 5.84×.
-**`COLLATION` is done, `CDX-READ` is done, and risk R2 is retired.**
+**Updated:** 2026-08-28 · the tree is **clean**; everything is committed to `main` and **pushed**.
+**Step [`010-expr`](claude/dev/010-expr/) is under way and its first sub-step is done.** The step is
+designed *and* planned, and **the oracle exists**: `net/corpus/CDXEXPR.*` plus `FUNCTIONS.dump.txt`
+record what the C library's own parser and evaluator answer — 987 assertions in
+[`ORACLE-SUITE.txt`](claude/dev/010-expr/ORACLE-SUITE.txt). **No C# of the engine is written yet**,
+by design: sub-step 1 is the gate, and sub-steps 2-8 build against it.
+**The design changed shape twice this session, and both changes are recorded as ADRs.** The gate is
+now **two axes** — what a function *computes* (C#-authored semantics, tested over **constants**) and
+what a value *becomes on disk* (stored key bytes, driven from the C library's recorded value so the
+two can never cancel). And the engine takes an explicit date policy (**ADR-42**) and supports
+**Visual FoxPro's functions** although CodeBase has none of them (**ADR-43**).
+**The headline finding: the reference has no arithmetic function at all.** 35 named functions, whole
+numeric surface `+ - * / ** ^` — a key-building vocabulary, not an expression language. Beside it:
+`STR` rounds **half away from zero on the decimal digits**, `CTOD` reads the century **off the system
+clock**, `TRIM` returns the source width **NUL-padded**, and **promotion beats the exact-type
+overload row**, which makes all six currency comparison rows dead.
+`dotnet test` is green on **1357 tests** (590 golden + 767 unit), up from 1333.
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
@@ -28,8 +29,8 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 **A DBF can be read whole, its records can be read in an index tag's order, and the read path is
 cached.** `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by
 design, ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test` is green on **1333 tests**,
-566 of them golden.
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test` is green on **1357 tests**,
+590 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -161,7 +162,7 @@ bin\testgen.exe   :: -> bin\out\
 copy-corpus.bat   :: -> ..\net\corpus\
 ```
 
-**`net/corpus/`** — twelve cases, five of them indexed. Each table has a `<NAME>.dump.txt` and each
+**`net/corpus/`** — thirteen cases, six of them indexed. Each table has a `<NAME>.dump.txt` and each
 index file a `<NAME>.cdx.dump.txt`, both written by the C library:
 
 | File | Version | Covers |
@@ -178,6 +179,7 @@ index file a `<NAME>.cdx.dump.txt`, both written by the C library:
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **machine beside `GENERAL`** over one cp1252 field: `keyLen` 20 and 40, pad `0x20` and `0x00`, accents and the `œ`/`ß`/`þ` expansions |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **one tree in both file shapes**, the `.IDX` derived and verified by walking both (ADR-25) |
 | `CDXTIME.DBF` + `.cdx` | `0x30` | **256 datetimes**, built in step 008 so real keys could check the 10802-byte `flags4dateTime` copy |
+| `CDXEXPR.DBF` + `.cdx` + `.fpt` | `0x30` | **the expression case, step 010** — 16 records, **22 tags** whose keys are not bare fields, the corpus's only `H` field, a deleted record, and a tag over a nullable field. Beside the usual dumps it carries `CDXEXPR.expr.dump.txt`; `FUNCTIONS.dump.txt` sits next to it |
 
 Beside them, `net/corpus/benchmark/PERF10K.DBF` + `.cdx` (610 456 + 304 640 bytes): a 10 000-record
 table with a `C(20)` and an `N(12,2)` tag, **benchmark data and not a gate** — no `.dump.txt`, no golden
@@ -186,68 +188,97 @@ test, and invisible to `Corpus.TableNames`, which is not recursive.
 Regeneration is byte-identical, index files included.
 
 **Documentation:** seven format specs, the porting plan, the development approach and the decision
-log. `claude/specs/QUERY-OPTIMIZER.md` **does not exist** and is the gap that matters — the optimizer
+log. `EXPRESSIONS.md` gained §5.1 (the 35-function set and the absence of arithmetic) and §7.7 (the
+47 comparison rows), and had §7.3's date-format claim corrected — it said the default picture was set
+outside this source drop; it is at `C4CODE.C:1126`, which `API-ERRORS.md` had cited all along. `claude/specs/QUERY-OPTIMIZER.md` **does not exist** and is the gap that matters — the optimizer
 is the only in-scope subsystem with no source-cited spec (risk R13).
 
 ---
 
-## 2. Last session (2026-08-27), and the three before it
+## 2. Last session (2026-08-28), and the three before it
 
-**Step 009 is closed, both halves.** This session decided the eight ADR candidates the step was held
-open on and wrote the closeout; **no code changed** beyond one orphaned XML-doc `<summary>` in
-`Table.cs` that had been left stranded above `Enter()` when sub-step 7 added it, and would have given
-docgen the wrong Brief. Tests green at **1333** (767 + 566).
+**Step 010's sub-step 1 landed: the expression oracle.** Three new generator files
+(`dump-expr.h/.cpp`, `case-cdxexpr.cpp`), seven new corpus files, **no C# of the engine**. The
+existing corpus regenerates **byte-identical**; the only C# touched was five inventory assertions
+that the corpus's own policing fired on, plus one guard in `CachedReadGoldenTests` that skips tags
+whose expression is not a bare field — ADR-28's refusal, and **sub-step 8 deletes that guard**.
 
-**Six new entries, ADR-36 to ADR-41** — where the cache lives and that one pool serves the engine; the
-three-valued policy and why the shipped default caches nothing; the invalidation surface and the block
-that lives in two places; eviction as a pure class in the reference's priority order; the project's
-first performance gate; and the threading contract with the detector and the library's first lock. Two
-candidates deliberately did not become entries: the engine-wide pool is one sentence inside ADR-36, and
-**rent-and-return with the window as the residency unit is deferred**, because it describes a zero-copy
-design that was not built — writing it now would document a plan, not a decision.
+**The gate was redesigned before any of it was built, on the user's objection**, and this is the
+change most worth carrying forward. The first draft made the C dump the oracle for everything, on a
+misreading of `CLAUDE.md` — which bars hand-written expected **bytes**, an on-disk fact, not
+`UPPER("abc") == "ABC"`. It is now **two axes that fail differently**, split where the reference
+itself splits (`expr4vary` returns a value, `expr4keyConvert` turns it into key bytes):
 
-**The design did not survive execution unchanged in three places**, which is why the entries were worth
-writing rather than transcribing: dropping blocks turned out to have two halves, `Refresh` has no memo
-cache to reset because `MemoReader` keeps no state, and the 2× gate had to be retargeted onto read
-counts.
+- **Axis A, what a function computes** — C#-authored expectations at layer 1, **tested over
+  constants** so the expression *is* the case and no failure can be a field-decode bug in disguise.
+  Fields appear only for the four types no literal reaches (`r4num`, `r4date`, `r4int`,
+  `r4currency`), which are also the four **no function returns**.
+- **Axis B, what a value becomes on disk** — stored key bytes only, and **driven from the C library's
+  recorded value rather than from our evaluator**, so a wrong kernel and a wrong transform can never
+  cancel on the tags the corpus happens to hold.
 
-**Before it, 2026-08-21 to 2026-08-22, the remediation ran** — eight sub-steps, the eighth unplanned,
-inside the same folder the way `007-audit-glm` held its own. What landed is in §1; what it cost and what
-it bought is in [`SUMMARY.md`](claude/dev/009-performance-audit/SUMMARY.md) and the per-sub-step results
-files beside it. Three things are worth carrying out of it:
+**What the first run answered, having been listed as unknown:** `STR` rounds **half away from zero on
+the decimal digits** (`0.135` → `0.14`, though the nearest double is below it) and overflows to `***`;
+the default `dateFormat` picture is **8 characters** and a compile-time constant, not a locale
+(`C4CODE.C:1126`); `r4floatBin` keys to **4** bytes; **a tag over a logical expression exists and its
+key is 1 byte**, so `KeyTypeResolver`'s refusal of `'L'` goes; the null indicator is one byte marked
+by `typeCode` bit **0x02**; and `TRIM` returns the **source width, NUL-padded** — a C#-authored guess
+would have said three bytes for `TRIM("abc   ")`.
 
-- **Every gate passed and the step was still wrong about where its time went — three times.** Sub-step
-  2's comparison work, sub-step 5's "3.9 µs in the `Table` layer", and finally the `Length` syscall.
-  **What found it was counting, not timing**: `4.000 Length queries and 0.000 reads per descent` named
-  the mechanism in one run, where a gate asserting a ratio cannot notice that the quantity it divides is
-  the wrong one.
-- **The rule ADR-35 generalises to:** *let the read be the refusal — unless the value being checked
-  sizes an allocation.* A fixed-size block read can fail safely; a memo payload whose length the file
-  supplies cannot.
-- **A process failure and its fix held.** Restoring after a mutation check is done from a checksummed
-  copy, **never** from `git` (`DEV_APPROACH.md` §4) — the rule step 008 wrote after `git checkout --`
-  destroyed an uncommitted surface. It was followed every time this step mutated something.
+**Three things the oracle found that no amount of reading would have:**
 
-**And the audit itself closed 2026-08-19** with no change to `net/`: 10 000 seeks over a 10 000-record
-table through the reference C library and through `CodeBase.Net`, same file, same query sets, matching
-per-record checksums. `experiments/` is gitignored; the harness *sources* are committed under
-[`009-performance-audit/harness/`](claude/dev/009-performance-audit/harness/), so the measurement can be
-rebuilt from the repository.
+- **`CTOD` has no century pivot — it reads the clock** (`D4DATE.C:580-601`). Every two-digit year
+  becomes the current century, so **no twentieth-century date is reachable through `CTOD`**. That
+  made nine cases clock-dependent, which is why the dump now records `dateFormat` and `century` in
+  its header and why **ADR-42** exists.
+- **Promotion beats the exact-type overload row.** `K_CUR > K_CUR2` resolves the `n,n` row, not
+  `Y,Y`, because `r4currency → r4numDoub` is tried first — so **all six currency comparison rows are
+  dead**, corroborating `EXPRESSIONS.md` §14 risk 8 from a second direction.
+- **No `f4assign*` reaches `r4floatBin`.** The first `CDXEXPR` stored the ASCII text `"0.00"` in its
+  `H` field; the type appears in exactly one assignment path in the library (`f4ass_f.c:99`). Left
+  unfixed, the port's only `r4floatBin` gate would have asserted against text.
 
-**Two consequences of the 2026-08-19 renumbering, worth knowing before reading a `git log`:** the older
-unpushed commits say `007-seek-by-value`, which was the folder's name when they were written — their
-content is step 008's; and `007-audit-glm/REMEDIATION-PLAN.md` §2.2 and §2.3 are out of order, because
-it planned to measure before `COLLATION` and the reverse happened.
+**And one contradiction the rejection dump caught on day one:** `DESIGN.md` §3 lists "a TRIM-family
+result may not feed `SUBSTR`" among the parser's restrictions, on the authority of a source comment.
+`SUBSTR(TRIM(K_TEXT),1,2)` **parses**. Recorded as unconfirmed rather than false, because the dump
+parses with no tag context — and *that* is now a named gap: `e4tagExpr` (−510) can never appear until
+a second rejection pass runs with a real `TAG4FILE`.
+
+**Before it, 2026-08-27, step 009 closed** — both halves, with ADR-36 to ADR-41. §1 has what it
+landed; [`SUMMARY.md`](claude/dev/009-performance-audit/SUMMARY.md) has what it cost. Three things
+worth carrying: every gate passed while the step was wrong about where its time went **three times**,
+and what found it was **counting, not timing**; ADR-35 generalises to *let the read be the refusal —
+unless the value being checked sizes an allocation*; and restoring after a mutation check is done
+from a checksummed copy, **never** from `git`.
+
+**Two consequences of the 2026-08-19 renumbering, worth knowing before reading a `git log`:** the
+older unpushed commits say `007-seek-by-value`, which was the folder's name when they were written —
+their content is step 008's; and `007-audit-glm/REMEDIATION-PLAN.md` §2.2 and §2.3 are out of order,
+because it planned to measure before `COLLATION` and the reverse happened.
 
 ## 3. Next
 
-### Step 010 is `EXPR` — where the next session starts
+### Step 010 continues at sub-step 2 — where the next session starts
 
-**It is [designed](claude/dev/010-expr/DESIGN.md), not yet planned.** `CDX-READ` owes it exactly **one**
-thing: typing a key expression that is not a bare field name (ADR-28). The second refusal, ADR-30,
-turned out not to need the expression engine at all and was closed inside step 008 as **ADR-34** — the
-third time that premise had been repeated without being checked. Scope is the **whole** function table,
-36 named functions and the operator set, because `QUERY` needs the filter vocabulary anyway.
+**Sub-step 1 is done and the oracle is committed.** The next session opens
+[`PLAN.md`](claude/dev/010-expr/PLAN.md) at **sub-step 2, the lexer**, and works forward. Scope is
+the **whole** function table, because `QUERY` needs the filter vocabulary anyway. Nothing about the
+engine has been written; every layer-4 gate it will be measured by already exists in the corpus.
+
+The plan's own ordering, and the reason for it: the **function table transcription** (sub-step 3)
+must be right before **row selection** (4) means anything, and the row must be right before a
+**value** (5) is worth comparing — a wrong row produces a *plausible* value. **Axis B lands complete
+at sub-step 7**, driven from recorded values, so **sub-step 8 is pure wiring** and the only sub-step
+that can turn an existing test red. The stop point after sub-step 5 is real.
+
+**Two things are owed to the corpus before the C# gets far:**
+
+- **A second rejection pass with a real `TAG4FILE`.** Every rejection is currently parsed with
+  `tagPtr = 0`, so `e4tagExpr` (−510) never appears and `OTHER->K_TEXT` comes back as `e4fieldName`
+  (−210). The tag-only refusals — an alias other than the indexed table, and whether the
+  `SUBSTR`-over-`TRIM` restriction bites — are unobservable until then.
+- **`CachedReadGoldenTests`'s `KeysABareField` guard is deleted at sub-step 8**, along with ADR-28's
+  refusal. It is the one place the suite currently averts its eyes.
 
 ### Two things that depend on nothing
 

@@ -27,6 +27,7 @@ turns out to be untested, add a generator case and regenerate.
 | `CDXBASE.DBF` + `.cdx` | `0x30` | **Index, ten tags, one block each.** One tag per key shape: character with shared prefixes and blank keys, the same field descending, runs of duplicates, a unique tag, keys holding bytes below the pad character, numeric, double (including `-0.0`), date, integer, and a filtered tag. See below. |
 | `CDXDEEP.DBF` + `.cdx` | `0x30` | **Index, multi-level trees.** 600 records and four tags; `D_WIDE` is three levels deep (55 leaves under two levels of branch), so interior nodes, sibling chains and full leaves are all reachable, and `D_PFX` is **descending** so a backwards walk and a descending seek cross block boundaries. See below. |
 | `CDXTIME.DBF` + `.cdx` | `0x30` | **Index, datetime keys.** 256 datetimes over one `T` field, indexed ascending and descending. The `T` key is the only one that is not arithmetic: an empirical 86400-bit bitmap decides whether the computed double is nudged down before conversion (i4conv.c:1513-2191), and these values are chosen so roughly a third land on a set bit and the rest do not. Also the day's edges, leap and non-leap Februaries, month and year rollovers, a blank datetime, and a duplicate run. |
+| `CDXEXPR.DBF` + `.cdx` + `.fpt` | `0x30` | **Index, expression keys.** 16 records and 22 tags, the corpus's first tags whose key is not a bare field. Ten are function *shapes* whose key rules differ (`UPPER`, `TRIM`, `SUBSTR`, both concat forms, `STR` over an int and over a numeric, `DTOS`, `DTOC`, `DESCEND`); five are one per result *type* a function can return (`VAL` → r4numDoub, `CTOD` → r4dateDoub, `EMPTY` → r4log, `K_FLT*1` → r4floatBin, `DATETIME` → r4dateTime); five are the types **no function returns** and so can only be bare fields (`N`, `D`, `I`, `Y`, `T`); one is over a nullable field, for the leading `0x80` indicator; one carries a `FOR` filter using `.AND.`, `$` and a function. It is also the only table with an `H` field, which `d4create` forces to 4 bytes. |
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **Index, collation.** cp1252, one `C(20)` field indexed twice — machine (`keyLen` 20, pad `0x20`) and `GENERAL` (`keyLen` 40, pad `0x00`) — over accented text and the `œ`/`ß`/`þ` expansions. See below. |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
 
@@ -157,6 +158,29 @@ the two files differ in 1025 bytes. The C library **cannot write** a single-tag 
 directory's header and then every tag's header, which in such a file is the same block
 (`i4check.c:889-914`). So this case is witnessed differently: the generator walks both files and
 requires the same 300 keys and record numbers from each. See ADR-25.
+
+## The expression dumps
+
+Two files that are not table dumps, written for the expression engine (step `010-expr`):
+
+* **`FUNCTIONS.dump.txt`** — the reference library's own `v4functions[193]`, printed from the array:
+  per row, its name, code, name length, priority, parameter count, return type and parameter types.
+  It depends on no table. The port's own function table is compared against it row for row, so a
+  transcription slip is a failing test rather than a parse difference discovered later.
+* **`CDXEXPR.expr.dump.txt`** — what the C library's parser and evaluator answer, in three sections:
+  `[constant expressions]`, which reference no field and so have no record dimension;
+  `[field expressions]`, evaluated at every record, for the types no literal can express (`r4num`,
+  `r4date`, `r4int`, `r4currency`, a memo, and null); and `[rejections]`, which records for each
+  malformed string whether the parser accepted it and with which `error4code`.
+
+  Each expression carries its **compiled node array** — per node the row index of `v4functions` that
+  overload resolution chose, plus its length, parameter count and field number — because a missing
+  overload row does not fail loudly, it selects the neighbouring row and returns a plausible value.
+  Values are the **raw result bytes**, escaped by the same rules as a key: a numeric result is a
+  double, and printing it as text would hide the low bits the key transform depends on.
+
+  The C's `resultPos` and `i1` are deliberately absent — positions in its evaluation stack and
+  constant pool, artefacts of a stack machine that returns pointers.
 
 ## The index dump
 

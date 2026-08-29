@@ -20,7 +20,7 @@ public sealed class MemoGoldenTests
     [Fact]
     public void TheGateCoversEveryTableThatHasAMemoFile()
     {
-        MemoTables().Should().HaveCount(5);
+        MemoTables().Should().HaveCount(6);
     }
 
     [Fact]

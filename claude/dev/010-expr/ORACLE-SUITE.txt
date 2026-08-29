@@ -1,0 +1,987 @@
+# CDXEXPR expression oracle, rendered flat from CDXEXPR.expr.dump.txt.
+# Derived, not a source: regenerate rather than edit, and assert against the dump.
+#
+# LEGEND  the middle dot · inside a quoted value is a NUL byte (0x00), shown so that
+#         padding is visible. It is NOT the byte 0xB7. Quoted values are raw result
+#         bytes; numbers are decoded doubles; dates are julian day numbers.
+
+UPPER("john smith")  ->  "JOHN SMITH"
+UPPER("")  ->  ""
+TRIM("abc   ")  ->  "abc···"
+TRIM("   ")  ->  "···"
+LTRIM("   abc")  ->  "abc···"
+ALLTRIM("  abc  ")  ->  "abc····"
+SUBSTR("ABCDEF",2,3)  ->  "BCD"
+SUBSTR("ABCDEF",5,10)  ->  "EF"
+LEFT("ABCDEF",3)  ->  "ABC"
+LEFT("ABC",10)  ->  "ABC"
+RIGHT("ABCDEF",3)  ->  "DEF"
+PADL("X",5)  ->  "    X"
+PADR("X",5)  ->  "X    "
+SPACE(5)  ->  "     "
+CHR(65)  ->  "A"
+CHR(0)  ->  "·"
+STR(2.5,10,0)  ->  "         3"
+STR(-2.5,10,0)  ->  "        -3"
+STR(0.125,10,2)  ->  "      0.13"
+STR(0.135,10,2)  ->  "      0.14"
+STR(12345.6789,12,3)  ->  "   12345.679"
+STR(1,3,0)  ->  "  1"
+STR(123456,3,0)  ->  "***"
+STRZERO(42,8)  ->  "00000042"
+STRZERO(-42,8)  ->  "00000-42"
+VAL("123.45")  ->  123.45
+VAL("not a number")  ->  0.0
+VAL("")  ->  0.0
+CTOD("01/15/2000")  ->  2458864 (julian)
+CTOD("99/99/9999")  ->  -1 (julian)
+DTOS(CTOD("01/15/00"))  ->  "20000115"
+DTOS(CTOD("01/15/29"))  ->  "20290115"
+DTOS(CTOD("01/15/30"))  ->  "20300115"
+DTOS(CTOD("01/15/49"))  ->  "20490115"
+DTOS(CTOD("01/15/50"))  ->  "20500115"
+DTOS(CTOD("01/15/69"))  ->  "20690115"
+DTOS(CTOD("01/15/70"))  ->  "20700115"
+DTOS(CTOD("01/15/99"))  ->  "20990115"
+DTOS(STOD("19700115"))  ->  "19700115"
+STOD("20000115")  ->  2451559 (julian)
+DTOS(CTOD("01/15/2000"))  ->  "20200115"
+DTOC(CTOD("01/15/2000"))  ->  "01/15/20"
+DAY(CTOD("01/15/2000"))  ->  15.0
+MONTH(CTOD("01/15/2000"))  ->  1.0
+YEAR(CTOD("01/15/2000"))  ->  2020.0
+DATETIME(2026,1,1)  ->  julian=2461042 ms=0
+L2BIN(1)  ->  "\x01···"
+L2BIN(0)  ->  "····"
+L2BIN(-1)  ->  "ÿÿÿÿ"
+L2BIN(65536)  ->  "··\x01·"
+KEYEQUAL("ABC","ABC")  ->  TRUE
+KEYEQUAL("ABC","ABD")  ->  FALSE
+KEYEQUAL("ABC","AB")  ->  TRUE
+EMPTY("")  ->  TRUE
+EMPTY("   ")  ->  TRUE
+EMPTY("x")  ->  FALSE
+"AAAA" = "AAA"  ->  TRUE
+"AAA" = "AAAA"  ->  TRUE
+"AAA" = "AAA"  ->  TRUE
+"AAA" <> "AAAA"  ->  FALSE
+"AB" $ "XABY"  ->  TRUE
+"Z" $ "XABY"  ->  FALSE
+"" $ "XABY"  ->  TRUE
+"ABC" > "ABD"  ->  FALSE
+"ABD" > "ABC"  ->  TRUE
+"ABC" < "ABD"  ->  TRUE
+"ABC" >= "ABC"  ->  TRUE
+"ABC" => "ABC"  ->  TRUE
+"ABC" <= "ABC"  ->  TRUE
+"ABC" =< "ABC"  ->  TRUE
+"ABC" # "ABD"  ->  TRUE
+"AAAA" > "AAA"  ->  TRUE
+"AAA" < "AAAA"  ->  TRUE
+2 > 1  ->  TRUE
+1 > 2  ->  FALSE
+1 < 2  ->  TRUE
+1 >= 1  ->  TRUE
+1 => 1  ->  TRUE
+1 <= 1  ->  TRUE
+1 =< 1  ->  TRUE
+1 <> 2  ->  TRUE
+1 # 2  ->  TRUE
+1 = 1  ->  TRUE
+.T. = .T.  ->  TRUE
+.T. <> .F.  ->  TRUE
+.T. # .F.  ->  TRUE
+CTOD("01/15/00") > CTOD("01/14/00")  ->  TRUE
+CTOD("01/14/00") < CTOD("01/15/00")  ->  TRUE
+CTOD("01/15/00") = CTOD("01/15/00")  ->  TRUE
+CTOD("01/15/00") >= CTOD("01/15/00")  ->  TRUE
+DATETIME(2026,1,1) > DATETIME(2020,1,1)  ->  TRUE
+DATETIME(2020,1,1) = DATETIME(2020,1,1)  ->  TRUE
+1/0  ->  0.0
+1*3  ->  3.0
+7/2  ->  3.5
+2**10  ->  1024.0
+2^10  ->  1024.0
+1+2  ->  3.0
+5-3  ->  2.0
+-1  ->  -1.0
+.T. .AND. .F.  ->  FALSE
+.T. .OR. .F.  ->  TRUE
+.NOT. .T.  ->  FALSE
+.NOT. 1 = 2  ->  TRUE
+IIF(.T.,"YES","NO")  ->  "YES"
+IIF(.F.,"YES","LONGER")  ->  "LONGER"
+"AB"+"CD"  ->  "ABCD"
+"AB  "+"CD"  ->  "AB  CD"
+"AB  "-"CD"  ->  "ABCD  "
+
+K_NUM @1  ->  "       0.000"
+K_NUM @2  ->  "-9999999.999"
+K_NUM @3  ->  "99999999.999"
+K_NUM @4  ->  "      -0.001"
+K_NUM @5  ->  "       2.500"
+K_NUM @6  ->  "      -2.500"
+K_NUM @7  ->  "       0.125"
+K_NUM @8  ->  "       0.135"
+K_NUM @9  ->  "     388.888"
+K_NUM @10  ->  "     499.999"
+K_NUM @11  ->  "     611.110"
+K_NUM @12  ->  "     722.221"
+K_NUM @13  ->  "     833.332"
+K_NUM @14  ->  "     944.443"
+K_NUM @15  ->  "    1055.554"
+K_NUM @16  ->  "    1166.665"
+
+K_NUM + 0 @1  ->  0.0
+K_NUM + 0 @2  ->  -9999999.999
+K_NUM + 0 @3  ->  99999999.999
+K_NUM + 0 @4  ->  -0.001
+K_NUM + 0 @5  ->  2.5
+K_NUM + 0 @6  ->  -2.5
+K_NUM + 0 @7  ->  0.125
+K_NUM + 0 @8  ->  0.135
+K_NUM + 0 @9  ->  388.888
+K_NUM + 0 @10  ->  499.999
+K_NUM + 0 @11  ->  611.11
+K_NUM + 0 @12  ->  722.221
+K_NUM + 0 @13  ->  833.332
+K_NUM + 0 @14  ->  944.443
+K_NUM + 0 @15  ->  1055.554
+K_NUM + 0 @16  ->  1166.665
+
+K_DATE @1  ->  "20000101"
+K_DATE @2  ->  "20000229"
+K_DATE @3  ->  "        "
+K_DATE @4  ->  "19000101"
+K_DATE @5  ->  "20261231"
+K_DATE @6  ->  "20240229"
+K_DATE @7  ->  "19701231"
+K_DATE @8  ->  "20200101"
+K_DATE @9  ->  "19851115"
+K_DATE @10  ->  "20010911"
+K_DATE @11  ->  "20100302"
+K_DATE @12  ->  "20120229"
+K_DATE @13  ->  "20150818"
+K_DATE @14  ->  "20180505"
+K_DATE @15  ->  "20220314"
+K_DATE @16  ->  "19991231"
+
+K_DATE + 1 @1  ->  2451546 (julian)
+K_DATE + 1 @2  ->  2451605 (julian)
+K_DATE + 1 @3  ->  0 (julian)
+K_DATE + 1 @4  ->  2415022 (julian)
+K_DATE + 1 @5  ->  2461407 (julian)
+K_DATE + 1 @6  ->  2460371 (julian)
+K_DATE + 1 @7  ->  2440953 (julian)
+K_DATE + 1 @8  ->  2458851 (julian)
+K_DATE + 1 @9  ->  2446386 (julian)
+K_DATE + 1 @10  ->  2452165 (julian)
+K_DATE + 1 @11  ->  2455259 (julian)
+K_DATE + 1 @12  ->  2455988 (julian)
+K_DATE + 1 @13  ->  2457254 (julian)
+K_DATE + 1 @14  ->  2458245 (julian)
+K_DATE + 1 @15  ->  2459654 (julian)
+K_DATE + 1 @16  ->  2451545 (julian)
+
+K_INT @1  ->  0
+K_INT @2  ->  -2147483648
+K_INT @3  ->  2147483647
+K_INT @4  ->  -21
+K_INT @5  ->  28
+K_INT @6  ->  35
+K_INT @7  ->  -42
+K_INT @8  ->  49
+K_INT @9  ->  56
+K_INT @10  ->  -63
+K_INT @11  ->  70
+K_INT @12  ->  77
+K_INT @13  ->  -84
+K_INT @14  ->  91
+K_INT @15  ->  98
+K_INT @16  ->  -105
+
+K_CUR @1  ->  0.0000
+K_CUR @2  ->  -1.0000
+K_CUR @3  ->  0.0001
+K_CUR @4  ->  -0.0001
+K_CUR @5  ->  401.0000
+K_CUR @6  ->  501.2500
+K_CUR @7  ->  601.5000
+K_CUR @8  ->  701.7500
+K_CUR @9  ->  802.0000
+K_CUR @10  ->  902.2500
+K_CUR @11  ->  1002.5000
+K_CUR @12  ->  1102.7500
+K_CUR @13  ->  1203.0000
+K_CUR @14  ->  1303.2500
+K_CUR @15  ->  1403.5000
+K_CUR @16  ->  1503.7500
+
+K_TS @1  ->  julian=2451545 ms=0
+K_TS @2  ->  julian=2451604 ms=45045000
+K_TS @3  ->  julian=0 ms=0
+K_TS @4  ->  julian=2415021 ms=1000
+K_TS @5  ->  julian=2461406 ms=86399000
+K_TS @6  ->  julian=2460370 ms=22500000
+K_TS @7  ->  julian=2440952 ms=67530000
+K_TS @8  ->  julian=2458850 ms=0
+K_TS @9  ->  julian=2446385 ms=33011000
+K_TS @10  ->  julian=2452164 ms=31560000
+K_TS @11  ->  julian=2455258 ms=3723000
+K_TS @12  ->  julian=2455987 ms=47655000
+K_TS @13  ->  julian=2457253 ms=73282000
+K_TS @14  ->  julian=2458244 ms=11045000
+K_TS @15  ->  julian=2459653 ms=54566000
+K_TS @16  ->  julian=2451544 ms=86398000
+
+K_DBL @1  ->  0.0
+K_DBL @2  ->  -0.0
+K_DBL @3  ->  3.141592653589793
+K_DBL @4  ->  -1e+300
+K_DBL @5  ->  1e-300
+K_DBL @6  ->  -1.5
+K_DBL @7  ->  -1.0
+K_DBL @8  ->  -0.5
+K_DBL @9  ->  0.0
+K_DBL @10  ->  0.5
+K_DBL @11  ->  1.0
+K_DBL @12  ->  1.5
+K_DBL @13  ->  2.0
+K_DBL @14  ->  2.5
+K_DBL @15  ->  3.0
+K_DBL @16  ->  3.5
+
+K_FLT @1  ->  0.0
+K_FLT @2  ->  -0.0
+K_FLT @3  ->  1.0
+K_FLT @4  ->  -1.0
+K_FLT @5  ->  3.4028234663852886e+38
+K_FLT @6  ->  1.1754943508222875e-38
+K_FLT @7  ->  -0.5
+K_FLT @8  ->  -0.25
+K_FLT @9  ->  0.0
+K_FLT @10  ->  0.25
+K_FLT @11  ->  0.5
+K_FLT @12  ->  0.75
+K_FLT @13  ->  1.0
+K_FLT @14  ->  1.25
+K_FLT @15  ->  1.5
+K_FLT @16  ->  1.75
+
+K_FLT * 1 @1  ->  0.0
+K_FLT * 1 @2  ->  -0.0
+K_FLT * 1 @3  ->  1.0
+K_FLT * 1 @4  ->  -1.0
+K_FLT * 1 @5  ->  3.4028234663852886e+38
+K_FLT * 1 @6  ->  1.1754943508222875e-38
+K_FLT * 1 @7  ->  -0.5
+K_FLT * 1 @8  ->  -0.25
+K_FLT * 1 @9  ->  0.0
+K_FLT * 1 @10  ->  0.25
+K_FLT * 1 @11  ->  0.5
+K_FLT * 1 @12  ->  0.75
+K_FLT * 1 @13  ->  1.0
+K_FLT * 1 @14  ->  1.25
+K_FLT * 1 @15  ->  1.5
+K_FLT * 1 @16  ->  1.75
+
+K_LOG @1  ->  FALSE
+K_LOG @2  ->  TRUE
+K_LOG @3  ->  TRUE
+K_LOG @4  ->  FALSE
+K_LOG @5  ->  TRUE
+K_LOG @6  ->  TRUE
+K_LOG @7  ->  FALSE
+K_LOG @8  ->  TRUE
+K_LOG @9  ->  TRUE
+K_LOG @10  ->  FALSE
+K_LOG @11  ->  TRUE
+K_LOG @12  ->  TRUE
+K_LOG @13  ->  FALSE
+K_LOG @14  ->  TRUE
+K_LOG @15  ->  TRUE
+K_LOG @16  ->  FALSE
+
+.NOT. K_LOG @1  ->  TRUE
+.NOT. K_LOG @2  ->  FALSE
+.NOT. K_LOG @3  ->  FALSE
+.NOT. K_LOG @4  ->  TRUE
+.NOT. K_LOG @5  ->  FALSE
+.NOT. K_LOG @6  ->  FALSE
+.NOT. K_LOG @7  ->  TRUE
+.NOT. K_LOG @8  ->  FALSE
+.NOT. K_LOG @9  ->  FALSE
+.NOT. K_LOG @10  ->  TRUE
+.NOT. K_LOG @11  ->  FALSE
+.NOT. K_LOG @12  ->  FALSE
+.NOT. K_LOG @13  ->  TRUE
+.NOT. K_LOG @14  ->  FALSE
+.NOT. K_LOG @15  ->  FALSE
+.NOT. K_LOG @16  ->  TRUE
+
+K_MEMO @1  ->  "·························································"… (1024 bytes)
+K_MEMO @2  ->  "abcdefghijkl·············································"… (1024 bytes)
+K_MEMO @3  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcde"… (1024 bytes)
+K_MEMO @4  ->  "abcdefghijklmnopqrstuvwxyzabc····························"… (1024 bytes)
+K_MEMO @5  ->  "abcdefghijklmnopqrstuvwxyzabcdef·························"… (1024 bytes)
+K_MEMO @6  ->  "abcdefghijklmnopqrstuvwxyzabcdefghi······················"… (1024 bytes)
+K_MEMO @7  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijkl···················"… (1024 bytes)
+K_MEMO @8  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmno················"… (1024 bytes)
+K_MEMO @9  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqr·············"… (1024 bytes)
+K_MEMO @10  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstu··········"… (1024 bytes)
+K_MEMO @11  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx·······"… (1024 bytes)
+K_MEMO @12  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyza····"… (1024 bytes)
+K_MEMO @13  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcd·"… (1024 bytes)
+K_MEMO @14  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcde"… (1024 bytes)
+K_MEMO @15  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcde"… (1024 bytes)
+K_MEMO @16  ->  "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcde"… (1024 bytes)
+
+EMPTY(K_MEMO) @1  ->  TRUE
+EMPTY(K_MEMO) @2  ->  FALSE
+EMPTY(K_MEMO) @3  ->  FALSE
+EMPTY(K_MEMO) @4  ->  FALSE
+EMPTY(K_MEMO) @5  ->  FALSE
+EMPTY(K_MEMO) @6  ->  FALSE
+EMPTY(K_MEMO) @7  ->  FALSE
+EMPTY(K_MEMO) @8  ->  FALSE
+EMPTY(K_MEMO) @9  ->  FALSE
+EMPTY(K_MEMO) @10  ->  FALSE
+EMPTY(K_MEMO) @11  ->  FALSE
+EMPTY(K_MEMO) @12  ->  FALSE
+EMPTY(K_MEMO) @13  ->  FALSE
+EMPTY(K_MEMO) @14  ->  FALSE
+EMPTY(K_MEMO) @15  ->  FALSE
+EMPTY(K_MEMO) @16  ->  FALSE
+
+K_NNUM @1  ->  "            "
+K_NNUM @2  ->  "-4999999.999"
+K_NNUM @3  ->  "49999999.999"
+K_NNUM @4  ->  "      -0.001"
+K_NNUM @5  ->  "       1.250"
+K_NNUM @6  ->  "            "
+K_NNUM @7  ->  "       0.063"
+K_NNUM @8  ->  "       0.068"
+K_NNUM @9  ->  "     194.444"
+K_NNUM @10  ->  "     250.000"
+K_NNUM @11  ->  "     305.555"
+K_NNUM @12  ->  "            "
+K_NNUM @13  ->  "     416.666"
+K_NNUM @14  ->  "     472.221"
+K_NNUM @15  ->  "     527.777"
+K_NNUM @16  ->  "     583.332"
+
+EMPTY(K_NNUM) @1  ->  TRUE
+EMPTY(K_NNUM) @2  ->  FALSE
+EMPTY(K_NNUM) @3  ->  FALSE
+EMPTY(K_NNUM) @4  ->  FALSE
+EMPTY(K_NNUM) @5  ->  FALSE
+EMPTY(K_NNUM) @6  ->  TRUE
+EMPTY(K_NNUM) @7  ->  FALSE
+EMPTY(K_NNUM) @8  ->  FALSE
+EMPTY(K_NNUM) @9  ->  FALSE
+EMPTY(K_NNUM) @10  ->  FALSE
+EMPTY(K_NNUM) @11  ->  FALSE
+EMPTY(K_NNUM) @12  ->  TRUE
+EMPTY(K_NNUM) @13  ->  FALSE
+EMPTY(K_NNUM) @14  ->  FALSE
+EMPTY(K_NNUM) @15  ->  FALSE
+EMPTY(K_NNUM) @16  ->  FALSE
+
+K_NNUM + 1 @1  ->  0.0
+K_NNUM + 1 @2  ->  -4999998.999
+K_NNUM + 1 @3  ->  50000000.999
+K_NNUM + 1 @4  ->  0.999
+K_NNUM + 1 @5  ->  2.25
+K_NNUM + 1 @6  ->  0.0
+K_NNUM + 1 @7  ->  1.063
+K_NNUM + 1 @8  ->  1.068
+K_NNUM + 1 @9  ->  195.444
+K_NNUM + 1 @10  ->  251.0
+K_NNUM + 1 @11  ->  306.555
+K_NNUM + 1 @12  ->  0.0
+K_NNUM + 1 @13  ->  417.666
+K_NNUM + 1 @14  ->  473.221
+K_NNUM + 1 @15  ->  528.777
+K_NNUM + 1 @16  ->  584.332
+
+K_NNUM = 0 @1  ->  FALSE
+K_NNUM = 0 @2  ->  FALSE
+K_NNUM = 0 @3  ->  FALSE
+K_NNUM = 0 @4  ->  FALSE
+K_NNUM = 0 @5  ->  FALSE
+K_NNUM = 0 @6  ->  FALSE
+K_NNUM = 0 @7  ->  FALSE
+K_NNUM = 0 @8  ->  FALSE
+K_NNUM = 0 @9  ->  FALSE
+K_NNUM = 0 @10  ->  FALSE
+K_NNUM = 0 @11  ->  FALSE
+K_NNUM = 0 @12  ->  FALSE
+K_NNUM = 0 @13  ->  FALSE
+K_NNUM = 0 @14  ->  FALSE
+K_NNUM = 0 @15  ->  FALSE
+K_NNUM = 0 @16  ->  FALSE
+
+UPPER(K_TEXT) @1  ->  "SMITH               "
+UPPER(K_TEXT) @2  ->  "SMITHSON            "
+UPPER(K_TEXT) @3  ->  "JOHN SMITH          "
+UPPER(K_TEXT) @4  ->  "  LEADING BLANKS    "
+UPPER(K_TEXT) @5  ->  "ABCDEFGHIJKLMNOPQRST"
+UPPER(K_TEXT) @6  ->  "                    "
+UPPER(K_TEXT) @7  ->  "                    "
+UPPER(K_TEXT) @8  ->  "123.45              "
+UPPER(K_TEXT) @9  ->  "NOT A NUMBER        "
+UPPER(K_TEXT) @10  ->  "01/15/2000          "
+UPPER(K_TEXT) @11  ->  "99/99/9999          "
+UPPER(K_TEXT) @12  ->  "ZEBRA               "
+UPPER(K_TEXT) @13  ->  "AARDVARK            "
+UPPER(K_TEXT) @14  ->  "MIDDLE              "
+UPPER(K_TEXT) @15  ->  "MIDDLE              "
+UPPER(K_TEXT) @16  ->  "Éè                  "
+
+TRIM(K_TEXT) @1  ->  "SMITH···············"
+TRIM(K_TEXT) @2  ->  "SMITHSON············"
+TRIM(K_TEXT) @3  ->  "john smith··········"
+TRIM(K_TEXT) @4  ->  "  leading blanks····"
+TRIM(K_TEXT) @5  ->  "ABCDEFGHIJKLMNOPQRST"
+TRIM(K_TEXT) @6  ->  "····················"
+TRIM(K_TEXT) @7  ->  "····················"
+TRIM(K_TEXT) @8  ->  "123.45··············"
+TRIM(K_TEXT) @9  ->  "not a number········"
+TRIM(K_TEXT) @10  ->  "01/15/2000··········"
+TRIM(K_TEXT) @11  ->  "99/99/9999··········"
+TRIM(K_TEXT) @12  ->  "ZEBRA···············"
+TRIM(K_TEXT) @13  ->  "AARDVARK············"
+TRIM(K_TEXT) @14  ->  "MIDDLE··············"
+TRIM(K_TEXT) @15  ->  "MIDDLE··············"
+TRIM(K_TEXT) @16  ->  "Éè··················"
+
+K_TEXT + K_CITY @1  ->  "SMITH               EDMONTON       "
+K_TEXT + K_CITY @2  ->  "SMITHSON            CALGARY        "
+K_TEXT + K_CITY @3  ->  "john smith          TORONTO        "
+K_TEXT + K_CITY @4  ->  "  leading blanks                   "
+K_TEXT + K_CITY @5  ->  "ABCDEFGHIJKLMNOPQRSTMONTREAL       "
+K_TEXT + K_CITY @6  ->  "                    OTTAWA         "
+K_TEXT + K_CITY @7  ->  "                                   "
+K_TEXT + K_CITY @8  ->  "123.45              HALIFAX        "
+K_TEXT + K_CITY @9  ->  "not a number        REGINA         "
+K_TEXT + K_CITY @10  ->  "01/15/2000          VICTORIA       "
+K_TEXT + K_CITY @11  ->  "99/99/9999          WINNIPEG       "
+K_TEXT + K_CITY @12  ->  "ZEBRA               QUEBEC         "
+K_TEXT + K_CITY @13  ->  "AARDVARK            LONDON         "
+K_TEXT + K_CITY @14  ->  "MIDDLE              PARIS          "
+K_TEXT + K_CITY @15  ->  "MIDDLE              PARIS          "
+K_TEXT + K_CITY @16  ->  "Éè                  BERLIN         "
+
+K_TEXT - K_CITY @1  ->  "SMITHEDMONTON                      "
+K_TEXT - K_CITY @2  ->  "SMITHSONCALGARY                    "
+K_TEXT - K_CITY @3  ->  "john smithTORONTO                  "
+K_TEXT - K_CITY @4  ->  "  leading blanks                   "
+K_TEXT - K_CITY @5  ->  "ABCDEFGHIJKLMNOPQRSTMONTREAL       "
+K_TEXT - K_CITY @6  ->  "OTTAWA                             "
+K_TEXT - K_CITY @7  ->  "                                   "
+K_TEXT - K_CITY @8  ->  "123.45HALIFAX                      "
+K_TEXT - K_CITY @9  ->  "not a numberREGINA                 "
+K_TEXT - K_CITY @10  ->  "01/15/2000VICTORIA                 "
+K_TEXT - K_CITY @11  ->  "99/99/9999WINNIPEG                 "
+K_TEXT - K_CITY @12  ->  "ZEBRAQUEBEC                        "
+K_TEXT - K_CITY @13  ->  "AARDVARKLONDON                     "
+K_TEXT - K_CITY @14  ->  "MIDDLEPARIS                        "
+K_TEXT - K_CITY @15  ->  "MIDDLEPARIS                        "
+K_TEXT - K_CITY @16  ->  "ÉèBERLIN                           "
+
+SUBSTR(K_TEXT,1,5) @1  ->  "SMITH"
+SUBSTR(K_TEXT,1,5) @2  ->  "SMITH"
+SUBSTR(K_TEXT,1,5) @3  ->  "john "
+SUBSTR(K_TEXT,1,5) @4  ->  "  lea"
+SUBSTR(K_TEXT,1,5) @5  ->  "ABCDE"
+SUBSTR(K_TEXT,1,5) @6  ->  "     "
+SUBSTR(K_TEXT,1,5) @7  ->  "     "
+SUBSTR(K_TEXT,1,5) @8  ->  "123.4"
+SUBSTR(K_TEXT,1,5) @9  ->  "not a"
+SUBSTR(K_TEXT,1,5) @10  ->  "01/15"
+SUBSTR(K_TEXT,1,5) @11  ->  "99/99"
+SUBSTR(K_TEXT,1,5) @12  ->  "ZEBRA"
+SUBSTR(K_TEXT,1,5) @13  ->  "AARDV"
+SUBSTR(K_TEXT,1,5) @14  ->  "MIDDL"
+SUBSTR(K_TEXT,1,5) @15  ->  "MIDDL"
+SUBSTR(K_TEXT,1,5) @16  ->  "Éè   "
+
+STR(K_NUM,12,3) @1  ->  "       0.000"
+STR(K_NUM,12,3) @2  ->  "-9999999.999"
+STR(K_NUM,12,3) @3  ->  "99999999.999"
+STR(K_NUM,12,3) @4  ->  "      -0.001"
+STR(K_NUM,12,3) @5  ->  "       2.500"
+STR(K_NUM,12,3) @6  ->  "      -2.500"
+STR(K_NUM,12,3) @7  ->  "       0.125"
+STR(K_NUM,12,3) @8  ->  "       0.135"
+STR(K_NUM,12,3) @9  ->  "     388.888"
+STR(K_NUM,12,3) @10  ->  "     499.999"
+STR(K_NUM,12,3) @11  ->  "     611.110"
+STR(K_NUM,12,3) @12  ->  "     722.221"
+STR(K_NUM,12,3) @13  ->  "     833.332"
+STR(K_NUM,12,3) @14  ->  "     944.443"
+STR(K_NUM,12,3) @15  ->  "    1055.554"
+STR(K_NUM,12,3) @16  ->  "    1166.665"
+
+STR(K_INT) @1  ->  "         0"
+STR(K_INT) @2  ->  "**********"
+STR(K_INT) @3  ->  "2147483647"
+STR(K_INT) @4  ->  "       -21"
+STR(K_INT) @5  ->  "        28"
+STR(K_INT) @6  ->  "        35"
+STR(K_INT) @7  ->  "       -42"
+STR(K_INT) @8  ->  "        49"
+STR(K_INT) @9  ->  "        56"
+STR(K_INT) @10  ->  "       -63"
+STR(K_INT) @11  ->  "        70"
+STR(K_INT) @12  ->  "        77"
+STR(K_INT) @13  ->  "       -84"
+STR(K_INT) @14  ->  "        91"
+STR(K_INT) @15  ->  "        98"
+STR(K_INT) @16  ->  "      -105"
+
+DTOS(K_DATE) @1  ->  "20000101"
+DTOS(K_DATE) @2  ->  "20000229"
+DTOS(K_DATE) @3  ->  "        "
+DTOS(K_DATE) @4  ->  "19000101"
+DTOS(K_DATE) @5  ->  "20261231"
+DTOS(K_DATE) @6  ->  "20240229"
+DTOS(K_DATE) @7  ->  "19701231"
+DTOS(K_DATE) @8  ->  "20200101"
+DTOS(K_DATE) @9  ->  "19851115"
+DTOS(K_DATE) @10  ->  "20010911"
+DTOS(K_DATE) @11  ->  "20100302"
+DTOS(K_DATE) @12  ->  "20120229"
+DTOS(K_DATE) @13  ->  "20150818"
+DTOS(K_DATE) @14  ->  "20180505"
+DTOS(K_DATE) @15  ->  "20220314"
+DTOS(K_DATE) @16  ->  "19991231"
+
+DTOC(K_DATE) @1  ->  "01/01/00"
+DTOC(K_DATE) @2  ->  "02/29/00"
+DTOC(K_DATE) @3  ->  "  /  /  "
+DTOC(K_DATE) @4  ->  "01/01/00"
+DTOC(K_DATE) @5  ->  "12/31/26"
+DTOC(K_DATE) @6  ->  "02/29/24"
+DTOC(K_DATE) @7  ->  "12/31/70"
+DTOC(K_DATE) @8  ->  "01/01/20"
+DTOC(K_DATE) @9  ->  "11/15/85"
+DTOC(K_DATE) @10  ->  "09/11/01"
+DTOC(K_DATE) @11  ->  "03/02/10"
+DTOC(K_DATE) @12  ->  "02/29/12"
+DTOC(K_DATE) @13  ->  "08/18/15"
+DTOC(K_DATE) @14  ->  "05/05/18"
+DTOC(K_DATE) @15  ->  "03/14/22"
+DTOC(K_DATE) @16  ->  "12/31/99"
+
+TTOC(K_TS) @1  ->  "20000101000000"
+TTOC(K_TS) @2  ->  "20000229123045"
+TTOC(K_TS) @3  ->  "        000000"
+TTOC(K_TS) @4  ->  "19000101000001"
+TTOC(K_TS) @5  ->  "20261231235959"
+TTOC(K_TS) @6  ->  "20240229061500"
+TTOC(K_TS) @7  ->  "19701231184530"
+TTOC(K_TS) @8  ->  "20200101000000"
+TTOC(K_TS) @9  ->  "19851115091011"
+TTOC(K_TS) @10  ->  "20010911084600"
+TTOC(K_TS) @11  ->  "20100302010203"
+TTOC(K_TS) @12  ->  "20120229131415"
+TTOC(K_TS) @13  ->  "20150818202122"
+TTOC(K_TS) @14  ->  "20180505030405"
+TTOC(K_TS) @15  ->  "20220314150926"
+TTOC(K_TS) @16  ->  "19991231235958"
+
+VAL(K_TEXT) @1  ->  0.0
+VAL(K_TEXT) @2  ->  0.0
+VAL(K_TEXT) @3  ->  0.0
+VAL(K_TEXT) @4  ->  0.0
+VAL(K_TEXT) @5  ->  0.0
+VAL(K_TEXT) @6  ->  0.0
+VAL(K_TEXT) @7  ->  0.0
+VAL(K_TEXT) @8  ->  123.45
+VAL(K_TEXT) @9  ->  0.0
+VAL(K_TEXT) @10  ->  1.0
+VAL(K_TEXT) @11  ->  99.0
+VAL(K_TEXT) @12  ->  0.0
+VAL(K_TEXT) @13  ->  0.0
+VAL(K_TEXT) @14  ->  0.0
+VAL(K_TEXT) @15  ->  0.0
+VAL(K_TEXT) @16  ->  0.0
+
+CTOD(K_TEXT) @1  ->  -1 (julian)
+CTOD(K_TEXT) @2  ->  -1 (julian)
+CTOD(K_TEXT) @3  ->  -1 (julian)
+CTOD(K_TEXT) @4  ->  -1 (julian)
+CTOD(K_TEXT) @5  ->  -1 (julian)
+CTOD(K_TEXT) @6  ->  -1 (julian)
+CTOD(K_TEXT) @7  ->  -1 (julian)
+CTOD(K_TEXT) @8  ->  -1 (julian)
+CTOD(K_TEXT) @9  ->  -1 (julian)
+CTOD(K_TEXT) @10  ->  2458864 (julian)
+CTOD(K_TEXT) @11  ->  -1 (julian)
+CTOD(K_TEXT) @12  ->  -1 (julian)
+CTOD(K_TEXT) @13  ->  -1 (julian)
+CTOD(K_TEXT) @14  ->  -1 (julian)
+CTOD(K_TEXT) @15  ->  -1 (julian)
+CTOD(K_TEXT) @16  ->  -1 (julian)
+
+DAY(K_DATE) @1  ->  1.0
+DAY(K_DATE) @2  ->  29.0
+DAY(K_DATE) @3  ->  0.0
+DAY(K_DATE) @4  ->  1.0
+DAY(K_DATE) @5  ->  31.0
+DAY(K_DATE) @6  ->  29.0
+DAY(K_DATE) @7  ->  31.0
+DAY(K_DATE) @8  ->  1.0
+DAY(K_DATE) @9  ->  15.0
+DAY(K_DATE) @10  ->  11.0
+DAY(K_DATE) @11  ->  2.0
+DAY(K_DATE) @12  ->  29.0
+DAY(K_DATE) @13  ->  18.0
+DAY(K_DATE) @14  ->  5.0
+DAY(K_DATE) @15  ->  14.0
+DAY(K_DATE) @16  ->  31.0
+
+YEAR(K_DATE) @1  ->  2000.0
+YEAR(K_DATE) @2  ->  2000.0
+YEAR(K_DATE) @3  ->  0.0
+YEAR(K_DATE) @4  ->  1900.0
+YEAR(K_DATE) @5  ->  2026.0
+YEAR(K_DATE) @6  ->  2024.0
+YEAR(K_DATE) @7  ->  1970.0
+YEAR(K_DATE) @8  ->  2020.0
+YEAR(K_DATE) @9  ->  1985.0
+YEAR(K_DATE) @10  ->  2001.0
+YEAR(K_DATE) @11  ->  2010.0
+YEAR(K_DATE) @12  ->  2012.0
+YEAR(K_DATE) @13  ->  2015.0
+YEAR(K_DATE) @14  ->  2018.0
+YEAR(K_DATE) @15  ->  2022.0
+YEAR(K_DATE) @16  ->  1999.0
+
+DESCEND(K_TEXT) @1  ->  "¬²¶«·ßßßßßßßßßßßßßßß"
+DESCEND(K_TEXT) @2  ->  "¬²¶«·¬°±ßßßßßßßßßßßß"
+DESCEND(K_TEXT) @3  ->  "\x95\x90\x97\x91ß\x8C\x92\x96\x8B\x97ßßßßßßßßßß"
+DESCEND(K_TEXT) @4  ->  "ßß\x93\x9A\x9E\x9B\x96\x91\x98ß\x9D\x93\x9E\x91\x94\x8Cßßßß"
+DESCEND(K_TEXT) @5  ->  "¾½¼»º¹¸·¶µ´³²±°¯®­¬«"
+DESCEND(K_TEXT) @6  ->  "ßßßßßßßßßßßßßßßßßßßß"
+DESCEND(K_TEXT) @7  ->  "ßßßßßßßßßßßßßßßßßßßß"
+DESCEND(K_TEXT) @8  ->  "ÎÍÌÑËÊßßßßßßßßßßßßßß"
+DESCEND(K_TEXT) @9  ->  "\x91\x90\x8Bß\x9Eß\x91\x8A\x92\x9D\x9A\x8Dßßßßßßßß"
+DESCEND(K_TEXT) @10  ->  "ÏÎÐÎÊÐÍÏÏÏßßßßßßßßßß"
+DESCEND(K_TEXT) @11  ->  "ÆÆÐÆÆÐÆÆÆÆßßßßßßßßßß"
+DESCEND(K_TEXT) @12  ->  "¥º½­¾ßßßßßßßßßßßßßßß"
+DESCEND(K_TEXT) @13  ->  "¾¾­»©¾­´ßßßßßßßßßßßß"
+DESCEND(K_TEXT) @14  ->  "²¶»»³ºßßßßßßßßßßßßßß"
+DESCEND(K_TEXT) @15  ->  "²¶»»³ºßßßßßßßßßßßßßß"
+DESCEND(K_TEXT) @16  ->  "6\x17ßßßßßßßßßßßßßßßßßß"
+
+ASCEND(K_TEXT) @1  ->  "SMITH               "
+ASCEND(K_TEXT) @2  ->  "SMITHSON            "
+ASCEND(K_TEXT) @3  ->  "john smith          "
+ASCEND(K_TEXT) @4  ->  "  leading blanks    "
+ASCEND(K_TEXT) @5  ->  "ABCDEFGHIJKLMNOPQRST"
+ASCEND(K_TEXT) @6  ->  "                    "
+ASCEND(K_TEXT) @7  ->  "                    "
+ASCEND(K_TEXT) @8  ->  "123.45              "
+ASCEND(K_TEXT) @9  ->  "not a number        "
+ASCEND(K_TEXT) @10  ->  "01/15/2000          "
+ASCEND(K_TEXT) @11  ->  "99/99/9999          "
+ASCEND(K_TEXT) @12  ->  "ZEBRA               "
+ASCEND(K_TEXT) @13  ->  "AARDVARK            "
+ASCEND(K_TEXT) @14  ->  "MIDDLE              "
+ASCEND(K_TEXT) @15  ->  "MIDDLE              "
+ASCEND(K_TEXT) @16  ->  "Éè                  "
+
+DELETED() @1  ->  FALSE
+DELETED() @2  ->  FALSE
+DELETED() @3  ->  FALSE
+DELETED() @4  ->  TRUE
+DELETED() @5  ->  FALSE
+DELETED() @6  ->  FALSE
+DELETED() @7  ->  FALSE
+DELETED() @8  ->  FALSE
+DELETED() @9  ->  FALSE
+DELETED() @10  ->  FALSE
+DELETED() @11  ->  FALSE
+DELETED() @12  ->  FALSE
+DELETED() @13  ->  FALSE
+DELETED() @14  ->  FALSE
+DELETED() @15  ->  FALSE
+DELETED() @16  ->  FALSE
+
+DEL() @1  ->  " "
+DEL() @2  ->  " "
+DEL() @3  ->  " "
+DEL() @4  ->  "*"
+DEL() @5  ->  " "
+DEL() @6  ->  " "
+DEL() @7  ->  " "
+DEL() @8  ->  " "
+DEL() @9  ->  " "
+DEL() @10  ->  " "
+DEL() @11  ->  " "
+DEL() @12  ->  " "
+DEL() @13  ->  " "
+DEL() @14  ->  " "
+DEL() @15  ->  " "
+DEL() @16  ->  " "
+
+RECNO() @1  ->  1.0
+RECNO() @2  ->  2.0
+RECNO() @3  ->  3.0
+RECNO() @4  ->  4.0
+RECNO() @5  ->  5.0
+RECNO() @6  ->  6.0
+RECNO() @7  ->  7.0
+RECNO() @8  ->  8.0
+RECNO() @9  ->  9.0
+RECNO() @10  ->  10.0
+RECNO() @11  ->  11.0
+RECNO() @12  ->  12.0
+RECNO() @13  ->  13.0
+RECNO() @14  ->  14.0
+RECNO() @15  ->  15.0
+RECNO() @16  ->  16.0
+
+RECCOUNT() @1  ->  16.0
+RECCOUNT() @2  ->  16.0
+RECCOUNT() @3  ->  16.0
+RECCOUNT() @4  ->  16.0
+RECCOUNT() @5  ->  16.0
+RECCOUNT() @6  ->  16.0
+RECCOUNT() @7  ->  16.0
+RECCOUNT() @8  ->  16.0
+RECCOUNT() @9  ->  16.0
+RECCOUNT() @10  ->  16.0
+RECCOUNT() @11  ->  16.0
+RECCOUNT() @12  ->  16.0
+RECCOUNT() @13  ->  16.0
+RECCOUNT() @14  ->  16.0
+RECCOUNT() @15  ->  16.0
+RECCOUNT() @16  ->  16.0
+
+K_INT > 0 .AND. "A" $ K_TEXT @1  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @2  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @3  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @4  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @5  ->  TRUE
+K_INT > 0 .AND. "A" $ K_TEXT @6  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @7  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @8  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @9  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @10  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @11  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @12  ->  TRUE
+K_INT > 0 .AND. "A" $ K_TEXT @13  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @14  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @15  ->  FALSE
+K_INT > 0 .AND. "A" $ K_TEXT @16  ->  FALSE
+
+K_CUR > K_CUR2 @1  ->  TRUE
+K_CUR > K_CUR2 @2  ->  FALSE
+K_CUR > K_CUR2 @3  ->  FALSE
+K_CUR > K_CUR2 @4  ->  FALSE
+K_CUR > K_CUR2 @5  ->  FALSE
+K_CUR > K_CUR2 @6  ->  FALSE
+K_CUR > K_CUR2 @7  ->  FALSE
+K_CUR > K_CUR2 @8  ->  FALSE
+K_CUR > K_CUR2 @9  ->  FALSE
+K_CUR > K_CUR2 @10  ->  FALSE
+K_CUR > K_CUR2 @11  ->  FALSE
+K_CUR > K_CUR2 @12  ->  FALSE
+K_CUR > K_CUR2 @13  ->  FALSE
+K_CUR > K_CUR2 @14  ->  TRUE
+K_CUR > K_CUR2 @15  ->  TRUE
+K_CUR > K_CUR2 @16  ->  TRUE
+
+K_CUR = K_CUR2 @1  ->  FALSE
+K_CUR = K_CUR2 @2  ->  FALSE
+K_CUR = K_CUR2 @3  ->  FALSE
+K_CUR = K_CUR2 @4  ->  FALSE
+K_CUR = K_CUR2 @5  ->  FALSE
+K_CUR = K_CUR2 @6  ->  FALSE
+K_CUR = K_CUR2 @7  ->  FALSE
+K_CUR = K_CUR2 @8  ->  FALSE
+K_CUR = K_CUR2 @9  ->  FALSE
+K_CUR = K_CUR2 @10  ->  FALSE
+K_CUR = K_CUR2 @11  ->  FALSE
+K_CUR = K_CUR2 @12  ->  FALSE
+K_CUR = K_CUR2 @13  ->  FALSE
+K_CUR = K_CUR2 @14  ->  FALSE
+K_CUR = K_CUR2 @15  ->  FALSE
+K_CUR = K_CUR2 @16  ->  FALSE
+
+K_CUR > 0 @1  ->  FALSE
+K_CUR > 0 @2  ->  FALSE
+K_CUR > 0 @3  ->  TRUE
+K_CUR > 0 @4  ->  FALSE
+K_CUR > 0 @5  ->  TRUE
+K_CUR > 0 @6  ->  TRUE
+K_CUR > 0 @7  ->  TRUE
+K_CUR > 0 @8  ->  TRUE
+K_CUR > 0 @9  ->  TRUE
+K_CUR > 0 @10  ->  TRUE
+K_CUR > 0 @11  ->  TRUE
+K_CUR > 0 @12  ->  TRUE
+K_CUR > 0 @13  ->  TRUE
+K_CUR > 0 @14  ->  TRUE
+K_CUR > 0 @15  ->  TRUE
+K_CUR > 0 @16  ->  TRUE
+
+K_TS > DATETIME(2020,1,1) @1  ->  FALSE
+K_TS > DATETIME(2020,1,1) @2  ->  FALSE
+K_TS > DATETIME(2020,1,1) @3  ->  FALSE
+K_TS > DATETIME(2020,1,1) @4  ->  FALSE
+K_TS > DATETIME(2020,1,1) @5  ->  TRUE
+K_TS > DATETIME(2020,1,1) @6  ->  TRUE
+K_TS > DATETIME(2020,1,1) @7  ->  FALSE
+K_TS > DATETIME(2020,1,1) @8  ->  FALSE
+K_TS > DATETIME(2020,1,1) @9  ->  FALSE
+K_TS > DATETIME(2020,1,1) @10  ->  FALSE
+K_TS > DATETIME(2020,1,1) @11  ->  FALSE
+K_TS > DATETIME(2020,1,1) @12  ->  FALSE
+K_TS > DATETIME(2020,1,1) @13  ->  FALSE
+K_TS > DATETIME(2020,1,1) @14  ->  FALSE
+K_TS > DATETIME(2020,1,1) @15  ->  TRUE
+K_TS > DATETIME(2020,1,1) @16  ->  FALSE
+
+K_NUM > 0 @1  ->  FALSE
+K_NUM > 0 @2  ->  FALSE
+K_NUM > 0 @3  ->  TRUE
+K_NUM > 0 @4  ->  FALSE
+K_NUM > 0 @5  ->  TRUE
+K_NUM > 0 @6  ->  FALSE
+K_NUM > 0 @7  ->  TRUE
+K_NUM > 0 @8  ->  TRUE
+K_NUM > 0 @9  ->  TRUE
+K_NUM > 0 @10  ->  TRUE
+K_NUM > 0 @11  ->  TRUE
+K_NUM > 0 @12  ->  TRUE
+K_NUM > 0 @13  ->  TRUE
+K_NUM > 0 @14  ->  TRUE
+K_NUM > 0 @15  ->  TRUE
+K_NUM > 0 @16  ->  TRUE
+
+K_INT > 0 @1  ->  FALSE
+K_INT > 0 @2  ->  FALSE
+K_INT > 0 @3  ->  TRUE
+K_INT > 0 @4  ->  FALSE
+K_INT > 0 @5  ->  TRUE
+K_INT > 0 @6  ->  TRUE
+K_INT > 0 @7  ->  FALSE
+K_INT > 0 @8  ->  TRUE
+K_INT > 0 @9  ->  TRUE
+K_INT > 0 @10  ->  FALSE
+K_INT > 0 @11  ->  TRUE
+K_INT > 0 @12  ->  TRUE
+K_INT > 0 @13  ->  FALSE
+K_INT > 0 @14  ->  TRUE
+K_INT > 0 @15  ->  TRUE
+K_INT > 0 @16  ->  FALSE
+
+K_DATE > CTOD("01/01/00") @1  ->  FALSE
+K_DATE > CTOD("01/01/00") @2  ->  TRUE
+K_DATE > CTOD("01/01/00") @3  ->  FALSE
+K_DATE > CTOD("01/01/00") @4  ->  FALSE
+K_DATE > CTOD("01/01/00") @5  ->  TRUE
+K_DATE > CTOD("01/01/00") @6  ->  TRUE
+K_DATE > CTOD("01/01/00") @7  ->  FALSE
+K_DATE > CTOD("01/01/00") @8  ->  TRUE
+K_DATE > CTOD("01/01/00") @9  ->  FALSE
+K_DATE > CTOD("01/01/00") @10  ->  TRUE
+K_DATE > CTOD("01/01/00") @11  ->  TRUE
+K_DATE > CTOD("01/01/00") @12  ->  TRUE
+K_DATE > CTOD("01/01/00") @13  ->  TRUE
+K_DATE > CTOD("01/01/00") @14  ->  TRUE
+K_DATE > CTOD("01/01/00") @15  ->  TRUE
+K_DATE > CTOD("01/01/00") @16  ->  FALSE
+
+K_FLT > 0 @1  ->  FALSE
+K_FLT > 0 @2  ->  FALSE
+K_FLT > 0 @3  ->  TRUE
+K_FLT > 0 @4  ->  FALSE
+K_FLT > 0 @5  ->  TRUE
+K_FLT > 0 @6  ->  TRUE
+K_FLT > 0 @7  ->  FALSE
+K_FLT > 0 @8  ->  FALSE
+K_FLT > 0 @9  ->  FALSE
+K_FLT > 0 @10  ->  TRUE
+K_FLT > 0 @11  ->  TRUE
+K_FLT > 0 @12  ->  TRUE
+K_FLT > 0 @13  ->  TRUE
+K_FLT > 0 @14  ->  TRUE
+K_FLT > 0 @15  ->  TRUE
+K_FLT > 0 @16  ->  TRUE
+
+K_TEXT > "M" @1  ->  TRUE
+K_TEXT > "M" @2  ->  TRUE
+K_TEXT > "M" @3  ->  TRUE
+K_TEXT > "M" @4  ->  FALSE
+K_TEXT > "M" @5  ->  FALSE
+K_TEXT > "M" @6  ->  FALSE
+K_TEXT > "M" @7  ->  FALSE
+K_TEXT > "M" @8  ->  FALSE
+K_TEXT > "M" @9  ->  TRUE
+K_TEXT > "M" @10  ->  FALSE
+K_TEXT > "M" @11  ->  FALSE
+K_TEXT > "M" @12  ->  TRUE
+K_TEXT > "M" @13  ->  FALSE
+K_TEXT > "M" @14  ->  TRUE
+K_TEXT > "M" @15  ->  TRUE
+K_TEXT > "M" @16  ->  TRUE
+
+K_TEXT <= "M" @1  ->  FALSE
+K_TEXT <= "M" @2  ->  FALSE
+K_TEXT <= "M" @3  ->  FALSE
+K_TEXT <= "M" @4  ->  TRUE
+K_TEXT <= "M" @5  ->  TRUE
+K_TEXT <= "M" @6  ->  TRUE
+K_TEXT <= "M" @7  ->  TRUE
+K_TEXT <= "M" @8  ->  TRUE
+K_TEXT <= "M" @9  ->  FALSE
+K_TEXT <= "M" @10  ->  TRUE
+K_TEXT <= "M" @11  ->  TRUE
+K_TEXT <= "M" @12  ->  FALSE
+K_TEXT <= "M" @13  ->  TRUE
+K_TEXT <= "M" @14  ->  TRUE
+K_TEXT <= "M" @15  ->  TRUE
+K_TEXT <= "M" @16  ->  FALSE
+
+DATE()  ->  (not recorded: reads the system clock; type d, len 8)
+TIME()  ->  (not recorded: reads the system clock; type C, len 8)
+DATE() + 1  ->  (not recorded: reads the system clock; type d, len 8)
+DTOS(DATE())  ->  (not recorded: reads the system clock; type C, len 8)
+
+-K_TEXT  ->  !e-490
+{01/01/2000}  ->  !e-490
+'unterminated  ->  !e-500
+TOOLONGFN("X")  ->  !e-470
+SUBSTR(TRIM(K_TEXT),1,2)  ->  ACCEPTED
+STR(K_NUM,K_INT)  ->  !e-460
+LEFT("ABC",K_INT)  ->  !e-425
+SPACE(K_INT)  ->  !e-425
+NOSUCHFIELD  ->  !e-490
+UPPER(  ->  !e-450
+K_TEXT +  ->  !e-490
+UPPER(K_TEXT, 2)  ->  !e-430
+UPPER(K_INT)  ->  !e-460
+1.AND.X  ->  !e-210
+K_TEXT.K_CITY  ->  !e-480
+OTHER->K_TEXT  ->  !e-210
+.T. > .F.  ->  !e-460
+.T. >= .F.  ->  !e-460
+
+ABS(-1)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+INT(1.5)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+ROUND(1.5,0)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+MOD(5,3)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+MIN(1,2)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+MAX(1,2)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+SQRT(4)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+SIGN(-3)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+LEN("AB")  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+AT("B","AB")  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+ASC("A")  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+LOWER("AB")  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)
+REPLICATE("A",3)  ->  CODEBASE-REFUSES (this port supports it -- DESIGN.md Decision 11)

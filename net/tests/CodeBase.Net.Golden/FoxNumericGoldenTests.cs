@@ -74,7 +74,7 @@ public sealed class FoxNumericGoldenTests
             total += ExpectedCount(dump);
         }
 
-        total.Should().Be(856);
+        total.Should().Be(888);
     }
 
     [Fact]

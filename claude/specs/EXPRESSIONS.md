@@ -387,6 +387,43 @@ Positional invariants checked at compile time: `E4NOT_EQUAL==51`, `E4LESS==91`, 
 
 ---
 
+### 5.1 The named set is 35, and none of it is arithmetic
+
+Read off the array itself (`FUNCTIONS.dump.txt`):
+
+```
+ALLTRIM ASCEND CHR CTOD DATE DATETIME DAY DEL DELETED DESCEND DTOC DTOS EMPTY IIF
+KEYEQUAL L2BIN LEFT LTRIM MONTH PADL PADR RECCOUNT RECNO RIGHT SPACE STOD STR
+STRZERO SUBSTR TIME TRIM TTOC UPPER VAL YEAR
+```
+
+There is **no `ABS`, `INT`, `ROUND`, `MOD`, `MIN`, `MAX`, `SQRT` or `SIGN`**, and no `LOWER`, `LEN`,
+`AT`, `ASC` or `REPLICATE`. The entire numeric surface is the six operators `+ - * / ** ^`. The table
+is a **key-building vocabulary** — slice, pad, case-fold, format a date, apply a sort transform — not
+a general expression language, and that bounds what a filter can express and what `QUERY` can ever be
+asked to decompose.
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`, rejections]: all thirteen of those VFP names are refused with
+`e4unrecFunction` (−470), so the absence is a gated fact and not a reading of the array. A port must
+refuse them too — someone translating a VFP index expression will write `ABS(X)`, and a silent
+misparse there is a wrong record set.
+
+Three of the 35 are easy to overlook, and all three are witnessed:
+
+* **`L2BIN(n)`** (row 147, `n → C`, length 4) writes the long's **four raw little-endian bytes**:
+  `L2BIN(1)` → `01 00 00 00`, `L2BIN(-1)` → `FF FF FF FF`, `L2BIN(65536)` → `00 00 01 00`.
+* **`DEL()`** (row 106, no parameters, `→ C`, length 1) is the deletion flag *as text* — `" "` for a
+  live record and `"*"` for a deleted one — where `DELETED()` is the same fact as `r4log`.
+* **`KEYEQUAL(a,b)`** (row 191, `C,C → L`) follows the prefix rule of §8, not exact equality:
+  `KEYEQUAL("ABC","AB")` is **true**.
+
+**`DATE()` and `TIME()` take no parameters and read the system clock**, so no value for them can be
+recorded in a reproducible corpus; `CDXEXPR.expr.dump.txt` carries them in a separate
+`[clock-dependent expressions]` section that records type, length, key length and node array and
+explicitly no value. `TIME()` is `r4str` of length 8; `DATE()` is `r4dateDoub`.
+
+---
+
 ## 6. Type system, overload resolution and implicit conversions
 
 `e4massage` walks the postfix array with a simulated typed stack (`types[]`, `length[]`,
@@ -437,6 +474,14 @@ digits zero-filled (usage D4DATE.C:404-406, comment e4functi.c:870-875). STRZERO
 blanks → '0' (e4functi.c:2569-2575). **Port must replicate VFP STR() rounding/overflow exactly**,
 since `STR(numfield)` is a common index key.
 
+**Rounding and overflow, witnessed** [`CDXEXPR.expr.dump.txt`, constant expressions 16-22]:
+`c4dtoa45` rounds **half away from zero**, not half to even, and it rounds the *decimal* digits
+rather than the exact binary value — `STR(2.5,10,0)` → `"         3"`, `STR(-2.5,10,0)` →
+`"        -3"`, `STR(0.125,10,2)` → `"      0.13"`, and `STR(0.135,10,2)` → `"      0.14"` even
+though the nearest double to 0.135 is below it. Overflow fills the whole field with `*`:
+`STR(123456,3,0)` → `"***"`. This closes §14 risk 1 for `STR`; the other missing kernels are
+untouched by it.
+
 ### 7.2 SUBSTR / LEFT / RIGHT
 
 `SUBSTR(s, start [,count])`: start/count constants; `i1 = start-1` clamped to [0, len(s)];
@@ -445,6 +490,9 @@ since `STR(numfield)` is a common index key.
 by the STR_CAT field loader (e4functi.c:2828-2849). `LEFT(s,n)` = SUBSTR with i1=0.
 `RIGHT(s,n)`: `i1 = len(s) - n` (shift), `len = n`; if operand is variable-length (trimmed),
 shift = max(0, trimmedLen − n) at runtime (e4functi.c:2832-2843; e4parse.c:1562-1613, 526-534).
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: a result never exceeds what exists — `LEFT("ABC",10)` has **length 3**, not 10, and
+`SUBSTR("ABCDEF",5,10)` has length 2. `SUBSTR(K_TEXT,1,5)` over a `C(20)` field is 5.
 
 ### 7.3 DTOS / DTOC / TTOC / date kernel
 
@@ -458,10 +506,47 @@ shift = max(0, trimmedLen − n) at runtime (e4functi.c:2832-2843; e4parse.c:156
   e4functi.c:635-641).
 * DTOC uses the CODE4 `dateFormat` picture (stored per CODE4, `trans.dateFormat[20]`,
   d4data.h:1172, LEN4DATE_FORMAT d4defs.h:1710; getter D4DATE.C:223-239). Default picture value is
-  set outside this source drop [UNVERIFIED — treat "MM/DD/YY" as the documented CodeBase default
-  and make it configurable].
+  set by `code4initLow` from a **compile-time language switch, not a locale** (C4CODE.C:1126 —
+  already cited by `API-ERRORS.md`; an earlier revision of this section wrongly called it "outside
+  this source drop"):
+
+  | build | picture | length |
+  |---|---|---|
+  | default, `S4FRENCH` | `MM/DD/YY` | 8 |
+  | `S4GERMAN` | `DD.MM.YY` | 8 |
+  | `S4SWEDISH`, `S4FINNISH` | `YYYY-MM-DD` | 10 |
+  | `S4NORWEGIAN` | `DD-MM-YYYY` | 10 |
+
+  **No locale API appears anywhere in the source** — no `GetLocaleInfo`, `setlocale` or
+  `GetDateFormat`. Confirmed by the corpus: `T_DTOC` has `keyLen=8`, and a DTOC key length *is* the
+  picture length (e4parse.c:500-509). §14 risk 2 is closed.
+
+  **Two pictures of equal length are indistinguishable from the file.** `MM/DD/YY` and `DD.MM.YY` are
+  both 8, and produce different bytes for the same date, so a stored `DTOC` tag does not record which
+  one built it and the computed-versus-stored key-length check of §9.1 cannot detect a wrong choice.
+* **`CTOD` has no century pivot — it takes the century from the system clock.** When the picture
+  carries no century digits, `c4decode` calls `GetLocalTime` (or `localtime`) and uses
+  `year / 100` (D4DATE.C:580-601). **Witnessed** in a 2026 run: `CTOD("01/15/00")` … `CTOD("01/15/99")`
+  all resolve to 20xx, so no 20th-century date is reachable through `CTOD` under `MM/DD/YY`, and
+  `CTOD("01/15/2000")` is 2020 because the 8-character picture consumes only `01/15/20`. `STOD` takes
+  `CCYYMMDD` and has no such dependence. **Any recorded `CTOD` value is therefore only true within the
+  century it was generated in**, which is why `CDXEXPR.expr.dump.txt` records `dateFormat` and
+  `century` in its header.
 * TTOC(x,1): 14 chars `CCYYMMDDHHMMSS`; from r4dateTime the time part is decomposed from
   milliseconds (e4functi.c:846-876); from date types the time is `"000000"` (e4functi.c:821-827).
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: 
+
+* **`CTOD` is picture-driven and reads a two-digit year**, so it is not a general date parser:
+  `CTOD("01/15/2000")` → julian 2458864, which `DTOS` renders `"20200115"` and `DTOC` renders
+  `"01/15/20"` — **2020**, because the 8-character picture consumes `01/15/20` and discards the
+  rest. `STOD("20000115")` → 2451559 for the same text. The two disagree by twenty years.
+* **An unparseable date is julian −1**, not 0: `CTOD("99/99/9999")` → −1.
+* **A blank date renders as the picture, not as blanks**: `DTOC` of a blank `D` field is
+  `"  /  /  "`, while `DTOS` of one is 8 blanks. `TTOC` of a blank datetime is
+  `"        000000"` — 8 blanks and a zero time.
+* **`DAY`, `MONTH` and `YEAR` of a blank date are 0.0**, and blank-date arithmetic collapses:
+  `K_DATE + 1` over a blank date is julian **0**, not 1.
 
 ### 7.4 Trim family and `hasTrim`
 
@@ -474,11 +559,70 @@ TRIM does not shrink the buffer; it records the logical length in `i2`/`varLengt
 (E4EXPR.C:736-748; also pre-collation at 697-702). Documented quirks: `$` and comparisons with
 TRIM can differ from VFP (e4parse.c:44-51).
 
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: a trim result **keeps the source width and pads with NUL**, which the value dump
+shows directly: `TRIM("abc   ")` is six bytes, `"abc\x00\x00\x00"`, and `TRIM(K_TEXT)` over a
+`C(20)` field is twenty bytes however short the text. `hasTrim=1` on the expression. A port that
+returns three bytes for the first is wrong before it ever reaches key time.
+
 ### 7.5 UPPER
 
 Under CDX with data codepage 1252/1250, uses Windows ANSI `CharUpper` (accented letters map like
 VFP); otherwise ASCII-style `c4upper` (e4functi.c:2878-2911). Port note: for VFP-compatible keys,
 implement Win-1252 uppercase mapping.
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: on a table with **no code-page mark** the ASCII path is what runs — bytes `C9 E8` pass
+through `UPPER` unchanged. So the mapping is selected by the table's code page, and an unmarked
+table must not be uppercased with a culture-aware routine.
+
+### 7.6 VAL
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: **`VAL` takes the leading numeric prefix and stops at the first character that is not
+part of a number** — it does not fail and does not return 0 for text that merely starts with digits.
+`VAL("123.45")` → 123.45, `VAL("01/15/2000")` → **1.0**, `VAL("99/99/9999")` → **99.0**,
+`VAL("not a number")` → 0.0, `VAL("")` → 0.0, `VAL("  leading blanks")` → 0.0.
+
+### 7.7 The comparison block — 47 rows, and how a group ends
+
+Rows 51-97 are **six operators over eight operand types**. Only the *first* row of a group carries a
+name; the rest are the unnamed continuations `functionI++` walks to, and **the group boundary is the
+`code` field**, not the name — `#`/`<>` are code 50, `>=`/`=>` 60, `<=`/`=<` 70, `=` **40**, `>` 80,
+`<` 90. The walk advances while `code` is unchanged and raises `e4typeSub` when it changes
+(e4parse.c:207-214, 286-292).
+
+| operator | operand types, in row order | rows |
+|---|---|---|
+| `#`, `<>` | C, n, d, **L**, Y, T, `7`, H | 51-59 |
+| `>=`, `=>` | C, n, d, Y, T, `7`, H | 60-67 |
+| `<=`, `=<` | C, n, d, Y, T, `7`, H | 68-75 |
+| `=` | C, **L**, n, d, Y, T, `7`, H | 76-83 |
+| `>` | C, n, d, Y, T, `7`, H | 84-90 |
+| `<` | C, n, d, Y, T, `7`, H | 91-97 |
+
+**No row anywhere takes `N`, `D` or `I`** — a numeric-text, date or integer operand reaches a
+comparison only through the promotions of §6, which rewrite the *producer* node.
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`]:
+
+* **`r4log` compares only with `=` and `<>`/`#`.** `.T. > .F.` and `.T. >= .F.` are refused with
+  `e4typeSub` (−460); `.T. = .T.` resolves row 77 and `.T. <> .F.` row 55.
+* **The alternate spellings are distinct rows at a group's head and converge below it.** `"ABC" >= "ABC"`
+  resolves row 60 and `"ABC" => "ABC"` row **61**, but `1 >= 1` and `1 => 1` both resolve row 62 —
+  the walk from either head lands on the same continuation. A port that normalises `=>` to `>=`
+  before lookup gets the same behaviour but a different row index.
+* **The `Y,Y` currency comparison rows (56, 64, 72, 80, 87, 94) are dead.** `K_CUR > K_CUR2` resolves
+  row **85** (`n,n`) and `K_CUR = K_CUR2` row **78**, because `r4currency → r4numDoub` is tried at
+  the `n,n` row, which precedes `Y,Y` in every group. Promotion beats the exact-type row whenever
+  one exists earlier in the walk. This is direct support for §14 risk 8.
+* **`r4dateTime` rows are live**, because that type has no promotion: `K_TS > DATETIME(2020,1,1)`
+  resolves row 88.
+* **Promotion rewrites the producer, visibly.** `K_NUM` on its own loads row 9 (the `r4num` field
+  loader); `K_NUM > 0` loads row **8** (the `r4numDoub` loader) instead. `K_INT > 0` loads row 18.
+  `K_DATE > CTOD(…)` loads row 6 and compares at row 86.
+* **The constant-only promotion is real.** `K_FLT > 0` turns the literal into row **29** (`E4FLOAT`)
+  and compares at row **90** (`H,H`) — the `r4numDoub` *constant* → `r4floatBin` rewrite, which no
+  non-constant operand can trigger.
+* `'7'` is `r4dateTimeMilli`, outside the readable field set — one unreachable row per group. With
+  the six dead `Y` rows that is **12 of the 47** comparison rows a port cannot exercise.
 
 ---
 
@@ -511,12 +655,41 @@ computed; for `>` the flag (stored in `p1` as 0/1) is 1 iff `len(a) > len(b)`; f
 ### 9.1 Key length — `expr4keyLen` (E4EXPR.C:1049-1100) and `expr4keyLenFromType` (E4EXPR.C:928-1045)
 
 For S4FOX (stand-alone): r4num, r4date, r4numDoub, r4currency, r4dateTime, r4dateTimeMilli → **8**;
-r4int, r5ui4, r5ui2, r5i2 → **4**; r4log → **1**; everything else (strings) → collation-dependent
+r4int, r5ui4, r5ui2, r5i2 → **4**; r4log → **1**; **r4floatBin → 4** [witnessed: the `T_FLT` tag
+over `K_FLT*1` in `CDXEXPR.cdx` has `keyLen=4`, matching the 4-byte field `d4create` forces for an
+`H` field, d4create.c:1620-1622]; everything else (strings) → collation-dependent
 (−2): key len = `nullIndicatorLen + expr4len * (1 + keySizeCharPerCharAdd)` for non-machine
 collations (skipped when the tag has ASCEND/DESCEND, which pre-collates) (E4EXPR.C:1067-1095).
 `nullIndicatorLen` = 1 if any referenced field is nullable, except for candidate keys
 (`typeCode & 0x04`) (E4EXPR.C:879-925, 894-899). Max FOX key size: `I4MAX_KEY_SIZE` = **240**
 (d4defs.h:2128).
+
+**Witnessed in `CDXEXPR.cdx`**, which is the first corpus index with expression tags:
+
+| tag | expression | result type | `keyLen` | `typeCode` |
+|---|---|---|---|---|
+| `T_EMPTY` | `EMPTY(K_TEXT)` | r4log | **1** | 0x60 |
+| `T_FLT` | `K_FLT*1` | r4floatBin | **4** | 0x60 |
+| `T_INT` | `K_INT` | r4int | 4 | 0x60 |
+| `T_NUM` / `T_DATE` / `T_CUR` / `T_TS` / `T_DTIME` / `T_VAL` / `T_CTOD` | — | r4num / r4date / r4currency / r4dateTime / r4numDoub | 8 | 0x60 |
+| `T_NULL` | `K_NNUM` (nullable `N(12,3)`) | r4num | **9** | **0x62** |
+| `T_DTOC` | `DTOC(K_DATE)` | r4str | 8 | 0x60 |
+| `T_STRI` | `STR(K_INT)` | r4str | 10 | 0x60 |
+| `T_CONCAT` / `T_CONCTR` | `K_TEXT+K_CITY`, `K_TEXT-K_CITY` | r4str | 35 | 0x60 |
+
+So **a tag over a logical expression exists and its key is one byte** — the C library builds one
+without complaint. The null indicator adds exactly one leading byte and is marked by **bit 0x02** of
+`typeCode`, which the header shows directly.
+
+**Key length is a property of the result *type*, never of the function that produced it** — §9.1
+switches on type and `expr4keyConvert` (§9.2) takes a key type — so two expressions of the same
+result type key identically however differently they were written. The practical consequence is that
+comparing a *computed* key length against the header's is a strong check on result length and on any
+type error that changes length, **but it cannot separate the five 8-byte types from each other**:
+`T_NUM`, `T_DATE`, `T_VAL`, `T_CUR`, `T_TS` and `T_DTIME` are `r4num`, `r4date`, `r4numDoub`,
+`r4currency` and `r4dateTime` respectively and **all six have `keyLen=8`**, while their §9.3
+transforms differ. A wrong result type among those is invisible to the length check; a wrong result
+length on a string is caught immediately.
 
 ### 9.2 Key generation — `expr4key` (E4EXPR.C:755-770) → `expr4keyConvert` (E4EXPR.C:777-812)
 
@@ -573,6 +746,11 @@ expression uses ASCEND/DESCEND set `tagPtr->hasAscendOrDescend`, which suppresse
 of the already-collated bytes (e4parse.c:617-620; E4EXPR.C:673-682, 1090-1091). Memo fields in a
 simple tag expression are limited to `I4MAX_KEY_SIZE_COMPATIBLE (240) − nullByte` and
 `memSizeMemoExpr` (e4parse.c:431-458).
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: `DESCEND` over machine-collated character data is a plain byte complement —
+`DESCEND(K_TEXT)` maps `'S'` (0x53) to 0xAC, i.e. `0xFF − c`, and a blank (0x20) to 0xDF. `ASCEND`
+over the same field is the identity. **A memo operand's expression length is 1024**, NUL-padded,
+whatever the payload — so the 240 cap above is a tag-time refusal and not an expression-time one.
 
 ---
 
@@ -658,12 +836,14 @@ Selected by exactly one of S4FOX / S4CLIPPER / S4MDX / S4NDX at build time.
 
 ## 14. Open questions / risks for the C# port
 
-1. **`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4clip`, `c4upper`, `c4encode` implementations are missing
+1. **[PARTLY CLOSED — `STR` rounding and overflow are now witnessed, §7.1.]**
+   **`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4clip`, `c4upper`, `c4encode` implementations are missing
    from this source drop** (declared d4declar.h:1888-1899, 224-225; no defining translation unit
    present). Their exact rounding, overflow (`*` fill) and clipping behavior must be recovered from
    the CodeBase DLL, the docs, or empirically from VFP — STR()-based index keys depend on it.
-2. **Default `dateFormat` value** is initialized outside this drop [UNVERIFIED]; DTOC()-based key
-   lengths depend on it (key len = picture length, e4parse.c:500-509).
+2. **[CLOSED — the picture is 8 characters, witnessed through `T_DTOC`'s key length, §7.3.]**
+   **Default `dateFormat` value** is initialized outside this drop; DTOC()-based key lengths depend
+   on it (key len = picture length, e4parse.c:500-509).
 3. **`flags4dateTime` bitset** (`flags4dateTimeInit`, used i4conv.c:2218-2219, 2263) encodes which
    seconds-of-day need the mantissa-decrement FoxPro fixup; the generator was not located in the
    e4/i4 files read — must be extracted (search F4FLAG.C / f4flag usage) before datetime index keys

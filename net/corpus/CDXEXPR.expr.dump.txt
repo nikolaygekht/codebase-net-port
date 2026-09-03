@@ -7,7 +7,7 @@ dateFormat   "MM/DD/YY"   (c4code.c:1126, a compile-time constant)
 century      20   (from the system clock at generation time)
 
 [constant expressions]
-count        109
+count        131
 
 expr 0 "UPPER(\"john smith\")"   ; the commonest kernel
   compiled type='C'(67) len=10 keyLen=10 hasTrim=0 nodes=2
@@ -755,8 +755,205 @@ expr 108 "\"AB  \"-\"CD\""   ; interior blanks moved to the end
     node  2 row=46 len=6 numParms=2 numEntries=3 fieldNo=0 i2=0
   value len=6 "ABCD  "
 
+expr 109 "TRIM(\"AB  \")+\"CD\""   ; row 41: a trim anywhere makes the next + move blanks
+  compiled type='C'(67) len=6 keyLen=6 hasTrim=1 nodes=4
+    node  0 row=28 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=121 len=4 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=28 len=2 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=41 len=6 numParms=2 numEntries=4 fieldNo=0 i2=0
+  value len=6 "ABCD\x00\x00"
+
+expr 110 ".TRUE. .AND. .T."   ; row 30, the long spelling
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=30 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=37 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 111 ".FALSE. .OR. .T."   ; row 32
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=32 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=36 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 112 "! .T."   ; row 35, negation spelled with a bang
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=2
+    node  0 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=35 len=4 numParms=1 numEntries=2 fieldNo=0 i2=0
+  value len=4 "\x00\x00\x00\x00"
+
+expr 113 ".T. .AND. .F. .AND. .T."   ; three terms in one .AND. node
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=4
+    node  0 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=33 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=37 len=4 numParms=3 numEntries=4 fieldNo=0 i2=0
+  value len=4 "\x00\x00\x00\x00"
+
+expr 114 ".T. .OR. .F. .OR. .T. .OR. .F."   ; four terms in one .OR. node
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=5
+    node  0 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=33 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=33 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  4 row=36 len=4 numParms=4 numEntries=5 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 115 ".T. .AND. .F. .OR. .T. .OR. .F."   ; .AND. binds tighter, so the .OR. run is three
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=6
+    node  0 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=33 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=37 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+    node  3 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  4 row=33 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  5 row=36 len=4 numParms=3 numEntries=6 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 116 "1 + CTOD(\"01/15/00\")"   ; row 43, numeric plus date
+  compiled type='d'(100) len=8 keyLen=8 hasTrim=0 nodes=4
+    node  0 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  3 row=43 len=8 numParms=2 numEntries=4 fieldNo=0 i2=0
+  value len=8 "\x00\x00\x00\x004\xB4BA"
+
+expr 117 "CTOD(\"01/15/00\") - CTOD(\"01/14/00\")"   ; row 48, date minus date is a count of days
+  compiled type='n'(110) len=8 keyLen=8 hasTrim=0 nodes=5
+    node  0 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  4 row=48 len=8 numParms=2 numEntries=5 fieldNo=0 i2=0
+  value len=8 "\x00\x00\x00\x00\x00\x00\xF0?"
+
+expr 118 "CTOD(\"01/15/00\") - 1"   ; row 49, date minus numeric is a date
+  compiled type='d'(100) len=8 keyLen=8 hasTrim=0 nodes=4
+    node  0 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=49 len=8 numParms=2 numEntries=4 fieldNo=0 i2=0
+  value len=8 "\x00\x00\x00\x003\xB4BA"
+
+expr 119 "CTOD(\"01/15/00\") <> CTOD(\"01/14/00\")"   ; row 54
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=5
+    node  0 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  4 row=54 len=4 numParms=2 numEntries=5 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 120 "CTOD(\"01/15/00\") <= CTOD(\"01/15/00\")"   ; row 71
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=5
+    node  0 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  4 row=71 len=4 numParms=2 numEntries=5 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 121 "DATETIME(2026,1,1) <> DATETIME(2020,1,1)"   ; row 57
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=9
+    node  0 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  4 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  5 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  6 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  7 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  8 row=57 len=4 numParms=2 numEntries=9 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 122 "DATETIME(2026,1,1) >= DATETIME(2020,1,1)"   ; row 65
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=9
+    node  0 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  4 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  5 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  6 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  7 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  8 row=65 len=4 numParms=2 numEntries=9 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 123 "DATETIME(2020,1,1) <= DATETIME(2026,1,1)"   ; row 73
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=9
+    node  0 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  4 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  5 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  6 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  7 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  8 row=73 len=4 numParms=2 numEntries=9 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 124 "DATETIME(2020,1,1) < DATETIME(2026,1,1)"   ; row 95
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=9
+    node  0 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  4 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  5 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  6 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  7 row=132 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+    node  8 row=95 len=4 numParms=2 numEntries=9 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 125 "IIF(.T.,1,2)"   ; row 129, numeric branches
+  compiled type='n'(110) len=8 keyLen=8 hasTrim=0 nodes=4
+    node  0 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=129 len=8 numParms=3 numEntries=4 fieldNo=0 i2=0
+  value len=8 "\x00\x00\x00\x00\x00\x00\xF0?"
+
+expr 126 "IIF(.T.,CTOD(\"01/15/00\"),CTOD(\"01/14/00\"))"   ; row 130, date branches
+  compiled type='d'(100) len=8 keyLen=8 hasTrim=0 nodes=6
+    node  0 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  3 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  4 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  5 row=130 len=8 numParms=3 numEntries=6 fieldNo=0 i2=0
+  value len=8 "\x00\x00\x00\x803\xB4BA"
+
+expr 127 "IIF(.T.,.T.,.F.)"   ; row 131, logical branches
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=4
+    node  0 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=33 len=4 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  3 row=131 len=4 numParms=3 numEntries=4 fieldNo=0 i2=0
+  value len=4 "\x01\x00\x00\x00"
+
+expr 128 "TTOC(CTOD(\"01/15/00\"))"   ; row 119, TTOC over a date-as-double
+  compiled type='C'(67) len=14 keyLen=14 hasTrim=0 nodes=3
+    node  0 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=119 len=14 numParms=1 numEntries=3 fieldNo=0 i2=0
+  value len=14 "20000115000000"
+
+expr 129 "EMPTY(CTOD(\"01/15/00\"))"   ; row 154
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=154 len=4 numParms=1 numEntries=3 fieldNo=0 i2=0
+  value len=4 "\x00\x00\x00\x00"
+
+expr 130 "ASCEND(CTOD(\"01/15/00\"))"   ; row 178
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=3
+    node  0 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  1 row=135 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+    node  2 row=178 len=8 numParms=1 numEntries=3 fieldNo=0 i2=0
+  value len=8 "20000115"
+
 [field expressions]
-count        49
+count        77
 
 expr 0 "K_NUM"   ; r4num -- stored text, no function returns it
   compiled type='N'(78) len=12 keyLen=8 hasTrim=0 nodes=1
@@ -1798,6 +1995,605 @@ expr 48 "K_TEXT <= \"M\""
   rec 14 len=4 "\x01\x00\x00\x00"
   rec 15 len=4 "\x01\x00\x00\x00"
   rec 16 len=4 "\x00\x00\x00\x00"
+
+expr 49 "K_FLT + 1"   ; row 45
+  compiled type='H'(72) len=4 keyLen=4 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=45 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x80?"
+  rec 2 len=4 "\x00\x00\x80?"
+  rec 3 len=4 "\x00\x00\x00@"
+  rec 4 len=4 "\x00\x00\x00\x00"
+  rec 5 len=4 "\xFF\xFF\x7F\x7F"
+  rec 6 len=4 "\x00\x00\x80?"
+  rec 7 len=4 "\x00\x00\x00?"
+  rec 8 len=4 "\x00\x00@?"
+  rec 9 len=4 "\x00\x00\x80?"
+  rec 10 len=4 "\x00\x00\xA0?"
+  rec 11 len=4 "\x00\x00\xC0?"
+  rec 12 len=4 "\x00\x00\xE0?"
+  rec 13 len=4 "\x00\x00\x00@"
+  rec 14 len=4 "\x00\x00\x10@"
+  rec 15 len=4 "\x00\x00 @"
+  rec 16 len=4 "\x00\x000@"
+
+expr 50 "K_FLT - 1"   ; row 50
+  compiled type='H'(72) len=4 keyLen=4 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=50 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x80\xBF"
+  rec 2 len=4 "\x00\x00\x80\xBF"
+  rec 3 len=4 "\x00\x00\x00\x00"
+  rec 4 len=4 "\x00\x00\x00\xC0"
+  rec 5 len=4 "\xFF\xFF\x7F\x7F"
+  rec 6 len=4 "\x00\x00\x80\xBF"
+  rec 7 len=4 "\x00\x00\xC0\xBF"
+  rec 8 len=4 "\x00\x00\xA0\xBF"
+  rec 9 len=4 "\x00\x00\x80\xBF"
+  rec 10 len=4 "\x00\x00@\xBF"
+  rec 11 len=4 "\x00\x00\x00\xBF"
+  rec 12 len=4 "\x00\x00\x80\xBE"
+  rec 13 len=4 "\x00\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x80>"
+  rec 15 len=4 "\x00\x00\x00?"
+  rec 16 len=4 "\x00\x00@?"
+
+expr 51 "K_FLT / 2"   ; row 103
+  compiled type='H'(72) len=4 keyLen=4 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=103 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x80"
+  rec 3 len=4 "\x00\x00\x00?"
+  rec 4 len=4 "\x00\x00\x00\xBF"
+  rec 5 len=4 "\xFF\xFF\xFF~"
+  rec 6 len=4 "\x00\x00@\x00"
+  rec 7 len=4 "\x00\x00\x80\xBE"
+  rec 8 len=4 "\x00\x00\x00\xBE"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x00\x00\x00>"
+  rec 11 len=4 "\x00\x00\x80>"
+  rec 12 len=4 "\x00\x00\xC0>"
+  rec 13 len=4 "\x00\x00\x00?"
+  rec 14 len=4 "\x00\x00 ?"
+  rec 15 len=4 "\x00\x00@?"
+  rec 16 len=4 "\x00\x00`?"
+
+expr 52 "K_FLT <> 1"   ; row 59
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=59 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x01\x00\x00\x00"
+  rec 2 len=4 "\x01\x00\x00\x00"
+  rec 3 len=4 "\x00\x00\x00\x00"
+  rec 4 len=4 "\x01\x00\x00\x00"
+  rec 5 len=4 "\x01\x00\x00\x00"
+  rec 6 len=4 "\x01\x00\x00\x00"
+  rec 7 len=4 "\x01\x00\x00\x00"
+  rec 8 len=4 "\x01\x00\x00\x00"
+  rec 9 len=4 "\x01\x00\x00\x00"
+  rec 10 len=4 "\x01\x00\x00\x00"
+  rec 11 len=4 "\x01\x00\x00\x00"
+  rec 12 len=4 "\x01\x00\x00\x00"
+  rec 13 len=4 "\x00\x00\x00\x00"
+  rec 14 len=4 "\x01\x00\x00\x00"
+  rec 15 len=4 "\x01\x00\x00\x00"
+  rec 16 len=4 "\x01\x00\x00\x00"
+
+expr 53 "K_FLT >= 1"   ; row 67
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=67 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\x01\x00\x00\x00"
+  rec 4 len=4 "\x00\x00\x00\x00"
+  rec 5 len=4 "\x01\x00\x00\x00"
+  rec 6 len=4 "\x00\x00\x00\x00"
+  rec 7 len=4 "\x00\x00\x00\x00"
+  rec 8 len=4 "\x00\x00\x00\x00"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x00\x00\x00\x00"
+  rec 11 len=4 "\x00\x00\x00\x00"
+  rec 12 len=4 "\x00\x00\x00\x00"
+  rec 13 len=4 "\x01\x00\x00\x00"
+  rec 14 len=4 "\x01\x00\x00\x00"
+  rec 15 len=4 "\x01\x00\x00\x00"
+  rec 16 len=4 "\x01\x00\x00\x00"
+
+expr 54 "K_FLT <= 1"   ; row 75
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=75 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x01\x00\x00\x00"
+  rec 2 len=4 "\x01\x00\x00\x00"
+  rec 3 len=4 "\x01\x00\x00\x00"
+  rec 4 len=4 "\x01\x00\x00\x00"
+  rec 5 len=4 "\x00\x00\x00\x00"
+  rec 6 len=4 "\x01\x00\x00\x00"
+  rec 7 len=4 "\x01\x00\x00\x00"
+  rec 8 len=4 "\x01\x00\x00\x00"
+  rec 9 len=4 "\x01\x00\x00\x00"
+  rec 10 len=4 "\x01\x00\x00\x00"
+  rec 11 len=4 "\x01\x00\x00\x00"
+  rec 12 len=4 "\x01\x00\x00\x00"
+  rec 13 len=4 "\x01\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x00\x00"
+  rec 15 len=4 "\x00\x00\x00\x00"
+  rec 16 len=4 "\x00\x00\x00\x00"
+
+expr 55 "K_FLT = 1"   ; row 83
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=83 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\x01\x00\x00\x00"
+  rec 4 len=4 "\x00\x00\x00\x00"
+  rec 5 len=4 "\x00\x00\x00\x00"
+  rec 6 len=4 "\x00\x00\x00\x00"
+  rec 7 len=4 "\x00\x00\x00\x00"
+  rec 8 len=4 "\x00\x00\x00\x00"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x00\x00\x00\x00"
+  rec 11 len=4 "\x00\x00\x00\x00"
+  rec 12 len=4 "\x00\x00\x00\x00"
+  rec 13 len=4 "\x01\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x00\x00"
+  rec 15 len=4 "\x00\x00\x00\x00"
+  rec 16 len=4 "\x00\x00\x00\x00"
+
+expr 56 "K_FLT < 1"   ; row 97
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=29 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=97 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x01\x00\x00\x00"
+  rec 2 len=4 "\x01\x00\x00\x00"
+  rec 3 len=4 "\x00\x00\x00\x00"
+  rec 4 len=4 "\x01\x00\x00\x00"
+  rec 5 len=4 "\x00\x00\x00\x00"
+  rec 6 len=4 "\x01\x00\x00\x00"
+  rec 7 len=4 "\x01\x00\x00\x00"
+  rec 8 len=4 "\x01\x00\x00\x00"
+  rec 9 len=4 "\x01\x00\x00\x00"
+  rec 10 len=4 "\x01\x00\x00\x00"
+  rec 11 len=4 "\x01\x00\x00\x00"
+  rec 12 len=4 "\x01\x00\x00\x00"
+  rec 13 len=4 "\x00\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x00\x00"
+  rec 15 len=4 "\x00\x00\x00\x00"
+  rec 16 len=4 "\x00\x00\x00\x00"
+
+expr 57 "K_FLT * K_INT"   ; row 25: the only promotion of an integer to a float
+  compiled type='H'(72) len=4 keyLen=4 hasTrim=0 nodes=3
+    node  0 row=24 len=4 numParms=0 numEntries=1 fieldNo=7 i2=0
+    node  1 row=25 len=4 numParms=0 numEntries=1 fieldNo=5 i2=0
+    node  2 row=101 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\x00\x00\x00O"
+  rec 4 len=4 "\x00\x00\xA8A"
+  rec 5 len=4 "\x00\x00\x80\x7F"
+  rec 6 len=4 "\x00\x00\x0C\x03"
+  rec 7 len=4 "\x00\x00\xA8A"
+  rec 8 len=4 "\x00\x00D\xC1"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x00\x00|\xC1"
+  rec 11 len=4 "\x00\x00\x0CB"
+  rec 12 len=4 "\x00\x00gB"
+  rec 13 len=4 "\x00\x00\xA8\xC2"
+  rec 14 len=4 "\x00\x80\xE3B"
+  rec 15 len=4 "\x00\x00\x13C"
+  rec 16 len=4 "\x00\xC07\xC3"
+
+expr 58 "TTOC(K_DATE)"   ; row 117
+  compiled type='C'(67) len=14 keyLen=14 hasTrim=0 nodes=2
+    node  0 row=7 len=8 numParms=0 numEntries=1 fieldNo=8 i2=0
+    node  1 row=117 len=14 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=14 "20000101000000"
+  rec 2 len=14 "20000229000000"
+  rec 3 len=14 "        000000"
+  rec 4 len=14 "19000101000000"
+  rec 5 len=14 "20261231000000"
+  rec 6 len=14 "20240229000000"
+  rec 7 len=14 "19701231000000"
+  rec 8 len=14 "20200101000000"
+  rec 9 len=14 "19851115000000"
+  rec 10 len=14 "20010911000000"
+  rec 11 len=14 "20100302000000"
+  rec 12 len=14 "20120229000000"
+  rec 13 len=14 "20150818000000"
+  rec 14 len=14 "20180505000000"
+  rec 15 len=14 "20220314000000"
+  rec 16 len=14 "19991231000000"
+
+expr 59 "MONTH(K_DATE)"   ; row 139
+  compiled type='n'(110) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=7 len=8 numParms=0 numEntries=1 fieldNo=8 i2=0
+    node  1 row=139 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "\x00\x00\x00\x00\x00\x00\xF0?"
+  rec 2 len=8 "\x00\x00\x00\x00\x00\x00\x00@"
+  rec 3 len=8 "\x00\x00\x00\x00\x00\x00\x00\x00"
+  rec 4 len=8 "\x00\x00\x00\x00\x00\x00\xF0?"
+  rec 5 len=8 "\x00\x00\x00\x00\x00\x00(@"
+  rec 6 len=8 "\x00\x00\x00\x00\x00\x00\x00@"
+  rec 7 len=8 "\x00\x00\x00\x00\x00\x00(@"
+  rec 8 len=8 "\x00\x00\x00\x00\x00\x00\xF0?"
+  rec 9 len=8 "\x00\x00\x00\x00\x00\x00&@"
+  rec 10 len=8 "\x00\x00\x00\x00\x00\x00\"@"
+  rec 11 len=8 "\x00\x00\x00\x00\x00\x00\x08@"
+  rec 12 len=8 "\x00\x00\x00\x00\x00\x00\x00@"
+  rec 13 len=8 "\x00\x00\x00\x00\x00\x00 @"
+  rec 14 len=8 "\x00\x00\x00\x00\x00\x00\x14@"
+  rec 15 len=8 "\x00\x00\x00\x00\x00\x00\x08@"
+  rec 16 len=8 "\x00\x00\x00\x00\x00\x00(@"
+
+expr 60 "EMPTY(K_TS)"   ; row 153
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=2
+    node  0 row=16 len=8 numParms=0 numEntries=1 fieldNo=9 i2=0
+    node  1 row=153 len=4 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\x01\x00\x00\x00"
+  rec 4 len=4 "\x00\x00\x00\x00"
+  rec 5 len=4 "\x00\x00\x00\x00"
+  rec 6 len=4 "\x00\x00\x00\x00"
+  rec 7 len=4 "\x00\x00\x00\x00"
+  rec 8 len=4 "\x00\x00\x00\x00"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x00\x00\x00\x00"
+  rec 11 len=4 "\x00\x00\x00\x00"
+  rec 12 len=4 "\x00\x00\x00\x00"
+  rec 13 len=4 "\x00\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x00\x00"
+  rec 15 len=4 "\x00\x00\x00\x00"
+  rec 16 len=4 "\x00\x00\x00\x00"
+
+expr 61 "EMPTY(K_LOG)"   ; row 155
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=2
+    node  0 row=5 len=4 numParms=0 numEntries=1 fieldNo=12 i2=0
+    node  1 row=155 len=4 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=4 "\x01\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\x00\x00\x00\x00"
+  rec 4 len=4 "\x01\x00\x00\x00"
+  rec 5 len=4 "\x00\x00\x00\x00"
+  rec 6 len=4 "\x00\x00\x00\x00"
+  rec 7 len=4 "\x01\x00\x00\x00"
+  rec 8 len=4 "\x00\x00\x00\x00"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x01\x00\x00\x00"
+  rec 11 len=4 "\x00\x00\x00\x00"
+  rec 12 len=4 "\x00\x00\x00\x00"
+  rec 13 len=4 "\x01\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x00\x00"
+  rec 15 len=4 "\x00\x00\x00\x00"
+  rec 16 len=4 "\x01\x00\x00\x00"
+
+expr 62 "K_LOG .AND. K_LOG .AND. K_LOG"   ; a three-term run over fields
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=4
+    node  0 row=5 len=4 numParms=0 numEntries=1 fieldNo=12 i2=0
+    node  1 row=5 len=4 numParms=0 numEntries=1 fieldNo=12 i2=0
+    node  2 row=5 len=4 numParms=0 numEntries=1 fieldNo=12 i2=0
+    node  3 row=37 len=4 numParms=3 numEntries=4 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x01\x00\x00\x00"
+  rec 3 len=4 "\x01\x00\x00\x00"
+  rec 4 len=4 "\x00\x00\x00\x00"
+  rec 5 len=4 "\x01\x00\x00\x00"
+  rec 6 len=4 "\x01\x00\x00\x00"
+  rec 7 len=4 "\x00\x00\x00\x00"
+  rec 8 len=4 "\x01\x00\x00\x00"
+  rec 9 len=4 "\x01\x00\x00\x00"
+  rec 10 len=4 "\x00\x00\x00\x00"
+  rec 11 len=4 "\x01\x00\x00\x00"
+  rec 12 len=4 "\x01\x00\x00\x00"
+  rec 13 len=4 "\x00\x00\x00\x00"
+  rec 14 len=4 "\x01\x00\x00\x00"
+  rec 15 len=4 "\x01\x00\x00\x00"
+  rec 16 len=4 "\x00\x00\x00\x00"
+
+expr 63 "DESCEND(K_NUM)"   ; row 157
+  compiled type='C'(67) len=12 keyLen=12 hasTrim=0 nodes=2
+    node  0 row=9 len=12 numParms=0 numEntries=1 fieldNo=4 i2=0
+    node  1 row=157 len=12 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=12 "\xCF\xCF\xCF\xCF\xCF\xCF\xCF\xCF\xD1\xCF\xCF\xCF"
+  rec 2 len=12 "\xD3\xDC\xDC\xDC\xDC\xDC\xDC\xDC\xD1\xDC\xDC\xDC"
+  rec 3 len=12 "\xC6\xC6\xC6\xC6\xC6\xC6\xC6\xC6\xD1\xC6\xC6\xC6"
+  rec 4 len=12 "\xD3\xD3\xD3\xD3\xD3\xD3\xD3\xD3\xD1\xD3\xD3\xD4"
+  rec 5 len=12 "\xCF\xCF\xCF\xCF\xCF\xCF\xCF\xCD\xD1\xCA\xCF\xCF"
+  rec 6 len=12 "\xD3\xD3\xD3\xD3\xD3\xD3\xD3\xD5\xD1\xD8\xD3\xD3"
+  rec 7 len=12 "\xCF\xCF\xCF\xCF\xCF\xCF\xCF\xCF\xD1\xCE\xCD\xCA"
+  rec 8 len=12 "\xCF\xCF\xCF\xCF\xCF\xCF\xCF\xCF\xD1\xCE\xCC\xCA"
+  rec 9 len=12 "\xCF\xCF\xCF\xCF\xCF\xCC\xC7\xC7\xD1\xC7\xC7\xC7"
+  rec 10 len=12 "\xCF\xCF\xCF\xCF\xCF\xCB\xC6\xC6\xD1\xC6\xC6\xC6"
+  rec 11 len=12 "\xCF\xCF\xCF\xCF\xCF\xC9\xCE\xCE\xD1\xCE\xCE\xCF"
+  rec 12 len=12 "\xCF\xCF\xCF\xCF\xCF\xC8\xCD\xCD\xD1\xCD\xCD\xCE"
+  rec 13 len=12 "\xCF\xCF\xCF\xCF\xCF\xC7\xCC\xCC\xD1\xCC\xCC\xCD"
+  rec 14 len=12 "\xCF\xCF\xCF\xCF\xCF\xC6\xCB\xCB\xD1\xCB\xCB\xCC"
+  rec 15 len=12 "\xCF\xCF\xCF\xCF\xCE\xCF\xCA\xCA\xD1\xCA\xCA\xCB"
+  rec 16 len=12 "\xCF\xCF\xCF\xCF\xCE\xCE\xC9\xC9\xD1\xC9\xC9\xCA"
+
+expr 64 "DESCEND(K_DATE)"   ; row 158: promoted, since no descend row takes a stored date
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=6 len=8 numParms=0 numEntries=1 fieldNo=8 i2=0
+    node  1 row=158 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "\xCD\xCF\xCF\xCF\xCF\xCE\xCF\xCE"
+  rec 2 len=8 "\xCD\xCF\xCF\xCF\xCF\xCD\xCD\xC6"
+  rec 3 len=8 "\xDF\xDF\xDF\xDF\xDF\xDF\xDF\xDF"
+  rec 4 len=8 "\xCE\xC6\xCF\xCF\xCF\xCE\xCF\xCE"
+  rec 5 len=8 "\xCD\xCF\xCD\xC9\xCE\xCD\xCC\xCE"
+  rec 6 len=8 "\xCD\xCF\xCD\xCB\xCF\xCD\xCD\xC6"
+  rec 7 len=8 "\xCE\xC6\xC8\xCF\xCE\xCD\xCC\xCE"
+  rec 8 len=8 "\xCD\xCF\xCD\xCF\xCF\xCE\xCF\xCE"
+  rec 9 len=8 "\xCE\xC6\xC7\xCA\xCE\xCE\xCE\xCA"
+  rec 10 len=8 "\xCD\xCF\xCF\xCE\xCF\xC6\xCE\xCE"
+  rec 11 len=8 "\xCD\xCF\xCE\xCF\xCF\xCC\xCF\xCD"
+  rec 12 len=8 "\xCD\xCF\xCE\xCD\xCF\xCD\xCD\xC6"
+  rec 13 len=8 "\xCD\xCF\xCE\xCA\xCF\xC7\xCE\xC7"
+  rec 14 len=8 "\xCD\xCF\xCE\xC7\xCF\xCA\xCF\xCA"
+  rec 15 len=8 "\xCD\xCF\xCD\xCD\xCF\xCC\xCE\xCB"
+  rec 16 len=8 "\xCE\xC6\xC6\xC6\xCE\xCD\xCC\xCE"
+
+expr 65 "DESCEND(K_LOG)"   ; row 159
+  compiled type='C'(67) len=1 keyLen=1 hasTrim=0 nodes=2
+    node  0 row=5 len=4 numParms=0 numEntries=1 fieldNo=12 i2=0
+    node  1 row=159 len=1 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=1 "\xCF"
+  rec 2 len=1 "\xCE"
+  rec 3 len=1 "\xCE"
+  rec 4 len=1 "\xCF"
+  rec 5 len=1 "\xCE"
+  rec 6 len=1 "\xCE"
+  rec 7 len=1 "\xCF"
+  rec 8 len=1 "\xCE"
+  rec 9 len=1 "\xCE"
+  rec 10 len=1 "\xCF"
+  rec 11 len=1 "\xCE"
+  rec 12 len=1 "\xCE"
+  rec 13 len=1 "\xCF"
+  rec 14 len=1 "\xCE"
+  rec 15 len=1 "\xCE"
+  rec 16 len=1 "\xCF"
+
+expr 66 "DESCEND(K_TS)"   ; row 160
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=16 len=8 numParms=0 numEntries=1 fieldNo=9 i2=0
+    node  1 row=160 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 ">\xBDK\xD3\x7F\xFF\xFF\xFF"
+  rec 2 len=8 ">\xBDK\xB5\xBDDDD"
+  rec 3 len=8 "\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 4 len=8 ">\xBD\x93)\x7F\xFF\x9E\xE8"
+  rec 5 len=8 ">\xBD8\x90\x80\x00a\x16"
+  rec 6 len=8 ">\xBD:\x96\xDE\xAA\xAA\xAA"
+  rec 7 len=8 ">\xBD`\x83\x9B\xF4\x9FI"
+  rec 8 len=8 ">\xBD=\x8E\xFF\xFF\xFF\xFF"
+  rec 9 len=8 ">\xBDU\xE7O\x18E\xC8"
+  rec 10 len=8 ">\xBDJ\x9D\xD1>\x93\xE9"
+  rec 11 len=8 ">\xBDD\x92\xFA|\x04\x8C"
+  rec 12 len=8 ">\xBDC&9fff"
+  rec 13 len=8 ">\xBD@\xAD\x13o\x1Fz"
+  rec 14 len=8 ">\xBD>\xBD\xEF\xA3\x14\xDB"
+  rec 15 len=8 ">\xBD;\xFD/)V\xD9"
+  rec 16 len=8 ">\xBDK\xD3\x80\x00\xC2."
+
+expr 67 "DESCEND(K_INT)"   ; row 161
+  compiled type='C'(67) len=4 keyLen=4 hasTrim=0 nodes=2
+    node  0 row=12 len=4 numParms=0 numEntries=1 fieldNo=5 i2=0
+    node  1 row=161 len=4 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=4 "\x7F\xFF\xFF\xFF"
+  rec 2 len=4 "\xFF\xFF\xFF\xFF"
+  rec 3 len=4 "\x00\x00\x00\x00"
+  rec 4 len=4 "\x80\x00\x00\x14"
+  rec 5 len=4 "\x7F\xFF\xFF\xE3"
+  rec 6 len=4 "\x7F\xFF\xFF\xDC"
+  rec 7 len=4 "\x80\x00\x00)"
+  rec 8 len=4 "\x7F\xFF\xFF\xCE"
+  rec 9 len=4 "\x7F\xFF\xFF\xC7"
+  rec 10 len=4 "\x80\x00\x00>"
+  rec 11 len=4 "\x7F\xFF\xFF\xB9"
+  rec 12 len=4 "\x7F\xFF\xFF\xB2"
+  rec 13 len=4 "\x80\x00\x00S"
+  rec 14 len=4 "\x7F\xFF\xFF\xA4"
+  rec 15 len=4 "\x7F\xFF\xFF\x9D"
+  rec 16 len=4 "\x80\x00\x00h"
+
+expr 68 "DESCEND(K_CUR)"   ; row 162
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=10 len=8 numParms=0 numEntries=1 fieldNo=10 i2=0
+    node  1 row=162 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 2 len=8 "\x80\x00\x00\x00\x00\x00'\x0F"
+  rec 3 len=8 "\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFE"
+  rec 4 len=8 "\x80\x00\x00\x00\x00\x00\x00\x00"
+  rec 5 len=8 "\x7F\xFF\xFF\xFF\xFF\xC2\xCF\xEF"
+  rec 6 len=8 "\x7F\xFF\xFF\xFF\xFF\xB3\x83\xEB"
+  rec 7 len=8 "\x7F\xFF\xFF\xFF\xFF\xA47\xE7"
+  rec 8 len=8 "\x7F\xFF\xFF\xFF\xFF\x94\xEB\xE3"
+  rec 9 len=8 "\x7F\xFF\xFF\xFF\xFF\x85\x9F\xDF"
+  rec 10 len=8 "\x7F\xFF\xFF\xFF\xFFvS\xDB"
+  rec 11 len=8 "\x7F\xFF\xFF\xFF\xFFg\x07\xD7"
+  rec 12 len=8 "\x7F\xFF\xFF\xFF\xFFW\xBB\xD3"
+  rec 13 len=8 "\x7F\xFF\xFF\xFF\xFFHo\xCF"
+  rec 14 len=8 "\x7F\xFF\xFF\xFF\xFF9#\xCB"
+  rec 15 len=8 "\x7F\xFF\xFF\xFF\xFF)\xD7\xC7"
+  rec 16 len=8 "\x7F\xFF\xFF\xFF\xFF\x1A\x8B\xC3"
+
+expr 69 "DESCEND(K_DBL)"   ; row 165
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=11 len=8 numParms=0 numEntries=1 fieldNo=6 i2=0
+    node  1 row=165 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 2 len=8 "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 3 len=8 "?\xF6\xDE\x04\xAB\xBB\xD2\xE7"
+  rec 4 len=8 "\xFE7\xE4<\x88\x00u\x9C"
+  rec 5 len=8 "~Z\x91\xE0=\x07\x0C\xA6"
+  rec 6 len=8 "\xBF\xF8\x00\x00\x00\x00\x00\x00"
+  rec 7 len=8 "\xBF\xF0\x00\x00\x00\x00\x00\x00"
+  rec 8 len=8 "\xBF\xE0\x00\x00\x00\x00\x00\x00"
+  rec 9 len=8 "\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 10 len=8 "@\x1F\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 11 len=8 "@\x0F\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 12 len=8 "@\x07\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 13 len=8 "?\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 14 len=8 "?\xFB\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 15 len=8 "?\xF7\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 16 len=8 "?\xF3\xFF\xFF\xFF\xFF\xFF\xFF"
+
+expr 70 "ASCEND(K_NUM)"   ; row 176
+  compiled type='C'(67) len=12 keyLen=12 hasTrim=0 nodes=2
+    node  0 row=9 len=12 numParms=0 numEntries=1 fieldNo=4 i2=0
+    node  1 row=176 len=12 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=12 "00000000.000"
+  rec 2 len=12 ",#######.###"
+  rec 3 len=12 "99999999.999"
+  rec 4 len=12 ",,,,,,,,.,,+"
+  rec 5 len=12 "00000002.500"
+  rec 6 len=12 ",,,,,,,*.',,"
+  rec 7 len=12 "00000000.125"
+  rec 8 len=12 "00000000.135"
+  rec 9 len=12 "00000388.888"
+  rec 10 len=12 "00000499.999"
+  rec 11 len=12 "00000611.110"
+  rec 12 len=12 "00000722.221"
+  rec 13 len=12 "00000833.332"
+  rec 14 len=12 "00000944.443"
+  rec 15 len=12 "00001055.554"
+  rec 16 len=12 "00001166.665"
+
+expr 71 "ASCEND(K_DATE)"   ; row 177: ascend does have a stored-date row
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=7 len=8 numParms=0 numEntries=1 fieldNo=8 i2=0
+    node  1 row=177 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "20000101"
+  rec 2 len=8 "20000229"
+  rec 3 len=8 "        "
+  rec 4 len=8 "19000101"
+  rec 5 len=8 "20261231"
+  rec 6 len=8 "20240229"
+  rec 7 len=8 "19701231"
+  rec 8 len=8 "20200101"
+  rec 9 len=8 "19851115"
+  rec 10 len=8 "20010911"
+  rec 11 len=8 "20100302"
+  rec 12 len=8 "20120229"
+  rec 13 len=8 "20150818"
+  rec 14 len=8 "20180505"
+  rec 15 len=8 "20220314"
+  rec 16 len=8 "19991231"
+
+expr 72 "ASCEND(K_LOG)"   ; row 179
+  compiled type='C'(67) len=1 keyLen=1 hasTrim=0 nodes=2
+    node  0 row=5 len=4 numParms=0 numEntries=1 fieldNo=12 i2=0
+    node  1 row=179 len=1 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=1 "0"
+  rec 2 len=1 "1"
+  rec 3 len=1 "1"
+  rec 4 len=1 "0"
+  rec 5 len=1 "1"
+  rec 6 len=1 "1"
+  rec 7 len=1 "0"
+  rec 8 len=1 "1"
+  rec 9 len=1 "1"
+  rec 10 len=1 "0"
+  rec 11 len=1 "1"
+  rec 12 len=1 "1"
+  rec 13 len=1 "0"
+  rec 14 len=1 "1"
+  rec 15 len=1 "1"
+  rec 16 len=1 "0"
+
+expr 73 "ASCEND(K_INT)"   ; row 180
+  compiled type='C'(67) len=4 keyLen=4 hasTrim=0 nodes=2
+    node  0 row=12 len=4 numParms=0 numEntries=1 fieldNo=5 i2=0
+    node  1 row=180 len=4 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=4 "\x80\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\xFF\xFF\xFF\xFF"
+  rec 4 len=4 "\x7F\xFF\xFF\xEB"
+  rec 5 len=4 "\x80\x00\x00\x1C"
+  rec 6 len=4 "\x80\x00\x00#"
+  rec 7 len=4 "\x7F\xFF\xFF\xD6"
+  rec 8 len=4 "\x80\x00\x001"
+  rec 9 len=4 "\x80\x00\x008"
+  rec 10 len=4 "\x7F\xFF\xFF\xC1"
+  rec 11 len=4 "\x80\x00\x00F"
+  rec 12 len=4 "\x80\x00\x00M"
+  rec 13 len=4 "\x7F\xFF\xFF\xAC"
+  rec 14 len=4 "\x80\x00\x00["
+  rec 15 len=4 "\x80\x00\x00b"
+  rec 16 len=4 "\x7F\xFF\xFF\x97"
+
+expr 74 "ASCEND(K_TS)"   ; row 181
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=16 len=8 numParms=0 numEntries=1 fieldNo=9 i2=0
+    node  1 row=181 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "\xC1B\xB4,\x80\x00\x00\x00"
+  rec 2 len=8 "\xC1B\xB4JB\xBB\xBB\xBB"
+  rec 3 len=8 "\x80\x00\x00\x00\x00\x00\x00\x00"
+  rec 4 len=8 "\xC1Bl\xD6\x80\x00a\x17"
+  rec 5 len=8 "\xC1B\xC7o\x7F\xFF\x9E\xE9"
+  rec 6 len=8 "\xC1B\xC5i!UUU"
+  rec 7 len=8 "\xC1B\x9F|d\x0B`\xB6"
+  rec 8 len=8 "\xC1B\xC2q\x00\x00\x00\x00"
+  rec 9 len=8 "\xC1B\xAA\x18\xB0\xE7\xBA7"
+  rec 10 len=8 "\xC1B\xB5b.\xC1l\x16"
+  rec 11 len=8 "\xC1B\xBBm\x05\x83\xFBs"
+  rec 12 len=8 "\xC1B\xBC\xD9\xC6\x99\x99\x99"
+  rec 13 len=8 "\xC1B\xBFR\xEC\x90\xE0\x85"
+  rec 14 len=8 "\xC1B\xC1B\x10\\\xEB$"
+  rec 15 len=8 "\xC1B\xC4\x02\xD0\xD6\xA9&"
+  rec 16 len=8 "\xC1B\xB4,\x7F\xFF=\xD1"
+
+expr 75 "ASCEND(K_CUR)"   ; row 182
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=10 len=8 numParms=0 numEntries=1 fieldNo=10 i2=0
+    node  1 row=182 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "\x80\x00\x00\x00\x00\x00\x00\x00"
+  rec 2 len=8 "\x7F\xFF\xFF\xFF\xFF\xFF\xD8\xF0"
+  rec 3 len=8 "\x80\x00\x00\x00\x00\x00\x00\x01"
+  rec 4 len=8 "\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 5 len=8 "\x80\x00\x00\x00\x00=0\x10"
+  rec 6 len=8 "\x80\x00\x00\x00\x00L|\x14"
+  rec 7 len=8 "\x80\x00\x00\x00\x00[\xC8\x18"
+  rec 8 len=8 "\x80\x00\x00\x00\x00k\x14\x1C"
+  rec 9 len=8 "\x80\x00\x00\x00\x00z` "
+  rec 10 len=8 "\x80\x00\x00\x00\x00\x89\xAC$"
+  rec 11 len=8 "\x80\x00\x00\x00\x00\x98\xF8("
+  rec 12 len=8 "\x80\x00\x00\x00\x00\xA8D,"
+  rec 13 len=8 "\x80\x00\x00\x00\x00\xB7\x900"
+  rec 14 len=8 "\x80\x00\x00\x00\x00\xC6\xDC4"
+  rec 15 len=8 "\x80\x00\x00\x00\x00\xD6(8"
+  rec 16 len=8 "\x80\x00\x00\x00\x00\xE5t<"
+
+expr 76 "ASCEND(K_DBL)"   ; row 183
+  compiled type='C'(67) len=8 keyLen=8 hasTrim=0 nodes=2
+    node  0 row=11 len=8 numParms=0 numEntries=1 fieldNo=6 i2=0
+    node  1 row=183 len=8 numParms=1 numEntries=2 fieldNo=0 i2=0
+  rec 1 len=8 "\x80\x00\x00\x00\x00\x00\x00\x00"
+  rec 2 len=8 "\x00\x00\x00\x00\x00\x00\x00\x00"
+  rec 3 len=8 "\xC0\x09!\xFBTD-\x18"
+  rec 4 len=8 "\x01\xC8\x1B\xC3w\xFF\x8Ac"
+  rec 5 len=8 "\x81\xA5n\x1F\xC2\xF8\xF3Y"
+  rec 6 len=8 "@\x07\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 7 len=8 "@\x0F\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 8 len=8 "@\x1F\xFF\xFF\xFF\xFF\xFF\xFF"
+  rec 9 len=8 "\x80\x00\x00\x00\x00\x00\x00\x00"
+  rec 10 len=8 "\xBF\xE0\x00\x00\x00\x00\x00\x00"
+  rec 11 len=8 "\xBF\xF0\x00\x00\x00\x00\x00\x00"
+  rec 12 len=8 "\xBF\xF8\x00\x00\x00\x00\x00\x00"
+  rec 13 len=8 "\xC0\x00\x00\x00\x00\x00\x00\x00"
+  rec 14 len=8 "\xC0\x04\x00\x00\x00\x00\x00\x00"
+  rec 15 len=8 "\xC0\x08\x00\x00\x00\x00\x00\x00"
+  rec 16 len=8 "\xC0\x0C\x00\x00\x00\x00\x00\x00"
 
 [clock-dependent expressions]
 count        4

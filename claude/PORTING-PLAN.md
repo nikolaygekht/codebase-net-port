@@ -309,9 +309,9 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 |---|---|---|---|---|
 | `CORPUS` | Corpus + generator | **P0** | in progress — 11 cases in, 4 of them indexed; mutation and write cases missing | R11 |
 | `DBF-READ` | DBF reading | **P1** | **done for reading** — metadata (001), records (002), memo and binary types (003). Writing is `WRITE` | — |
-| `CDX-READ` | CDX reading & navigation | **P1** | **done** — decode and traversal (004), seek by key bytes (005), tags on a `Table` (006), seek by value (008). Only a non-field key expression waits on `EXPR` | **R1** retired |
+| `CDX-READ` | CDX reading & navigation | **P1** | **done** — decode and traversal (004), seek by key bytes (005), tags on a `Table` (006), seek by value (008), and a non-field key expression (010) | **R1** retired |
 | `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (008 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
-| `EXPR` | Expression engine (read subset) | **P1** | **in progress** — designed and planned ([`010-expr`](dev/010-expr/)); sub-step 1 done: `CDXEXPR` + `FUNCTIONS.dump.txt` + the expression oracle are in the corpus, and no C# exists yet | R5 |
+| `EXPR` | Expression engine (read subset) | **P1** | **done** 2026-09-03 ([`010-expr`](dev/010-expr/)) — table, scanner, parser, overload resolution, evaluator, key conversion, and wired into the tag path. **Every key of every expression tag in `CDXEXPR.cdx` is rebuilt byte for byte** (22 tags, 338 keys), each tag walks the records the reference stored in its order, and ADR-28's refusal is gone. Also **the thirteen functions Visual FoxPro has and CodeBase refuses** (ADR-43), gated by Visual FoxPro's own answers in a VM (ADR-44) — 36 values on stored bits and 16 tag key lengths against its own headers. Outstanding and named: the Windows ANSI case mapping for `UPPER` and `LOWER`, which no corpus table can witness | **R5** retired |
 | `QUERY` | **Bitmap query optimizer** | **P1** | not started — **spec written** ([`QUERY-OPTIMIZER.md`](specs/QUERY-OPTIMIZER.md), 2026-09-03); no C# exists | **R12**, ~~R13~~ |
 | `WRITE` | Single-user write & round-trip | **P2** | not started — **owes the block cache, see §5's cross-capability obligation** | R4, R9, **R6** |
 | `LOCKING` | Locking & multi-user | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | R3, R10, **R6** |
@@ -427,10 +427,11 @@ VFP reserved area, the `t4dblToFox` sign rule.
   3364 corpus keys — **with every field of every record visited checked against the table's own record
   dump**, so the index has to deliver records and not merely record numbers. The failure shapes at the
   ends follow `d4skip` (ADR-29, `CDX-FORMAT.md` §7.1).
-- **Still waiting on `EXPR`:** a tag whose key expression is not a bare field name (refused when the tag
-  is first used, ADR-28), and stepping in a tag's order *from a record the tag does not list* — a
-  filtered or unique tag is fully walkable, but mixing `Go(n)` to an unlisted record with a tag-order
-  step is refused rather than answered (ADR-30).
+- ~~**A tag whose key expression is not a bare field name**~~ — **closed 2026-09-03** by step 010. It
+  is selectable, walks and positions like any other tag, and ADR-28's refusal is gone.
+- **Still open:** stepping in a tag's order *from a record the tag does not list* — a filtered or
+  unique tag is fully walkable, but mixing `Go(n)` to an unlisted record with a tag-order step is
+  refused rather than answered (ADR-30).
 - **Why it matters beyond its tier:** this gate retires the single biggest technical risk in the
   port (R1).
 

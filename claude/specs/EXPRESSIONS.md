@@ -136,8 +136,21 @@ Runtime buffer sizes assigned by massage: doubles/dates/dateTime/currency-as-dou
 
 ## 3. Lexical grammar
 
-`expr4parseValue` dispatches on the first non-blank character (e4parse.c:2518-2574). Whitespace =
-chars ≤ `' '` (e4parse.c:2531, 1187).
+`expr4parseValue` dispatches on the first non-blank character (e4parse.c:2518-2574). **What counts as
+blank is not one rule but three**, because `s4scanRange(scan, startChar, endChar)` skips the
+inclusive character range it is handed (e4parse.c:2671-2679) and the three call sites hand it three
+different ranges:
+
+| Site | Range skipped | Where |
+|---|---|---|
+| before a **value** | `' '` … `' '` — **the space character only** | e4parse.c:2531 |
+| before an **operator** | `\x01` … `' '` | e4parse.c:1187 |
+| between a **name** and a possible `(` | `\x00` … `' '` | e4parse.c:2506 |
+
+So a tab is whitespace where an operator is expected and is **not** whitespace where a value is
+expected: `A <TAB> + B` parses, `A + <TAB> B` is `e4unrecValue`. *(Corrected 2026-09-03 while
+porting the scanner; the earlier text read "Whitespace = chars ≤ `' '`" and cited 2531 for it, which
+is the one site where that is false.)*
 
 * **String constants**: delimited by `'…'`, `"…"`, or `[…]` (e4parse.c:2549-2553, 2166-2171).
   No escape mechanism; scanner searches for the matching close delimiter (e4parse.c:2174).
@@ -161,8 +174,8 @@ chars ≤ `' '` (e4parse.c:2531, 1187).
   e4parse.c:1224-1233; e4lookup e4parse.c:120-128).
 * **Field references**: `FIELD`, `ALIAS->FIELD` (e4parse.c:2371-2379), and — **S4FOX only** —
   `ALIAS.FIELD` (e4parse.c:2357-2369). Alias is resolved via `tran4dataName` among open DATA4s
-  (e4parse.c:2252-2272). Field names > 10 chars are an error unless the DBF supports long field
-  names (e4parse.c:2404-2417). In a *tag* expression an alias other than the indexed table itself
+  (e4parse.c:2252-2272). Field names > 10 chars are an error — `e4unrecValue`, not a
+  name-specific code — unless the DBF supports long field names (e4parse.c:2404-2417). In a *tag* expression an alias other than the indexed table itself
   is an error `e4tagExpr` (e4parse.c:2385-2387).
 
 ---
@@ -178,6 +191,48 @@ value      := '(' expression ')'               (e4parse.c:2537-2539, 2097-2120)
             | name '(' [expression {',' expression}] ')'   (e4parse.c:1858-1918, 1984-2093)
             | [alias ('->'|'.')] fieldname
 ```
+
+**An empty parameter list is empty only when nothing at all is between the brackets.**
+`expr4parseParamaters` tests for `\0` and then for `')'` **before** skipping anything
+(e4parse.c:1871-1890), so `DATE()` parses and `DATE( )` is `e4unrecValue` — the space makes it a
+parameter that never arrives. The same two tests are why an expression that ends inside a parameter
+list is `e4rightMissing` (−450) and not `e4unrecValue` (−490).
+
+**What the parse pass does besides the shunting-yard.** `expr4parseLow` runs the yard to completion
+and only then calls `e4massage` (e4parse.c:1103-1122), and five things happen on the parse side of
+that line. Each is observable, and the last two change the node array:
+
+* **A field's loader row is chosen from the field's type** — `getV4functionsIndexFromFieldType`
+  (e4parse.c:2276-2347), switching on `fieldPtr->type`, which is the DBF type letter itself
+  (`r4charBin`/`r4memoBin` having been folded to `'C'`/`'M'` with a separate binary flag,
+  d4defs.h:2771-2772). A name that resolves to no field is `e4fieldName` (−210) here
+  (e4parse.c:2452-2456), and a type with no row is `e4typeSub` (−460) (:2343-2345).
+* **A function's parameter count is checked against its row** — `e4numParms` (−430) in
+  `expr4parseFunction` (e4parse.c:2064-2081), before any type is known. `e4massage` checks again
+  (:198-205), and the two conditions differ: parse time rejects a mismatch when the row declares
+  `numParms >= 0`, massage only when `> 0`.
+* **`DTOC` and `TTOC` given two parameters are rewritten, not refused** (e4parse.c:2067-2075): the
+  second parameter's node is popped, `numParms` drops to one, and `DTOC` additionally becomes
+  `DTOS`.
+* **Nine functions read a constant parameter and remove its node**, because the number decides the
+  result's length: `STR`/`STRZERO`'s width and decimals, `SUBSTR`'s start and count, `LEFT`'s and
+  `RIGHT`'s count, `PADL`/`PADR`'s count, `SPACE`'s count, and `DATETIME`'s hour-to-milliseconds
+  (e4parse.c:1404-1856, each ending in `e4functionPop`). **`STR(K_NUM,12,3)` is therefore two
+  nodes, not four** — witnessed in `CDXEXPR.expr.dump.txt`, and `SPACE` is the one exception that
+  reads its constant without popping it. A parameter that is not a numeric constant is
+  `e4notConstant` (−425) — **except from `STR`/`STRZERO`, which report `e4typeSub` (−460)**
+  (e4parse.c:1434-1436 against :1577-1581, both witnessed in the `[rejections]` section).
+* **A top-level `)` or `,` ends the expression and the rest of the text is ignored.**
+  `e4getOperator` returns `E4DONE` for `\0`, `)` and `,` (e4parse.c:1189-1194), and
+  `expr4parseLow` then checks only that the operator stack came back empty — never that the scan
+  reached the end (:1108-1115). So `"K_LOG)"` compiles to just `K_LOG`, and `"K_LOG,"` likewise.
+
+**A parameter list is re-tested at every comma, not only at its opening bracket.**
+`expr4parseParamaters`'s loop tests for end-of-string and then for `')'` at the top of every
+iteration (e4parse.c:1868-1890), and it re-enters that top after consuming each comma. So
+`UPPER(K_TEXT,)` parses as `UPPER(K_TEXT)` with **one** parameter, and `UPPER(K_TEXT,` is
+`e4rightMissing` (−450). A parameter that ends at neither `,` nor `)` is `e4commaExpected` (−400)
+(:1907-1912).
 
 Parsing is the classic **shunting-yard**: operators are pushed on an op stack; before pushing, any
 stacked operator with `priority >= new.priority` is popped to the postfix output (left
@@ -424,12 +479,50 @@ explicitly no value. `TIME()` is `r4str` of length 8; `DATE()` is `r4dateDoub`.
 
 ---
 
+### 5.2 The thirteen Visual FoxPro adds, and their witnessed rules
+
+Not part of `v4functions` — the reference has **no row for any of them** and refuses every one with
+`e4unrecFunction` (−470), recorded in `CDXEXPR.expr.dump.txt`'s `[vfp-only]` section. The port carries
+them anyway (ADR-43), because a CDX written by Visual FoxPro can hold one in a tag expression.
+**Visual FoxPro itself is their only oracle** (ADR-44): its answers are in
+`corpus/vfp/VFPFVAL.DBF` and its key lengths in `corpus/vfp/VFPFUNC.CDX`.
+
+`ABS INT ROUND MOD MIN MAX SQRT SIGN LEN AT ASC LOWER REPLICATE`
+
+Five rules are not what a reader would guess, and all five are witnessed in the stored bits rather
+than in the dump's formatting:
+
+* **`MOD` takes its sign from the divisor, not the dividend** — floored, not truncated.
+  `MOD(5,3)`→2, `MOD(-5,3)`→**1**, `MOD(5,-3)`→**−1**, `MOD(-5,-3)`→**−2**, `MOD(5.5,2)`→1.5.
+* **`INT` truncates towards zero on both signs.** `INT(1.5)`→1, `INT(-1.5)`→−1, `INT(-0.5)`→0 — and
+  that last one is stored as a **positive** zero, whose bits differ from a negative zero's and which
+  no formatting distinguishes.
+* **`ROUND` rounds half away from zero on the decimal digits**, the same rule `STR` follows:
+  `ROUND(0.135,2)`→0.14 although the nearest double to 0.135 is below it. A negative number of
+  places rounds to tens: `ROUND(1.5,-1)`→0, `ROUND(15,-1)`→20.
+* **`AT` counts from one and answers zero for absent**, with an optional third operand saying which
+  occurrence: `AT("B","ABAB",2)`→4.
+* **`MIN` and `MAX` are variadic and have a string form as well as a numeric one.** `MIN(1,2,3)`→1,
+  `MIN("A","B")`→`"A"`.
+
+**Key lengths, witnessed in Visual FoxPro's own tag headers**: 8 for every numeric-returning
+function; the operand's width for `LOWER` (20 over a `C(20)`); the count times the operand's width
+for `REPLICATE` (40 over a `C(20)` repeated twice). `REPLICATE`'s count therefore has to be a
+constant, as `SPACE`'s is in the reference, or the key cannot be sized.
+
+**`LOWER` has the same open question as `UPPER`**: Visual FoxPro maps by the table's code page, and
+the oracle's one case above 0x7F is on a code-page-1251 table where 0xC9 lowers to 0xE9. Only the
+ASCII path is implemented, and that case is excluded from the gate by name.
+
+---
+
 ## 6. Type system, overload resolution and implicit conversions
 
 `e4massage` walks the postfix array with a simulated typed stack (`types[]`, `length[]`,
 `position[]`; e4parse.c:156-193). For each node:
 
-1. Parameter-count check against the table (variadic = −1 allowed; e4parse.c:198-205).
+1. Parameter-count check against the table (variadic = −1 allowed; e4parse.c:198-205) — the
+   **second** of two, the first being at parse time with a slightly wider condition (§4).
 2. For each parameter, if `types[parmPos] != typeShouldBe`, try these **implicit field/constant
    promotions** (rewriting the *producer* node) (e4parse.c:227-285):
    * r4date → r4dateDoub (producer becomes `E4FIELD_DATE_D`) (:229-234)
@@ -440,6 +533,24 @@ explicitly no value. `TIME()` is `r4str` of length 8; `DATE()` is `r4dateDoub`.
    * r4int → r4floatBin (`E4FIELD_INT_F`) (:280-285)
 3. If promotion fails, advance to the next overload row: `info->functionI++` and retry; if the
    `code` changes, the expression is a type error `e4typeSub` (e4parse.c:207-214, 286-292).
+
+**A promotion writes the new row onto the producer node and the new length onto the simulated
+stack — never onto the producer's own `len`.** The producer's `info->len` was assigned when the walk
+visited it (e4parse.c:940) and the walk never returns to it, so the node keeps the pre-promotion
+length while the stack carries 8 or 4 into the consumer's own length rule. Witnessed
+[`CDXEXPR.expr.dump.txt`]: `K_NUM + 0` compiles to three nodes and the field node is **row 8
+(`E4FIELD_NUM_D`) with `len=12`**, the `N(12,3)` field's width, while the `+` node is `len=8`. The
+promotion also leaves `types[parmPos]` alone, which only matters if the row later backtracks; a
+producer promoted during a failed attempt at one overload **stays promoted** when the next overload
+is tried.
+
+Two consequences worth stating because code depends on them: the node **count** is identical before
+and after this pass, and the declared length a caller reads off a promoted node is the field's, not
+the double's.
+
+`numEntries` — a node's postfix subtree size — is assigned here too, as `1` plus its operands'
+(e4parse.c:941-946), though it depends on nothing the type system decides and follows from
+`numParms` and the postfix order alone.
 
 Result type = `v4functions[functionI].returnType` (calc nodes take the calc expression's type)
 (e4parse.c:388-394). Result lengths are then assigned per §2.4 plus function-specific rules
@@ -576,6 +687,22 @@ shows directly: `TRIM("abc   ")` is six bytes, `"abc\x00\x00\x00"`, and `TRIM(K_
 `C(20)` field is twenty bytes however short the text. `hasTrim=1` on the expression. A port that
 returns three bytes for the first is wrong before it ever reaches key time.
 
+### 7.4b EMPTY — five rows, four answers
+
+Witnessed and read off the kernels (e4functi.c:3111-3190):
+
+| operand | row | empty when |
+|---|---|---|
+| `r4str` | 151 | **every byte is a blank** — so an all-blank string is empty, and the corpus says `EMPTY("   ")` is true |
+| `r4str` over a **memo field** | 151 | the field's stored **block number** is zero (`f4long`), read out of the record and not out of the memo — so a memo holding blanks is *not* empty |
+| `r4numDoub` | 152 | the double is zero |
+| `r4dateTime` | 153 | the **first four bytes** — the julian day — are zero, whatever the time is |
+| `r4dateDoub` | 154 | the double is zero, sharing the numeric kernel; a valid date is never empty and an unreadable one (−1) is not either |
+| `r4log` | 155 | the value is false |
+
+There is no `r4num`, `r4date`, `r4int` or `r4currency` row, so a field of those types reaches `EMPTY`
+only through a promotion, and `EMPTY(K_NNUM)` over an `N(12,3)` field resolves row **152**.
+
 ### 7.5 UPPER
 
 Under CDX with data codepage 1252/1250, uses Windows ANSI `CharUpper` (accented letters map like
@@ -656,6 +783,27 @@ computed; for `>` the flag (stored in `p1` as 0/1) is 1 iff `len(a) > len(b)`; f
 * `>` : memcmp on i1; if equal prefix, result = p1 flag (longer left wins) (e4functi.c:1479-1512).
 * `<` : symmetric (e4functi.c:1884-1916). `>=`/`<=` are negations of `<`/`>`
   (e4functi.c:1608-1630, 2012-2034).
+
+**And the tie-break applies to the two strict forms only, which makes the four an asymmetric set.**
+`p1` is assigned during massage under `if (info->functionI == E4GREATER)` and
+`if (info->functionI == E4LESS)` — the two *named head* rows, 84 and 91 (e4parse.c:800-822). A `>=`
+or `<=` node carries neither row, so its `p1` is never written; `e4lessEq` then calls `e4greater()`
+**on its own node** and negates the answer (e4functi.c:2012-2034), reading that unwritten flag as
+zero. So on an equal common prefix the strict forms decide by width and the inclusive forms decide
+nothing:
+
+| operands | `>` | `>=` | `<` | `<=` |
+|---|---|---|---|---|
+| `"AAAA"` against `"AAA"` | true | true | false | **true** |
+| `"AAA"` against `"AAAA"` | false | true | true | true |
+
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: `K_TEXT <= "M"` is **true** at the two records whose `C(20)`
+text begins with `M`, while `K_TEXT > "M"` is true at the same two. A port that computed `<=` as
+`!(>)` with the width tie-break in place gets both of those wrong, and gets no other case wrong,
+which is why it took a field expression to find it. Note this is a property of the *node*, not of the
+operands: the same two strings compare differently depending on which of the four operators asks.
+`p1` is also never written for a comparison whose operands are not strings, which costs nothing there
+because the typed kernels do not read it.
 * Numeric/date comparisons compare doubles (e4functi.c:1634-1668, 2038-2071); currency uses
   `currency4compare`; datetime uses `date4timeCompare` with the same tie flag mechanism
   (e4functi.c:1404-1475).

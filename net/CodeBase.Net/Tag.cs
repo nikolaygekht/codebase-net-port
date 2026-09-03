@@ -1,4 +1,5 @@
 using CodeBase.Net.Cdx;
+using CodeBase.Net.Expressions;
 
 namespace CodeBase.Net;
 
@@ -86,6 +87,28 @@ public sealed class Tag
     /// The tag as the index reader sees it.
     /// </summary>
     internal CdxTag Inner { get; }
+
+    /// <summary>
+    /// Gets the tag's compiled key expression, once something has needed it.
+    /// </summary>
+    /// <value>
+    /// Kept rather than discarded. Typing a tag compiles its expression and then reads three things
+    /// off the result — the key's kind, its length and its pad byte — and it would be natural to
+    /// throw the rest away. The query optimizer is what stops that being natural: it decides whether
+    /// a tag can stand in for a subexpression by comparing two compiled node arrays node for node
+    /// (r4log.c:61-255), so every tag has to be able to show its own. Recompiling from the header
+    /// text later is not the same thing, because a caller can only compare what is there.
+    ///
+    /// Null until the tag is used for the first time, which is when it is compiled (ADR-28's shape:
+    /// one unreadable tag must not make a table unopenable).
+    /// </value>
+    internal CompiledExpression? Compiled { get; private set; }
+
+    /// <summary>
+    /// Remembers the compiled expression the first thing to need it produced.
+    /// </summary>
+    /// <param name="compiled">The compiled key expression.</param>
+    internal void Remember(CompiledExpression compiled) => Compiled ??= compiled;
 
     /// <summary>
     /// Returns the tag's name and what it orders by, for diagnostics and failure messages.

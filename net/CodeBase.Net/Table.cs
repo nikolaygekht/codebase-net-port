@@ -1,6 +1,7 @@
 using CodeBase.Net.Cdx;
 using System.Text;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.Expressions;
 using CodeBase.Net.IO;
 using CodeBase.Net.Memo;
 
@@ -63,9 +64,15 @@ public sealed class Table : IDisposable
     private TableTagCursor? selected;
     private bool closed;
 
-    internal Table(string path, OpenedTable opened, Encoding? defaultEncoding, Action<Table> onClosed)
+    internal Table(
+        string path,
+        OpenedTable opened,
+        Encoding? defaultEncoding,
+        ExpressionOptions expressionOptions,
+        Action<Table> onClosed)
     {
         Path = path;
+        ExpressionOptions = expressionOptions;
         this.opened = opened;
         this.defaultEncoding = defaultEncoding;
         this.onClosed = onClosed;
@@ -833,6 +840,23 @@ public sealed class Table : IDisposable
         return count < 0 ? SkipResult.Bof : SkipResult.Eof;
     }
 
+    /// <summary>
+    /// Gets a tag's compiled key expression, compiling it if nothing has needed it yet.
+    /// </summary>
+    /// <param name="tag">The tag.</param>
+    /// <returns>The compiled expression.</returns>
+    /// <exception cref="CodeBaseException">The tag is not usable on this table.</exception>
+    /// <value>
+    /// What the query optimizer asks a table for: it walks every tag looking for one whose
+    /// expression matches a subexpression of the filter, and it compares compiled node arrays rather
+    /// than text.
+    /// </value>
+    internal CompiledExpression CompiledFor(Tag tag)
+    {
+        using Hold hold = Enter();
+        return CursorFor(tag).Compiled;
+    }
+
     private TableTagCursor CursorFor(Tag tag)
     {
         if (!ReferenceEquals(Tags.TryGet(tag.Name, out Tag? mine) ? mine : null, tag))
@@ -846,9 +870,25 @@ public sealed class Table : IDisposable
         {
             // Constructing it is what asks for the pad byte, so a tag whose expression cannot be typed
             // fails here — at the first attempt to use it, and not when the table was opened.
-            cursor = new TableTagCursor(tag, [.. Fields], CodePageNumber ?? CodePageMap.UnmarkedCodePage);
+            cursor = new TableTagCursor(
+                tag,
+                [.. Fields],
+                CodePageNumber ?? CodePageMap.UnmarkedCodePage,
+                new EvaluationContext
+                {
+                    NullFlags = NullFlags,
+                    RecordCount = opened.Header.RecordCount,
+                    Options = ExpressionOptions,
+                    Memo = memoReader is null ? null : field => GetMemoBytes(field),
+                },
+                System.IO.Path.GetFileNameWithoutExtension(Path));
             tagCursors[tag] = cursor;
         }
+
+        // The tag keeps what typing it produced. Reading the kind, the length and the pad byte off a
+        // compiled expression and then discarding it would leave the query optimizer with nothing to
+        // compare a subexpression against.
+        tag.Remember(cursor.Compiled);
 
         return cursor;
     }
@@ -1072,6 +1112,27 @@ public sealed class Table : IDisposable
         // and never a throw for a byte it cannot map. See ADR-21.
         return TextEncoding.GetString(ReadMemo(field).Payload);
     }
+
+    /// <summary>
+    /// Gets the date picture and century policy this table's expressions are read under.
+    /// </summary>
+    /// <value>
+    /// ADR-42's two settings, taken from the engine when the table was opened. They matter to a
+    /// [i]key[/i]: the picture's length is a formatted date's key length, and a two-digit year with
+    /// no century configured is refused rather than guessed, so a tag over one is refused rather
+    /// than keyed differently on a different machine.
+    /// </value>
+    internal ExpressionOptions ExpressionOptions { get; }
+
+    /// <summary>
+    /// Gets the buffer the current record was read into.
+    /// </summary>
+    /// <value>
+    /// Internal, and it is what the expression engine reads a field out of. Handing over the buffer
+    /// rather than a copy is what lets one compiled expression be evaluated at every record of a
+    /// scan without the record being rebuilt each time.
+    /// </value>
+    internal RecordBuffer CurrentRecord => record;
 
     /// <summary>
     /// Gets whether a field of the current record is marked null.

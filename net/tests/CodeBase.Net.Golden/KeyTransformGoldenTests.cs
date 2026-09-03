@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using CodeBase.Net.Cdx;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.Expressions;
 using CodeBase.Net.IO;
 using CodeBase.Net.TestUtils;
 using Xunit;
@@ -60,7 +61,8 @@ public sealed class KeyTransformGoldenTests
         foreach (CdxTag tag in reader.Tags)
         {
             DumpIndexTag expected = index.RealTags.Single(t => t.Name.TrimEnd() == tag.Name.TrimEnd());
-            SeekConverter converter = SeekConverter.For(tag.Header, fields, codePage);
+            SeekConverter converter = SeekConverter.For(
+                tag.Header, fields, codePage, ExpressionOptions.Invariant, tableName);
             string field = converter.Field!.Name;
 
             foreach (DumpIndexKey stored in expected.Keys)

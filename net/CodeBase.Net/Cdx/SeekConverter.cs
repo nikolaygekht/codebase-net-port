@@ -1,4 +1,5 @@
 using CodeBase.Net.Dbf;
+using CodeBase.Net.Expressions;
 
 namespace CodeBase.Net.Cdx;
 
@@ -31,6 +32,12 @@ internal enum KeyKind
 
     /// <summary>A datetime, keyed through the day, the rounded time and the decrement table.</summary>
     DateTime,
+
+    /// <summary>A four-byte binary float, which only an expression over an H field produces.</summary>
+    Single,
+
+    /// <summary>A truth value, keyed as one letter, which only an expression produces.</summary>
+    Logical,
 }
 
 /// <summary>
@@ -40,16 +47,22 @@ internal enum KeyKind
 /// and hanging them off the tag (tfile4initSeekConv, i4init.c:557-753). The same choice is made here,
 /// as data rather than function pointers, and it is the only place the mapping lives.
 ///
-/// A tag whose key expression is not a bare field name is refused, exactly as its pad byte is
-/// (ADR-28). That refusal is what makes this total: for every tag a caller can select, the key type
-/// is known, so building a key can fail because a record has no entry but never because the library
-/// could not work out what to build.
+/// The kind now comes from the [b]compiled expression's result type[/b] rather than from a field's
+/// declared type, which is what lets a tag be keyed on anything the engine can compute. A tag over a
+/// bare field still records the field, because the seek path takes a caller's value in its stored
+/// form and needs to know what that form is.
+///
+/// The compiled expression is [b]kept[/b] and not discarded once the kind, the length and the pad
+/// byte have been read off it. The query optimizer decides whether a tag can stand in for a
+/// subexpression by comparing compiled node arrays, so throwing this away would make that
+/// impossible, and recompiling from the header text later is not the same thing.
 /// </summary>
 internal sealed class SeekConverter
 {
     private SeekConverter(
         KeyKind kind,
         FieldDefinition? field,
+        CompiledExpression compiled,
         int keyLength,
         byte padByte,
         CollationName collation,
@@ -57,6 +70,7 @@ internal sealed class SeekConverter
     {
         Kind = kind;
         Field = field;
+        Compiled = compiled;
         KeyLength = keyLength;
         PadByte = padByte;
         Collation = collation;
@@ -66,8 +80,11 @@ internal sealed class SeekConverter
     /// <summary>Gets the kind of key the tag stores.</summary>
     public KeyKind Kind { get; }
 
-    /// <summary>Gets the field the tag is built on, or null when the tag is not a bare field.</summary>
+    /// <summary>Gets the field the tag is built on, or null when its expression is not a bare name.</summary>
     public FieldDefinition? Field { get; }
+
+    /// <summary>Gets the tag's compiled key expression.</summary>
+    public CompiledExpression Compiled { get; }
 
     /// <summary>Gets the tag's key length.</summary>
     public int KeyLength { get; }
@@ -82,35 +99,48 @@ internal sealed class SeekConverter
     public int CodePage { get; }
 
     /// <summary>
+    /// Gets a value indicating whether the key carries a leading byte saying the value is there.
+    /// </summary>
+    public bool HasNullIndicator => ExpressionKey.CanBeAbsent(Compiled);
+
+    /// <summary>
     /// Resolves the converter for a tag.
     /// </summary>
     /// <param name="header">The tag's header.</param>
     /// <param name="fields">The fields of the table the tag indexes.</param>
     /// <param name="codePage">The table's code page number.</param>
+    /// <param name="options">The date picture and century policy the expression is read under.</param>
+    /// <param name="alias">The name a field reference may be qualified by.</param>
     /// <returns>The converter.</returns>
     /// <exception cref="CodeBaseException">
-    /// The expression is not a bare field name, names a field whose type this library does not key,
-    /// or names a collation this library has no weights for on the table's code page.
+    /// The expression cannot be compiled, produces a type this library does not key, cannot be used
+    /// for a key because its value would not be the same twice, or names a collation this library has
+    /// no weights for on the table's code page.
     /// </exception>
     public static SeekConverter For(
-        IndexHeader header, IReadOnlyList<FieldDefinition> fields, int codePage)
+        IndexHeader header,
+        IReadOnlyList<FieldDefinition> fields,
+        int codePage,
+        ExpressionOptions options,
+        string alias)
     {
         string expression = header.Expression.Trim();
-        byte padByte = KeyTypeResolver.PadByteFor(header, fields);
         CollationName collation = header.Collation;
+
+        CompiledExpression compiled = TypeResolver.Resolve(
+            ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias)));
+
+        RefuseIfNotTheSameTwice(compiled, expression);
+
+        // One compile, one resolution, one refusal: the pad byte follows from the same result type
+        // the kind does, so it is read off the expression already compiled here rather than by
+        // compiling it a second time.
+        byte padByte = header.PadByte ?? KeyTypeResolver.PadByteOf(compiled.ResultType, header, expression);
+
+        KeyKind kind = KindOf(compiled.ResultType, collation, expression);
 
         FieldDefinition? field = fields.FirstOrDefault(
             f => string.Equals(f.Name, expression, StringComparison.OrdinalIgnoreCase));
-
-        if (field is null)
-        {
-            throw new CodeBaseException(
-                ErrorCode.NotSupported,
-                $"The key expression '{expression}' is not the name of a field of this table, so a " +
-                $"value cannot be turned into a key for it. That needs the expression engine.");
-        }
-
-        KeyKind kind = KindOf(field, collation, expression);
 
         // A collated tag names a sort order; which weight table that means depends on the table's
         // code page, and the index does not record it. Settled here, at the one point that knows
@@ -123,30 +153,68 @@ internal sealed class SeekConverter
                 $"weights for the table's code page {codePage}.");
         }
 
-        return new SeekConverter(kind, field, header.KeyLength, padByte, collation, codePage);
+        return new SeekConverter(
+            kind, field, compiled, header.KeyLength, padByte, collation, codePage);
     }
 
     /// <summary>
-    /// Maps a field's type to the kind of key a tag over it stores.
+    /// Refuses an expression whose value is not the same twice (Decision 5).
+    /// </summary>
+    /// <value>
+    /// A key built from the clock or from where the cursor happens to be is a key nothing can find
+    /// again, and the reference does not forbid it — it simply produces a tag nobody can maintain.
+    /// This port refuses it when the tag is [i]selected[/i], and says which function made it so,
+    /// because a caller who sees the name can fix the expression. A filter over the same functions
+    /// evaluates normally; it is only a stored key that cannot survive them.
+    /// </value>
+    private static void RefuseIfNotTheSameTwice(CompiledExpression compiled, string expression)
+    {
+        foreach (ExpressionNode node in compiled.Nodes)
+        {
+            string? name = node.Row switch
+            {
+                FunctionRows.Today => "DATE",
+                FunctionRows.Time => "TIME",
+                FunctionRows.RecordNumber => "RECNO",
+                FunctionRows.RecordCount => "RECCOUNT",
+                _ => null,
+            };
+
+            if (name is not null)
+            {
+                throw new CodeBaseException(
+                    ErrorCode.NotSupported,
+                    $"The key expression '{expression}' uses {name}(), whose value is not the same " +
+                    "twice, so a key built from it could never be found again.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Maps an expression's result type to the kind of key a tag over it stores.
     /// </summary>
     /// <remarks>
-    /// The rows of i4init.c:557-753 that this library keys. A character field is the only one whose
-    /// answer depends on anything but its type, because a collation replaces its bytes with weights.
+    /// The rows of i4init.c:557-753 that this library keys, read by result type rather than by field
+    /// type. A string is the only one whose answer depends on anything else, because a collation
+    /// replaces its bytes with weights. The four types that carry a number, a date or their stored
+    /// text all key through the same transform, which is why they share one kind.
     /// </remarks>
-    private static KeyKind KindOf(FieldDefinition field, CollationName collation, string expression) =>
-        field.Type switch
+    private static KeyKind KindOf(ExpressionType type, CollationName collation, string expression) =>
+        type switch
         {
-            'C' or 'Z' => collation == CollationName.Machine
-                ? KeyKind.Character
-                : KeyKind.CollatedCharacter,
-            'N' or 'F' or 'B' => KeyKind.Double,
-            'I' => KeyKind.Int32,
-            'Y' => KeyKind.Currency,
-            'D' => KeyKind.Date,
-            'T' => KeyKind.DateTime,
+            ExpressionType.Character or ExpressionType.Memo or ExpressionType.General =>
+                collation == CollationName.Machine ? KeyKind.Character : KeyKind.CollatedCharacter,
+            ExpressionType.NumericAsText or ExpressionType.NumericAsDouble
+                or ExpressionType.DateAsDouble => KeyKind.Double,
+            ExpressionType.DateAsText => KeyKind.Date,
+            ExpressionType.Integer => KeyKind.Int32,
+            ExpressionType.Currency => KeyKind.Currency,
+            ExpressionType.Timestamp or ExpressionType.TimestampWithMilliseconds => KeyKind.DateTime,
+            ExpressionType.BinaryFloat => KeyKind.Single,
+            ExpressionType.Logical => KeyKind.Logical,
             _ => throw new CodeBaseException(
                 ErrorCode.NotSupported,
-                $"The key expression '{expression}' names a field of type '{field.Type}', which this " +
-                "library does not build keys from."),
+                $"The key expression '{expression}' produces a value of type '{(char)type}', which " +
+                "this library does not build keys from."),
         };
 }

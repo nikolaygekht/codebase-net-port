@@ -158,9 +158,15 @@ whose type comes from the *table* — and resolution **rewrites producer nodes i
 `EXPRESSIONS.md` §6's promotions. Separating it means the pass that has to be checked
 row-for-row against `e4massage` is drivable at layer 1 with no file near it.
 
-**A promotion changes a node's row and its length; it never adds a node.** All six are literally
-`pointers[parmPos]->functionI = <new row>` followed by `length[parmPos] = sizeof(double)` or
-`sizeof(float)` (`e4parse.c:227-289`), so **node count is invariant under promotion**: `K_NUM` alone
+**A promotion changes a node's row and nothing else about the node; it never adds one.** All six are
+literally `pointers[parmPos]->functionI = <new row>` followed by `length[parmPos] = sizeof(double)`
+or `sizeof(float)` (`e4parse.c:227-289`) — and that second assignment is to the *simulated stack*,
+not to the node. The producer's `info->len` was written when the producer was visited and is never
+revisited, so **a promoted numeric field still reports the field's width**: `K_NUM + 0`'s field node
+carries row 8 and length 12, which the oracle shows and §6's optimizer reads. *(Corrected 2026-09-03,
+at sub-step 4. An earlier draft of this paragraph said a promotion changes "a node's row and its
+length", which is true of the stack and false of the node.)* So **node count is invariant under
+promotion**: `K_NUM` alone
 is one node at row 9, and `K_NUM > 0` is the *same one node* at row 8 (`EXPRESSIONS.md` §7.7,
 witnessed by the oracle). An earlier draft of this document said promotion would be "wrapping a child
 in a conversion node". That is a different data structure and it breaks two things at once —
@@ -197,11 +203,45 @@ sensible:
 - **`ALIAS->FIELD`, and — S4FOX only — `ALIAS.FIELD`**, which collides head-on with the dotted-operator
   rule. In a *tag* expression an alias other than the indexed table is `e4tagExpr`.
 
-The parser itself is quieter: `(` and `,` are stack barriers in the C, which here is just a
+The grammar the parser walks is small: `(` and `,` are stack barriers in the C, which here is just a
 parenthesised expression and arguments parsed at precedence 0; named functions sit at priority 0
 because they are call syntax; consecutive identical `.AND.`/`.OR.` flatten into one variadic node at
 parse time (`E4ANOTHER_PARM`). One grouping worth a test of its own: `.NOT.` is priority 5 and
 comparison is 6, so `.NOT. A = B` groups as `.NOT. (A = B)`.
+
+### What the parse pass owns, which is more than shape
+
+*Added 2026-09-03, from reading `e4parse.c` before writing the parser. An earlier draft of this
+section called the parser "quieter" than the lexer. It is not, and putting its work in the wrong pass
+would have moved three error codes and made the sub-step's gate impossible to state.*
+
+`expr4parseLow` runs the shunting-yard to completion **and then** calls `e4massage`. Everything below
+happens on the parse side of that line, in the reference, so it happens on the parse side here:
+
+- **The parameter-count check is parse-time.** `e4numParms` (−430) is raised in `expr4parseFunction`
+  (`e4parse.c:2064-2081`), against `v4functions[functionNumber].numParms`, before a single type is
+  known. It is not one of `e4massage`'s steps, and §2's numbered list should be read as starting at
+  its promotions.
+- **`DTOC` and `TTOC` with two parameters are rewritten, not refused** (`:2067-2075`): the second
+  parameter's node is popped, `numParms` drops to one, and `DTOC` additionally becomes `DTOS`. This is
+  the one place the parser changes a row after choosing it.
+- **The constant parameters of nine functions are folded into their caller's node and their own nodes
+  removed** — `e4functionPop`, driven from the per-function parse routines (`:1404-1854`): `STR` and
+  `STRZERO`'s width and decimals, `SUBSTR`'s start and count, `LEFT`'s and `RIGHT`'s count,
+  `PADL`/`PADR`'s count, `SPACE`'s count, `DATETIME`'s hour-to-milliseconds. **`STR(K_NUM,12,3)` is
+  therefore two nodes, not four**, and the dump witnesses it. So `e4notConstant` (−425) is parse-time
+  as well, and the parser needs the constant's *value*, not merely its presence: the constants store
+  is a parse-time artefact that the folding reads back out of.
+- **A field's loader row is chosen from its type, at parse time**
+  (`getV4functionsIndexFromFieldType`, `:2276-2347`). The parser therefore needs field metadata —
+  name, number, type, length, decimals — which is the seam §Seams now lists.
+
+**And the fact that makes this sub-step gateable on its own.** Promotion rewrites a node's row and its
+length and nothing else, so `numParms`, `numEntries` and `fieldNo` are settled by the parser and are
+**never touched again**. The dump records all three per node. So the parse pass can be gated against
+the C library's own node arrays *before* the type system exists — on node count and on that
+three-field sequence — which is a far stronger check than parse shape alone, and it is exactly the
+folding above that it catches.
 
 ### The rule that keeps the front end honest: never accept a superset
 
@@ -383,12 +423,17 @@ nothing and would otherwise look like accidents:
 | Class | Role | Responsibility | Notes |
 |---|---|---|---|
 | `ExpressionLexer` | Entity | Text to tokens | the `[…]`/`'…'`/`"…"` forms, `.AND.`-style operators, **no `{}` date literals** and **no unary minus outside a numeric literal** (§3) |
-| `ExpressionParser` | Entity | Tokens to a postfix node array by precedence (§4) | left-associative, `.AND.`/`.OR.` variadic |
+| `ExpressionParser` | Entity | Tokens to a postfix node array by precedence (§4) | left-associative, `.AND.`/`.OR.` variadic; and everything else the reference does before `e4massage` — the field loader's row from its type, the parameter-count refusal, the constant-parameter folding that *removes* nodes, `DTOC`/`TTOC`'s two-parameter rewrite (§2b) |
+| `IFieldMetadata` | Boundary | What the parser needs to know about a field to choose its loader row | name, number, type, length, decimals, and whether the alias it was qualified by is the table being indexed. The parser has no table, no record and no file behind it |
+| `ExpressionNode` | Entity | One node of the compiled postfix array | the six fields of §6, of which the parser settles `numParms`, `numEntries`, `fieldNo` and the constant's identity, and the resolver settles row and length |
+| `ConstantStore` | Entity | The literals a compiled expression carries | a parse-time artefact the constant folding reads back out of, which is why it is not merely the evaluator's |
 | `TypeResolver` | Entity | Assigns each node its row and its result type | the promotion-then-advance loop, **rewriting rows in place** (§2b); where `e4typeSub` is raised. Produces the **node table** of §6 — per node its row, result type, declared length, parameter count, subtree size and field — which is both what the resolution gate compares against the C's `E4INFO` array and what `QUERY` walks |
 | `ExpressionValue` | Entity | One evaluated value | a discriminated union over the ten types of §1, carrying `isNull` and a length — never `object` |
 | `FunctionTable` | Entity | The rows, as data | one row per `(name, code, prio, return, parameter types)`; the table is transcribed, not coded |
 | `CompiledExpression` | Entity | An immutable compiled expression | result type, key length, key-legal, referenced fields, **and §6's node table** — the postfix array is *retained*, not discarded once the resolver has run |
-| `ExpressionEvaluator` | Controller | A compiled expression and a record, out comes a value | holds no state between calls; **evaluates at any node, and needs no record when that node's subtree is constant** (§6) |
+| `ExpressionEvaluator` | Controller | A compiled expression and a record, out comes a value | **evaluates at any node, and needs no record when that node's subtree is constant** (§6). Built per compiled expression and reused across records, because it owns its operand stack — a scan should not allocate one per record. That is a scratch buffer and not state: nothing survives a call, and like everything else over one table it is not for two threads at once (ADR-41) |
+| `EvaluationContext` | Entity | What an evaluation needs that the compiled expression does not carry | the record, where the cursor is, how many records there are, the date policy, and a delegate that reads a memo. The record is **optional**, because §6's constant-subtree case has none |
+| `ExpressionOptions` | Entity | The date picture and the century policy | ADR-42's two settings, explicit. The default infers no century at all, so the reference's clock read is unreachable unless a caller asks for it |
 | `ExpressionValueSource` | Controller | `IKeyValueSource` over an evaluator | the seam of §5 |
 | `SeekConverter` *(changed)* | Entity | The tag's key kind, length and pad, from a compiled expression | absorbs `KeyTypeResolver`; keeps the bare-field shortcut as a fast path |
 
@@ -410,6 +455,7 @@ its step's decision, not this one's.
 
 | Seam | Interface | Faked how | Used to test |
 |---|---|---|---|
+| the fields an expression names | `IFieldMetadata` | a hand implementation over a list of declared fields | **the parser at layer 1** — a field's loader row is chosen from its type, so parse shape over fields is testable with no table, no file and no record anywhere near it |
 | the record under an expression | `RecordBuffer` | built in memory from a field list | evaluation over *fields*, layers 1–2 — needed for the typed pairs, currency, datetime, memo and null, and for nothing else, since the kernels are tested over constants |
 | the value behind a key | `IKeyValueSource` | hand implementation returning a fixed `ExpressionValue` | **axis B's gate itself** — a value the C library recorded, converted and compared to stored key bytes, with the evaluator out of the circuit |
 | the C library's own answers | the generator's dump | committed corpus file | the gate |

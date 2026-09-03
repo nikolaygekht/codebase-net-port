@@ -1,49 +1,62 @@
 using System.Buffers.Binary;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.Expressions;
 
 namespace CodeBase.Net.Cdx;
 
 /// <summary>
 /// Where the value behind a tag's key comes from, for one record.
 ///
-/// This is the seam the expression engine plugs into, and the only one it needs. Deriving a key is
-/// two steps — find the value, then weigh it — and only the first depends on what the key expression
-/// says. Today the expression is always a bare field name, so the value is the field's stored bytes;
-/// step 008 adds an implementation that evaluates an expression instead, and nothing above this
-/// interface changes.
-///
-/// The value is handed over in its **stored** form rather than as a decoded number, because that is
-/// the form the transforms take and the form an expression result arrives in too.
+/// Deriving a key is two steps — find the value, then weigh it — and only the first depends on what
+/// the key expression says. The value is handed over [b]typed[/b] rather than as stored bytes,
+/// because an expression result has no field to look its interpretation up from: the bytes of
+/// [c]UPPER(NAME)+STR(ID)[/c] are not any field's bytes, and the same eight bytes mean a different
+/// key depending on whether they are a number, a date or text.
 /// </summary>
 internal interface IKeyValueSource
 {
     /// <summary>
-    /// Returns the bytes the key is built from, for a record.
+    /// Returns the value the key is built from, for a record.
     /// </summary>
     /// <param name="record">The record to read.</param>
-    /// <returns>The value's stored bytes.</returns>
-    ReadOnlySpan<byte> Read(RecordBuffer record);
+    /// <returns>The value.</returns>
+    ExpressionValue Read(RecordBuffer record);
 }
 
 /// <summary>
-/// The value behind a key when the key expression is a bare field name.
+/// The value behind a key, evaluated from the tag's compiled expression.
+///
+/// One implementation serves every tag, a bare field name included, because a bare field name is an
+/// expression the engine compiles to a single loader node. Keeping a separate path for it would mean
+/// two ways of reading the same thing and two places for them to disagree.
 /// </summary>
-/// <remarks>
-/// The whole implementation, because a bare field reference is not a computation: the value is the
-/// bytes already sitting in the record.
-/// </remarks>
-internal sealed class FieldValueSource : IKeyValueSource
+internal sealed class ExpressionValueSource : IKeyValueSource
 {
-    private readonly FieldDefinition field;
+    private readonly ExpressionEvaluator evaluator;
+    private readonly EvaluationContext context;
 
     /// <summary>
-    /// Initializes a new instance reading one field.
+    /// Initializes a new instance over a compiled expression.
     /// </summary>
-    /// <param name="field">The field the tag is built on.</param>
-    public FieldValueSource(FieldDefinition field) => this.field = field;
+    /// <param name="compiled">The tag's compiled key expression.</param>
+    /// <param name="context">
+    /// What the evaluation needs besides the record. Its record is replaced per call, so one of
+    /// these serves a whole scan.
+    /// </param>
+    public ExpressionValueSource(CompiledExpression compiled, EvaluationContext context)
+    {
+        evaluator = new ExpressionEvaluator(compiled);
+        this.context = context;
+    }
 
     /// <inheritdoc/>
-    public ReadOnlySpan<byte> Read(RecordBuffer record) => record.Field(field);
+    /// <value>
+    /// The deletion flag comes off the record rather than from the context, because it is the one
+    /// record-dependent thing a key may legally read: it is the same answer every time for the same
+    /// record, which is what a stored key needs.
+    /// </value>
+    public ExpressionValue Read(RecordBuffer record) =>
+        evaluator.Evaluate(context with { Record = record, Deleted = record.Deleted });
 }
 
 /// <summary>
@@ -72,6 +85,52 @@ internal static class RecordKey
     public static int Write(
         SeekConverter converter, IKeyValueSource source, RecordBuffer record, Span<byte> destination) =>
         WriteValue(converter, source.Read(record), destination);
+
+    /// <summary>
+    /// Writes the key a tag holds for an evaluated value.
+    /// </summary>
+    /// <param name="converter">The tag's resolved converter.</param>
+    /// <param name="value">The value the tag's expression produced.</param>
+    /// <param name="destination">Where to write, at least the tag's key length.</param>
+    /// <returns>How many bytes were written.</returns>
+    /// <value>
+    /// The build form, and the one an expression tag needs. It differs from the byte form below in
+    /// three ways, and each is something a bare field never had: the value can be absent, which
+    /// spends a leading byte; a trimmed result carries zero bytes where its trailing characters were,
+    /// which become blanks here; and what transform to use comes from the value's own type rather
+    /// than from a field's declared one.
+    /// </value>
+    public static int WriteValue(
+        SeekConverter converter, ExpressionValue value, Span<byte> destination)
+    {
+        Span<byte> key = destination[..converter.KeyLength];
+
+        if (converter.HasNullIndicator)
+        {
+            if (value.IsNull)
+            {
+                key.Clear();
+                return key.Length;
+            }
+
+            key[0] = 0x80;
+            key = key[1..];
+        }
+
+        if (converter.Kind == KeyKind.CollatedCharacter)
+        {
+            return CollatedKey.Write(
+                value.Bytes,
+                CollationWeights.TableFor(converter.Collation, converter.CodePage),
+                CollationWeights.ExpansionsFor(converter.Collation, converter.CodePage),
+                includeTails: true,
+                key);
+        }
+
+        return ExpressionKey.Write(
+            value, converter.Compiled.HasTrim, withIndicator: false, key)
+            + (converter.HasNullIndicator ? 1 : 0);
+    }
 
     /// <summary>
     /// Writes the key a tag holds for a value already in its stored form.

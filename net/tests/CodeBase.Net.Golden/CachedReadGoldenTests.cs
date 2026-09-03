@@ -150,9 +150,6 @@ public sealed class CachedReadGoldenTests
 
         foreach (Tag tag in open.Tags)
         {
-            if (!KeysABareField(tag, open))
-                continue;
-
             open.SelectTag(tag);
             seen.Add($"--- {tag.Name}");
             seen.AddRange(Walk(open));
@@ -198,9 +195,6 @@ public sealed class CachedReadGoldenTests
 
         foreach (Tag tag in open.Tags)
         {
-            if (!KeysABareField(tag, open))
-                continue;
-
             // Every value the tag holds, sought by its own text, which is the case a caller writes
             // and the one that exercises the padded comparison as well.
             open.SelectTag(tag);
@@ -225,22 +219,4 @@ public sealed class CachedReadGoldenTests
         return seen;
     }
 
-    /// <summary>Answers whether the tag's key expression is a bare field name of the table.</summary>
-    /// <param name="tag">The tag whose expression is examined.</param>
-    /// <param name="table">The table the tag belongs to, whose fields the expression is matched against.</param>
-    /// <returns>[c]true[/c] when the expression names a field, so the tag can be selected today.</returns>
-    private static bool KeysABareField(Tag tag, Table table)
-    {
-        // ADR-28: a tag whose expression is anything else cannot be typed until the expression
-        // engine exists, and SelectTag throws. CDXEXPR is in the corpus so step 010 has an
-        // oracle to build against; its expression tags become selectable at sub-step 8, and
-        // this guard is deleted then -- see claude/dev/010-expr/PLAN.md.
-        foreach (FieldDefinition field in table.Fields)
-        {
-            if (string.Equals(field.Name, tag.Expression, StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-
-        return false;
-    }
 }

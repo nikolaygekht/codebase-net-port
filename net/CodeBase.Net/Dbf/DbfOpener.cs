@@ -253,7 +253,10 @@ internal sealed class DbfOpener
         // The resolver is asked only for a machine-collated tag, and only when its tag is opened, so a
         // tag whose expression this library cannot type does not stop the file from opening. It fails
         // when that tag is selected instead.
-        return IndexFileReader.Open(source, indexPath, header => KeyTypeResolver.PadByteFor(header, fields));
+        string alias = Path.GetFileNameWithoutExtension(indexPath);
+
+        return IndexFileReader.Open(
+            source, indexPath, header => KeyTypeResolver.PadByteFor(header, fields, alias));
     }
 }
 

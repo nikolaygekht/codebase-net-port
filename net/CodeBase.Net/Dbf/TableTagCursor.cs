@@ -1,4 +1,5 @@
 using CodeBase.Net.Cdx;
+using CodeBase.Net.Expressions;
 
 namespace CodeBase.Net.Dbf;
 
@@ -24,6 +25,8 @@ internal sealed class TableTagCursor
     private readonly TagCursor cursor;
     private readonly IReadOnlyList<FieldDefinition> fields;
     private readonly int codePage;
+    private readonly EvaluationContext evaluation;
+    private readonly string alias;
 
     private SeekConverter? converter;
     private IKeyValueSource? source;
@@ -37,25 +40,39 @@ internal sealed class TableTagCursor
     /// <param name="tag">The tag whose order to follow.</param>
     /// <param name="fields">The fields of the table, which say what the tag's keys are made of.</param>
     /// <param name="codePage">The table's code page, which says which weights a collation means.</param>
+    /// <param name="evaluation">What evaluating the tag's expression needs besides the record.</param>
+    /// <param name="alias">The name a field reference in the expression may be qualified by.</param>
     /// <exception cref="CodeBaseException">
     /// The tag's key expression is not one this library can type, so its keys cannot be padded correctly.
     /// </exception>
-    public TableTagCursor(Tag tag, IReadOnlyList<FieldDefinition> fields, int codePage)
+    public TableTagCursor(
+        Tag tag,
+        IReadOnlyList<FieldDefinition> fields,
+        int codePage,
+        EvaluationContext evaluation,
+        string alias)
     {
         this.tag = tag;
         this.fields = fields;
         this.codePage = codePage;
+        this.evaluation = evaluation;
+        this.alias = alias;
 
-        // Asking for the pad byte here is the point rather than a side effect: it is resolved on first
-        // use (ADR-28), and a tag this library cannot type has to be refused when a caller asks to use
-        // the tag — not part-way through a walk, when the first leaf block happens to be decoded.
-        _ = tag.Inner.PadByte;
+        // Resolving the converter here is the point rather than a side effect. It compiles the tag's
+        // key expression, and a tag whose expression this library cannot read has to be refused when
+        // a caller asks to use the tag — not part-way through a walk, when the first leaf block
+        // happens to be decoded or the first key happens to be built. It subsumes the pad byte, which
+        // used to be forced here for the same reason and comes off the same compile now.
+        _ = Converter;
 
         cursor = tag.Inner.OpenCursor();
     }
 
     /// <summary>Gets the tag being followed.</summary>
     public Tag Tag => tag;
+
+    /// <summary>Gets the tag's compiled key expression, which resolving the converter produced.</summary>
+    public CompiledExpression Compiled => Converter.Compiled;
 
 
     /// <summary>Gets a value indicating whether a search is running that Next can continue.</summary>
@@ -115,9 +132,12 @@ internal sealed class TableTagCursor
                 break;
 
             case KeyKind.CollatedCharacter:
-                // A whole-key search weighs the value at the field's full width, padding first, so
-                // that its tails land where a stored key's do.
-                Span<byte> padded = stackalloc byte[resolved.KeyLength / 2];
+                // A whole-key search weighs the value at the expression's own width, padding first,
+                // so that its tails land where a stored key's do. The width is the expression's
+                // result length and not half the key length: those two agree only because a
+                // collation that adds one byte per character doubles a bare field's width, and an
+                // expression's key length is its own arithmetic.
+                Span<byte> padded = stackalloc byte[resolved.Compiled.Length];
                 padded.Fill((byte)' ');
                 value[..Math.Min(value.Length, padded.Length)].CopyTo(padded);
                 length = CollatedKey.Write(
@@ -234,9 +254,9 @@ internal sealed class TableTagCursor
     }
 
     private SeekConverter Converter =>
-        converter ??= SeekConverter.For(tag.Inner.Header, fields, codePage);
+        converter ??= SeekConverter.For(tag.Inner.Header, fields, codePage, evaluation.Options, alias);
 
-    private IKeyValueSource Source => source ??= new FieldValueSource(Converter.Field!);
+    private IKeyValueSource Source => source ??= new ExpressionValueSource(Converter.Compiled, evaluation);
 
     private byte[] Buffer => buffer ??= new byte[Converter.KeyLength];
 

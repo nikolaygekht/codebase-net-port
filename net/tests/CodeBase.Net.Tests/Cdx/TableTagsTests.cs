@@ -419,14 +419,36 @@ public sealed class TableTagsTests
 
     [Trait("Layer", "Fault")]
     [Fact]
-    public void SelectTag_ATagWhoseExpressionCannotBeTypedIsRefusedWhenItIsUsed()
+    public void SelectTag_ATagWhoseExpressionIsNotABareFieldNameIsNowSelectable()
     {
-        // Refused at selection and not at open, so one exotic tag does not make a table unopenable
-        // (ADR-28). The table itself, and any other tag, stays perfectly usable.
+        // The line ADR-28 drew, and where it goes away. A tag keyed on a function used to be refused
+        // because nothing could work out what type its keys were; the expression engine works it out
+        // by compiling the expression, so the tag is ordinary now.
         (CodeBaseEngine engine, Table table) = IndexedTableImage.Open(
             ["ALPHA"],
             [("ALPHA", 1)],
             expression: "UPPER(TEXT)");
+
+        using (engine)
+        {
+            Action act = () => table.SelectTag(table.Tags[0]);
+
+            act.Should().NotThrow();
+            table.SelectedTag.Should().BeSameAs(table.Tags[0]);
+        }
+    }
+
+    [Trait("Layer", "Fault")]
+    [Fact]
+    public void SelectTag_ATagWhoseExpressionTheEngineCannotReadIsRefusedWhenItIsUsed()
+    {
+        // What is still refused is what the reference refuses too -- here a minus in front of a name,
+        // which is not a negation in this language. Refused at selection and not at open, so one
+        // unreadable tag does not make a table unopenable, and record order still works.
+        (CodeBaseEngine engine, Table table) = IndexedTableImage.Open(
+            ["ALPHA"],
+            [("ALPHA", 1)],
+            expression: "-TEXT");
 
         using (engine)
         {
@@ -435,7 +457,7 @@ public sealed class TableTagsTests
 
             Action act = () => table.SelectTag(table.Tags[0]);
 
-            act.Should().Throw<CodeBaseException>().WithMessage("*UPPER(TEXT)*");
+            act.Should().Throw<CodeBaseException>().WithMessage("*-TEXT*");
 
             // And record order still works, which is the point of refusing late.
             table.Top().Should().Be(GoResult.Ok);

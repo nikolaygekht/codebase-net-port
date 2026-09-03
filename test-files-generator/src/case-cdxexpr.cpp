@@ -307,7 +307,49 @@ static const EXPRCASE CONSTANTS[] =
    { "IIF(.F.,\"YES\",\"LONGER\")",  0 },
    { "\"AB\"+\"CD\"",                "concat" },
    { "\"AB  \"+\"CD\"",              "interior blanks kept" },
-   { "\"AB  \"-\"CD\"",              "interior blanks moved to the end" }
+   { "\"AB  \"-\"CD\"",              "interior blanks moved to the end" },
+   { "TRIM(\"AB  \")+\"CD\"",         "row 41: a trim anywhere makes the next + move blanks" },
+
+   /* Second run, 2026-09-03. The resolution gate found 46 table rows that are
+    * reachable and that nothing above reached, so the row a wrong overload
+    * would have been compared against did not exist. These close that, and
+    * every one of them is here to pin one row index. */
+
+   /* The long spellings of the logical constants and of negation: three rows
+    * the short forms never reach, because lookup matches on name length. */
+   { ".TRUE. .AND. .T.",             "row 30, the long spelling" },
+   { ".FALSE. .OR. .T.",             "row 32" },
+   { "! .T.",                        "row 35, negation spelled with a bang" },
+
+   /* A run of one variadic operator collapses into a single node with an
+    * operand per term. Nothing above has a run longer than two, so numParms
+    * was never anything but 2 in this dump. */
+   { ".T. .AND. .F. .AND. .T.",      "three terms in one .AND. node" },
+   { ".T. .OR. .F. .OR. .T. .OR. .F.", "four terms in one .OR. node" },
+   { ".T. .AND. .F. .OR. .T. .OR. .F.", ".AND. binds tighter, so the .OR. run is three" },
+
+   /* Date arithmetic in the orders the d+n case above does not reach. */
+   { "1 + CTOD(\"01/15/00\")",       "row 43, numeric plus date" },
+   { "CTOD(\"01/15/00\") - CTOD(\"01/14/00\")", "row 48, date minus date is a count of days" },
+   { "CTOD(\"01/15/00\") - 1",       "row 49, date minus numeric is a date" },
+
+   /* The comparison rows for date-as-double and for timestamp that the four
+    * spellings above skip. */
+   { "CTOD(\"01/15/00\") <> CTOD(\"01/14/00\")", "row 54" },
+   { "CTOD(\"01/15/00\") <= CTOD(\"01/15/00\")", "row 71" },
+   { "DATETIME(2026,1,1) <> DATETIME(2020,1,1)", "row 57" },
+   { "DATETIME(2026,1,1) >= DATETIME(2020,1,1)", "row 65" },
+   { "DATETIME(2020,1,1) <= DATETIME(2026,1,1)", "row 73" },
+   { "DATETIME(2020,1,1) < DATETIME(2026,1,1)",  "row 95" },
+
+   /* The conditional's three non-string overloads, and the timestamp and date
+    * forms of the functions whose first row takes a stored date. */
+   { "IIF(.T.,1,2)",                 "row 129, numeric branches" },
+   { "IIF(.T.,CTOD(\"01/15/00\"),CTOD(\"01/14/00\"))", "row 130, date branches" },
+   { "IIF(.T.,.T.,.F.)",             "row 131, logical branches" },
+   { "TTOC(CTOD(\"01/15/00\"))",     "row 119, TTOC over a date-as-double" },
+   { "EMPTY(CTOD(\"01/15/00\"))",    "row 154" },
+   { "ASCEND(CTOD(\"01/15/00\"))",   "row 178" }
 };
 
 /* Axis A's remainder: the types no literal reaches, plus the field-side shapes
@@ -362,7 +404,50 @@ static const EXPRCASE FIELDEXPRS[] =
    { "K_DATE > CTOD(\"01/01/00\")",   "r4date promoted to r4dateDoub" },
    { "K_FLT > 0",                    "r4floatBin against a numeric literal" },
    { "K_TEXT > \"M\"",               "r4str, over a field" },
-   { "K_TEXT <= \"M\"",              0 }
+   { "K_TEXT <= \"M\"",              0 },
+
+   /* Second run, 2026-09-03 -- the rest of the rows the resolution gate found
+    * unreachable from this dump. See the note in CONSTANTS above. */
+
+   /* The binary float's own rows. Only H*n was here, so the seven comparisons,
+    * both other arithmetic rows and the division row were never chosen. The
+    * right operand is a literal throughout, which promotes to a float and
+    * keeps the arithmetic away from the field's extremes. */
+   { "K_FLT + 1",                    "row 45" },
+   { "K_FLT - 1",                    "row 50" },
+   { "K_FLT / 2",                    "row 103" },
+   { "K_FLT <> 1",                   "row 59" },
+   { "K_FLT >= 1",                   "row 67" },
+   { "K_FLT <= 1",                   "row 75" },
+   { "K_FLT = 1",                    "row 83" },
+   { "K_FLT < 1",                    "row 97" },
+   { "K_FLT * K_INT",                "row 25: the only promotion of an integer to a float" },
+
+   /* The stored-date overload of two functions, which a date-as-double
+    * argument walks straight past. */
+   { "TTOC(K_DATE)",                 "row 117" },
+   { "MONTH(K_DATE)",                "row 139" },
+
+   { "EMPTY(K_TS)",                  "row 153" },
+   { "EMPTY(K_LOG)",                 "row 155" },
+   { "K_LOG .AND. K_LOG .AND. K_LOG", "a three-term run over fields" },
+
+   /* Key conversion, one row per type. This is a fifth of the table and only
+    * its two character rows were reached. */
+   { "DESCEND(K_NUM)",               "row 157" },
+   { "DESCEND(K_DATE)",              "row 158: promoted, since no descend row takes a stored date" },
+   { "DESCEND(K_LOG)",               "row 159" },
+   { "DESCEND(K_TS)",                "row 160" },
+   { "DESCEND(K_INT)",               "row 161" },
+   { "DESCEND(K_CUR)",               "row 162" },
+   { "DESCEND(K_DBL)",               "row 165" },
+   { "ASCEND(K_NUM)",                "row 176" },
+   { "ASCEND(K_DATE)",               "row 177: ascend does have a stored-date row" },
+   { "ASCEND(K_LOG)",                "row 179" },
+   { "ASCEND(K_INT)",                "row 180" },
+   { "ASCEND(K_TS)",                 "row 181" },
+   { "ASCEND(K_CUR)",                "row 182" },
+   { "ASCEND(K_DBL)",                "row 183" }
 };
 
 /* Recorded for SHAPE only -- these read the system clock, so a recorded value

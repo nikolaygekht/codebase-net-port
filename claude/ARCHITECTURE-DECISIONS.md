@@ -1616,3 +1616,124 @@ meant discovering (b) in step 011, after the resolution gate had frozen the node
 it. The spec's §12 carries eight open questions; three want a generator case (a reflected comparison
 nested in an `.AND.`, an `H`-field comparison, and an OR range) and one records that `bmf4OrOt` was
 read for shape rather than transcribed. `ADR-11` and `ADR-23` are unaffected.
+
+---
+
+## ADR-47 — The scanner is table-driven, so the function table is transcribed before it · accepted
+
+**Date.** 2026-09-03.
+
+**Context.** [`dev/010-expr/PLAN.md`](dev/010-expr/PLAN.md) split step 010 with the lexer at sub-step
+2 and the function table at sub-step 3. Porting the lexer showed the order is backwards. The
+reference does not tokenize an operator and then look it up: `e4getOperator` hands the raw text to
+`e4lookupInFunctionArray` with a length of −1, which **prefix-matches it against `v4functions` rows
+36–106 in row order and returns the first match** (`e4parse.c:1195, 1226-1268`). Which of two
+overlapping spellings wins is therefore a property of the table, not a longest-match rule: `>=` beats
+`>` because row 60 precedes row 84, and `**` beats `*` because row 99 precedes row 100. The same is
+true of `.T.`, `.NOT.` and the rest, over rows 30–35.
+
+**Decision.** Sub-step 2 is **function table + lexer**, in that order; sub-step 3 is the parser. The
+scanner holds no operator names of its own and calls `FunctionTable.FindByPrefix` for every one of
+them. The transcription gate moves with the table and is now the step's first layer-4 gate.
+
+**Rejected — a scanner with its own small operator list, reconciled with the table at sub-step 3.**
+It is a second source of truth for exactly the fact `DESIGN.md` §2b says must have one, and it fails
+in a way no test would catch: a list that agrees with the table today keeps agreeing after a
+transcription slip, because both would be read from the same misreading.
+
+**Rejected — a context-free scanner that maximally munches a class of operator characters and lets
+the parser resolve it.** It is not the same language. Given `A <=> B` the reference matches `<=` at
+row 68 and then refuses `>` as the start of a value; maximal munch yields `<=>` and refuses somewhere
+else, with a different code. `DESIGN.md` §2b's "never accept a superset" rule cuts both ways —
+refusing differently is as wrong as accepting differently.
+
+**One transcription that looks like a bug and is kept.** `E4LAST_OPERATOR` is 106, two rows past the
+last real operator, so `CHR` and `DEL` are matched where an *operator* is expected (`e4expr.h:154`).
+Narrowing the band to 104 would make this port refuse text the reference accepts. Transcribed, and
+`ExpressionLexerTests` pins it so nobody tidies it away.
+
+**Consequences.** `PLAN.md`'s steps table and its first mutation now say sub-step 2.
+`PORTING-PLAN.md` §5's `EXPR` row advances. The scanner takes two inputs the design had not named —
+the set of table aliases a field may be qualified by, and whether the table holds long field names —
+because both are read at scan time in the reference (`e4parse.c:2357-2417`); with no alias known, a
+qualified name scans exactly as the reference scans it, which is why the default is empty rather than
+a refusal. Three spec corrections came out of the same pass and are in
+[`specs/EXPRESSIONS.md`](specs/EXPRESSIONS.md) §3 and §4.
+
+## ADR-48 — An expression's type set is derived from what the reader admits, not chosen · accepted
+
+**Context.** Step 010 had to decide which types the expression engine carries. Listing them invites
+both errors at once: carrying a type nothing can produce, and collapsing two that look alike.
+
+**Decision.** The set is a **closure, not a preference**. A value enters an expression through
+exactly three doors — a field the reader opens, a literal the scanner builds, or a function's return
+over those — so the set is fixed by `DBF-READ`'s `ReadableTypes` and by nothing this step decides.
+It closes to **ten**, and `ExpressionValue` has exactly those cases. `r5wstr`, the OLE-DB structs,
+the sized integers and `r4dateTimeMilli` are **unreachable rather than excluded**: their field types
+are refused one layer below, so no expression can produce one and code for one would be dead.
+
+**Why.** If `DBF-READ` ever widens, the closure recomputes and the engine grows by construction.
+Deriving it also forced the two pairs into the open — `r4num`/`r4numDoub` and `r4date`/`r4dateDoub`
+— which a careless design collapses. They are not exotic: they are two states of one ordinary field,
+selected by what reads it, and §9.3 gives each half a **different key route**. Collapsing them is not
+a scope reduction, it is a wrong key.
+
+**Consequence.** The resolution gate's row coverage reports the unreachable rows as a declared list
+with a reason — 39 of the 49 are exactly this closure's complement.
+
+## ADR-49 — Key-legal and filter-legal are different sets, and a non-deterministic key is refused · accepted
+
+**Context.** `DATE()`, `TIME()`, `RECNO()` and `RECCOUNT()` are legal in a filter and meaningless in
+a stored key: a key built from the clock changes value every time it is evaluated, and one built from
+the cursor's position depends on where the cursor was. The reference does not forbid them in a tag
+expression; it simply produces a tag nobody can maintain.
+
+**Decision.** A compiled expression knows whether it is **key-legal**, and a tag whose expression is
+not is **refused when the tag is selected**, with a message naming which function made it so. The
+same expression evaluates normally in a filter.
+
+**Why.** This is a divergence from the reference and it is the safe direction: refusing is visible at
+the moment a caller can act on it, while the reference's silence produces an index that disagrees
+with itself between two runs. Naming the function is what makes it actionable — a caller who sees
+`RECNO` knows what to change.
+
+**Consequence.** No corpus case can gate it, because the generator would have to build a tag the
+reference itself cannot maintain. It is asserted at layer 2 over a compile instead.
+
+## ADR-50 — Prefix equality follows the reference, not Visual FoxPro · accepted
+
+**Context.** `=` on strings compares only the common prefix (`u4memcmp` over `min(len(a),len(b))`),
+so the reference says `"AAAA" = "AAA"` **and** `"AAA" = "AAAA"` are both true. Visual FoxPro with
+`SET EXACT OFF` runs to the end of the **right** operand, so only the first is true. Witnessed in
+`corpus/vfp/VFPFVAL.vfp.dump.txt`, and the reverse of what the source's own note at
+`e4parse.c:59-62` claims.
+
+**Decision.** Replicate the reference. Recorded as a divergence from the compatibility target rather
+than as a bug in either.
+
+**Why.** The stored keys in every corpus index were built by the reference, and a filter's record set
+has to agree with the index it is read through. Following VFP here would make this port disagree with
+the files it is reading.
+
+**Consequence, and it is not symmetrical.** The same asymmetry appears in the ordering operators and
+in the opposite direction from what anyone would guess: the width tie-break is set only on the two
+**named head** rows, so `>` and `<` break a tie on width and `>=` and `<=` do not. `"AAAA" > "AAA"`
+and `"AAAA" <= "AAA"` are both true. `EXPRESSIONS.md` §8 has the table; two records in the whole
+corpus distinguish it.
+
+## ADR-51 — The expression engine is internal, except the one setting a caller must be able to name · accepted
+
+**Context.** Step 010's design said the engine would be internal and that the only visible change
+would be `table.Tags["X"]` no longer throwing. ADR-42 then required the engine to take an explicit
+date picture and century policy — which a caller has no way to supply through an internal type.
+
+**Decision.** The engine stays internal. **`ExpressionOptions` is public**, and settable on
+`CodeBaseEngine`; everything else — the parser, the resolver, the evaluator, the compiled form —
+remains internal until `QUERY` needs a filter argument, which is that step's decision.
+
+**Why.** Without it ADR-42's default is not a default but a wall: a tag over `CTOD` is refused and
+nothing a caller can write will make it work. One small type with two properties and two presets is
+the smallest surface that makes the policy sayable.
+
+**Consequence.** Its documentation is now API documentation and follows docgen's rules, and the
+default it advertises — infer no century — is the behaviour most callers will meet first.

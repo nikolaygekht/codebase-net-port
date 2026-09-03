@@ -118,6 +118,95 @@ internal static class FoxDate
     }
 
     /// <summary>
+    /// Converts a Julian day number back to the stored text of a date.
+    /// </summary>
+    /// <param name="julian">The Julian day number.</param>
+    /// <param name="into">Where to write, of which the first eight bytes are used.</param>
+    /// <value>
+    /// A Julian day of zero or less writes eight blanks, which is how the C library renders a blank
+    /// date and how it renders an unreadable one too (D4DATE.C:370-373) — the two are distinct going
+    /// in and the same coming out. The year is found by dividing by the mean year length and then
+    /// corrected in both directions, exactly as the reference does, because the estimate can land on
+    /// either side.
+    /// </value>
+    public static void FromJulian(long julian, Span<byte> into)
+    {
+        if (julian <= 0)
+        {
+            into[..Length].Fill((byte)' ');
+            return;
+        }
+
+        long totalDays = julian - JulianAdjustment;
+        int year = (int)((double)totalDays / 365.2425) + 1;
+
+        int dayOfYear = (int)(totalDays - YearToDays(year));
+        if (dayOfYear <= 0)
+        {
+            year--;
+            dayOfYear = (int)(totalDays - YearToDays(year));
+        }
+
+        int daysInYear = IsLeapYear(year) ? 366 : 365;
+        if (dayOfYear > daysInYear)
+        {
+            year++;
+            dayOfYear -= daysInYear;
+        }
+
+        (int month, int day) = MonthAndDay(year, dayOfYear);
+
+        WriteDigits(into, 0, 4, year);
+        WriteDigits(into, 4, 2, month);
+        WriteDigits(into, 6, 2, day);
+    }
+
+    /// <summary>
+    /// Splits a day of the year into its month and its day of the month.
+    /// </summary>
+    /// <param name="year">The year, which decides whether February has a twenty-ninth.</param>
+    /// <param name="dayOfYear">The day of the year, counting from one.</param>
+    /// <returns>The month and the day of the month, both counting from one.</returns>
+    /// <value>
+    /// The inverse of the day-of-year sum, written as the inverse rather than as a table of its own
+    /// so that the two cannot drift apart. The C library's own version of this is declared and not
+    /// defined in this source drop, so the corpus is what says it is right.
+    /// </value>
+    public static (int Month, int Day) MonthAndDay(int year, int dayOfYear)
+    {
+        int leap = IsLeapYear(year) ? 1 : 0;
+
+        for (int month = 12; month >= 1; month--)
+        {
+            int before = MonthTotals[month] + (month <= 2 ? 0 : leap);
+            if (dayOfYear > before)
+                return (month, dayOfYear - before);
+        }
+
+        return (1, dayOfYear);
+    }
+
+    /// <summary>
+    /// Answers whether a year has a twenty-ninth of February, the way the C library asks.
+    /// </summary>
+    /// <param name="year">The year.</param>
+    /// <returns>True where the year is leap.</returns>
+    public static bool IsLeapYear(int year) =>
+        (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+
+    /// <summary>
+    /// Writes a number right-aligned and zero-filled, as the C library's own conversion does.
+    /// </summary>
+    private static void WriteDigits(Span<byte> into, int offset, int count, int value)
+    {
+        for (int i = offset + count - 1; i >= offset; i--)
+        {
+            into[i] = (byte)('0' + (value % 10));
+            value /= 10;
+        }
+    }
+
+    /// <summary>
     /// Counts the days before the given year, treating blanks in the calendar as the C library does.
     /// </summary>
     private static long YearToDays(int year)

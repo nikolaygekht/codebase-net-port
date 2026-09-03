@@ -56,17 +56,27 @@ public sealed class KeyTypeResolverTests
     }
 
     [Fact]
-    public void PadByteFor_AnExpressionThatIsNotAFieldNameIsRefusedAndQuoted()
+    public void PadByteFor_AnExpressionThatIsNotAFieldNameIsCompiled()
     {
-        // The line ADR-28 draws: this is the case that waits for the expression engine, and the message
-        // has to say which expression so a caller knows which tag to avoid.
-        IndexHeader header = Header("UPPER(NAME)", keyLength: 20);
+        // The line ADR-28 drew, and this is where it goes away. The padding follows from the key's
+        // type, and the type of a key is the type of the expression that builds it, so an expression
+        // that is not a field name has a pad byte like any other -- worked out by compiling it.
+        KeyTypeResolver.PadByteFor(Header("UPPER(NAME)", keyLength: 20), [Field("NAME", 'C')])
+            .Should().Be(KeyPadding.Space);
 
-        Action act = () => KeyTypeResolver.PadByteFor(header, [Field("NAME", 'C')]);
+        // And one whose result is not text pads with NUL, however textual its operand was.
+        KeyTypeResolver.PadByteFor(Header("VAL(NAME)", keyLength: 8), [Field("NAME", 'C')])
+            .Should().Be(KeyPadding.Nul);
+    }
 
-        act.Should().Throw<CodeBaseException>()
-            .Where(e => e.Code == ErrorCode.NotSupported)
-            .WithMessage("*UPPER(NAME)*");
+    [Fact]
+    public void PadByteFor_AnExpressionTheEngineCannotReadIsStillRefused()
+    {
+        // What remains refused is what the reference refuses too. The message names the expression,
+        // because that is what a caller has to act on.
+        Action act = () => KeyTypeResolver.PadByteFor(Header("-NAME", keyLength: 20), [Field("NAME", 'C')]);
+
+        act.Should().Throw<CodeBaseException>().WithMessage("*-NAME*");
     }
 
     [Fact]
@@ -80,20 +90,18 @@ public sealed class KeyTypeResolverTests
     }
 
     [Theory]
-    [InlineData('L')]
-    [InlineData('M')]
-    [InlineData('G')]
-    public void PadByteFor_AFieldTypeWithNoOrdinaryKeyIsRefused(char fieldType)
+    // A logical key is one letter and is never padded; a memo or general operand is text, and text
+    // pads with blanks. All three were refused before the expression engine could type them, and
+    // the corpus has a tag over a logical expression whose key is one byte, so the refusal was the
+    // gap rather than the answer.
+    [InlineData('L', KeyPadding.Nul)]
+    [InlineData('M', KeyPadding.Space)]
+    [InlineData('G', KeyPadding.Space)]
+    public void PadByteFor_TheThreeTypesThatUsedToBeRefusedNowHaveAPadByte(char fieldType, byte expected)
     {
-        // A logical, memo or general field is not something the C library builds an ordinary key from.
-        // Guessing a pad byte for one would be worse than saying so.
         IndexHeader header = Header("KEYFIELD", keyLength: 8);
 
-        Action act = () => KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", fieldType)]);
-
-        act.Should().Throw<CodeBaseException>()
-            .Where(e => e.Code == ErrorCode.NotSupported)
-            .WithMessage($"*'{fieldType}'*");
+        KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", fieldType)]).Should().Be(expected);
     }
 
     private static IndexHeader Header(string expression, int keyLength, string collation = "") =>

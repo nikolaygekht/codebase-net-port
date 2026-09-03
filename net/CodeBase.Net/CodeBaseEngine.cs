@@ -1,5 +1,6 @@
 using System.Text;
 using CodeBase.Net.Dbf;
+using CodeBase.Net.Expressions;
 using CodeBase.Net.IO;
 
 namespace CodeBase.Net;
@@ -48,6 +49,19 @@ public sealed class CodeBaseEngine : IDisposable
     /// registered for those tables. See ADR-17.
     /// </value>
     public Encoding? DefaultEncoding { get; set; }
+
+    /// <summary>
+    /// Gets or sets the date picture and century policy expressions are read under.
+    /// </summary>
+    /// <value>
+    /// The reference implementation takes both implicitly — the picture from a compile-time switch
+    /// and the century from a read of the system clock — so a two-digit year meant one thing in 1999
+    /// and another now. This library makes them a choice, and the default infers no century at all,
+    /// which means a tag whose expression reads a two-digit year is refused rather than keyed
+    /// differently on a different machine. Set this to reproduce a particular build's answers. See
+    /// ADR-42.
+    /// </value>
+    public ExpressionOptions ExpressionOptions { get; set; } = ExpressionOptions.Invariant;
 
     /// <summary>
     /// Gets or sets which files may have their blocks kept in memory between reads.
@@ -101,7 +115,7 @@ public sealed class CodeBaseEngine : IDisposable
     {
         ObjectDisposedException.ThrowIf(closed, this);
 
-        Table table = new(path, opener.Open(path), DefaultEncoding, Forget);
+        Table table = new(path, opener.Open(path), DefaultEncoding, ExpressionOptions, Forget);
         open.Add(table);
         return table;
     }

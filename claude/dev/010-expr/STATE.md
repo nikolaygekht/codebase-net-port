@@ -1,8 +1,8 @@
 # 010-expr — state
 
-**Updated:** 2026-08-29 · **sub-step 1 of 8 is done, and sub-step 5b now has its oracle too.** The
-step is designed ([`DESIGN.md`](DESIGN.md)), planned ([`PLAN.md`](PLAN.md)) and has both oracles in
-the corpus. **No C# of the expression engine exists.** The **second oracle** (Visual FoxPro 9 in a
+**Updated:** 2026-09-03 · **sub-step 1 of 8 is done, sub-step 5b has its oracle, and the design now
+carries the optimizer's contract.** The step is designed ([`DESIGN.md`](DESIGN.md)), planned
+([`PLAN.md`](PLAN.md)) and has both oracles in the corpus. **No C# of the expression engine exists.** The **second oracle** (Visual FoxPro 9 in a
 VM, **ADR-44**) has been **run**, and its output is committed in `net/corpus/vfp/`.
 
 ## Where the sub-steps stand
@@ -86,6 +86,41 @@ Sub-steps 2-5 never waited on it, and still do not.
   the one place the suite currently averts its eyes, and it exists only because `CDXEXPR` had to land
   before the engine that reads its tags.
 
+## What `QUERY-OPTIMIZER.md` changed in this step (2026-09-03)
+
+[`specs/QUERY-OPTIMIZER.md`](../../specs/QUERY-OPTIMIZER.md) was written before sub-step 2 and read
+back against this step's design. It **corrected one thing and added three**, all in `DESIGN.md` §6
+(new) and §2b, mirrored in `PLAN.md`'s sub-steps 3, 4, 5 and 8.
+
+**The correction, which stands on its own.** `DESIGN.md` §2b said a promotion would be "wrapping a
+child in a conversion node". It is not: all six are an in-place rewrite of the producer's row and
+length (`e4parse.c:227-289`), so **node count is invariant under promotion**. A wrapper node would
+have failed `PLAN.md` sub-step 4's own gate, which is a *sequence* equality against the C's `E4INFO`
+array — so this was a contradiction inside the step, independent of `QUERY`. A mutation now proves
+it: wrap one promotion, and the resolution gate must redden on sequence length.
+
+**Why the optimizer cares about the same fact.** `e4isTag` (`r4log.c:61-255`) matches a subexpression
+to a tag by comparing node counts first, then rows, tolerating a differing row **only when both are
+field loaders** (`r4log.c:234-236`) — and the six promotions target exactly the field-loader rows
+(6, 8, 18, 19, 25) plus `E4FLOAT` for the constant case. Row-rewrite promotion and that exemption are
+a matched pair. With wrapper nodes, `K_NUM > 0` would never match a tag on `K_NUM`, and every
+promoted comparison would silently fall back to scanning.
+
+**The three additions**, all cheap now and expensive after sub-step 4 freezes the node shape:
+
+| # | Addition | Sub-step |
+|---|---|---|
+| 1 | `CompiledExpression` **retains** the node table — row, result type, declared length, parameter count, subtree size, field. The first three the resolution gate already needs; the last three are free to keep and cannot be rebuilt later | 3-4 |
+| 2 | The evaluator answers **at a node index**, and needs **no record** when that subtree is constant; plus a per-node **is-constant** predicate mirroring `e4isConstant` | 5 |
+| 3 | A `Tag` **keeps** its `CompiledExpression` rather than discarding it once `SeekConverter` has taken kind, length and pad | 8 |
+
+One detail worth not rediscovering: the length the optimizer reads is the node's **declared** length,
+not the value's runtime width. `"SM"` is declared 2 against a `keyLen` of 20, and that is what makes
+`NAME = "SM"` a prefix range rather than a wrong equality.
+
+**Structural equality itself is step 011's**, as are the `BITMAP4` tree, the merge algebra, the four
+seek positions and the `F4FLAG` bitset. Nothing in them constrains this step.
+
 ## The shape of the gate, in one paragraph
 
 Two axes, because they fail differently and the reference splits there too — `expr4vary` returns a
@@ -104,6 +139,9 @@ a wrong kernel and a wrong transform cannot cancel. The mutations that prove the
 ADR-04, unblocks ADR-11).
 **ADR-45** — prefix `=` and division by zero replicate CodeBase; the oracle also corrects what the
 source says VFP does.
+**ADR-46** *(open)* — the optimizer's spec is written, and it leaves two decisions the port must
+make; it also records that `EXPR` constrains `QUERY` at sub-steps 3-4, which is why `DESIGN.md` §6
+exists.
 
 Decisions 1, 3, 5 and 8 of `DESIGN.md` remain ADR candidates for step close, following step 009's
 pattern of writing them at closeout.

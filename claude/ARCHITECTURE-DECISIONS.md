@@ -1556,3 +1556,63 @@ in value, which is a key-length question and belongs with the `.cdx` tag header,
 will read it. But `=` inside a stored `FOR` filter is evaluated by whoever opens the table, and the
 port cannot be two engines at once; the choice is which one it is consistently. ADR-43 already
 settles that CodeBase governs behaviour and VFP governs bytes, and nothing here is a byte.
+
+---
+
+## ADR-46 — The optimizer's spec is written, and it leaves two decisions the port must make · open
+
+**Date.** 2026-09-03.
+
+**Context.** [`specs/QUERY-OPTIMIZER.md`](specs/QUERY-OPTIMIZER.md) retires risk R13: the optimizer
+is now specified to the same `FILE.C:line` standard as the other seven, from `m4map.c`, `C4CONST.C`,
+`r4log.c`, `R4RELATE.H`, `F4FLAG.H` and `e4expr.h`. Writing it surfaced two things that are not
+spec facts but choices, and one that is neither.
+
+**The first choice — which tags the port's optimizer may use.** `e4isTag` (r4log.c:64-255) skips a
+tag unless it is unfiltered, not unique-or-candidate under the default `errDefaultUnique`, collated
+`none` or `machine`, and of key type `r4double`, `r4charBin` or `r4memoBin`. So **CodeBase's
+optimizer cannot use an integer, currency, datetime or `GENERAL` tag** — most of what steps 004-008
+built and gated. Its stated reason for the type refusal (r4log.c:71-91) is that "the constant '6'
+cannot be converted to an int which would be able to be looked up in the index file", which **is not
+true of this port**: typed seek by `int`, `double` and `DateOnly` landed in step 008, gated on 3364
+keys. Replicating the refusal buys a record set identical to CodeBase's for the same query, which is
+the only thing a compatibility gate can compare. Extending makes the optimizer work on the tags this
+port is best at, with no reference answer to check against — but the real check was never the
+reference: it is the full-scan equivalence gate, which `PORTING-PLAN.md` §5 already makes
+non-negotiable and always-on. Undecided, and it does not block the spec or step 010.
+
+**The second choice — what to do with a defect that inverts a range.** At m4map.c:216, 243, 251 and
+278 the reference writes `if ( tagPos = 1 && constPos == 0 )` — an **assignment**. C evaluates it as
+`tagPos = (constPos == 0)` and tests the result, so the condition is `constPos == 0` alone and the
+intended `tagPos == 1` half is discarded. The four sites are the operand-order reflections (`4 > K_NUM`
+meaning `K_NUM < 4`), added deliberately under four `AS Feb 19/13` comments, so the intent is not in
+doubt. The two readings agree whenever a comparison's operands are single nodes and diverge only for
+a comparison nested inside a larger expression. **C# will not compile the letter of it**, so this
+cannot be replicated by accident: the port must choose, and the recommendation in the spec (§10.1)
+is to implement the intent and gate both operand orders inside an `.AND.`. Getting it wrong swaps
+`lt` for `gt` and returns a **wrong record set**, which `CLAUDE.md` ranks above slowness — so this
+is R12's most concrete instance and wants a corpus case before the code exists.
+
+**And one thing that is not a choice: `EXPR` constrains `QUERY` more tightly than the plan said.**
+`PORTING-PLAN.md` §5 listed `EXPR` among `QUERY`'s dependencies as though an evaluator were the
+requirement. It is not. The optimizer never sees the filter text; it walks the compiled node array
+and (a) identifies operators by **row-index range** over `v4functions` — `E4COMPARE_START..END` and
+five sub-blocks, e4expr.h:155-157 — and (b) decides "is this subexpression some tag's key
+expression?" by comparing two compiled node arrays **node-for-node**, including a `memcmp` over
+`FIELD4` prefixes that `d4data.h:3602` orders a struct field to accommodate. Both are properties of
+the representation step 010 is fixing right now at sub-steps 3 and 4. `DESIGN.md:294` already
+preserves (a) by transcribing the table as data and gating resolved rows against the C's
+`functionI`, but as a side effect of the resolution gate rather than by intent; (b) has no
+counterpart yet — a typed AST has no `memcmp`, and the port must define structural equality over
+nodes, deciding where §6's promotion wrappers sit in it. Recorded here so that sub-step 3 knows it
+has a second consumer.
+
+**Rejected — deferring the spec until `EXPR` was done.** The ordering argument runs the other way.
+The spec's §3 is a contract *on* the expression engine's compiled form, and the cheapest moment to
+satisfy a contract is while the thing it constrains is still being designed. Deferring would have
+meant discovering (b) in step 011, after the resolution gate had frozen the node shape.
+
+**Consequences.** R13 retired in `PORTING-PLAN.md` §6.2. §5's `QUERY` row now says what `EXPR` owes
+it. The spec's §12 carries eight open questions; three want a generator case (a reflected comparison
+nested in an `.AND.`, an `H`-field comparison, and an OR range) and one records that `bmf4OrOt` was
+read for shape rather than transcribed. `ADR-11` and `ADR-23` are unaffected.

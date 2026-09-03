@@ -29,8 +29,11 @@ with `KEY-COLLATION.md` §3 for the key half and `DBF-FORMAT.md` §5 for the fie
 
 - **Writing** an index or a record from an expression — `WRITE`'s job. This step evaluates and keys;
   it never stores.
-- **`QUERY` itself.** This step gives it the evaluator and the filter vocabulary; decomposition into
-  a bitmap is step 011+ and needs `claude/specs/QUERY-OPTIMIZER.md`, which does not exist yet.
+- **`QUERY` itself.** This step gives it the evaluator, the filter vocabulary **and the compiled form
+  it walks** (§6); decomposition into a bitmap is step 011+, now specified in
+  [`specs/QUERY-OPTIMIZER.md`](../../specs/QUERY-OPTIMIZER.md). **§6's requirements are in this
+  step**, because sub-step 4's gate freezes the compiled form and reopening it later means redoing
+  that gate.
 - **Named calculations (`EXPR4CALC`) and report totals** — `E4CALC_FUNCTION`, `E4TOTAL` and
   `PAGENO` are the report writer's, which is out of scope project-wide (`PORTING-PLAN.md` §2.2).
 - **User-defined functions.** No hook exists and none is wanted.
@@ -129,7 +132,7 @@ Result type is the matched row's; result *lengths* follow §2.4 plus the functio
 FOX key transforms step 008 already ported (§9.3, §9.5, `Cdx/KeyTransform.cs`). They are worth naming
 because they look like a fifth of the work and are not.
 
-**Null propagation is part of the type system, not an afterthought** (§6): every kernel checks
+**Null propagation is part of the type system, not an afterthought** (`EXPRESSIONS.md` §6): every kernel checks
 `isNull`; arithmetic is null-in/null-out with value 0; a comparison whose operands disagree on
 nullness is false (true for `<>`) and marks its node null.
 
@@ -151,9 +154,24 @@ in-place double conversion is possible" (`e4parse.c:922-931`) are artefacts of a
 returning pointers, and carry nothing observable for a value-returning evaluator.
 
 **The resolver is a separate pass on purpose.** The parser cannot know types — a bare name is a field
-whose type comes from the *table* — and resolution **rewrites producer nodes** to insert §6's
-promotions, which on an AST is wrapping a child in a conversion node. Separating it means the pass
-that has to be checked row-for-row against `e4massage` is drivable at layer 1 with no file near it.
+whose type comes from the *table* — and resolution **rewrites producer nodes in place** to apply
+`EXPRESSIONS.md` §6's promotions. Separating it means the pass that has to be checked
+row-for-row against `e4massage` is drivable at layer 1 with no file near it.
+
+**A promotion changes a node's row and its length; it never adds a node.** All six are literally
+`pointers[parmPos]->functionI = <new row>` followed by `length[parmPos] = sizeof(double)` or
+`sizeof(float)` (`e4parse.c:227-289`), so **node count is invariant under promotion**: `K_NUM` alone
+is one node at row 9, and `K_NUM > 0` is the *same one node* at row 8 (`EXPRESSIONS.md` §7.7,
+witnessed by the oracle). An earlier draft of this document said promotion would be "wrapping a child
+in a conversion node". That is a different data structure and it breaks two things at once —
+[`PLAN.md`](PLAN.md) sub-step 4's gate is a **sequence** equality against the C's `E4INFO` array,
+which a wrapper lengthens; and §6 below has the optimizer matching a subexpression to a tag by node
+count *first*, so wrappers would make every promoted comparison silently unoptimizable. In place, then.
+
+Note which rows the six promotions target: `E4FIELD_DATE_D` (6), `E4FIELD_NUM_D` (8),
+`E4FIELD_INT_D` (18), `E4FIELD_CUR_D` (19), `E4FIELD_INT_F` (25) — all **field-loader rows**, and
+`E4FLOAT` (29) for the constant-only case, which is guarded on the producer already being `E4DOUBLE`
+(`e4parse.c:274-279`). §6 explains why that matters to something other than this pass.
 
 **Precedence is read from the ported function table, not hard-coded in the parser** — as the C does,
 comparing `v4functions[i].priority` on its operator stack. One source of truth, so a transcription
@@ -205,7 +223,7 @@ refusal has today.
 The first draft treated functions as one flat list. They are not, and the reference already says so
 in two ways:
 
-- **Parser-time constant folding** (§6, "Restrictions", `e4parse.c:17-32`): the 2nd and 3rd parameters
+- **Parser-time constant folding** (`EXPRESSIONS.md` §6, "Restrictions", `e4parse.c:17-32`): the 2nd and 3rd parameters
   of `STR`/`STRZERO`/`SUBSTR`, the 2nd of `LEFT`/`RIGHT`/`PADL`/`PADR`, the 1st of `SPACE`, and
   `DATETIME`'s hour-to-ms must be numeric **constants**, or it is `e4notConstant`. `RIGHT`'s first
   parameter must itself be a field or a constant. A TRIM-family result may not feed `SUBSTR`.
@@ -286,17 +304,91 @@ to `stackalloc byte[resolved.KeyLength / 2]`, inferring the value's natural widt
 expression key that inference is wrong — §9.1 makes the width `expr4len`, and only the *key* is
 `expr4len × (1 + perCharAdd)`. The width has to come from the compiled expression.
 
+## 6. What `QUERY` needs from the compiled form, and why it lands here
+
+[`specs/QUERY-OPTIMIZER.md`](../../specs/QUERY-OPTIMIZER.md) §3 is a contract **on this step's
+output**. The optimizer never sees filter text: it walks the compiled node array, and it asks three
+things of it that a value-returning evaluator alone cannot answer. All three are cheap now and
+expensive after sub-step 4's gate has frozen the node shape, which is the whole reason they are here
+and not in step 011.
+
+**1. A node table, retained and ordered.** Postfix, root last, and per node:
+
+| Field | C counterpart | Who else needs it |
+|---|---|---|
+| row index | `E4INFO.functionI` | the resolution gate — already required |
+| result type | `E4INFO.type` | the resolution gate — already required |
+| **declared** length | `E4INFO.len` | the resolution gate, and the length note under point 2 |
+| parameter count | `E4INFO.numParms` | the optimizer only |
+| subtree size | `E4INFO.numEntries` | the optimizer only |
+| the field it loads, and that field's table | `E4INFO.fieldPtr` | the optimizer only |
+
+The first three the resolution gate already demands. The last three cost nothing to keep and cannot
+be reconstructed later. So the table stops being an `internal` projection built for a test and
+becomes what `CompiledExpression` *is*.
+
+Operator classification comes free with the row index: the optimizer identifies a comparison as
+`functionI` in `E4COMPARE_START..E4COMPARE_END`, and each of the six operators as a sub-range
+(`QUERY-OPTIMIZER.md` §3.1). That works only because the table is transcribed **in row order** — a
+property Decision 3 and sub-step 4's gate already guarantee, as a side effect rather than on purpose.
+Now it is on purpose.
+
+**2. Evaluate a subexpression, at a node, without a record.** `const4get` (`C4CONST.C:971-996`) calls
+`expr4execute(expr, pos, &result)` — evaluate the subtree rooted at node `pos` — and for a constant
+operand there is no record to pass. So the evaluator takes a node index, and the record becomes
+optional. It also needs a per-node **is-this-constant** predicate: `e4isConstant` (`r4log.c:27-52`)
+answers from the node's row alone, except for `STOD`/`CTOD`, where it walks the subtree rejecting any
+field load or calculation row.
+
+**The length the optimizer takes is the node's declared length, not the value's.** `const4get` reads
+`info[pos].len`, and that number decides prefix behaviour: a character constant shorter than the
+tag's key length turns `>` into `>=` (`QUERY-OPTIMIZER.md` §4.4). `"SM"` has declared length 2
+against a `keyLen` of 20. Hand the optimizer a padded runtime width instead and every prefix range
+collapses into a wrong equality — which is Decision 8's consequence arriving from the key side.
+
+**3. Subexpression identity, node for node.** The optimizer decides "can a tag replace this
+subexpression?" by comparing two compiled node arrays backwards in lockstep — `e4isTag`
+(`r4log.c:61-255`), specified in `QUERY-OPTIMIZER.md` §3.3. In C the field half of that is a `memcmp`
+over a `FIELD4` prefix, which `d4data.h:3602` orders a struct field to accommodate; there is no
+`memcmp` here, so **structural equality has to be defined**, over the node table above plus field
+name, length, decimals, type, offset and owning file.
+
+Writing the comparison is step 011's. What is *this* step's is the property that makes it possible:
+`e4isTag` requires equal node counts and equal rows, **tolerating a differing row only when both are
+field loaders** (`r4log.c:234-236`) — and §2b showed the six promotions targeting exactly the
+field-loader rows. Row-rewrite promotion and that exemption are a matched pair. Wrapper nodes break
+both halves, which is the second reason §2b decides as it does.
+
+**4. And a tag must keep its compiled expression.** `e4isTag` iterates every tag of the table and
+compares against `tagFile->expr`, having first bound it to the data file (`expr4context`,
+`r4log.c:142`). `SeekConverter` compiles a tag's expression anyway, to get its kind, length and pad
+byte — so the requirement is only that sub-step 8 **keeps** it on the `Tag` rather than discarding it
+once those three are computed.
+
+**What is not owed here.** The `BITMAP4` tree, the constraint-merge algebra, the four seek positions,
+the `F4FLAG` bitset and the residual filter are all step 011's, and none of them constrains this
+step. Two facts from the optimizer spec are worth knowing while building, though, because they cost
+nothing and would otherwise look like accidents:
+
+- **`.AND.`/`.OR.` variadic flattening is right.** The C is variadic too (`numParms`), and a bitmap
+  branch's children map straight onto the flattened parameter list (`QUERY-OPTIMIZER.md` §4.1). The
+  §2b decision to flatten is aligned with the reference, not a divergence from it.
+- **`E4FLOAT` is missing from `e4isConstant`**, so a comparison against an `H` field is predicted
+  **never optimizable** (`QUERY-OPTIMIZER.md` §3.2, §12 item 3). Nothing to do about it here; it is
+  listed because `CDXEXPR` holds the corpus's only `H` field and the prediction is cheap to check
+  once `QUERY` exists.
+
 ## Classes
 
 | Class | Role | Responsibility | Notes |
 |---|---|---|---|
 | `ExpressionLexer` | Entity | Text to tokens | the `[…]`/`'…'`/`"…"` forms, `.AND.`-style operators, **no `{}` date literals** and **no unary minus outside a numeric literal** (§3) |
 | `ExpressionParser` | Entity | Tokens to a postfix node array by precedence (§4) | left-associative, `.AND.`/`.OR.` variadic |
-| `TypeResolver` | Entity | Assigns each node its row and its result type | §6's promotion-then-advance loop; where `e4typeSub` is raised. Exposes an `internal` **postfix projection** — per node, its row, result type and length — which is what the resolution gate compares against the C's `E4INFO` array |
+| `TypeResolver` | Entity | Assigns each node its row and its result type | the promotion-then-advance loop, **rewriting rows in place** (§2b); where `e4typeSub` is raised. Produces the **node table** of §6 — per node its row, result type, declared length, parameter count, subtree size and field — which is both what the resolution gate compares against the C's `E4INFO` array and what `QUERY` walks |
 | `ExpressionValue` | Entity | One evaluated value | a discriminated union over the ten types of §1, carrying `isNull` and a length — never `object` |
 | `FunctionTable` | Entity | The rows, as data | one row per `(name, code, prio, return, parameter types)`; the table is transcribed, not coded |
-| `CompiledExpression` | Entity | An immutable compiled expression | result type, key length, key-legal, referenced fields |
-| `ExpressionEvaluator` | Controller | A compiled expression and a record, out comes a value | holds no state between calls |
+| `CompiledExpression` | Entity | An immutable compiled expression | result type, key length, key-legal, referenced fields, **and §6's node table** — the postfix array is *retained*, not discarded once the resolver has run |
+| `ExpressionEvaluator` | Controller | A compiled expression and a record, out comes a value | holds no state between calls; **evaluates at any node, and needs no record when that node's subtree is constant** (§6) |
 | `ExpressionValueSource` | Controller | `IKeyValueSource` over an evaluator | the seam of §5 |
 | `SeekConverter` *(changed)* | Entity | The tag's key kind, length and pad, from a compiled expression | absorbs `KeyTypeResolver`; keeps the bare-field shortcut as a fast path |
 
@@ -599,6 +691,17 @@ rows no dump can reach.
 **Recorded as ADR-43.** It is a deliberate divergence, it changes what `Table.Tags` will open, and it
 makes VFP a second source of truth beside the C library.
 
+**12. The compiled form is `QUERY`'s interface, and it is frozen by this step.** §6 makes the
+retained node table, evaluate-at-a-node and the row-rewrite promotion of §2b part of this step's
+deliverable rather than step 011's. The reason is ordering, not ambition: sub-step 4's gate asserts
+our postfix sequence *equals* the C's `E4INFO` array, so the node shape is settled here whether or
+not anyone writes it down, and settling it wrongly costs that gate. Three of the six per-node fields
+are already required by the gate; the other three are free to keep and impossible to reconstruct.
+*Rejected —* leaving the node table `internal` to `TypeResolver` as a test artefact and rebuilding
+what `QUERY` needs in step 011: it is the same data, and the rebuild would have to re-derive subtree
+spans that the resolver knows for free. **See ADR-46**, which records the two decisions the optimizer
+spec left open and the finding that `EXPR` constrains `QUERY` at sub-steps 3-4 rather than later.
+
 ### Two semantic divergences that have to be decided, not implemented by accident
 
 Both are §14 risk 6 — behaviours the source documents as CodeBase-not-VFP — and both are
@@ -610,7 +713,11 @@ compares to the end of the right operand. `e4parse.c:59-62` claims the other one
 refutes it; see ADR-45. Recommendation: **replicate CodeBase**, because a `FOR` filter's semantics decide
 which records a tag contains and a stored index must agree with the engine that built it. It has a
 direct consequence for `QUERY`: `NAME = "SM"` is a **prefix range**, not an equality, and decomposing
-it as equality would silently lose records. *ADR candidate, and the one `QUERY` will lean on.*
+it as equality would silently lose records. **The optimizer corroborates this from the key side:**
+`bitmap4can` widens `>` to `>=` whenever a character constant is shorter than the tag's key length —
+"same as >= since a partial >" (`m4map.c:222-236`, `QUERY-OPTIMIZER.md` §4.4) — so the reference
+applies prefix semantics to range bounds and not only to `=`. **Recorded as ADR-45**, which also
+corrects what `e4parse.c:59-62` claims VFP does.
 
 **9. Division by zero yields 0.0, not an error** (row 102, `e4functi.c:753-756`). Recommendation:
 replicate, same reasoning, no exception. *Fold into 8.*

@@ -1,7 +1,12 @@
 # Project state
 
-**Updated:** 2026-08-29 · **the tree is clean and nothing is pushed.** The VFP oracle — its scripts
-in `test-files-generator/vfp/`, its output in `net/corpus/vfp/` — is committed together with the
+**Updated:** 2026-09-03 · **the tree is clean and two commits are unpushed.** The second of them is
+documents only — **`claude/specs/QUERY-OPTIMIZER.md`** is written, the eighth spec and the last gap,
+and it was read back against step 010's design: `claude/PORTING-PLAN.md` (**R13 retired**),
+`claude/ARCHITECTURE-DECISIONS.md` (**ADR-46**), `dev/010-expr/`'s `DESIGN.md` (**new §6**, and §2b
+corrected), `PLAN.md`, `STATE.md`, and this file. **No `.cs` file was touched.**
+**Before that:** the VFP oracle — its scripts
+in `test-files-generator/vfp/`, its output in `net/corpus/vfp/` — was committed together with the
 documentation that names it, across `CLAUDE.md`, `FOR-DEVELOPERS.md`, `.gitignore`,
 `ARCHITECTURE-DECISIONS.md` (**ADR-44**, **ADR-45**), `PORTING-PLAN.md`, `specs/EXPRESSIONS.md`,
 `specs/CDX-FORMAT.md`, `net/corpus/README.md`, `dev/010-expr/` and this file. **The oracle has been
@@ -202,11 +207,14 @@ dump a VFP-built CDX at all — with `*.vfp.dump.txt` beside them as provenance.
 Regeneration is byte-identical, index files included; the VFP corner's `.cdx` version counter is the
 one exception, and is assert-and-mask.
 
-**Documentation:** seven format specs, the porting plan, the development approach and the decision
-log. `EXPRESSIONS.md` gained §5.1 (the 35-function set and the absence of arithmetic) and §7.7 (the
-47 comparison rows), and had §7.3's date-format claim corrected — it said the default picture was set
-outside this source drop; it is at `C4CODE.C:1126`, which `API-ERRORS.md` had cited all along. `claude/specs/QUERY-OPTIMIZER.md` **does not exist** and is the gap that matters — the optimizer
-is the only in-scope subsystem with no source-cited spec (risk R13).
+**Documentation:** seven format specs **plus
+[`QUERY-OPTIMIZER.md`](claude/specs/QUERY-OPTIMIZER.md)**, the porting plan, the development approach
+and the decision log. `EXPRESSIONS.md` gained §5.1 (the 35-function set and the absence of
+arithmetic) and §7.7 (the 47 comparison rows), and had §7.3's date-format claim corrected — it said
+the default picture was set outside this source drop; it is at `C4CODE.C:1126`, which
+`API-ERRORS.md` had cited all along.
+**`claude/specs/QUERY-OPTIMIZER.md` now exists** (2026-09-03, 911 lines, 171 cited lines), so every
+in-scope subsystem has a source-cited spec and **risk R13 is retired**.
 
 ---
 
@@ -340,8 +348,15 @@ two being ADR-11's, which is unblocked but still open.
 
 ### Step 010 continues at sub-step 2 — where the next session starts
 
-**Sub-step 1 is done and the oracle is committed.** The next session opens
-[`PLAN.md`](claude/dev/010-expr/PLAN.md) at **sub-step 2, the lexer**, and works forward. Scope is
+**Sub-step 1 is done, the oracle is committed, and the design now carries the optimizer's contract.**
+The next session opens [`PLAN.md`](claude/dev/010-expr/PLAN.md) at **sub-step 2, the lexer**, and
+works forward. **Read `DESIGN.md` §6 before sub-step 3**: writing
+[`specs/QUERY-OPTIMIZER.md`](claude/specs/QUERY-OPTIMIZER.md) found that §2b's promotion-as-a-wrapper-node
+would have failed sub-step 4's own gate — promotion is an **in-place row rewrite** and node count is
+invariant under it (`e4parse.c:227-289`) — and added three things to the compiled form that are cheap
+before that gate freezes it and expensive after: the **retained node table** (six fields per node),
+**evaluate-at-a-node with no record for a constant subtree**, and a `Tag` that **keeps** its
+`CompiledExpression`. `dev/010-expr/STATE.md` has the detail; **ADR-46** has why it lands in this step. Scope is
 the **whole** function table, because `QUERY` needs the filter vocabulary anyway. Nothing about the
 engine has been written; every layer-4 gate it will be measured by already exists in the corpus.
 
@@ -362,12 +377,14 @@ that can turn an existing test red. The stop point after sub-step 5 is real.
 
 ### Two things that depend on nothing
 
-**Write `claude/specs/QUERY-OPTIMIZER.md`.** Sources: `R4RELATE.H:268-396`, `C4CONST.C`, `m4map.c`, to
-the same `FILE.C:line` standard as the existing seven. Must cover the `BITMAP4` tree and flags,
-`CONST4` range constraints, filter-to-bitmap decomposition, **which expression forms are optimizable and
-which are not**, leaf evaluation via tag seek, AND/OR/negation combination, and the fall-back-to-scan
-boundary. Prerequisite for `QUERY` (risk R13), and **the only in-scope subsystem with no source-cited
-spec**.
+**~~Write `claude/specs/QUERY-OPTIMIZER.md`~~ — done 2026-09-03.** R13 retired. What it leaves behind
+is three generator cases, listed in the spec's §12 and worth adding before any `QUERY` C#: a
+**reflected comparison nested in an `.AND.`** (`4 > K_NUM` beside `K_NUM < 4`, which is where the
+reference's `tagPos = 1` defect could invert a bound), an **`H`-field comparison** (predicted
+un-optimizable because `E4FLOAT` is missing from `e4isConstant`, and `CDXEXPR` has the corpus's only
+`H` field), and an **OR range** (`bmf4OrOt` was read for shape, not transcribed). **ADR-46** carries
+the two decisions it surfaced — whether the port keeps CodeBase's tag-eligibility refusals, and what
+to do about the defect — and the finding that `EXPR` constrains `QUERY` at sub-steps 3-4, not later.
 
 **Close ADR-23 if it is wanted.** Its own small step: add zlib to the generator, reconstruct the
 `c4compress` wrapper from the layout the reader pins down, add a case with `code4memoCompress` enabled

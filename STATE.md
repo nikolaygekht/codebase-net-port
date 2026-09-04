@@ -1,9 +1,10 @@
 # Project state
 
-**Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is **step 011
-closed — `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
-a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3260
-tests** (799 golden, 2461 unit), up from 1909 at the start of the step, and **no existing corpus file
+**Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit fixes an `EXPR`
+gap step 011 exposed — a field may be qualified by the table's own name. **Before it, step 011
+closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
+a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
+tests** (801 golden, 2461 unit), up from 1909 at the start of the step, and **no existing corpus file
 changed at any point** — the three `*.query.dump.txt` files were pure addition.
 
 ```csharp
@@ -70,11 +71,39 @@ and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.
 
 ## 1. What is ready
 
-**A DBF can be read whole, its records can be read in an index tag's order, and the read path is
-cached.** `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by
-design, ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test` is green on **1909 tests**,
-639 of them golden.
+**The library answers a query.** A filter over one table becomes a record set produced by seeking
+its indexes rather than reading them, which is what the whole port exists for — and beneath it a DBF
+can be read whole, its records read in an index tag's order, and the read path is cached.
+`net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
+ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test` is green on **3262 tests**,
+801 of them golden.
+
+```csharp
+using var engine = new CodeBaseEngine();
+using Table table = engine.OpenTable("employee.dbf");
+
+table.SelectTag(table.Tags["NAME"]);                  // or leave it, for record-number order
+Query q = table.Query("UPPER(NAME) = \"SM\" .AND. SALARY > 50000");
+
+for (GoResult go = q.Top(); go == GoResult.Ok; go = q.Next())
+    Console.WriteLine(table.GetString(table.Fields["NAME"]));
+
+int howMany = q.Count;      // reads no record at all when the tags answer the whole filter
+```
+
+Each term some tag's key expression can answer becomes a seek; terms over one tag merge into one
+range so the tag is seeked once; the record-number sets combine; and only the terms no tag could
+answer are evaluated, on the candidates that survive rather than on the table. A filter nothing can
+be seeked for still works and reads every record, which is what a table scan is. Measured on 10 000
+records: a filter matching 0.1% of them costs **0.001×** a full scan's reads, 10% costs 0.101×, and
+the crossover is at *total* selectivity where the loss is 1.2%.
+
+`CodeBaseEngine.QueryTagScope` chooses which tags may answer: `Compatible` uses only the ones the
+reference would, which keeps its record sets comparable; `AllSeekable` adds the integer and currency
+tags it refuses. Filtered, unique and **collated** tags are refused in both — the first two because
+they index a subset rather than the table, the third because a filter's comparisons are in byte order
+and a collated tag's keys are not (**ADR-54**).
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -259,6 +288,22 @@ nothing at all is between the brackets**, and a field name over ten characters i
 ---
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
+
+**Step 011 closed and `QUERY` is done** — the record is
+[`SUMMARY.md`](claude/dev/011-query-optimizer/SUMMARY.md), and §1 above says what a caller can now
+do. **Risk R12 is retired**, and it was a real risk: the gates caught a wrong record set three times.
+Gate C came in on exact numbers rather than thresholds — a fully mapped `Count` reads **zero**
+records, a fully mapped walk reads **exactly what it returns** — and a selectivity sweep over
+`PERF10K` settled the omitted go-around with a measurement: the crossover is at *total* selectivity
+and the loss there is **1.2%**.
+
+**Then one fix, and what it found is worth more than the fix.** `CDXEXPR->K_NUM` — a field qualified
+by the table's **own** name — was refused as an unknown field, because neither compile path passed
+the alias set to the scanner. One argument in each of two places. But `QueryHarness`, the helper every
+query golden test compiles through, carried its **own copy** of the compile path: parser and resolver
+assembled by hand. So production changed and the tests did not notice, which is exactly how a suite
+stays green while the real thing is broken. It goes through `Table.CompileFilter` now, and the only
+tests that caught the discrepancy were the two using the public `Query`.
 
 **Gate A landed, and it was right twice on its first run — both times only under `AllSeekable`,
 which no reference-backed gate can see at all.**
@@ -823,6 +868,39 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ## 3. Next
 
+### Step 012 — how much work does a query cost the reference? (tomorrow)
+
+**`QUERY`'s performance has never been compared against the C library.** Step 009 measured seek and
+walk — 1.36–1.43× slower per seek, **2.45× faster** on a walk — but it predates the optimizer, and its
+own summary says as much: *"that matters most, because `QUERY` will drive it far harder than a walk
+does."* Step 011's Gate C counts the port's reads against a **port-side** scan, so it proves the
+optimizer optimizes and says nothing about how it compares.
+
+**Do the counted comparison first, not the timed one.** It is nearly free, and counting is the metric
+this project learned to trust: step 009's decisive finding came from counting reads and `Length`
+queries, not from a stopwatch, and a read count is identical on every machine where a timing is not.
+
+- **The mechanism already exists.** `dump-query.cpp` runs all 81 filters through a real `RELATE4`.
+  Recording, per filter, how many records the reference **read** to answer it — and how many index
+  blocks — makes the corpus compare *work* directly. One Windows trip; only the query dumps change.
+- **What it would settle.** Gate C's exact numbers become comparable: a fully-mapped `Count` reads
+  zero records here, and the reference claims the same (`relate4count` returns `f4flagCount`,
+  r4relate.c:6780-6781) — that is a claim about the reference nothing has checked. And where the
+  read counts match, any timing difference can only be per-read cost, which step 009 already
+  characterised, so the timed comparison may not be needed at all.
+- **How the C counts.** Step 009 used `GetProcessIoCounters`, which cannot see a metadata call —
+  that is how the `Length`-per-read defect hid (ADR-35). For a per-filter figure the generator wants
+  a counter it controls rather than a process-wide one.
+
+**Then, only if the counts disagree, the timed arm.** `claude/dev/009-performance-audit/harness/` is
+already built for this shape — query sets as *files*, read by both sides in the same order, with a
+per-scenario checksum that makes "both did the same work" a property of the data. It times seven
+scenarios and none of them is a query; adding a `relate4querySet` one plus the matching C# arm is
+contained. `PERF10K` has the two tags it needs.
+
+**Its own step, and its own method write-up**, the way step 009 earned its numbers — not a benchmark
+bolted onto a closed step.
+
 ### The VFP oracle's second run, whenever it is convenient — it blocks nothing
 
 The first run is committed and its findings are recorded. Three probe rows were changed *after* it,
@@ -836,100 +914,22 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-steps 1 to 7 are done, and a caller can run a query
+### What is closed, and what each close left owed
 
-**Next is sub-step 8 — the equivalence gate, the widened scope and the efficiency gate**, and it
-needs **no generator run**. **Gate A**: for every filter, the optimized record sequence must equal a
-brute-force scan of the same compiled expression, in both scopes — the check that needs no reference
-at all and is the only one `AllSeekable` has, since a widened tag has no reference answer by
-construction. **Gate C**: `CountingSource` behind the engine, and the four counted assertions of
-`DESIGN.md` Decision 13 — a fully-mapped count reads **zero** records, a fully-mapped query runs zero
-residual evaluations and reads exactly what it returns, and a selective query's block reads are a
-fraction of a scan's. Gate C is the only thing that can see an optimizer that is correct and never
-optimizes.
+**`QUERY` — step 011, closed 2026-09-04.** The record is
+[`SUMMARY.md`](claude/dev/011-query-optimizer/SUMMARY.md); risk **R12** is retired and the three
+gates that retire it stay. Owed and named rather than skipped: the **filtered-tag refusal** cannot be
+isolated by any dump, because every filtered tag in the corpus shares its field with a plain one that
+is found first; and a **collated tag** can only be reached where no machine tag shadows it. Both want
+a generator case, not a unit test standing in.
 
-**The merge algebra moved from sub-step 4 to sub-step 6.** The first plan gated sub-step 3 on
-`FullyMapped` alone — one bit per filter, which cannot see a swapped bound — and then left the
-operand-order reflection unchecked for four sub-steps. That is R12's most concrete instance and the
-one thing the reference itself gets wrong, so it was the plan's weakest point.
+**`EXPR` — step 010, closed 2026-09-03.** [`SUMMARY.md`](claude/dev/010-expr/SUMMARY.md); **R5**
+retired. Owed: the **Windows ANSI upper-case mapping**, which no corpus table can witness, and the
+**second rejection pass with a real `TAG4FILE`**, without which `e4tagExpr` (−510) and the tag-only
+alias refusals stay unobservable. The alias gap that step 011 exposed is **fixed** — a field may now
+be qualified by the table's own name.
 
-What makes the reorder work is that **merging is an optimization, not a correctness requirement**:
-unmerged, `K_NUM > 0 .AND. K_NUM < 100` decomposes into two leaves that seek separately and
-intersect, which is the right answer reached by seeking one tag twice. So decomposition, seeking and
-combination are a complete optimizer on their own, and **depth 3 can be green on all 74 filters
-before any merge code exists**. The twelve routines of merge case analysis then get written against a
-green end-to-end gate, with a sharper gate of their own: the record sets must not move, and the leaf
-count must fall. Those two fail differently — a wrong merge fails the first, a merge that never
-happens fails the second.
-
-Order now: 3 decomposition, 4 leaf evaluation, 5 combination (**depth 3 green here**), 6 the merge
-algebra, 7 residual filter and public surface, 8 the equivalence and efficiency gates, 9 close.
-
-**Three of `DESIGN.md`'s four open questions are closed** by sub-step 1's run: the bitset survives
-the walk, a filter with nothing optimizable records `set absent` (and `bitmapsFreed` is never set,
-which that question had assumed the opposite of), and no wider corpus table is needed. Only
-`e4tagExpr` (−510) stays open, with the rejection pass step 010 owes.
-
-**Still owed to the corpus, and deliberately not folded into this run:** the second rejection pass
-with a real `TAG4FILE`, so `e4tagExpr` (−510) and the alias refusals stop being unobservable. It is a
-change to the *rejection* dump rather than the query one, and mixing the two would have made this
-run's byte-identical check ambiguous. The three-or-more `.AND.`/`.OR.` run that step 010 also owed
-**is** now covered, by two query filters.
-
-### Step 010 is closed; what came before
-
-**`EXPR` is done and step 010 needs nothing further — all nine sub-steps.** An expression tag is an
-ordinary tag, every key of every one in the corpus is rebuilt byte for byte, Visual FoxPro's thirteen
-extra functions are supported and gated by Visual FoxPro, and `PORTING-PLAN.md` §5 records the
-capability closed and **R5 retired**. One thing is owed and named: the Windows ANSI case mapping,
-which no corpus table can witness. The step's record is [`SUMMARY.md`](claude/dev/010-expr/SUMMARY.md).
-
-**`QUERY` is step 011, now designed and planned above.** It is the bitmap optimizer, what the whole
-port exists for, specified in [`specs/QUERY-OPTIMIZER.md`](claude/specs/QUERY-OPTIMIZER.md). Step 010 built it
-the compiled form it walks and **gated the contract**: the node table with all six fields per node,
-evaluation **at a node** with no record for a constant subtree, the per-node is-constant predicate
-checked against the evaluator's own behaviour rather than against a copy of its rule, and a `Tag`
-that **keeps** its `CompiledExpression` — the same instance the key path builds keys from. What is
-left for step 011 is
-structural equality between two node arrays, the `BITMAP4` tree, the constraint-merge algebra, the
-four seek positions and the `F4FLAG` bitset. **Read `DESIGN.md` §6 first**: writing
-[`specs/QUERY-OPTIMIZER.md`](claude/specs/QUERY-OPTIMIZER.md) found that §2b's promotion-as-a-wrapper-node
-would have failed sub-step 4's own gate — promotion is an **in-place row rewrite** and node count is
-invariant under it (`e4parse.c:227-289`) — and added three things to the compiled form that are cheap
-before that gate freezes it and expensive after: the **retained node table** (six fields per node),
-**evaluate-at-a-node with no record for a constant subtree**, and a `Tag` that **keeps** its
-`CompiledExpression`. `dev/010-expr/STATE.md` has the detail; **ADR-46** has why it lands in this step. Scope is
-the **whole** function table, because `QUERY` needs the filter vocabulary anyway. Nothing about the
-engine has been written; every layer-4 gate it will be measured by already exists in the corpus.
-
-The plan's own ordering, and the reason for it: the **function table transcription** (now sub-step 2,
-and green) had to be right before **row selection** (4) can mean anything, and the row must be right
-before a **value** (5) is worth comparing — a wrong row produces a *plausible* value. **Axis B lands complete
-at sub-step 7**, driven from recorded values, so **sub-step 8 is pure wiring** and the only sub-step
-that can turn an existing test red. The stop point after sub-step 5 is real.
-
-**Things owed to the corpus before the C# gets far:**
-
-- **A second rejection pass with a real `TAG4FILE`.** Every rejection is currently parsed with
-  `tagPtr = 0`, so `e4tagExpr` (−510) never appears and `OTHER->K_TEXT` comes back as `e4fieldName`
-  (−210). The tag-only refusals — an alias other than the indexed table, and whether the
-  `SUBSTR`-over-`TRIM` restriction bites — are unobservable until then.
-- **A run of three or more `.AND.`/`.OR.` operators**, over constants and over fields. The whole dump
-  holds only two-term runs, so the variadic collapse `QUERY-OPTIMIZER.md` §4.1 depends on is gated by
-  C#-authored tests alone — found by a mutation at sub-step 3 that layer 4 did not catch.
-- **`CachedReadGoldenTests`'s `KeysABareField` guard is deleted at sub-step 8**, along with ADR-28's
-  refusal. It is the one place the suite currently averts its eyes.
-
-### Two things that depend on nothing
-
-**~~Write `claude/specs/QUERY-OPTIMIZER.md`~~ — done 2026-09-03**, and **~~its three generator
-cases~~ are now step 011's sub-step 1**. R13 retired. The three, listed in the spec's §12: a
-**reflected comparison nested in an `.AND.`** (`4 > K_NUM` beside `K_NUM < 4`, which is where the
-reference's `tagPos = 1` defect could invert a bound), an **`H`-field comparison** (predicted
-un-optimizable because `E4FLOAT` is missing from `e4isConstant`, and `CDXEXPR` has the corpus's only
-`H` field), and an **OR range** (`bmf4OrOt` was read for shape, not transcribed). **ADR-46** carries
-the two decisions it surfaced — whether the port keeps CodeBase's tag-eligibility refusals, and what
-to do about the defect — and the finding that `EXPR` constrains `QUERY` at sub-steps 3-4, not later.
+### One thing that depends on nothing
 
 **Close ADR-23 if it is wanted.** Its own small step: add zlib to the generator, reconstruct the
 `c4compress` wrapper from the layout the reader pins down, add a case with `code4memoCompress` enabled

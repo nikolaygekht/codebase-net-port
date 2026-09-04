@@ -31,7 +31,7 @@ public sealed class DecompositionGoldenTests
     [MemberData(nameof(Tables))]
     public void FullyMappedAgreesWithTheReferenceOnEveryFilter(string table)
     {
-        QueryHarness harness = QueryHarness.For(table);
+        using QueryHarness harness = QueryHarness.For(table);
 
         foreach (DumpQueryCase filter in harness.Dump.Cases)
         {
@@ -49,7 +49,7 @@ public sealed class DecompositionGoldenTests
     [MemberData(nameof(Tables))]
     public void ATreeIsBuiltForExactlyTheFiltersTheReferenceOptimized(string table)
     {
-        QueryHarness harness = QueryHarness.For(table);
+        using QueryHarness harness = QueryHarness.For(table);
 
         foreach (DumpQueryCase filter in harness.Dump.Cases)
         {
@@ -67,7 +67,7 @@ public sealed class DecompositionGoldenTests
     [MemberData(nameof(Tables))]
     public void EveryLeafIsAttributedToATermThePlanThenAnswers(string table)
     {
-        QueryHarness harness = QueryHarness.For(table);
+        using QueryHarness harness = QueryHarness.For(table);
 
         foreach (DumpQueryCase filter in harness.Dump.Cases)
         {
@@ -97,7 +97,7 @@ public sealed class DecompositionGoldenTests
     [InlineData("K_NUM <> 0", "0 <> K_NUM")]
     public void WritingAComparisonBothWaysRoundConstrainsTheTagIdentically(string tagFirst, string constantFirst)
     {
-        QueryHarness harness = QueryHarness.For("CDXEXPR");
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
 
         LeafConstraint direct = harness.OnlyLeaf(tagFirst).Constraint!;
         LeafConstraint reflected = harness.OnlyLeaf(constantFirst).Constraint!;
@@ -126,10 +126,14 @@ public sealed class DecompositionGoldenTests
     [InlineData("2.5 > K_NUM", 3.0, false)]
     [InlineData("2.5 <= K_NUM", 2.5, true)]
     [InlineData("2.5 >= K_NUM", 2.5, true)]
-    public void AConstraintAdmitsExactlyWhatItsTermDoes(string filter, double value, bool admitted) =>
-        QueryHarness.For("CDXEXPR").OnlyLeaf(filter).Constraint!
+    public void AConstraintAdmitsExactlyWhatItsTermDoes(string filter, double value, bool admitted)
+    {
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
+
+        harness.OnlyLeaf(filter).Constraint!
             .Accepts(QueryHarness.NumericValue(value))
             .Should().Be(admitted, "{0} at {1}", filter, value);
+    }
 
     /// <summary>
     /// The mistake worth naming: 3.0 must be inside "greater than 2.5" and outside "less than 2.5".
@@ -138,7 +142,7 @@ public sealed class DecompositionGoldenTests
     [Fact]
     public void AReflectedComparisonBoundsTheTagTheWayItReads()
     {
-        QueryHarness harness = QueryHarness.For("CDXEXPR");
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
 
         // "2.5 > K_NUM" reads as K_NUM below 2.5.
         harness.OnlyLeaf("2.5 > K_NUM").Constraint!.Upper.Should().NotBeNull();
@@ -157,7 +161,7 @@ public sealed class DecompositionGoldenTests
     [Fact]
     public void AShortCharacterConstantWidensOnlyALowerBound()
     {
-        QueryHarness harness = QueryHarness.For("CDXEXPR");
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
 
         harness.OnlyLeaf("UPPER(K_TEXT) > \"S\"").Constraint!.Lower!.Value.Inclusive.Should().BeTrue();
         harness.OnlyLeaf("\"S\" < UPPER(K_TEXT)").Constraint!.Lower!.Value.Inclusive.Should().BeTrue();
@@ -170,10 +174,13 @@ public sealed class DecompositionGoldenTests
     /// characters against a twenty-byte key is the boundary the rule turns on.
     /// </summary>
     [Fact]
-    public void AFullWidthCharacterConstantIsNotWidened() =>
-        QueryHarness.For("CDXEXPR")
-            .OnlyLeaf("UPPER(K_TEXT) > \"ABCDEFGHIJKLMNOPQRST\"")
+    public void AFullWidthCharacterConstantIsNotWidened()
+    {
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
+
+        harness.OnlyLeaf("UPPER(K_TEXT) > \"ABCDEFGHIJKLMNOPQRST\"")
             .Constraint!.Lower!.Value.Inclusive.Should().BeFalse();
+    }
 
     /// <summary>
     /// Every constant a filter can hold is exactly as wide as its node declares it to be.
@@ -194,7 +201,7 @@ public sealed class DecompositionGoldenTests
     [MemberData(nameof(Tables))]
     public void AConstantIsAsWideAsItsNodeSaysItIs(string table)
     {
-        QueryHarness harness = QueryHarness.For(table);
+        using QueryHarness harness = QueryHarness.For(table);
         List<string> divergent = [];
         int seen = 0;
 
@@ -226,6 +233,10 @@ public sealed class DecompositionGoldenTests
     /// slower -- which is what makes the record sets checkable before any merge code exists.
     /// </summary>
     [Fact]
-    public void TwoTermsOverOneTagAreTwoLeavesUntilTheyAreMerged() =>
-        QueryHarness.For("CDXEXPR").Plan("K_NUM > 0 .AND. K_NUM < 100").LeafCount.Should().Be(2);
+    public void TwoTermsOverOneTagAreTwoLeavesUntilTheyAreMerged()
+    {
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
+
+        harness.Plan("K_NUM > 0 .AND. K_NUM < 100").LeafCount.Should().Be(2);
+    }
 }

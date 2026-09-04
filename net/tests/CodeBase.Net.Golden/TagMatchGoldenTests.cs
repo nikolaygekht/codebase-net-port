@@ -34,7 +34,7 @@ public sealed class TagMatchGoldenTests
     [MemberData(nameof(Tables))]
     public void EveryNodeMatchesTheTagTheReferenceMatched(string table)
     {
-        QueryHarness harness = QueryHarness.For(table);
+        using QueryHarness harness = QueryHarness.For(table);
 
         foreach (DumpQueryCase filter in harness.Dump.Cases)
         {
@@ -54,7 +54,7 @@ public sealed class TagMatchGoldenTests
     [MemberData(nameof(Tables))]
     public void TheGateHasSomethingToProve(string table)
     {
-        QueryHarness harness = QueryHarness.For(table);
+        using QueryHarness harness = QueryHarness.For(table);
 
         harness.Dump.Cases
             .SelectMany(c => c.Nodes)
@@ -70,7 +70,7 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void AnOrAbandonsItsBranchBeforeReachingAnOperandWrittenFirst()
     {
-        QueryHarness harness = QueryHarness.For("CDXEXPR");
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
 
         DumpQueryCase written = harness.Dump.Cases.Single(c => c.Filter == "K_NUM > 0 .OR. K_LOG");
         DumpQueryCase mirrored = harness.Dump.Cases.Single(c => c.Filter == "K_LOG .OR. K_NUM > 0");
@@ -95,7 +95,7 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void ARefusedTagDoesNotStopTheSearch()
     {
-        QueryHarness harness = QueryHarness.For("CDXBASE");
+        using QueryHarness harness = QueryHarness.For("CDXBASE");
         QueryTag?[] matched = harness.Match("K_DUP = \"CHERRY\"");
 
         matched.Should().Contain(t => t != null && t.Value.Name == "T_DUP");
@@ -109,7 +109,7 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void DateAndLogicalTagsAreEligible()
     {
-        QueryHarness harness = QueryHarness.For("CDXEXPR");
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
 
         harness.Match("K_DATE = STOD(\"20200101\")")
             .Should().Contain(t => t != null && t.Value.Name == "T_DATE");
@@ -124,8 +124,8 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void WideningTheScopeOnlyEverAddsTags()
     {
-        QueryHarness compatible = QueryHarness.For("CDXEXPR");
-        QueryHarness wide = QueryHarness.For("CDXEXPR", QueryTagScope.AllSeekable);
+        using QueryHarness compatible = QueryHarness.For("CDXEXPR");
+        using QueryHarness wide = QueryHarness.For("CDXEXPR", QueryTagScope.AllSeekable);
 
         foreach (DumpQueryCase filter in compatible.Dump.Cases)
         {

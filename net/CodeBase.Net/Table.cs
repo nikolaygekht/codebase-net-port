@@ -877,8 +877,9 @@ public sealed class Table : IDisposable
         using Hold hold = Enter();
         List<QueryTag> projected = [];
 
-        foreach (Tag tag in Tags)
+        for (int ordinal = 0; ordinal < Tags.Count; ordinal++)
         {
+            Tag tag = Tags[ordinal];
             TableTagCursor cursor;
 
             try
@@ -891,7 +892,7 @@ public sealed class Table : IDisposable
             }
 
             projected.Add(new QueryTag(
-                projected.Count,
+                ordinal,
                 tag.Name,
                 tag.KeyLength,
                 cursor.KeyKind,
@@ -902,6 +903,30 @@ public sealed class Table : IDisposable
         }
 
         return projected;
+    }
+
+    /// <summary>
+    /// Opens a probe over one of the table's tags, for the optimizer to seek with.
+    /// </summary>
+    /// <param name="tag">The tag, as the planner projected it.</param>
+    /// <returns>The probe, which walks the tag's keys in the order they are stored.</returns>
+    /// <value>
+    /// The probe opens a cursor of its own rather than sharing the one a caller's seeks run on, so a
+    /// query cannot move a cursor somebody else is part-way through using.
+    /// </value>
+    internal ITagProbe OpenProbe(in QueryTag tag)
+    {
+        using Hold hold = Enter();
+        Tag mine = Tags[tag.Ordinal];
+
+        return new TagProbe(
+            mine.Inner,
+            SeekConverter.For(
+                mine.Inner.Header,
+                [.. Fields],
+                CodePageNumber ?? CodePageMap.UnmarkedCodePage,
+                ExpressionOptions,
+                System.IO.Path.GetFileNameWithoutExtension(Path)));
     }
 
     private TableTagCursor CursorFor(Tag tag)

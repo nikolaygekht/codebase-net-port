@@ -22,22 +22,29 @@ internal sealed class ConstraintValue
 {
     private readonly byte[] bytes;
 
-    private ConstraintValue(ExpressionType type, int length, byte[] bytes, double number)
+    private ConstraintValue(ExpressionValue source, int length, byte[] bytes)
     {
-        Type = type;
+        Source = source;
         Length = length;
         this.bytes = bytes;
-        Number = number;
     }
 
+    /// <summary>Gets the evaluated value this came from.</summary>
+    /// <value>
+    /// Kept because turning the constant into the bytes a tag's keys are compared against is the same
+    /// transform that builds a key from a record, and that transform takes a value. Rebuilding one
+    /// from the bytes would be a second conversion with its own chance of disagreeing.
+    /// </value>
+    public ExpressionValue Source { get; }
+
     /// <summary>Gets the type of the constant this came from.</summary>
-    public ExpressionType Type { get; }
+    public ExpressionType Type => Source.Type;
 
     /// <summary>Gets the length the compiled expression declared for it.</summary>
     public int Length { get; }
 
     /// <summary>Gets its value as a number, where its type is one that compares as a number.</summary>
-    public double Number { get; }
+    public double Number => Source.Number;
 
     /// <summary>Gets its bytes, truncated to the declared length.</summary>
     public ReadOnlySpan<byte> Bytes => bytes;
@@ -58,11 +65,7 @@ internal sealed class ConstraintValue
         byte[] raw = value.ToRaw();
         int length = Math.Clamp(declaredLength, 0, raw.Length);
 
-        return new ConstraintValue(
-            value.Type,
-            length,
-            length == raw.Length ? raw : raw[..length],
-            value.Number);
+        return new ConstraintValue(value, length, length == raw.Length ? raw : raw[..length]);
     }
 
     /// <summary>

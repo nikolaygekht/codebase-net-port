@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 to 3 of 9 done**
-**Current sub-step:** PLAN.md step 4, leaf evaluation. A filter decomposes into a constraint tree;
-nothing seeks yet. **The step order changed after sub-step 2** — see Deviations.
+**Status:** in progress — **sub-steps 1 to 4 of 9 done**
+**Current sub-step:** PLAN.md step 5, combination. One leaf reaches its records; what is missing is
+folding several of them together. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
@@ -14,6 +14,7 @@ nothing seeks yet. **The step order changed after sub-step 2** — see Deviation
 - [x] step 1 — the query oracle, 2026-09-04 — **74 filters, five depths each, run and committed**
 - [x] step 2 — eligibility and subexpression identity, 2026-09-04 — **depth 1 green, five mutations**
 - [x] step 3 — decomposition, 2026-09-04 — **depth 2 green, four of five mutations red**
+- [x] step 4 — leaf evaluation, 2026-09-04 — **the contract pair passes, 41 filters reach depth 3**
 - [ ] step 3 — decomposition
 - [ ] step 4 — the merge algebra
 - [ ] step 5 — leaf evaluation
@@ -21,6 +22,46 @@ nothing seeks yet. **The step order changed after sub-step 2** — see Deviation
 - [ ] step 7 — the residual filter and the public surface
 - [ ] step 8 — the equivalence gate, and the widened scope
 - [ ] step 9 — close
+
+## What sub-step 4 landed
+
+`ITagProbe` (the step's one seam), `TagProbe`, `RecordSet` and `ConstraintSeeker`, plus
+`Table.OpenProbe`. Tests: `TagProbeContract` run against **both** implementations, `ConstraintSeekerTests`
+at layer 2, `RecordSetTests` at layer 1, and `LeafEvaluationGoldenTests` — the **first end-to-end
+signal**, where **41 single-leaf filters** (24 on `CDXEXPR`, 9 on `CDXBASE`, 8 on `CDXDEEP`) reach
+exactly the records the reference's own bitmap holds. **2054 tests green** (720 golden, 1334 unit).
+No corpus file changed.
+
+**The probe opens its own cursor.** A query walks tags while a caller may be part-way through a seek
+on the same one; sharing a cursor would have each move the other. The reference has the same hazard
+and works around it by saving and restoring the tag's traversal flag around every leaf — a second
+cursor costs one descent and removes the question.
+
+**The seam is stored order, not tag order**, and that is the whole of what `TagProbe` decides. Keys
+sort ascending whatever a descending tag's flag says, so stepping up in stored order means stepping
+that cursor backwards. `CDXDEEP`'s `D_PFX` is descending and is the only tag over its field, so the
+corpus exercises it: walking in tag order instead reddens both `CDXDEEP` golden tests.
+
+**The range walk seeks one end, not two.** The reference reaches a range by seeking both ends — two
+of its four seek positions by inverting the tag and seeking forwards on the reversed view — and
+walking between the recorded positions. This port seeks the lower end and tests each key against the
+upper bound as it walks up. Same records, one descent instead of two, and no inversion. An exclusive
+bound is not a different seek either: the walk steps over the keys equal to it, which is the same
+records and one fewer thing to get wrong. An empty range needs no rule at all — the first key tested
+is already past the upper bound.
+
+**An exclusion on its own builds the complement**, which is the one place the flag is created rather
+than carried: `K_TEXT <> "X"` is nearly the whole table, so naming what it leaves out and saying so
+beats walking every key. Combining two sets normalises the flag away first.
+
+**Four mutations reddened; the fifth found dead code.** An exclusive bound admitting its own value,
+an inclusive upper bound excluding it, walking a descending tag in tag order, and padding a short
+character constant to the key width — all red. Scrubbing the spare bits after a complement **changed
+nothing**, because every read of the set goes through its range check, so a bit outside one to the
+record count is not a record however it came to be set. The scrubbing was removed and the invariant
+now lives in one place, with a note for whoever later counts set bits a byte at a time and would need
+to mask it themselves. The test that claimed to cover it was renamed to say what it actually catches:
+an off-by-one in the complement.
 
 ## What sub-step 3 landed
 
@@ -206,4 +247,4 @@ it. Question 3 is the `e4tagExpr` one above.
 
 ## Blockers
 
-None. Sub-step 4 needs no generator run either.
+None. Sub-step 5 needs no generator run either.

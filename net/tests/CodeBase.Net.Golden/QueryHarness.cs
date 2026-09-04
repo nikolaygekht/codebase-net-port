@@ -11,15 +11,24 @@ namespace CodeBase.Net.Golden;
 /// projecting its tags is done once per harness rather than per filter, because the projection is
 /// what a real caller does once when a query is planned.
 /// </summary>
-internal sealed class QueryHarness
+internal sealed class QueryHarness : IDisposable
 {
+    private readonly CodeBaseEngine engine;
+    private readonly Table table;
     private readonly IFieldMetadata fields;
     private readonly IReadOnlyList<QueryTag> tags;
     private readonly QueryTagScope scope;
 
     private QueryHarness(
-        CorpusQueryDump dump, IFieldMetadata fields, IReadOnlyList<QueryTag> tags, QueryTagScope scope)
+        CodeBaseEngine engine,
+        Table table,
+        CorpusQueryDump dump,
+        IFieldMetadata fields,
+        IReadOnlyList<QueryTag> tags,
+        QueryTagScope scope)
     {
+        this.engine = engine;
+        this.table = table;
         Dump = dump;
         this.fields = fields;
         this.tags = tags;
@@ -37,10 +46,12 @@ internal sealed class QueryHarness
     /// <returns>The harness.</returns>
     public static QueryHarness For(string table, QueryTagScope scope = QueryTagScope.Compatible)
     {
-        using var engine = new CodeBaseEngine();
-        using Table opened = engine.OpenTable(Corpus.PathOf(table + ".DBF"));
+        var engine = new CodeBaseEngine();
+        Table opened = engine.OpenTable(Corpus.PathOf(table + ".DBF"));
 
         return new QueryHarness(
+            engine,
+            opened,
             CorpusQueryDump.Load(table),
             new TableFieldMetadata([.. opened.Fields], table),
             opened.QueryTags(),
@@ -78,6 +89,21 @@ internal sealed class QueryHarness
         return plan.Root is null
             ? throw new InvalidOperationException($"'{filter}' decomposed to nothing.")
             : plan.Root.Walk().Single(node => node.IsLeaf);
+    }
+
+    /// <summary>Gets how many records the table holds.</summary>
+    public int RecordCount => table.RecordCount;
+
+    /// <summary>Opens a probe over one of the table's tags.</summary>
+    /// <param name="tag">The tag.</param>
+    /// <returns>The probe.</returns>
+    public ITagProbe Probe(in QueryTag tag) => table.OpenProbe(tag);
+
+    /// <summary>Closes the table.</summary>
+    public void Dispose()
+    {
+        table.Dispose();
+        engine.Dispose();
     }
 
     /// <summary>

@@ -1,7 +1,13 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011's sub-step 3 — decomposition**: a filter now becomes a constraint tree.
+**step 011's sub-step 4 — leaf evaluation**: one constraint now reaches its records by seeking.
+`ITagProbe` (the step's one seam) with a contract test run against **both** implementations,
+`TagProbe`, `RecordSet` and `ConstraintSeeker`. **41 single-leaf filters reach exactly the records
+the reference's own bitmap holds** — the first end-to-end signal — and `dotnet test` is green on
+**2054 tests** (720 golden, 1334 unit). Four of five mutations reddened; **the fifth found dead
+code**, which was removed. No corpus file changed.
+**Before it, sub-step 3 — decomposition**: a filter became a constraint tree.
 `net/CodeBase.Net/Query/` gained `ConstraintValue`, `LeafConstraint`, `ConstraintNode`, `QueryPlan`
 and a grown `QueryDecomposer`; **depth 2 of the gate is green on all 74 filters** and `dotnet test`
 is green on **2006 tests** (714 golden, 1292 unit). Four of five mutations reddened; **the fifth is
@@ -278,7 +284,31 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011's sub-step 3 landed: a filter decomposes into a constraint tree.** `ConstraintValue`,
+**Step 011's sub-step 4 landed: a constraint reaches its records.** `ITagProbe`, `TagProbe`,
+`RecordSet`, `ConstraintSeeker`, and the **first end-to-end signal** — 41 single-leaf filters (24 on
+`CDXEXPR`, 9 on `CDXBASE`, 8 on `CDXDEEP`) reaching exactly the records the reference's bitmap holds.
+The fake and the real probe are held to **one contract test run against both**, because a stand-in
+that reported the end of the keys one entry early would make every layer-2 test above it confidently
+wrong.
+
+**The seam is stored order, not tag order**, and that is the whole of what `TagProbe` decides: keys
+sort ascending whatever a descending tag's flag says, so stepping up in stored order steps that
+cursor backwards. `CDXDEEP`'s `D_PFX` is descending and the only tag over its field, so the corpus
+catches it — walking in tag order reddens both its golden tests.
+
+**The range walk seeks one end where the reference seeks two.** The reference reaches two of its four
+seek positions by inverting the tag and seeking forwards on the reversed view; this port seeks the
+lower end and tests each key against the upper bound as it walks. Same records, one descent, no
+inversion — and an empty range needs no rule at all, because the first key tested is already past the
+upper bound.
+
+**Four mutations reddened; the fifth found dead code.** Scrubbing the spare bits after a complement
+changed nothing, because every read of the set goes through its range check — a bit outside one to
+the record count is not a record however it came to be set. Removed, with the invariant left in one
+place and a note for whoever later counts bits a byte at a time. The test that claimed to cover it
+was renamed to what it actually catches.
+
+**Before that in the same session — sub-step 3: a filter decomposes into a constraint tree.** `ConstraintValue`,
 `LeafConstraint` as the closed union Decision 2 asked for, `ConstraintNode`, `QueryPlan` and a
 `QueryDecomposer` grown from matching tags to building constraints. **Depth 2 green on all 74
 filters, asserted unconditionally** — the reference's defect changes which *slot* a constant lands
@@ -708,13 +738,13 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-steps 1 to 3 are done, and the order of the rest changed
+### Step 011 is under way: sub-steps 1 to 4 are done, and the order of the rest changed
 
-**Next is sub-step 4 — leaf evaluation**, and it needs **no generator run**. `ITagProbe` and its
-contract-test pair, `TagProbe` over a real tag, `RecordSet` (the bitset with its complement flag), and
-`ConstraintSeeker`: the four seek positions and the range walk. It is the step's one seam, so the
-whole of leaf evaluation becomes testable at layer 2 over a sorted key list with no index file. Then
-sub-step 5 combines, and **depth 3 goes green there** — the first end-to-end record sets.
+**Next is sub-step 5 — combination**, and it needs **no generator run**. `QueryExecutor`: walk the
+plan, seek each leaf, fold the children with the bitset's own intersect and union, and short-circuit a
+branch proved empty. **Depth 3 goes green there**, on all 74 filters rather than the 41 single-leaf
+ones — and at that point the optimizer is complete and correct, with the merge algebra still to come
+against a green end-to-end gate.
 
 **The merge algebra moved from sub-step 4 to sub-step 6.** The first plan gated sub-step 3 on
 `FullyMapped` alone — one bit per filter, which cannot see a swapped bound — and then left the

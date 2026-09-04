@@ -74,6 +74,15 @@ internal sealed class TableTagCursor
     /// <summary>Gets the tag's compiled key expression, which resolving the converter produced.</summary>
     public CompiledExpression Compiled => Converter.Compiled;
 
+    /// <summary>
+    /// Gets what the tag's keys are made of.
+    /// </summary>
+    /// <value>
+    /// The query optimizer reads it to decide whether it may answer a term with this tag, because the
+    /// reference implementation refuses four key types outright (r4log.c:127-139).
+    /// </value>
+    public KeyKind KeyKind => Converter.Kind;
+
 
     /// <summary>Gets a value indicating whether a search is running that Next can continue.</summary>
     public bool HasSearch => searching;

@@ -4,6 +4,7 @@ using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
 using CodeBase.Net.IO;
 using CodeBase.Net.Memo;
+using CodeBase.Net.Query;
 
 namespace CodeBase.Net;
 
@@ -855,6 +856,52 @@ public sealed class Table : IDisposable
     {
         using Hold hold = Enter();
         return CursorFor(tag).Compiled;
+    }
+
+    /// <summary>
+    /// Projects the table's tags into what the query optimizer needs to know about them.
+    /// </summary>
+    /// <returns>One entry per tag, in the table's own tag order.</returns>
+    /// <value>
+    /// Taken once when a filter is planned, so that deciding which tag can answer a term needs no
+    /// open index and no record -- which is what lets the whole planning half be tested without a
+    /// file. The order is the table's own, because tags are considered in it and the first match
+    /// wins.
+    ///
+    /// A tag whose expression this library cannot type is left out rather than allowed to fail the
+    /// query: it is a tag the optimizer could not have used anyway, and refusing the whole filter
+    /// because some unrelated tag is unreadable would turn a missing optimization into an error.
+    /// </value>
+    internal IReadOnlyList<QueryTag> QueryTags()
+    {
+        using Hold hold = Enter();
+        List<QueryTag> projected = [];
+
+        foreach (Tag tag in Tags)
+        {
+            TableTagCursor cursor;
+
+            try
+            {
+                cursor = CursorFor(tag);
+            }
+            catch (CodeBaseException)
+            {
+                continue;
+            }
+
+            projected.Add(new QueryTag(
+                projected.Count,
+                tag.Name,
+                tag.KeyLength,
+                cursor.KeyKind,
+                tag.Inner.Header.Collation,
+                tag.Filtered,
+                tag.Unique,
+                cursor.Compiled));
+        }
+
+        return projected;
     }
 
     private TableTagCursor CursorFor(Tag tag)

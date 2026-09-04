@@ -602,6 +602,27 @@ static const QUERYCASE QUERIES[] =
    { "1 = 1",                     0, "both sides constant -- neither matches a tag" },
    { "K_NUM > K_DBL",             0, "both sides fields -- no constant" },
 
+   /* -- the type gate's ALLOW side, which the refusals above cannot show ----
+    *
+    * r4log.c:127-139 is a BLACKLIST of four types, not the whitelist of three
+    * its own comment names, so a date tag and a logical tag are eligible. Both
+    * need a comparison to be reached at all, and the date one has to avoid the
+    * clock: STOD takes a full CCYYMMDD string (row 134) where CTOD infers the
+    * century from the system date. */
+   { "K_DATE = STOD(\"20200101\")", "T_DATE",  "a DATE tag -- eligible, because the type gate refuses only I, Y, T and T-with-ms" },
+   { "K_DATE > STOD(\"20000101\")", "T_DATE",  "a range over a date tag" },
+   { "EMPTY(K_TEXT) = .T.",         "T_EMPTY", "a LOGICAL tag -- also outside the blacklist" },
+
+   /* -- the .OR. short circuit is order-dependent, and that is observable ---
+    * bitmap4can visits a connective's children BACKWARDS (m4map.c:107), and an
+    * .OR. destroys the whole branch the moment one child fails. So in
+    * "K_NUM > 0 .OR. K_LOG" the failing K_LOG is reached first and the
+    * comparison is never visited at all -- its operand never even gets tested
+    * against a tag. Reversed, the comparison IS visited first and its tag is
+    * recorded, on a branch that is then thrown away. Same records, different
+    * parallel array, and only this pair can tell a port's walk order. */
+   { "K_LOG .OR. K_NUM > 0",        "T_NUM",   "the mirror of the .OR. above -- the optimizable disjunct is visited FIRST" },
+
    /* -- the two degenerate answers ----------------------------------------- */
    { "K_NUM > 1000000000",        "T_NUM", "empty result" },
    { "K_NUM > -1000000000",       "T_NUM", "every record" }

@@ -7,7 +7,7 @@ useGeneral   0   (CODE4.useGeneralTagsInRelate, r4log.c:115-120)
 errUnique    25   (CODE4.errDefaultUnique, c4code.c:984)
 
 [query cases]
-count        43
+count        47
 
 query 0 "K_NUM > 0"   ; gt
   fullyMapped  1
@@ -914,7 +914,98 @@ query 40 "K_NUM > K_DBL"   ; both sides fields -- no constant
     recs 3 4 5 7 8 9 10 11 12 13 14 15 16
   agree        yes
 
-query 41 "K_NUM > 1000000000"   ; empty result
+query 41 "K_DATE = STOD(\"20200101\")"   ; a DATE tag -- eligible, because the type gate refuses only I, Y, T and T-with-ms
+  fullyMapped  1
+  bitmapsFreed 0
+  nodes        4
+    node  0 row=6 len=8 numParms=0 numEntries=1 fieldNo=8 tag="T_DATE"
+    node  1 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 tag=-
+    node  2 row=134 len=8 numParms=1 numEntries=2 fieldNo=0 tag=-
+    node  3 row=79 len=4 numParms=2 numEntries=4 fieldNo=0 tag=-
+  set          present numFlags=17 isFlip=0 rawSet=1
+    bits 8
+  setAfterWalk present numFlags=17 isFlip=0 rawSet=1
+    bits 8
+  setStable    yes
+  optimized    order=record count=1
+    recs 8
+  count        1
+  byTagName    "T_DATE"
+  byTag        order=tag count=1
+    recs 8
+  scan         order=record count=1
+    recs 8
+  agree        yes
+
+query 42 "K_DATE > STOD(\"20000101\")"   ; a range over a date tag
+  fullyMapped  1
+  bitmapsFreed 0
+  nodes        4
+    node  0 row=6 len=8 numParms=0 numEntries=1 fieldNo=8 tag="T_DATE"
+    node  1 row=28 len=8 numParms=0 numEntries=1 fieldNo=0 tag=-
+    node  2 row=134 len=8 numParms=1 numEntries=2 fieldNo=0 tag=-
+    node  3 row=86 len=4 numParms=2 numEntries=4 fieldNo=0 tag=-
+  set          present numFlags=17 isFlip=1 rawSet=6
+    bits 1 3 4 7 9 16
+  setAfterWalk present numFlags=17 isFlip=1 rawSet=6
+    bits 1 3 4 7 9 16
+  setStable    yes
+  optimized    order=record count=10
+    recs 2 5 6 8 10 11 12 13 14 15
+  count        10
+  byTagName    "T_DATE"
+  byTag        order=tag count=10
+    recs 2 10 11 12 13 14 8 15 6 5
+  scan         order=record count=10
+    recs 2 5 6 8 10 11 12 13 14 15
+  agree        yes
+
+query 43 "EMPTY(K_TEXT) = .T."   ; a LOGICAL tag -- also outside the blacklist
+  fullyMapped  1
+  bitmapsFreed 0
+  nodes        4
+    node  0 row=0 len=20 numParms=0 numEntries=1 fieldNo=2 tag=-
+    node  1 row=151 len=4 numParms=1 numEntries=2 fieldNo=0 tag="T_EMPTY"
+    node  2 row=31 len=4 numParms=0 numEntries=1 fieldNo=0 tag=-
+    node  3 row=77 len=4 numParms=2 numEntries=4 fieldNo=0 tag=-
+  set          present numFlags=17 isFlip=0 rawSet=2
+    bits 6 7
+  setAfterWalk present numFlags=17 isFlip=0 rawSet=2
+    bits 6 7
+  setStable    yes
+  optimized    order=record count=2
+    recs 6 7
+  count        2
+  byTagName    "T_EMPTY"
+  byTag        order=tag count=2
+    recs 6 7
+  scan         order=record count=2
+    recs 6 7
+  agree        yes
+
+query 44 "K_LOG .OR. K_NUM > 0"   ; the mirror of the .OR. above -- the optimizable disjunct is visited FIRST
+  fullyMapped  0
+  bitmapsFreed 0
+  nodes        5
+    node  0 row=5 len=4 numParms=0 numEntries=1 fieldNo=12 tag=-
+    node  1 row=8 len=12 numParms=0 numEntries=1 fieldNo=4 tag="T_NUM"
+    node  2 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 tag=-
+    node  3 row=85 len=4 numParms=2 numEntries=3 fieldNo=0 tag=-
+    node  4 row=36 len=4 numParms=2 numEntries=5 fieldNo=0 tag=-
+  set          absent
+  setAfterWalk absent
+  setStable    yes
+  optimized    order=record count=14
+    recs 2 3 5 6 7 8 9 10 11 12 13 14 15 16
+  count        14
+  byTagName    "T_NUM"
+  byTag        order=tag count=14
+    recs 2 6 7 8 5 9 10 11 12 13 14 15 16 3
+  scan         order=record count=14
+    recs 2 3 5 6 7 8 9 10 11 12 13 14 15 16
+  agree        yes
+
+query 45 "K_NUM > 1000000000"   ; empty result
   fullyMapped  1
   bitmapsFreed 0
   nodes        3
@@ -931,7 +1022,7 @@ query 41 "K_NUM > 1000000000"   ; empty result
   scan         order=record count=0
   agree        yes
 
-query 42 "K_NUM > -1000000000"   ; every record
+query 46 "K_NUM > -1000000000"   ; every record
   fullyMapped  1
   bitmapsFreed 0
   nodes        3

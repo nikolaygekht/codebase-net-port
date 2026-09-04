@@ -232,8 +232,24 @@ Three things to take from it:
 
 ### 3.3 `e4isTag` — does a tag's key expression equal this subtree? (r4log.c:61-255)
 
-This is the hinge of the whole optimizer, and it is a **structural comparison of two compiled node
-arrays**. For each tag of the table, in `d4tagNext` order (r4log.c:103-105), the tag is skipped
+**It is called from exactly two places, and both are in `bitmap4can`'s comparison branch**
+(m4map.c:165, 172) — never from a sweep over the node array. Only **one operand of a comparison whose
+other operand is a constant** is ever tested, and only for comparisons the decomposition walk
+actually reaches. So `infoReport[i].tag` is a property of **the walk**, not of "which subexpressions
+some tag happens to equal", and a port that fills the array by testing every node against every tag
+will fill entries the reference leaves empty. Two consequences are witnessed in the corpus
+(`CDXEXPR.query.dump.txt`):
+
+- **Nothing under a `.NOT.` is ever tested.** `.NOT. K_NUM > 0` leaves the whole array empty, because
+  `E4NOT` is neither connective nor comparison and the walk returns before descending (§4.1).
+- **An `.OR.` is abandoned at the first operand it cannot use, and operands are visited backwards**
+  (m4map.c:107, and the destroy loop at m4map.c:127-141). So `K_NUM > 0 .OR. K_LOG` leaves the array
+  **empty** — `K_LOG` is visited first and kills the branch before the comparison is reached — while
+  the mirror image `K_LOG .OR. K_NUM > 0` **records `T_NUM`** on a branch that is then thrown away.
+  Same records, same absent bitmap, different parallel array. Nothing but reproducing the visit order
+  gets both right.
+
+The comparison itself is a **structural comparison of two compiled node arrays**. For each tag of the table, in `d4tagNext` order (r4log.c:103-105), the tag is skipped
 unless it passes the four gates of §3.4; then the tag's own root node
 (`tagFile->expr->info + tagFile->expr->infoN - 1`, r4log.c:146) is compared against the candidate
 node, walking **both arrays backwards in lockstep** for `numEntries` nodes (r4log.c:147-151):
@@ -272,7 +288,7 @@ Before any matching, `e4isTag` skips a tag entirely under four conditions:
 | Gate | Rule | File:line |
 |---|---|---|
 | collation | unless `CODE4.useGeneralTagsInRelate` is set, a tag whose `collateName` is **neither `collate4none` nor `collate4machine`** is skipped | r4log.c:115-120 |
-| type | S4FOX: a tag whose `tfile4type` is `r4currency`, `r4int`, `r4dateTime` or `r4dateTimeMilli` is skipped | r4log.c:127-139 |
+| type | S4FOX: a tag whose `tfile4type` is `r4currency`, `r4int`, `r4dateTime` or `r4dateTimeMilli` is skipped — **a blacklist of four, not a shortlist**, see below | r4log.c:127-139 |
 | filter | a tag with a filter (`tagFile->filter != 0`) is skipped | r4log.c:144 |
 | unique | a tag for which `t4unique(tagOn) == r4uniqueContinue` is skipped | r4log.c:144 |
 
@@ -282,8 +298,14 @@ r4log.c:64-108. Paraphrased:
 - **Type.** "CodeBase is also not able to optimize on tags in the new FoxPro field formats. This is
   because we only have simple field support, so, eg: `INT_FIELD = 6` — `INT_FIELD` can be converted
   to a double as an expression check, but the constant `6` cannot be converted to an int which would
-  be able to be looked up in the index file." The allowed set is named as `r4double`, `r4charBin`,
-  `r4memoBin`.
+  be able to be looked up in the index file." The comment goes on to name the allowed set as
+  `r4double`, `r4charBin`, `r4memoBin` — **and the code does not implement that.** It is a `switch`
+  that `continue`s on four types and falls through on everything else, so **date, logical and binary
+  float keys are eligible**. Witnessed: `K_DATE = STOD("20200101")` matches a date tag and
+  `EMPTY(K_TEXT) = .T.` matches a tag over a logical expression, both fully mapped
+  (`CDXEXPR.query.dump.txt`). Per `CLAUDE.md`'s source-of-truth rule the code is authoritative and
+  the comment is noise, as in §10.4. A port that transcribed the comment would refuse three kinds of
+  tag the reference uses.
 - **Collation.** "problem was using general tags in relation but the relate module normally uses
   machine collation so results could differ depending on if a tag was available" (AS 04/26/00). The
   seek machinery *does* collate the constant (§6.1 calls `expr4keyConvert` with the tag), so this is
@@ -305,8 +327,8 @@ one (`T_UNIQ`) over the same field, and `K_DUP = "CHERRY"` matches `T_DUP`
 candidate rather than stopping at the first tag whose expression would have matched. A table with
 one tag per field could not distinguish the two behaviours.
 
-The net effect is that **CodeBase's optimizer can only use plain, unfiltered, machine-or-none-collated
-tags over `r4double`, `r4charBin` or `r4memoBin` keys.** For this port that excludes the integer,
+The net effect is that **CodeBase's optimizer can only use plain, unfiltered,
+machine-or-none-collated tags whose key type is not integer, currency or datetime.** For this port that excludes the integer,
 currency, datetime and `GENERAL` tags that steps 004-008 built and gated. Whether the port keeps the
 restriction is a decision, not a fact; §11.1 states the case each way, and **ADR-52 decided it**:
 replicate all four by default, widen the type and collation gates under an explicit setting, never
@@ -818,6 +840,8 @@ else is evaluated per candidate record (§7.3), which is always correct and neve
 | both sides fields | **no** — no constant | m4map.c:163-175 |
 | comparison against an `H` (`r4floatBin`) constant | **no** — `E4FLOAT` is not in `e4isConstant` | r4log.c:31-40; §3.2 |
 | a term over a tag of type `I`, `Y`, `T` or `r4dateTimeMilli` | **no** | r4log.c:127-139 |
+| a term over a **date** or **logical** tag | **yes** — the type gate is a blacklist of four, whatever its comment says | r4log.c:127-139; §3.4 |
+| a term inside an `.OR.` written before an unoptimizable one | **no**, and it is never even *tested* — operands are visited backwards and the branch dies at the first failure | m4map.c:107, 127-141; §3.3 |
 | a term over a `GENERAL`-collated tag | **no** by default (`useGeneralTagsInRelate == 0`) | r4log.c:115-120 |
 | a term over a filtered tag | **no** | r4log.c:144 |
 | a term over a `unique`/`candidate` tag | **no** by default (`errDefaultUnique == r4uniqueContinue`) | r4log.c:144; I4TAG.C:3327-3337 |

@@ -4,15 +4,15 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-step 1 of 9 done**
-**Current sub-step:** PLAN.md step 2, eligibility and subexpression identity. No C# of the optimizer
-exists yet; what exists is the oracle it will be measured against.
+**Status:** in progress — **sub-steps 1 and 2 of 9 done**
+**Current sub-step:** PLAN.md step 3, decomposition. The walk exists and matches tags; what it does
+not yet do is build constraints.
 
 ## Done so far
 
 - [x] phases 1-5 — [`DESIGN.md`](DESIGN.md) and [`PLAN.md`](PLAN.md) written, 2026-09-04
-- [x] step 1 — the query oracle, 2026-09-04 — **70 filters, five depths each, run and committed**
-- [ ] step 2 — eligibility and subexpression identity
+- [x] step 1 — the query oracle, 2026-09-04 — **74 filters, five depths each, run and committed**
+- [x] step 2 — eligibility and subexpression identity, 2026-09-04 — **depth 1 green, five mutations**
 - [ ] step 3 — decomposition
 - [ ] step 4 — the merge algebra
 - [ ] step 5 — leaf evaluation
@@ -20,6 +20,41 @@ exists yet; what exists is the oracle it will be measured against.
 - [ ] step 7 — the residual filter and the public surface
 - [ ] step 8 — the equivalence gate, and the widened scope
 - [ ] step 9 — close
+
+## What sub-step 2 landed
+
+`net/CodeBase.Net/Query/` — `QueryTagScope` (public), `QueryTag`, `TagEligibility`, `SubtreeMatch`
+and `QueryDecomposer`; plus `Table.QueryTags()` and `TableTagCursor.KeyKind` to project a table's
+tags into what the planner needs. Tests: `TagMatchGoldenTests` (depth 1) and, at layer 1,
+`TagEligibilityTests` and `SubtreeMatchTests`. **1968 tests green** (676 golden, 1292 unit), up
+from 1936.
+
+**Depth 1 passed on the first run** — every node of all 74 filters across three tables, matching the
+reference's own parallel array. **Five mutations were run and all five reddened it**: widening
+eligibility under `Compatible`, visiting a connective's operands forwards, an `.OR.` that does not
+abandon its branch, dropping the field-loader row exemption, and dropping the field-identity check.
+Restores were from a checksummed copy, verified, never from `git`.
+
+**The walk landed here rather than in sub-step 3, and it had to.** `e4isTag` is called from exactly
+two places, both inside `bitmap4can`'s comparison branch (m4map.c:165, 172) — never from a sweep over
+the node array. Only one operand of a comparison whose other operand is a constant is ever tested,
+and only for comparisons the walk actually reaches. So the tag array is a property of the **walk**,
+and depth 1 cannot be satisfied without it. `PLAN.md`'s sub-step 2 row says so now.
+
+**Two corpus filters exist only to gate that**, and they are the sharpest pair in the dump:
+`K_NUM > 0 .OR. K_LOG` and `K_LOG .OR. K_NUM > 0` select the same fourteen records and neither is
+optimized — but one records `T_NUM` and the other records nothing, because operands are visited
+**backwards** and an `.OR.` dies at the first one it cannot use. Nothing but the visit order gets
+both right, and a port that filled the array by testing every node against every tag would fill both.
+
+**A spec correction, and it would have cost three kinds of tag.** `QUERY-OPTIMIZER.md` §3.4 said the
+type gate allows `r4double`, `r4charBin` and `r4memoBin` — which is what the *comment* at r4log.c:71
+says. The **code** is a `switch` that refuses four types and falls through on everything else, so
+**date, logical and binary-float tags are eligible**. Four filters were added to `CDXEXPR` to witness
+it: `K_DATE = STOD("20200101")` and `EMPTY(K_TEXT) = .T.` both match a tag and are fully mapped.
+`STOD` is the clock-free way to write a date constant — `CTOD` infers the century from the system
+date, which would make the dump churn every year. Same pattern as ADR-33 and §10.4: the code is
+authoritative, the comment is noise.
 
 ## What sub-step 1 landed
 
@@ -117,10 +152,13 @@ it. Question 3 is the `e4tagExpr` one above.
   filters — so raw-bit equality would fail a correct port that omits the go-around (Decision 8).
   `DESIGN.md` Decision 8 already said depth 3 compares sets and not the flag, so this is `PLAN.md`
   catching up with `DESIGN.md`, not a change of intent. Both now say effective.
+- **The decomposition walk landed in sub-step 2, not sub-step 3.** Depth 1 is sub-step 2's gate and
+  depth 1 is a property of the walk, so `QueryDecomposer` exists now and returns the tag array;
+  sub-step 3 grows the same walk to build constraints rather than writing a second one.
 - **The oracle records five depths, not four.** Depth 0, the reference's own scan truth under
   `bitmapDisable`, was added to `DESIGN.md` as Decision 12 during the design pass and is what
   sub-step 1 actually built.
 
 ## Blockers
 
-None. Sub-step 2 needs no generator run: the oracle it is gated by is committed.
+None. Sub-step 3 needs no generator run either.

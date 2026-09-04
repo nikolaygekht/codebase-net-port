@@ -1,7 +1,13 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011's sub-step 1 — the query oracle**: `test-files-generator/src/dump-query.h/.cpp` and query
+**step 011's sub-step 2 — eligibility and subexpression identity**: `net/CodeBase.Net/Query/` now
+holds `QueryTagScope` (public), `QueryTag`, `TagEligibility`, `SubtreeMatch` and `QueryDecomposer`,
+and **depth 1 of the gate is green on its first run** — every node of all 74 filters matching the
+reference's own parallel array, with **five mutations run against it and all five red**. `dotnet
+test` green on **1968 tests** (676 golden, 1292 unit). It corrected the spec's type gate, which would
+have cost three kinds of tag.
+**Before it, sub-step 1 — the query oracle**: `test-files-generator/src/dump-query.h/.cpp` and query
 filter lists on three cases, three new `net/corpus/*.query.dump.txt` files holding **70 filters at
 five depths each**, and the C# that reads them. **No C# of the optimizer.** `dotnet test` green on
 **1936 tests** (666 golden, up from 639), and **all 48 pre-existing corpus files regenerated
@@ -267,8 +273,34 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011's sub-step 1 landed: the query oracle exists, and it overturned two things on its first
-run.** `dump-query.cpp` sets each filter on a real `RELATE4` and reads what the optimizer decided out
+**Step 011's sub-step 2 landed: the port matches tags exactly where the reference does.** Depth 1
+green on its first run across all 74 filters and every node, and five mutations reddened it —
+widening eligibility under `Compatible`, visiting a connective's operands forwards, an `.OR.` that
+does not abandon its branch, dropping the field-loader row exemption, and dropping the field-identity
+check. Restores from a checksummed copy, verified, never `git`.
+
+**The decomposition walk had to land here rather than in sub-step 3.** `e4isTag` is called from
+exactly two places, both inside `bitmap4can`'s comparison branch (m4map.c:165, 172) — never from a
+sweep over the node array. Only one operand of a comparison whose *other* operand is a constant is
+ever tested, and only for comparisons the walk reaches. So the tag array is a property of the
+**walk**, and depth 1 cannot be satisfied without it.
+
+**The sharpest pair in the corpus exists to gate exactly that.** `K_NUM > 0 .OR. K_LOG` and
+`K_LOG .OR. K_NUM > 0` select the same fourteen records and neither is optimized — but one records
+`T_NUM` and the other records nothing, because a connective's operands are visited **backwards** and
+an `.OR.` dies at the first one it cannot use. A port that filled the array by testing every node
+against every tag would fill both and look right on every other measure.
+
+**A spec correction that would have cost three kinds of tag.** §3.4 said the type gate allows
+`r4double`, `r4charBin` and `r4memoBin` — which is what the *comment* at r4log.c:71 says. The **code**
+refuses four types and falls through on everything else, so **date, logical and binary-float tags are
+eligible**. Four filters were added to witness it, and `K_DATE = STOD("20200101")` and
+`EMPTY(K_TEXT) = .T.` both match a tag and are fully mapped. `STOD` is the clock-free way to write a
+date constant, since `CTOD` takes its century from the system date. Same pattern as ADR-33: the code
+is authoritative, the comment is noise.
+
+**Before that in the same session — sub-step 1: the query oracle exists, and it overturned two things
+on its first run.** `dump-query.cpp` sets each filter on a real `RELATE4` and reads what the optimizer decided out
 of `RELATE4`/`RELATION4`; each filter is then run a **second** time with `RELATION4.bitmapDisable`
 set, so the dump carries the reference's own scan truth beside its optimized answer. 43 filters on
 `CDXEXPR`, 15 on `CDXBASE`, 12 on `CDXDEEP`. **All 48 pre-existing corpus files regenerate
@@ -649,13 +681,13 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-step 1 is done, sub-step 2 is next
+### Step 011 is under way: sub-steps 1 and 2 are done, sub-step 3 is next
 
-**Next is sub-step 2 — eligibility and subexpression identity**, and it needs **no generator run**:
-the oracle it is gated by is committed. `QueryTag`, `QueryTagScope`, `TagEligibility` and
-`SubtreeMatch`, gated by **depth 1** — for every filter, every node and every tag of the table, our
-answer to "does this tag's key expression equal this subtree?" must equal the reference's, under
-`Compatible`. `net/tests/CodeBase.Net.Golden/CorpusQueryDump.cs` already reads it.
+**Next is sub-step 3 — decomposition**, and it needs **no generator run**. `ConstraintValue`,
+`LeafConstraint`, `ConstraintNode`, `QueryPlan`, and `QueryDecomposer` grown to build constraints
+rather than only match tags — the walk is already there and already gated, so what is new is the
+operator-to-slot table in both operand orders and the partial-string widening. Gated by **depth 2**:
+`FullyMapped` must equal the reference's `fullyMapped` on every case.
 
 **Still owed to the corpus, and deliberately not folded into this run:** the second rejection pass
 with a real `TAG4FILE`, so `e4tagExpr` (−510) and the alias refusals stop being unobservable. It is a

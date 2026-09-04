@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 to 4 of 9 done**
-**Current sub-step:** PLAN.md step 5, combination. One leaf reaches its records; what is missing is
-folding several of them together. **The step order changed after sub-step 2** — see Deviations.
+**Status:** in progress — **sub-steps 1 to 5 of 9 done. The optimizer is complete and correct.**
+**Current sub-step:** PLAN.md step 6, the merge algebra — which now lands against a green
+end-to-end gate, which is what the reorder after sub-step 2 was for. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
@@ -15,6 +15,7 @@ folding several of them together. **The step order changed after sub-step 2** �
 - [x] step 2 — eligibility and subexpression identity, 2026-09-04 — **depth 1 green, five mutations**
 - [x] step 3 — decomposition, 2026-09-04 — **depth 2 green, four of five mutations red**
 - [x] step 4 — leaf evaluation, 2026-09-04 — **the contract pair passes, 41 filters reach depth 3**
+- [x] step 5 — combination, 2026-09-04 — **depth 3 green on all 74, four mutations red**
 - [ ] step 3 — decomposition
 - [ ] step 4 — the merge algebra
 - [ ] step 5 — leaf evaluation
@@ -22,6 +23,40 @@ folding several of them together. **The step order changed after sub-step 2** �
 - [ ] step 7 — the residual filter and the public surface
 - [ ] step 8 — the equivalence gate, and the widened scope
 - [ ] step 9 — close
+
+## What sub-step 5 landed
+
+`QueryExecutor` and `CandidateSetGoldenTests`. **Depth 3 is green on all 74 filters across three
+tables** — the candidate set this port builds holds exactly the records the reference's own bitmap
+holds, compared **before** any residual filtering and **before** any merging exists. **2066 tests
+green** (732 golden, 1334 unit). No corpus file changed.
+
+**The optimizer is now complete and correct**, seeking one tag twice where it will later seek once.
+That is what the reorder after sub-step 2 was for: the merge algebra lands next against a gate that
+is already green, so anything it moves is its own.
+
+**The executor is one routine where the reference has four**, and the reason is worth carrying:
+`bitmap4generate` hands every leaf a **freshly zeroed** bitmap (m4map.c:2328-2333), so the mode that
+picks between the and-side and or-side routines chooses *how* a leaf's set is computed and never
+*what it means*. A leaf's set does not depend on the connective above it. Now `QUERY-OPTIMIZER.md`
+§6.5 — and it **narrows §12 item 7**: `bmf4OrOt` being untranscribed cannot affect evaluating a leaf,
+only merging two `.OR.` leaves on one tag, which is Decision 9's territory anyway.
+
+**A spec correction that would have cost the whole gate.** §6.4 quoted the reference's own header
+comment approvingly: an `.AND.` map "marks as true all records which meet **at least one**
+condition". The code beside it folds an `.AND.` branch with `f4flagAnd` — an **intersection**. Built
+from the comment, the executor would union where it must intersect and return far too many records.
+The comment's parenthesis is the true part: an `.AND.` branch is a superset because a conjunct that
+could not be optimized was dropped, and the residual check is what removes what it would have
+excluded.
+
+**And one observation recorded rather than replicated.** A leaf whose constraint merging proved empty
+short-circuits asymmetrically (m4map.c:2267-2283): under an `.AND.` it leaves the set empty, which is
+right, and under an `.OR.` it makes **every record succeed**, which under §6.4's or-semantics would
+turn the query into the whole table. Whether it is reachable is not settled — `noMatch` comes from a
+merge, and whether an `.OR.` merge can prove emptiness is a `bmf4OrOt` question — and no corpus case
+reaches it. A port following set logic cannot produce it by accident, so §6.6 exists to stop someone
+producing it deliberately.
 
 ## What sub-step 4 landed
 
@@ -247,4 +282,4 @@ it. Question 3 is the `e4tagExpr` one above.
 
 ## Blockers
 
-None. Sub-step 5 needs no generator run either.
+None. Sub-step 6 needs no generator run either.

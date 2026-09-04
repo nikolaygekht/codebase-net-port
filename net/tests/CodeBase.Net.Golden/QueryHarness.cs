@@ -91,6 +91,12 @@ internal sealed class QueryHarness : IDisposable
             : plan.Root.Walk().Single(node => node.IsLeaf);
     }
 
+    /// <summary>Works out which records a filter's plan reaches.</summary>
+    /// <param name="filter">The filter text.</param>
+    /// <returns>The records.</returns>
+    public RecordSet Reach(string filter) =>
+        new QueryExecutor(tag => table.OpenProbe(tag), table.RecordCount).Evaluate(Plan(filter));
+
     /// <summary>Gets how many records the table holds.</summary>
     public int RecordCount => table.RecordCount;
 

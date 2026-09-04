@@ -1,7 +1,13 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011's sub-step 4 — leaf evaluation**: one constraint now reaches its records by seeking.
+**step 011's sub-step 5 — combination**, and with it **the optimizer is complete and correct**:
+**depth 3 of the gate is green on all 74 filters**, meaning the candidate set this port builds holds
+exactly the records the reference's own bitmap holds — compared before any residual filtering and
+before any merging exists. `dotnet test` green on **2066 tests** (732 golden, 1334 unit). Four
+mutations run, all red. No corpus file changed. It corrected a spec claim that would have cost the
+whole gate.
+**Before it, sub-step 4 — leaf evaluation**: one constraint reached its records by seeking.
 `ITagProbe` (the step's one seam) with a contract test run against **both** implementations,
 `TagProbe`, `RecordSet` and `ConstraintSeeker`. **41 single-leaf filters reach exactly the records
 the reference's own bitmap holds** — the first end-to-end signal — and `dotnet test` is green on
@@ -284,7 +290,34 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011's sub-step 4 landed: a constraint reaches its records.** `ITagProbe`, `TagProbe`,
+**Step 011's sub-step 5 landed, and the optimizer is now complete and correct.** `QueryExecutor`
+walks the plan, seeks each leaf and folds the children, and **depth 3 is green on all 74 filters
+across three tables** — before any residual filtering, so a decomposition error cannot hide behind a
+later pass, and before any merging, so what it measures is decomposition, seeking and combination
+alone. The port seeks one tag twice where it will later seek once, which is the right answer reached
+the slow way. **That is what the reorder after sub-step 2 was for**: the merge algebra lands next
+against a gate that is already green, so anything it moves is its own.
+
+**A spec correction that would have cost the whole gate.** `QUERY-OPTIMIZER.md` §6.4 quoted the
+reference's own header comment approvingly — an `.AND.` map "marks as true all records which meet
+**at least one** condition". The code beside it folds an `.AND.` branch with `f4flagAnd`, an
+**intersection**. Built from the comment, the executor would union where it must intersect and return
+far too many records. The comment's parenthesis is the true half: an `.AND.` branch is a superset
+because an unoptimizable conjunct was dropped, and the residual check removes what it would have
+excluded.
+
+**One routine where the reference has four**, and the reason narrows an open risk. Every leaf starts
+from a **freshly zeroed** bitmap, so the mode that picks between the and-side and or-side routines
+chooses *how* a leaf's set is computed and never *what it means* — a leaf's set does not depend on
+the connective above it. Now §6.5, and it **narrows §12 item 7**: `bmf4OrOt` being untranscribed
+cannot affect evaluating a leaf, only merging two `.OR.` leaves on one tag.
+
+**And one thing recorded rather than replicated.** A leaf proved empty short-circuits asymmetrically:
+under an `.AND.` the set stays empty, which is right; under an `.OR.` **every record succeeds**, which
+under the reference's own or-semantics would turn the query into the whole table. Reachability is not
+settled and no corpus case reaches it, so §6.6 records it to stop anyone reproducing it deliberately.
+
+**Before that in the same session — sub-step 4: a constraint reaches its records.** `ITagProbe`, `TagProbe`,
 `RecordSet`, `ConstraintSeeker`, and the **first end-to-end signal** — 41 single-leaf filters (24 on
 `CDXEXPR`, 9 on `CDXBASE`, 8 on `CDXDEEP`) reaching exactly the records the reference's bitmap holds.
 The fake and the real probe are held to **one contract test run against both**, because a stand-in
@@ -738,13 +771,14 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-steps 1 to 4 are done, and the order of the rest changed
+### Step 011 is under way: sub-steps 1 to 5 are done, and the optimizer works
 
-**Next is sub-step 5 — combination**, and it needs **no generator run**. `QueryExecutor`: walk the
-plan, seek each leaf, fold the children with the bitset's own intersect and union, and short-circuit a
-branch proved empty. **Depth 3 goes green there**, on all 74 filters rather than the 41 single-leaf
-ones — and at that point the optimizer is complete and correct, with the merge algebra still to come
-against a green end-to-end gate.
+**Next is sub-step 6 — the merge algebra**, and it needs **no generator run**. `ConstraintMerge` plus
+the reduce and redistribute passes that decide which leaves meet: two terms over one tag become one
+range, so the tag is seeked once instead of twice. Its gate is two assertions that fail differently —
+**depth 3 must stay green**, because merging must move no record set at all, and the **leaf count
+must fall**, because a merge that is correct and never merges passes the first and is useless. Then
+sub-step 7 adds the residual filter and the public surface.
 
 **The merge algebra moved from sub-step 4 to sub-step 6.** The first plan gated sub-step 3 on
 `FullyMapped` alone — one bit per filter, which cannot see a swapped bound — and then left the

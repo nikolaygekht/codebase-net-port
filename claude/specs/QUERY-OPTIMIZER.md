@@ -721,6 +721,42 @@ The comment at m4map.c:2318-2323 states the semantic difference that §7 turns i
 > bitmappable expressions). For an or, if the entry is set, then the record is in the set, **so no
 > further checking is needed**.
 
+**Its first clause is wrong and the code beside it is right.** An `.AND.` branch folds its children
+with `f4flagAnd` (m4map.c:2368-2371) — an **intersection**, not "at least one condition". What is
+true is the parenthesis: an `.AND.` branch's set is a *superset* of the answer, because a conjunct
+that could not be optimized was dropped from the branch entirely (§4.1) and only the residual check
+removes the records it would have excluded. A port that implemented the comment's first clause
+literally would union where it should intersect and return far too many records. Read the fold.
+
+### 6.5 A leaf's set does not depend on the connective above it
+
+Worth stating because it collapses four routines into one. `bitmap4generate` hands every leaf a
+**freshly zeroed** `F4FLAG` (m4map.c:2328-2333) before calling `bitmap4flagGenerate`, so the mode
+that selects between `bmf4AndEq`/`bmf4AndOt` and `bmf4OrNe`/`bmf4OrOt` is choosing *how to compute*
+the leaf's set and never *what it means*. The two families must therefore agree, and inspection says
+they do: an exclusion reached through the or path is flagged and inverted, and the same exclusion
+reached through the and path is an unbounded range walked with that value dropped. Same records.
+
+**Consequence for §12 item 7.** `bmf4OrOt` was never transcribed, and that is a smaller gap than it
+looks: it cannot mean anything a leaf under an `.AND.` does not already mean, so a port needs one
+leaf routine and not four. What the untranscribed routine still bears on is *merging* two `.OR.`
+leaves on one tag, which is a different question and the one a port should stay cautious about.
+
+### 6.6 An empty leaf under an `.OR.` — an observation, not a settled defect
+
+`bitmap4flagGenerate` short-circuits a leaf whose constraint merging proved empty (`noMatch`), and
+the two arms are not symmetric (m4map.c:2267-2283). Under an `.AND.` it returns with the flag left
+zeroed, which is the empty set and correct. Under an `.OR.` it makes **every record succeed** — the
+comments say so explicitly ("so make all succeed"). Since an `.OR.` branch unions its children and
+§6.4 says a set bit in an `.OR.` needs no further checking, a provably-empty disjunct would turn the
+whole query into every record.
+
+Whether that is reachable is **not settled here**: `noMatch` is set by `bitmap4collapse` after a
+merge proves a conjunction empty, and whether an `.OR.` merge can ever prove one is a question about
+`bmf4OrOt`'s family that this document does not answer. No corpus case reaches it. A port following
+set logic — an empty disjunct contributes nothing, an empty conjunct empties the branch — cannot
+produce the behaviour by accident, so the note is here to stop someone reproducing it deliberately.
+
 ---
 
 ## 7. Consumption — and the fall-back-to-scan boundary
@@ -1011,7 +1047,10 @@ is independent support.
 7. **`bmf4OrOt` (m4map.c:1902-2188) was read for its shape, not transcribed line by line.** It is the
    largest single routine in the module and handles OR ranges with their own position/flip logic. Its
    rules are believed to mirror `bmf4AndOt` with the flip polarity inverted; **verify before
-   implementing OR ranges.**
+   implementing OR ranges.** **Narrowed 2026-09-04:** §6.5 shows it cannot *mean* anything different
+   from the and-side routine, because every leaf starts from a zeroed bitmap — so evaluating a leaf
+   needs one routine whichever connective is above it, and this item bears only on **merging** two
+   `.OR.` leaves on one tag.
 8. ~~**No corpus case gates any of this yet**~~ — **as of 2026-09-04 seventy filters do**, across
    `CDXEXPR` (43), `CDXBASE` (15) and `CDXDEEP` (12), each recorded at five depths including the
    reference's own scan truth. **Visual FoxPro cannot supply one.** ADR-44's oracle

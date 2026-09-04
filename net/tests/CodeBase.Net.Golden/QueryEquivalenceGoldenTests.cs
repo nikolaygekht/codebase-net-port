@@ -176,6 +176,47 @@ public sealed class QueryEquivalenceGoldenTests
     }
 
     /// <summary>
+    /// And a constant the widened tag's keys cannot express exactly is still refused, in both scopes.
+    /// </summary>
+    /// <value>
+    /// An integer key holds no halves, and rounding one either way moves the boundary: the records
+    /// with two in them are outside "at least two and a half" and inside "at least two". So the term
+    /// is checked per record instead. The reference never faces this, because it gives the tag up
+    /// before it ever looks at the constant.
+    /// </value>
+    [Theory]
+    [InlineData("K_INT > 2.5")]
+    [InlineData("K_INT >= 2.5")]
+    [InlineData("K_CUR > 0.00005")]
+    public void AConstantTheKeysCannotExpressIsRefusedEvenWhenWidened(string filter)
+    {
+        using QueryHarness compatible = QueryHarness.For("CDXEXPR");
+        using QueryHarness wide = QueryHarness.For("CDXEXPR", QueryTagScope.AllSeekable);
+
+        compatible.Plan(filter).Root.Should().BeNull();
+        wide.Plan(filter).Root.Should().BeNull("no key means exactly {0}", filter);
+    }
+
+    /// <summary>
+    /// A datetime tag is never used, and two independent things stop it: no literal is a moment, and
+    /// a timestamp field will not compile against a number at all.
+    /// </summary>
+    /// <value>
+    /// Recorded because the guard that refuses such a constant is unreachable today, and a reader
+    /// finding it should know it is a guard rather than a live path. It earns its place by being what
+    /// would keep a datetime tag safe if a timestamp constant ever became expressible -- without it,
+    /// a number would be written into a datetime key.
+    /// </value>
+    [Fact]
+    public void ADatetimeTagIsNeverUsedBecauseNoConstantCanReachIt()
+    {
+        using QueryHarness wide = QueryHarness.For("CDXEXPR", QueryTagScope.AllSeekable);
+
+        wide.Plan("K_TS > K_TS").Root.Should().BeNull("neither side is a constant");
+        Assert.Throws<CodeBaseException>(() => wide.Plan("K_TS > 0"));
+    }
+
+    /// <summary>
     /// A collated tag is never used, in either scope, because a filter's comparisons are in byte
     /// order and its keys are not.
     /// </summary>

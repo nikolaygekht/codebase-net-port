@@ -359,6 +359,16 @@ and `setStable` is yes for all 70.
 
 ## Notes for the next session
 
+**A field qualified by the table's own alias is refused, in filters and in tag expressions alike.**
+`CDXEXPR->K_NUM > 0` comes back `e4fieldName` (−210), and so would the same text as a tag expression.
+The cause is one line in two places: `ExpressionParser.Parse` takes the set of aliases a field may be
+qualified by and **neither `Table.CompileFilter` nor `SeekConverter.For` passes it**, so the scanner
+never learns the table's own name and the qualified form never resolves. It is a step 010 gap rather
+than a step 011 one — the two paths are consistent with each other — and it fails safe, refusing
+rather than answering wrongly. Worth fixing where `EXPR` is next touched; the alias machinery is also
+what multi-table relations would need, and it is inert until then.
+
+
 **Two decisions were taken during design and are already ADRs**, so they do not need re-deriving:
 tag eligibility replicates CodeBase by default and widens under an explicit `QueryTagScope`
 (**ADR-52**), and the reference's `tagPos = 1` defect is not replicated — the intent is

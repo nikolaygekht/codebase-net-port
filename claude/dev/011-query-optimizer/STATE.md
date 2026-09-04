@@ -361,7 +361,11 @@ and `setStable` is yes for all 70.
 
 ## Notes for the next session
 
-**A field qualified by the table's own alias is refused, in filters and in tag expressions alike.**
+**~~A field qualified by the table's own alias is refused~~ — fixed 2026-09-04.** What follows is the
+finding as it stood; the fix was one argument in each of two places, plus routing the test harness
+through the real compile path.
+
+**A field qualified by the table's own alias was refused, in filters and in tag expressions alike.**
 `CDXEXPR->K_NUM > 0` comes back `e4fieldName` (−210), and so would the same text as a tag expression.
 The cause is one line in two places: `ExpressionParser.Parse` takes the set of aliases a field may be
 qualified by and **neither `Table.CompileFilter` nor `SeekConverter.For` passes it**, so the scanner

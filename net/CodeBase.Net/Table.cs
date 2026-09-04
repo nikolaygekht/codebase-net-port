@@ -933,10 +933,19 @@ public sealed class Table : IDisposable
     /// <param name="filter">The expression.</param>
     /// <returns>The compiled filter.</returns>
     /// <exception cref="CodeBaseException">The expression cannot be compiled against this table.</exception>
-    internal CompiledExpression CompileFilter(string filter) =>
-        TypeResolver.Resolve(ExpressionParser.Parse(
-            filter,
-            new TableFieldMetadata([.. Fields], System.IO.Path.GetFileNameWithoutExtension(Path))));
+    /// <value>
+    /// The table's own name is handed to the scanner as an alias a field may be qualified by, because
+    /// that is where the reference reads it (e4parse.c:2357-2417) and without it the qualified form
+    /// never resolves. A filter naming any other alias still fails, which is what refuses a field of
+    /// a table this query does not have.
+    /// </value>
+    internal CompiledExpression CompileFilter(string filter)
+    {
+        string alias = System.IO.Path.GetFileNameWithoutExtension(Path);
+
+        return TypeResolver.Resolve(ExpressionParser.Parse(
+            filter, new TableFieldMetadata([.. Fields], alias), [alias]));
+    }
 
     /// <summary>
     /// Gathers what evaluating an expression over the current record needs.

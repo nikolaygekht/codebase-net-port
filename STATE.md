@@ -54,6 +54,14 @@ and item 7 is narrowed twice.
 10 121. The go-around could recover at most that.
 
 
+**One fix landed after the step closed.** A field qualified by the table's **own** name —
+`CDXEXPR->K_NUM` — was refused as an unknown field, in filters and tag expressions alike, because
+neither compile path passed the alias set to the scanner (the reference reads it there,
+`e4parse.c:2357-2417`). One argument in each of two places. It also found that the query tests'
+harness carried its **own copy** of the compile path, so the suite stayed green while the real one
+was broken; it goes through `Table.CompileFilter` now, which is what a harness should have been doing
+all along. **3262 tests green** (801 golden, 2461 unit).
+
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status
 and gates in [`claude/PORTING-PLAN.md`](claude/PORTING-PLAN.md) §5.

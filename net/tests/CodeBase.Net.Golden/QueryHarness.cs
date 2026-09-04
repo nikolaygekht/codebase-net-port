@@ -5,7 +5,7 @@ using CodeBase.Net.TestUtils;
 namespace CodeBase.Net.Golden;
 
 /// <summary>
-/// One corpus table, its tags projected once, and a filter compiler over its fields.
+/// One corpus table, its tags projected once, and its own compiler for a filter.
 ///
 /// Shared by the query gates so they all decompose a filter the same way. Opening the table and
 /// projecting its tags is done once per harness rather than per filter, because the projection is
@@ -15,7 +15,6 @@ internal sealed class QueryHarness : IDisposable
 {
     private readonly CodeBaseEngine engine;
     private readonly Table table;
-    private readonly IFieldMetadata fields;
     private readonly IReadOnlyList<QueryTag> tags;
     private readonly QueryTagScope scope;
 
@@ -25,14 +24,12 @@ internal sealed class QueryHarness : IDisposable
         CodeBaseEngine engine,
         Table table,
         CorpusQueryDump? dump,
-        IFieldMetadata fields,
         IReadOnlyList<QueryTag> tags,
         QueryTagScope scope)
     {
         this.engine = engine;
         this.table = table;
         this.dump = dump;
-        this.fields = fields;
         this.tags = tags;
         this.scope = scope;
     }
@@ -62,7 +59,6 @@ internal sealed class QueryHarness : IDisposable
             File.Exists(Path.Combine(Corpus.Root, table + ".query.dump.txt"))
                 ? CorpusQueryDump.Load(table)
                 : null,
-            new TableFieldMetadata([.. opened.Fields], table),
             opened.QueryTags(),
             scope);
     }
@@ -70,8 +66,13 @@ internal sealed class QueryHarness : IDisposable
     /// <summary>Compiles a filter against the table's fields.</summary>
     /// <param name="filter">The filter text.</param>
     /// <returns>The compiled filter.</returns>
-    public CompiledExpression Compile(string filter) =>
-        TypeResolver.Resolve(ExpressionParser.Parse(filter, fields));
+    /// <value>
+    /// Through the table rather than by assembling the parser and the resolver here, so that these
+    /// checks compile a filter exactly as a caller's query does. A harness with its own copy of that
+    /// path is how a suite stays green while the real one is broken -- which is what happened when
+    /// the table learned to pass its own name to the scanner and this did not.
+    /// </value>
+    public CompiledExpression Compile(string filter) => table.CompileFilter(filter);
 
     /// <summary>Works out which tag answers each node of a filter.</summary>
     /// <param name="filter">The filter text.</param>

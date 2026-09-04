@@ -157,6 +157,42 @@ public sealed class QueryResultGoldenTests
         seen.Should().BeGreaterThan(0);
     }
 
+    /// <summary>
+    /// A field may be qualified by the table's own name, and by no other.
+    /// </summary>
+    /// <value>
+    /// The reference reads the aliases a name may carry while it is still scanning, so a table always
+    /// knows its own; this port has to be told, and until the query path made the omission visible it
+    /// was not -- so [c]CDXEXPR-&gt;K_NUM[/c] came back as an unknown field in filters and in tag
+    /// expressions alike. A foreign alias still fails, with the code the reference reports for it,
+    /// which is the corpus's one recorded alias case.
+    /// </value>
+    [Fact]
+    public void AFieldMayBeQualifiedByTheTablesOwnNameAndNoOther()
+    {
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
+
+        harness.Plan("CDXEXPR->K_NUM > 0").LeafCount.Should().Be(1, "the table knows its own name");
+        harness.OnlyLeaf("CDXEXPR->K_NUM > 0").Constraint!.ToString()
+            .Should().Be(harness.OnlyLeaf("K_NUM > 0").Constraint!.ToString());
+
+        Assert.Throws<CodeBaseException>(() => harness.Plan("OTHER->K_NUM > 0"))
+            .Code.Should().Be(ErrorCode.FieldName);
+    }
+
+    /// <summary>
+    /// And a query written that way returns the same records as one written without it.
+    /// </summary>
+    [Fact]
+    public void AQualifiedFilterReturnsWhatTheUnqualifiedOneDoes()
+    {
+        using var engine = new CodeBaseEngine();
+        using Table opened = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
+        opened.SelectTag(null);
+
+        Walk(opened.Query("CDXEXPR->K_NUM > 0")).Should().Equal(Walk(opened.Query("K_NUM > 0")));
+    }
+
     private static List<int> Walk(Query query)
     {
         List<int> records = [];

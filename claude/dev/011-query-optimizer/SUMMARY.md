@@ -85,9 +85,11 @@ in the step** — every regeneration was byte-identical outside the query dumps.
   walk, about 121 reads. The go-around could recover at most that. Not worth building.
 - **`bmf4OrOt` is still untranscribed**, but its *answers* are now witnessed on all five shapes the
   corpus reaches (`QUERY-OPTIMIZER.md` §12 item 7, narrowed twice).
-- **A field qualified by the table's own alias is refused** — `CDXEXPR->K_NUM` comes back
-  `e4fieldName`, in filters and tag expressions alike, because neither `Table.CompileFilter` nor
-  `SeekConverter.For` passes the alias set to the scanner. A step 010 gap; it fails safe.
+- ~~A field qualified by the table's own alias is refused~~ — **fixed 2026-09-04**, after the step
+  closed. The table's own name now reaches the scanner in both paths, so `CDXEXPR->K_NUM` resolves
+  and a foreign alias still fails with the reference's own code. Fixing it also found that
+  `QueryHarness` carried its **own copy** of the compile path, which is how the suite stayed green
+  while the real one was broken; it goes through `Table.CompileFilter` now.
 - **Two corpus gaps named rather than papered over:** the filtered-tag refusal cannot be isolated by
   any dump (every filtered tag shares its field with a plain one), and a collated tag can only be
   reached where no machine tag shadows it.

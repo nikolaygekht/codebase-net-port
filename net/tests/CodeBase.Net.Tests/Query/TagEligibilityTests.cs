@@ -90,21 +90,27 @@ public sealed class TagEligibilityTests
         TagEligibility.Allows(Plain((KeyKind)kind), QueryTagScope.Compatible).Should().BeTrue();
 
     /// <summary>
-    /// A collated tag is refused by default and usable when widened -- and note that a collated tag
-    /// is a character tag, so this is the collation gate on its own and not the type gate again.
+    /// A collated tag is refused under both scopes, and it is a character tag, so this is the
+    /// collation gate on its own and not the type gate again.
     /// </summary>
+    /// <value>
+    /// The refusal the widened scope does [b]not[/b] lift, because it is not a limitation of the
+    /// reference: a filter's comparisons are in byte order and a collated tag's keys are not, so a
+    /// range of one selects a different set of records -- and a term answered by a tag is never
+    /// checked again, so nothing puts the missing ones back.
+    /// </value>
     [Fact]
-    public void ACollatedTagIsUsableOnlyWhenWidened()
+    public void ACollatedTagIsRefusedUnderBothScopes()
     {
         QueryTag collated = Plain(KeyKind.CollatedCharacter, CollationName.General);
 
         TagEligibility.Allows(collated, QueryTagScope.Compatible).Should().BeFalse();
-        TagEligibility.Allows(collated, QueryTagScope.AllSeekable).Should().BeTrue();
+        TagEligibility.Allows(collated, QueryTagScope.AllSeekable).Should().BeFalse();
     }
 
     /// <summary>
-    /// Widening lifts the reference's two limits and neither of the structural ones, so a tag that is
-    /// both filtered and of a widened type stays refused.
+    /// Widening lifts the reference's one liftable limit and none of the structural ones, so a tag
+    /// that is both filtered and of a widened type stays refused.
     /// </summary>
     [Fact]
     public void WideningDoesNotRescueAStructuralRefusal() =>

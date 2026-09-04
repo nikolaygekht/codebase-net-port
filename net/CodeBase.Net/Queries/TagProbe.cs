@@ -73,15 +73,43 @@ internal sealed class TagProbe : ITagProbe
             return KeySearch.Into(buffer, weighed, converter.KeyLength, converter.PadByte);
         }
 
+        int indicator = converter.HasNullIndicator ? 1 : 0;
         int written = ExpressionKey.Write(
-            value.Source, converter.Compiled.HasTrim, converter.HasNullIndicator, buffer);
+            InTheTagsDomain(value), converter.Compiled.HasTrim, converter.HasNullIndicator, buffer);
 
-        int length = converter.Kind == KeyKind.Character
-            ? Math.Min(value.Length, written)
+        // A character value shorter than the key stays short; a number is always its whole width.
+        int length = converter.Kind is KeyKind.Character or KeyKind.CollatedCharacter
+            ? Math.Min(value.Length + indicator, written)
             : written;
 
         return KeySearch.Into(buffer, length, converter.KeyLength, converter.PadByte);
     }
+
+    /// <summary>
+    /// Restates a constant as a value of the kind the tag's keys are made of.
+    /// </summary>
+    /// <value>
+    /// A key is built from what a value [i]is[/i], so a constant has to arrive as the right kind of
+    /// thing before it can become one. The two differ wherever a comparison promoted the field: an
+    /// integer field compared against a number promotes to a double, so the constant arrives as a
+    /// double while the tag's keys are four bytes of integer, and writing it as what it is would put
+    /// eight bytes into four.
+    ///
+    /// This is exactly where the reference gives up instead. It refuses integer, currency and
+    /// datetime tags outright and says why -- the constant "cannot be converted to an int which would
+    /// be able to be looked up in the index file". Converting it is the whole of what lets this
+    /// library use those tags, and refusing the constants that would not survive the conversion is
+    /// what keeps that honest.
+    /// </value>
+    private ExpressionValue InTheTagsDomain(ConstraintValue value) => converter.Kind switch
+    {
+        KeyKind.Int32 => ExpressionValue.Whole((int)value.Number),
+        KeyKind.Currency => ExpressionValue.Currency(ConstraintValue.AsCurrency(value.Number)),
+        KeyKind.Single => ExpressionValue.Float(value.Number),
+        KeyKind.Logical => ExpressionValue.Logic(value.Source.Logical),
+        KeyKind.Double or KeyKind.Date => ExpressionValue.Numeric(value.Number),
+        _ => value.Source,
+    };
 
     /// <inheritdoc/>
     public bool First() => descending ? cursor.Bottom() : cursor.Top();

@@ -1738,7 +1738,7 @@ the smallest surface that makes the policy sayable.
 **Consequence.** Its documentation is now API documentation and follows docgen's rules, and the
 default it advertises — infer no century — is the behaviour most callers will meet first.
 
-## ADR-52 — The optimizer replicates CodeBase's tag refusals by default and widens by an explicit setting · accepted
+## ADR-52 — The optimizer replicates CodeBase's tag refusals by default and widens by an explicit setting · accepted, collation half superseded by ADR-54
 
 **Date.** 2026-09-04. Closes the first half of **ADR-46**.
 
@@ -1855,3 +1855,55 @@ equal the reference's even though the port's residual filter ran on fewer terms 
 which needs no reference at all. `QUERY-OPTIMIZER.md` §10.1 already recommended the first; §7.3 and
 §12 item 2 are updated with the second and the resolution. `PORTING-PLAN.md` §8's benign-divergence
 list gains both.
+
+## ADR-54 — A collated tag may never answer a query, and the full-scan gate is what found it · accepted
+
+**Date.** 2026-09-04. **Supersedes the collation half of [ADR-52](#adr-52); its type half stands.**
+
+**Context.** ADR-52 gave `QueryTagScope.AllSeekable` two widenings: the key **type** gate, whose
+stated reason in the reference does not hold here, and the **collation** gate. Its argument for the
+second was that the reference refuses a collated tag because *its* residual comparison runs in byte
+order and could disagree with the tag, and that "the argument is inert here, because a term backed by
+a tag is never re-compared and a term not backed by one never consults the tag's order — so the two
+orders never meet in one answer."
+
+**That argument is wrong, and step 011's sub-step 8 proved it.** The two orders do not need to meet
+in one answer. **A comparison in a filter is defined in byte order** — that is what evaluating it
+does — while a collated tag stores its keys in another order, so answering the filter by seeking the
+tag silently substitutes one for the other. And because a term answered by a tag is never checked
+again, nothing puts back what the substitution dropped.
+
+**The evidence, from `CDXCOLL` under `AllSeekable`.** The filter `K_TEXT > "M"` lost **six records** —
+`alpha`, `cafe`, `café`, `Æther`, `æon` and `aeon`. Every one of them begins with a byte above `M`'s,
+so the filter admits them; `GENERAL` collation sorts every one of them *below* `M`, so a range seek
+of the collated tag started past them. A wrong record set, which `CLAUDE.md` ranks above slowness.
+
+**Decision.** The collation gate is **structural**, alongside the filter and unique gates: a collated
+tag is refused in **both** scopes. `AllSeekable` widens the key **type** gate only.
+
+**Two things this also settles.**
+
+- **The reference's refusal is right for its own stated reason**, and the reason is better than its
+  comment suggests. It is not that a residual comparison *might* disagree with a tag; it is that the
+  filter and the tag are in different orders and using the tag answers a different question.
+- **`AllSeekable` needs a second, finer refusal that `Compatible` never reaches**: the constant must
+  be expressible in the tag's key domain **exactly**. A fractional number against an integer tag has
+  no exact key, and rounding it either way admits or drops the record on the boundary — `K_INT >= 2.5`
+  is not `K_INT >= 2`. Such a term falls back to being checked per record. The reference has no
+  equivalent because it never converts a constant into those domains at all.
+
+**How it was found, which is the part worth carrying.** Every other gate in step 011 compares against
+what the C library answered, and under `Compatible` a collated tag is refused — so no reference-backed
+gate could see this at all. **Gate A computes its own expectation** by evaluating the same compiled
+filter over every record, which is why it is the only check that can be pointed at tags the reference
+would not use. `PORTING-PLAN.md` §5 already called it non-negotiable; it earned that here, on its
+first run, twice — the collated defect and a key-domain conversion bug that wrote eight bytes of
+double into a four-byte integer key.
+
+**Rejected — keeping the collation widening behind a further opt-in.** There is no setting under which
+returning fewer records than the filter names is what a caller wanted.
+
+**Consequences.** `TagEligibility` refuses collation in both scopes and gains `CanExpress` for the
+constant. `QUERY-OPTIMIZER.md` §3.4 and §11.1 are corrected. `CDXCOLL` joins the equivalence gate,
+where it is the only table that can witness this, and it needs no generator run because its
+expectation is a scan.

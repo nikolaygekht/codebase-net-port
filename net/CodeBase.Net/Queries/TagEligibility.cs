@@ -1,4 +1,5 @@
 using CodeBase.Net.Cdx;
+using CodeBase.Net.Expressions;
 
 namespace CodeBase.Net.Queries;
 
@@ -22,8 +23,45 @@ internal static class TagEligibility
     /// <param name="scope">Which tags the caller allows.</param>
     /// <returns>True when the optimizer may use it.</returns>
     public static bool Allows(in QueryTag tag, QueryTagScope scope) =>
-        !tag.IsFiltered && !tag.IsUnique
-        && (scope == QueryTagScope.AllSeekable || (IsCompatibleKind(tag.Kind) && IsCompatibleOrder(tag.Collation)));
+        !tag.IsFiltered && !tag.IsUnique && IsUsableOrder(tag.Collation)
+        && (scope == QueryTagScope.AllSeekable || IsCompatibleKind(tag.Kind));
+
+    /// <summary>
+    /// Decides whether a tag's keys can express a constant exactly.
+    /// </summary>
+    /// <param name="tag">The tag.</param>
+    /// <param name="value">The constant a term compares against.</param>
+    /// <returns>True when a key can be built that means exactly this value.</returns>
+    /// <value>
+    /// A term is only worth seeking for if the value it names survives being turned into a key. Where
+    /// it does not, the tag is left alone and the term is checked per record instead, which is slower
+    /// and right.
+    ///
+    /// This is where the reference's blanket refusal of integer, currency and datetime tags turns
+    /// into a narrow one. It gives them up entirely because it cannot convert a constant into their
+    /// key domain at all; this library can, so it refuses only the constants that would not survive
+    /// the conversion. Two would not: a fractional number against an integer tag, where rounding it
+    /// either way admits or drops the record at the boundary, and a value too large for the key's
+    /// width. Under the compatible scope none of this is reachable, because those tags are refused
+    /// before a constant is ever looked at.
+    /// </value>
+    public static bool CanExpress(in QueryTag tag, ConstraintValue value) => tag.Kind switch
+    {
+        KeyKind.Int32 => IsWhole(value.Number) && value.Number is >= int.MinValue and <= int.MaxValue,
+        KeyKind.Currency => IsWhole(value.Number * 10000d)
+            && value.Number * 10000d is >= long.MinValue and <= long.MaxValue,
+        KeyKind.Single => (double)(float)value.Number == value.Number,
+
+        // Only a timestamp can name a moment, and no literal is one -- so a term against a datetime
+        // tag has no constant this could convert even in principle.
+        KeyKind.DateTime => value.Type is ExpressionType.Timestamp
+            or ExpressionType.TimestampWithMilliseconds,
+
+        _ => true,
+    };
+
+    /// <summary>Decides whether a number has nothing after its point.</summary>
+    private static bool IsWhole(double number) => Math.Floor(number) == number && !double.IsInfinity(number);
 
     /// <summary>
     /// The key types the reference implementation will optimize on.
@@ -44,17 +82,24 @@ internal static class TagEligibility
         kind is not (KeyKind.Int32 or KeyKind.Currency or KeyKind.DateTime);
 
     /// <summary>
-    /// The key orders the reference implementation will optimize on.
+    /// The key orders a tag may be used in, which is one.
     /// </summary>
     /// <param name="collation">The order the tag's character keys follow.</param>
-    /// <returns>True when the reference would not skip a tag in this order.</returns>
+    /// <returns>True when a term may be answered by seeking a tag in this order.</returns>
     /// <value>
-    /// The refusal is a correctness argument rather than a missing feature: the reference's residual
-    /// comparison runs in byte order, so a collated tag and the check that follows it could disagree
-    /// (AS 04/26/00, r4log.c:108-120). Here the argument is inert, because a term backed by a tag is
-    /// never re-compared and a term not backed by one never consults a tag's order -- so the two
-    /// orders never meet in one answer. The refusal is kept anyway under the compatible scope,
-    /// because it is what makes the reference's own record sets comparable.
+    /// Refused in [b]both[/b] scopes, and that is not conservatism. A comparison in a filter is
+    /// defined in byte order -- that is what evaluating it does -- while a collated tag stores its
+    /// keys in a different order, so seeking a range of one answers a different question. Over a
+    /// table holding [c]alpha[/c], [c]cafe[/c] and [c]aeon[/c] the filter "greater than M" includes
+    /// all three, because their first bytes are above that letter's; a collated tag sorts them below
+    /// it and a range seek drops them. Nothing downstream puts them back, because a term answered by
+    /// a tag is not checked again.
+    ///
+    /// The reference refuses collated tags for exactly this reason and says so: results "could
+    /// differ depending on if a tag was available" (AS 04/26/00, r4log.c:108-120). An earlier reading
+    /// of this port held that the argument did not apply here, because the two orders never meet in
+    /// one answer. They do not have to. The filter's meaning is one order and the tag is the other,
+    /// and answering the filter from the tag silently swaps them.
     /// </value>
-    private static bool IsCompatibleOrder(CollationName collation) => collation == CollationName.Machine;
+    private static bool IsUsableOrder(CollationName collation) => collation == CollationName.Machine;
 }

@@ -272,6 +272,11 @@ internal sealed class QueryDecomposer
                 evaluator.Evaluate(constantNode, new EvaluationContext { Options = owner.options }),
                 filter.Nodes[constantNode].Length);
 
+            // A tag whose keys cannot express this exact value would answer a slightly different
+            // question, so the term is left to be checked per record instead.
+            if (!TagEligibility.CanExpress(tag, value))
+                return null;
+
             LeafConstraint? constraint = Constrain(filter.Nodes[root].Row, !constantOnRight, value, tag);
 
             return constraint is null ? null : ConstraintNode.Leaf(tag, constraint, root);

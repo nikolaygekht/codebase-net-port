@@ -330,9 +330,9 @@ one tag per field could not distinguish the two behaviours.
 The net effect is that **CodeBase's optimizer can only use plain, unfiltered,
 machine-or-none-collated tags whose key type is not integer, currency or datetime.** For this port that excludes the integer,
 currency, datetime and `GENERAL` tags that steps 004-008 built and gated. Whether the port keeps the
-restriction is a decision, not a fact; §11.1 states the case each way, and **ADR-52 decided it**:
-replicate all four by default, widen the type and collation gates under an explicit setting, never
-widen the filter and unique gates.
+restriction is a decision, not a fact; §11.1 states the case each way, and **ADR-52 decided it, as
+corrected by ADR-54**: replicate all four by default, and widen the **type gate only**. The filter,
+unique and collation gates are structural — see §11.1.
 
 ---
 
@@ -982,9 +982,21 @@ debug flag.
 
 **Decided by ADR-52: both, selected by `CodeBaseEngine.QueryTagScope`.** `Compatible` (the default)
 replicates, which is what keeps the reference usable as an oracle at three of the four gate depths;
-`AllSeekable` widens the type and collation gates. The **filter and unique gates are never widened**
-— a filtered tag indexes a subset of the table and a unique tag stores one key per duplicate group,
-so both refusals are structural rather than conservative.
+`AllSeekable` widens the **type gate only**.
+
+**The collation gate is never widened, and ADR-54 corrects ADR-52 on this.** The refusal is not a
+limitation of the reference to be lifted — it is a correctness rule, and a sharper one than the
+source's own comment states. A comparison in a filter is defined in **byte order**, which is what
+evaluating it does; a collated tag stores its keys in another order; so answering the filter by
+seeking the tag substitutes one order for the other, and a term answered by a tag is never checked
+again. Witnessed on `CDXCOLL`, where `K_TEXT > "M"` loses `alpha`, `cafe`, `café`, `Æther`, `æon` and
+`aeon` — each begins with a byte above `M`'s, and `GENERAL` sorts each below it.
+
+**And widening the type gate needs a refusal the reference has no equivalent of**: the constant must
+be expressible in the tag's key domain *exactly*. `K_INT >= 2.5` is not `K_INT >= 2`, so a fractional
+constant against an integer tag falls back to being checked per record. The reference never needs this
+because it never converts a constant into those domains at all — which is the very thing it gives the
+tags up for.
 
 ### 11.2 Model the canonical leaf as a type
 

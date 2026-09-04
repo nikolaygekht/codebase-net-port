@@ -5,8 +5,8 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — **sub-steps 1 to 7 of 9 done. A caller can run a query.**
-**Current sub-step:** PLAN.md step 8, the equivalence gate, the widened scope and the efficiency
-gate. **The step order changed after sub-step 2** — see Deviations.
+**Current sub-step:** PLAN.md step 8 — **Gate A is done and it found two wrong record sets**; what
+remains of the sub-step is Gate C, the counted efficiency assertions. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
@@ -25,6 +25,45 @@ gate. **The step order changed after sub-step 2** — see Deviations.
 - [ ] step 7 — the residual filter and the public surface
 - [ ] step 8 — the equivalence gate, and the widened scope
 - [ ] step 9 — close
+
+## What Gate A landed, and what it caught
+
+`QueryEquivalenceGoldenTests`: every filter's record sequence compared against a **scan of the same
+compiled filter**, in record-number order and in every tag's order, in **both** scopes — over four
+tables, `CDXCOLL` included, which has no query dump at all and needs none because the expectation is
+computed. **3246 tests green** (785 golden, 2461 unit). No corpus file changed.
+
+**It went red on its first run, only under `AllSeekable`, and it was right twice.**
+
+**The first was a crash rather than a wrong answer.** `TagProbe.KeyFor` built a key from what the
+constant *is* instead of from what the tag's keys *are*: comparing an integer field against a number
+promotes the field to a double, so the constant arrives as one, and writing it as a double put eight
+bytes into a four-byte integer key. Fixed by restating the constant in the tag's domain before
+building the key — which also had to keep going through `ExpressionKey.Write`, because bypassing it
+dropped the null-indicator byte and quietly broke `T_NULL` under the **default** scope.
+
+**The second is the one that matters, and it retires half of ADR-52.** Over `CDXCOLL` the filter
+`K_TEXT > "M"` **lost six records** — `alpha`, `cafe`, `café`, `Æther`, `æon`, `aeon`. Each begins
+with a byte above `M`'s, so the filter admits it; `GENERAL` collation sorts each *below* `M`, so a
+range seek of the collated tag started past them. ADR-52 had widened the collation gate on the
+argument that the reference's reason "is inert here, because the two orders never meet in one
+answer". They do not have to: **the filter's meaning is byte order and the tag is another order**, and
+answering the filter from the tag swaps them — with nothing downstream to put the records back,
+because a term answered by a tag is never checked again. **ADR-54** makes collation structural,
+refused in both scopes, and `AllSeekable` now widens the **type gate only**.
+
+**Widening the type gate needed a refusal of its own**, which `Compatible` never reaches: the constant
+must be expressible in the tag's key domain **exactly**. `K_INT >= 2.5` is not `K_INT >= 2`, so a
+fractional constant against an integer tag falls back to being checked per record. The reference has
+no equivalent because it never converts into those domains at all — which is the very thing it gives
+those tags up for.
+
+**Why nothing else could have found either.** Every other gate here compares against what the C
+library answered, and under `Compatible` a collated tag is refused — so no reference-backed check can
+say anything about one. Gate A computes its own expectation, which is exactly why it is the only
+check that can be pointed at tags the reference would not use. It is also the slowest thing in the
+suite by far, at 46 seconds, because it reads every record for every filter over every tag; that is
+what it costs to have an expectation that owes the reference nothing.
 
 ## What sub-step 7 landed
 

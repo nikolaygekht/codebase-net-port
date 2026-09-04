@@ -69,6 +69,13 @@ internal sealed class ConstraintValue
     }
 
     /// <summary>
+    /// Scales a number into the ten-thousandths a currency key is made of.
+    /// </summary>
+    /// <param name="number">The number.</param>
+    /// <returns>The scaled value.</returns>
+    public static long AsCurrency(double number) => (long)Math.Round(number * 10000d);
+
+    /// <summary>
     /// Orders two values of one tag's key domain.
     /// </summary>
     /// <param name="other">The value to compare against.</param>

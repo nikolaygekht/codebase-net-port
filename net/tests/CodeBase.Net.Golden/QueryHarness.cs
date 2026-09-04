@@ -19,24 +19,31 @@ internal sealed class QueryHarness : IDisposable
     private readonly IReadOnlyList<QueryTag> tags;
     private readonly QueryTagScope scope;
 
+    private readonly CorpusQueryDump? dump;
+
     private QueryHarness(
         CodeBaseEngine engine,
         Table table,
-        CorpusQueryDump dump,
+        CorpusQueryDump? dump,
         IFieldMetadata fields,
         IReadOnlyList<QueryTag> tags,
         QueryTagScope scope)
     {
         this.engine = engine;
         this.table = table;
-        Dump = dump;
+        this.dump = dump;
         this.fields = fields;
         this.tags = tags;
         this.scope = scope;
     }
 
     /// <summary>Gets the reference's own answers for this table.</summary>
-    public CorpusQueryDump Dump { get; }
+    /// <value>
+    /// Absent for a table the generator records no filters for, which is legitimate: a check whose
+    /// expectation is a scan rather than a recorded answer needs no dump at all.
+    /// </value>
+    public CorpusQueryDump Dump => dump ?? throw new InvalidOperationException(
+        "This table has no recorded query answers; only checks computing their own expectation apply.");
 
     /// <summary>
     /// Opens a corpus table and takes what planning a filter over it needs.
@@ -52,7 +59,9 @@ internal sealed class QueryHarness : IDisposable
         return new QueryHarness(
             engine,
             opened,
-            CorpusQueryDump.Load(table),
+            File.Exists(Path.Combine(Corpus.Root, table + ".query.dump.txt"))
+                ? CorpusQueryDump.Load(table)
+                : null,
             new TableFieldMetadata([.. opened.Fields], table),
             opened.QueryTags(),
             scope);

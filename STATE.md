@@ -1,7 +1,13 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011's sub-step 7 — the residual filter and the public surface**, so **a caller can run a
+**Gate A — full-scan equivalence — and it found two wrong record sets that nothing else could have.**
+Every filter's records are now compared against a scan of the same compiled filter, in both orders,
+in both tag scopes, over four tables including `CDXCOLL`, which has no query dump and needs none.
+**3246 tests green** (785 golden, 2461 unit). It retired half of **ADR-52**: a collated tag may never
+answer a query, in either scope (**ADR-54**), because `K_TEXT > "M"` over `CDXCOLL` lost six records
+whose bytes are above `M` and whose collation weights are below it.
+**Before it, sub-step 7 — the residual filter and the public surface**, so **a caller can run a
 query**: `table.Query("UPPER(NAME) = \"SM\" .AND. SALARY > 50000")`, walked in the selected tag's
 order or in record-number order, with a count that reads no record when the plan answers the whole
 filter. **Depth 4 of the gate is green on its first run** — all 81 filters, both orders, counts and
@@ -303,7 +309,36 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011's sub-step 7 landed: a caller can run a query.** `ResidualFilter`, the public `Query`
+**Gate A landed, and it was right twice on its first run — both times only under `AllSeekable`,
+which no reference-backed gate can see at all.**
+
+**The one that matters retires half of ADR-52.** Over `CDXCOLL`, `K_TEXT > "M"` **lost six records**:
+`alpha`, `cafe`, `café`, `Æther`, `æon`, `aeon`. Each begins with a byte above `M`'s, so the filter
+admits it; `GENERAL` collation sorts each below `M`, so a range seek of the collated tag started past
+them. ADR-52 had widened the collation gate arguing the reference's reason was "inert here, because
+the two orders never meet in one answer" — **they do not have to**. The filter's meaning is byte
+order, the tag is another order, and answering the filter from the tag swaps them, with nothing
+downstream to put the records back because a term answered by a tag is never checked again.
+**ADR-54** makes collation structural: refused in both scopes, and `AllSeekable` widens the **type
+gate only**.
+
+**The other was a crash.** `TagProbe.KeyFor` built a key from what the constant *is* rather than what
+the tag's keys *are* — an integer field compared against a number promotes to a double, so eight
+bytes of double went into a four-byte integer key. Fixing it by bypassing the key writer then dropped
+the null-indicator byte and broke `T_NULL` under the **default** scope, which the reference-backed
+gates caught at once.
+
+**And widening the type gate needed a refusal the reference has no equivalent of:** the constant must
+be expressible in the tag's key domain **exactly**, because `K_INT >= 2.5` is not `K_INT >= 2`. A
+fractional constant against an integer tag falls back to being checked per record.
+
+**Why nothing else could have found either.** Every other gate compares against what the C library
+answered, and under `Compatible` a collated tag is refused — so no reference-backed check can say
+anything about one. Gate A computes its own expectation, which is why it is the only check that can
+be pointed at tags the reference would not use. `PORTING-PLAN.md` §5 called it non-negotiable; it
+earned that on its first run.
+
+**Before that in the same session — sub-step 7: a caller can run a query.** `ResidualFilter`, the public `Query`
 with both skip strategies, `Table.Query`, `CodeBaseEngine.QueryTagScope` and `ErrorCode.Relate`.
 **Depth 4 green on its first run** — 81 filters, record-number order and tag order, counts and
 backwards walks — and with it **ADR-53's second divergence is proved**: the port's residual checks

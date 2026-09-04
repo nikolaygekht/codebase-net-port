@@ -1,4 +1,4 @@
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// Walks a plan, seeks each of its leaves, and combines what they reach.

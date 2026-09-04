@@ -1,6 +1,6 @@
 using AwesomeAssertions;
 using CodeBase.Net.Expressions;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 using Xunit;
 
 namespace CodeBase.Net.Golden;

@@ -1,7 +1,14 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011's sub-step 6 — the merge algebra**: two terms over one tag now become one seek, and
+**step 011's sub-step 7 — the residual filter and the public surface**, so **a caller can run a
+query**: `table.Query("UPPER(NAME) = \"SM\" .AND. SALARY > 50000")`, walked in the selected tag's
+order or in record-number order, with a count that reads no record when the plan answers the whole
+filter. **Depth 4 of the gate is green on its first run** — all 81 filters, both orders, counts and
+backwards walks — and **ADR-53's second divergence is proved**: the port's residual checks strictly
+fewer terms than the reference's and returns the same records. `dotnet test` green on **3225 tests**
+(764 golden, 2461 unit). No corpus file changed.
+**Before it, sub-step 6 — the merge algebra**: two terms over one tag now become one seek, and
 **depth 3 stayed green through it**, which is what the whole reorder was for. It went red the moment
 merging landed and caught two real bugs, one of them a shared-buffer alias that nothing before
 merging could have exposed. `dotnet test` green on **3209 tests** (748 golden, 2461 unit), up from
@@ -296,7 +303,35 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011's sub-step 6 landed: two terms over one tag become one seek.** `ConstraintMerge`, a fold
+**Step 011's sub-step 7 landed: a caller can run a query.** `ResidualFilter`, the public `Query`
+with both skip strategies, `Table.Query`, `CodeBaseEngine.QueryTagScope` and `ErrorCode.Relate`.
+**Depth 4 green on its first run** — 81 filters, record-number order and tag order, counts and
+backwards walks — and with it **ADR-53's second divergence is proved**: the port's residual checks
+strictly fewer terms than the reference's, because it asks the plan rather than reading two fixed
+positions beside each term, and returns the same records on every filter.
+
+**Three of five mutations did not redden, and that is the right shape rather than a gap.** The trust
+rule fails in one direction only. Trusting a term no leaf answered loses the records that term would
+have excluded (12 tests red), and a count that skips the residual keeps candidates that are not
+answers (2 red). Trusting *nothing*, or refusing to split the outer conjunction, only makes the port
+check terms the bitmap already answered — which can only agree with it, so no record moves and
+nothing can see it.
+
+**Which is why the fully-mapped short-circuit needed its own assertion**, and writing one found that
+the per-term rule did not cover it: a filter rooted at an `.OR.` has its leaves recorded against the
+comparisons inside it, so asking whether that one term is answered says no even when every part of it
+is. Whole-filter and per-term are the same question at two scales, and the coarse one has to be asked
+first.
+
+**Two mutations were invalid before they were valid**, both caught by insisting a run distinguish a
+build failure from a pass — one read a field while its own initializer was still running. A mutation
+that does not execute proves nothing, and an empty failure list looks identical either way.
+
+**One naming change:** the public class is `Query`, so the namespace is `CodeBase.Net.Queries` — a
+class cannot share a name with its own namespace, the caller-facing name is the one a reader sees,
+and `Expressions` beside it already sets the plural precedent.
+
+**Before that in the same session — sub-step 6: two terms over one tag become one seek.** `ConstraintMerge`, a fold
 pass in the decomposer, and a leaf that answers several terms rather than one. **Depth 3 stayed
 green**, which is the claim merging has to make, and `MergeGoldenTests` counts leaves, which is the
 claim no correctness check can see — a merge that is perfectly correct and never merges passes every
@@ -815,14 +850,17 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-steps 1 to 6 are done, and the optimizer seeks once
+### Step 011 is under way: sub-steps 1 to 7 are done, and a caller can run a query
 
-**Next is sub-step 7 — the residual filter and the public surface**, and it needs **no generator
-run**. `ResidualFilter` (evaluate the terms no tag answered, per candidate), `QueryPlanner`, the
-public `Query` with both skip strategies, `Table.Query` and `CodeBaseEngine.QueryTagScope`. Gated by
-**depth 4**: the record sequence and the count must equal the reference's, in tag order with a tag
-selected and in record-number order without one. It is also where ADR-53's second divergence is
-proved safe — the port's residual runs on **fewer** terms than the reference's and must still agree.
+**Next is sub-step 8 — the equivalence gate, the widened scope and the efficiency gate**, and it
+needs **no generator run**. **Gate A**: for every filter, the optimized record sequence must equal a
+brute-force scan of the same compiled expression, in both scopes — the check that needs no reference
+at all and is the only one `AllSeekable` has, since a widened tag has no reference answer by
+construction. **Gate C**: `CountingSource` behind the engine, and the four counted assertions of
+`DESIGN.md` Decision 13 — a fully-mapped count reads **zero** records, a fully-mapped query runs zero
+residual evaluations and reads exactly what it returns, and a selective query's block reads are a
+fraction of a scan's. Gate C is the only thing that can see an optimizer that is correct and never
+optimizes.
 
 **The merge algebra moved from sub-step 4 to sub-step 6.** The first plan gated sub-step 3 on
 `FullyMapped` alone — one bit per filter, which cannot see a swapped bound — and then left the

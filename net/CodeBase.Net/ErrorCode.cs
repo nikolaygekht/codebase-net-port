@@ -146,6 +146,16 @@ public enum ErrorCode
     UnterminatedString = -500,
 
     /// <summary>
+    /// A query was asked of something that cannot answer one.
+    /// </summary>
+    /// <value>
+    /// Raised when a filter is not a logical expression. The C library reports the same code for a
+    /// query set on a relation whose expression does not evaluate to true or false, its
+    /// [c]e4relate[/c] (d4defs.h:2005).
+    /// </value>
+    Relate = -710,
+
+    /// <summary>
     /// An operation was asked for in a state that has no meaning for it.
     /// </summary>
     /// <value>

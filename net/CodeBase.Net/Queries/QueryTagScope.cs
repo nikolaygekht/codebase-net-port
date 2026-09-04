@@ -1,4 +1,4 @@
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// Which of a table's tags the query optimizer is allowed to answer a filter with.

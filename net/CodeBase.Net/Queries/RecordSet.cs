@@ -1,4 +1,4 @@
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// A set of record numbers, held as bits, which may stand for its own complement.

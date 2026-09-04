@@ -1,6 +1,6 @@
 using CodeBase.Net.Expressions;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// Turns a compiled filter into the constraint tree an optimizer can answer it from.

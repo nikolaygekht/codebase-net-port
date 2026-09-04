@@ -1,4 +1,4 @@
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>How a branch combines what its children answer.</summary>
 internal enum ConstraintCombination

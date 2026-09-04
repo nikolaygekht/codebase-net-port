@@ -2,7 +2,7 @@ using AwesomeAssertions;
 using CodeBase.Net.Cdx;
 using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 using Xunit;
 
 namespace CodeBase.Net.Tests.Query;

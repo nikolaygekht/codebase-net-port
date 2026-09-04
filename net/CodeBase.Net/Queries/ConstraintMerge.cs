@@ -1,4 +1,4 @@
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// Folds two constraints on one tag into one, so the tag is seeked once instead of twice.

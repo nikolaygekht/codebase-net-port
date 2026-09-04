@@ -1,7 +1,7 @@
 using CodeBase.Net.Cdx;
 using CodeBase.Net.Expressions;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// What the optimizer needs to know about one tag, taken once when a filter is planned.

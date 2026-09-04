@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 using Xunit;
 
 namespace CodeBase.Net.Tests.Query;

@@ -1,3 +1,4 @@
+using CodeBase.Net.Queries;
 using System.Text;
 using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
@@ -64,6 +65,17 @@ public sealed class CodeBaseEngine : IDisposable
     public ExpressionOptions ExpressionOptions { get; set; } = ExpressionOptions.Invariant;
 
     /// <summary>
+    /// Gets or sets which of a table's tags a query may be answered with.
+    /// </summary>
+    /// <value>
+    /// The default uses only the tags the reference implementation would use, which keeps a query's
+    /// records comparable with what that library returns for the same filter. Widening it adds the
+    /// integer, currency, datetime and collated tags, which this library keys and seeks as exactly as
+    /// any other -- see [clink=CodeBase.Net.Queries.QueryTagScope]QueryTagScope[/clink].
+    /// </value>
+    public QueryTagScope QueryTagScope { get; set; } = QueryTagScope.Compatible;
+
+    /// <summary>
     /// Gets or sets which files may have their blocks kept in memory between reads.
     /// </summary>
     /// <value>
@@ -115,7 +127,7 @@ public sealed class CodeBaseEngine : IDisposable
     {
         ObjectDisposedException.ThrowIf(closed, this);
 
-        Table table = new(path, opener.Open(path), DefaultEncoding, ExpressionOptions, Forget);
+        Table table = new(path, opener.Open(path), DefaultEncoding, ExpressionOptions, QueryTagScope, Forget);
         open.Add(table);
         return table;
     }

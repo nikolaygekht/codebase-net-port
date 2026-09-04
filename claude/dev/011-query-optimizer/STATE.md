@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 to 6 of 9 done**
-**Current sub-step:** PLAN.md step 7, the residual filter and the public surface — the first thing a
-caller can hold. **The step order changed after sub-step 2** — see Deviations.
+**Status:** in progress — **sub-steps 1 to 7 of 9 done. A caller can run a query.**
+**Current sub-step:** PLAN.md step 8, the equivalence gate, the widened scope and the efficiency
+gate. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
@@ -17,6 +17,7 @@ caller can hold. **The step order changed after sub-step 2** — see Deviations.
 - [x] step 4 — leaf evaluation, 2026-09-04 — **the contract pair passes, 41 filters reach depth 3**
 - [x] step 5 — combination, 2026-09-04 — **depth 3 green on all 74, four mutations red**
 - [x] step 6 — the merge algebra, 2026-09-04 — **depth 3 stayed green, leaf counts fall**
+- [x] step 7 — residual filter and public surface, 2026-09-04 — **depth 4 green, both orders**
 - [ ] step 3 — decomposition
 - [ ] step 4 — the merge algebra
 - [ ] step 5 — leaf evaluation
@@ -24,6 +25,42 @@ caller can hold. **The step order changed after sub-step 2** — see Deviations.
 - [ ] step 7 — the residual filter and the public surface
 - [ ] step 8 — the equivalence gate, and the widened scope
 - [ ] step 9 — close
+
+## What sub-step 7 landed
+
+`ResidualFilter`, the public `Query` with both skip strategies, `Table.Query`, `Table.CompileFilter`,
+`Table.EvaluationContext`, `CodeBaseEngine.QueryTagScope` and `ErrorCode.Relate`. **Depth 4 green on
+its first run** — all 81 filters, in record-number order and in tag order, with counts and backwards
+walks. **3225 tests green** (764 golden, 2461 unit). No corpus file changed.
+
+**The public class is `Query` and the namespace became `Queries`.** They collided; the caller-facing
+name won, and `Expressions` beside it already sets the plural precedent. A deviation from `DESIGN.md`,
+which named the namespace `CodeBase.Net.Query`.
+
+**ADR-53's second divergence is proved.** The port's residual checks **strictly fewer** terms than
+the reference's — it asks the plan rather than reading two fixed positions beside each term — and
+returns the same records on every filter of the corpus.
+
+**The mutation results have a shape worth reading, and three of five did not redden.** That is not a
+gap: the trust rule fails in only one direction. Trusting a term no leaf answered **loses the
+records the term would have excluded** (12 tests red), and a count that skips the residual keeps
+candidates that are not answers (2 red). Trusting *nothing*, or refusing to split the outer
+conjunction, only makes the port check terms the bitmap already answered — which can only agree with
+it, so no record moves and nothing can see it. Gated where being wrong loses records, provably inert
+where being wrong costs time.
+
+**Which is exactly why the fully-mapped short-circuit needed an assertion of its own.** Writing one
+found that the per-term rule did not see it: a filter rooted at an `.OR.` has its leaves recorded
+against the comparisons inside, so asking whether that one term is answered says no even when every
+part of it is. Whole-filter and per-term are the same question at two scales and the coarse one has
+to be asked first. Now `ResidualFilter` short-circuits on `FullyMapped`, and the assertion that a
+fully mapped plan leaves no work is the only thing that can see it — removing the short-circuit
+reddens three tests and no record set.
+
+**Two mutations were invalid before they were valid**, and both were caught by insisting a run
+distinguish a build failure from a pass. One read a field while its own initializer was still
+running and threw; the earlier form of another was unreachable code the compiler refused. A mutation
+that does not execute proves nothing, and an empty failure list looks identical either way.
 
 ## What sub-step 6 landed
 
@@ -326,6 +363,10 @@ it. Question 3 is the `e4tagExpr` one above.
   filters — so raw-bit equality would fail a correct port that omits the go-around (Decision 8).
   `DESIGN.md` Decision 8 already said depth 3 compares sets and not the flag, so this is `PLAN.md`
   catching up with `DESIGN.md`, not a change of intent. Both now say effective.
+- **The public class is `Query` and its namespace is `CodeBase.Net.Queries`, not `.Query`.** A class
+  cannot share a name with its own namespace. The caller-facing name won because it is the one a
+  reader sees, and `Expressions` beside it already sets the plural precedent; the folder was renamed
+  to match, since every other folder here does.
 - **The merge algebra moved from sub-step 4 to sub-step 6, so depth 3 arrives before it.** The
   first plan gated sub-step 3 on `FullyMapped` alone — one bit per filter, blind to a swapped bound —
   and left the operand-order reflection unchecked until sub-step 6. Merging turns out to be an
@@ -344,4 +385,4 @@ it. Question 3 is the `e4tagExpr` one above.
 
 ## Blockers
 
-None. Sub-step 7 needs no generator run either.
+None. Sub-step 8 needs no generator run either.

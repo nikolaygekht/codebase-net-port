@@ -1,5 +1,5 @@
 using CodeBase.Net.Expressions;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 using CodeBase.Net.TestUtils;
 
 namespace CodeBase.Net.Golden;
@@ -96,6 +96,17 @@ internal sealed class QueryHarness : IDisposable
     /// <returns>The records.</returns>
     public RecordSet Reach(string filter) =>
         new QueryExecutor(tag => table.OpenProbe(tag), table.RecordCount).Evaluate(Plan(filter));
+
+    /// <summary>Builds the residual filter a plan leaves behind.</summary>
+    /// <param name="filter">The filter text.</param>
+    /// <returns>The residual filter.</returns>
+    public ResidualFilter Residual(string filter)
+    {
+        CompiledExpression compiled = Compile(filter);
+
+        return new ResidualFilter(
+            compiled, new QueryDecomposer(tags, scope).Decompose(compiled));
+    }
 
     /// <summary>Gets how many records the table holds.</summary>
     public int RecordCount => table.RecordCount;

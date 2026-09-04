@@ -1,7 +1,7 @@
 using CodeBase.Net.Cdx;
 using CodeBase.Net.Expressions;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// The keys of a real tag, in stored order.

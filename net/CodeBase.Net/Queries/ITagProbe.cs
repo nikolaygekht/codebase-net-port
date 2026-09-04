@@ -1,6 +1,6 @@
 using CodeBase.Net.Cdx;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// One tag's keys, in stored order, seekable and steppable.

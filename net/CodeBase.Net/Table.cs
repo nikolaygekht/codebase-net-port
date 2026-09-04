@@ -4,7 +4,7 @@ using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
 using CodeBase.Net.IO;
 using CodeBase.Net.Memo;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 
 namespace CodeBase.Net;
 
@@ -70,10 +70,12 @@ public sealed class Table : IDisposable
         OpenedTable opened,
         Encoding? defaultEncoding,
         ExpressionOptions expressionOptions,
+        QueryTagScope queryTagScope,
         Action<Table> onClosed)
     {
         Path = path;
         ExpressionOptions = expressionOptions;
+        QueryTagScope = queryTagScope;
         this.opened = opened;
         this.defaultEncoding = defaultEncoding;
         this.onClosed = onClosed;
@@ -906,6 +908,52 @@ public sealed class Table : IDisposable
     }
 
     /// <summary>
+    /// Builds a query over the table.
+    /// </summary>
+    /// <param name="filter">A logical expression naming the records wanted.</param>
+    /// <returns>The query, which is answered when it is first moved.</returns>
+    /// <value>
+    /// The filter is stored rather than parsed here, which is what the reference does: it is compiled
+    /// and decomposed when the query is first moved, so building one costs nothing and a filter that
+    /// will not compile is reported where a caller is looking.
+    ///
+    /// Records come out in the table's selected tag's order, or in record-number order when no tag is
+    /// selected, and which one a caller wants is said by selecting a tag before moving the query.
+    /// </value>
+    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
+    public Query Query(string filter)
+    {
+        using Hold hold = Enter();
+        return new Query(this, filter, QueryTagScope);
+    }
+
+    /// <summary>
+    /// Compiles a filter expression against the table's fields.
+    /// </summary>
+    /// <param name="filter">The expression.</param>
+    /// <returns>The compiled filter.</returns>
+    /// <exception cref="CodeBaseException">The expression cannot be compiled against this table.</exception>
+    internal CompiledExpression CompileFilter(string filter) =>
+        TypeResolver.Resolve(ExpressionParser.Parse(
+            filter,
+            new TableFieldMetadata([.. Fields], System.IO.Path.GetFileNameWithoutExtension(Path))));
+
+    /// <summary>
+    /// Gathers what evaluating an expression over the current record needs.
+    /// </summary>
+    /// <returns>The context.</returns>
+    internal EvaluationContext EvaluationContext() => new()
+    {
+        Record = record,
+        NullFlags = NullFlags,
+        RecordNumber = position.Number,
+        Deleted = record.Deleted,
+        RecordCount = opened.Header.RecordCount,
+        Options = ExpressionOptions,
+        Memo = opened.Memo is null ? null : field => GetMemoBytes(field),
+    };
+
+    /// <summary>
     /// Opens a probe over one of the table's tags, for the optimizer to seek with.
     /// </summary>
     /// <param name="tag">The tag, as the planner projected it.</param>
@@ -1195,6 +1243,15 @@ public sealed class Table : IDisposable
     /// than keyed differently on a different machine.
     /// </value>
     internal ExpressionOptions ExpressionOptions { get; }
+
+    /// <summary>
+    /// Gets which of the table's tags a query over it may be answered with.
+    /// </summary>
+    /// <value>
+    /// Taken from the engine when the table was opened, like the expression options beside it, so
+    /// that one table's behaviour cannot change under it while a query is being walked.
+    /// </value>
+    internal QueryTagScope QueryTagScope { get; }
 
     /// <summary>
     /// Gets the buffer the current record was read into.

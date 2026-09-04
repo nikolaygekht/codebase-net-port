@@ -1,7 +1,7 @@
 using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// Whether a tag's key expression is the same expression as a subexpression of a filter.

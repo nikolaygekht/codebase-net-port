@@ -1,6 +1,6 @@
 using CodeBase.Net.Cdx;
 using CodeBase.Net.Expressions;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 using CodeBase.Net.TestUtils;
 using Xunit;
 

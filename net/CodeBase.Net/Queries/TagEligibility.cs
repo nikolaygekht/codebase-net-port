@@ -1,6 +1,6 @@
 using CodeBase.Net.Cdx;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// Whether the optimizer is allowed to answer a term with a given tag.

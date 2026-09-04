@@ -1,6 +1,6 @@
 using System.Text;
 using CodeBase.Net.Expressions;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 
 namespace CodeBase.Net.TestUtils;
 

@@ -1,6 +1,6 @@
 using CodeBase.Net.Expressions;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// One value a filter constrains a tag to, and the length it was written at.

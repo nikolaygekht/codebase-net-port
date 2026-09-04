@@ -1,4 +1,4 @@
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// What a filter decomposed into: which tags can answer parts of it, and whether that is all of it.

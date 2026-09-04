@@ -1,6 +1,6 @@
 using CodeBase.Net.Cdx;
 
-namespace CodeBase.Net.Query;
+namespace CodeBase.Net.Queries;
 
 /// <summary>
 /// Turns one leaf of a plan into the records it selects, by seeking its tag.

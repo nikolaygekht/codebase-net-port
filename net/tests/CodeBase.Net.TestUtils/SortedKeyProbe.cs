@@ -1,5 +1,5 @@
 using CodeBase.Net.Cdx;
-using CodeBase.Net.Query;
+using CodeBase.Net.Queries;
 
 namespace CodeBase.Net.TestUtils;
 

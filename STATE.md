@@ -4,8 +4,9 @@
 **step 011's sub-step 6 — the merge algebra**: two terms over one tag now become one seek, and
 **depth 3 stayed green through it**, which is what the whole reorder was for. It went red the moment
 merging landed and caught two real bugs, one of them a shared-buffer alias that nothing before
-merging could have exposed. `dotnet test` green on **3202 tests** (741 golden, 2461 unit), up from
-2066. Five mutations, all red. No corpus file changed.
+merging could have exposed. `dotnet test` green on **3209 tests** (748 golden, 2461 unit), up from
+2066. Five mutations, all red. `CDXEXPR` gained seven query filters and its dump is the only
+corpus file that changed.
 **Before it, sub-step 5 — combination**, which made **the optimizer complete and correct**:
 **depth 3 of the gate is green on all 74 filters**, meaning the candidate set this port builds holds
 exactly the records the reference's own bitmap holds — compared before any residual filtering and
@@ -313,10 +314,19 @@ allocates, while an implementation careful about allocation fails.
 non-matching leaves into sibling branches until same-tag ones sit together; grouping by tag reaches
 the same pairs with no shuffle, because a branch here is an array rather than a list to reorder.
 
-**The disjunction side is deliberately partial and layer 4 never reaches it**: not one corpus filter
-has two `.OR.` terms over one tag whose union is a single constraint. The population tests — every
-pair from a fifteen-constraint set, checked value by value — are that code's only gate, and they say
-so in as many words.
+**The corpus was extended to reach the disjunction side, and that was the most productive part.**
+Seven filters were added to `CDXEXPR` (43 to 54; only its query dump changed). **The reference does
+fold `.OR.` ranges, and its answers are exactly what the cautious fold produces** on all five shapes
+— so Decision 9's refusal to build on the untranscribed `bmf4OrOt` now has its *answers* witnessed,
+and §12 item 7 narrows a second time. A second filter puts **`doCheck`'s own case** in the corpus and
+shows the port needs no such guard: seeking one end and testing the other reaches the same nothing.
+
+**And extending found a gap, whose fix found a bug.** `K_NUM > 0 .OR. K_NUM = 0` did not fold,
+because an exact value was only ever treated as sitting *inside* a range and never as extending its
+edge. Reading it as a range whose ends have met removed three special cases rather than adding one —
+and immediately broke everything, because the unbounded test looked only at the two ends and an exact
+value keeps its value in its own field. Two exact values took the path meant for struck-out values
+and came back as **everything**. Caught by the population test and depth 3 together.
 
 **And a prediction in the plan was wrong, which the run said out loud.** Omitting the rule that moves
 an inclusive bound past a value struck out at it was supposed to cost one record. It costs none: a

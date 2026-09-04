@@ -13,10 +13,10 @@ namespace CodeBase.Net.Tests.Query;
 /// merge [i]means[/i], so it survives any rewrite of how the folding is done -- where a test naming
 /// which field ended up set would not.
 ///
-/// It is also the only gate the disjunction side has. Not one filter in the corpus has two terms over
-/// one tag joined by an or whose union is a single constraint, so layer four never reaches that code:
-/// its two corpus cases are a range with a hole in it and two separate values, and both are refused.
-/// The conjunction side is reached by the corpus and by these together.
+/// It is the exhaustive gate rather than the only one. The corpus reaches both sides -- five of its
+/// filters join two terms over one tag by an or whose union really is one constraint, and the
+/// reference's own answers agree with what folding them produces -- but it reaches perhaps a fifth of
+/// the pairs below, because the algebra is a cross-product and a filter list is a sample.
 /// </summary>
 [Trait("Layer", "Unit")]
 public sealed class ConstraintMergeTests

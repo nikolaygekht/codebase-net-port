@@ -66,16 +66,6 @@ internal static class ConstraintMerge
         if (right.Kind == ConstraintKind.Empty)
             return left;
 
-        // One value inside the other constraint adds nothing to it.
-        if (left.Kind == ConstraintKind.Equal && right.Accepts(left.Value!))
-            return right;
-
-        if (right.Kind == ConstraintKind.Equal && left.Accepts(right.Value!))
-            return left;
-
-        if (left.Kind == ConstraintKind.Equal || right.Kind == ConstraintKind.Equal)
-            return null;
-
         // Two sets of struck-out values: whatever one of them lets through, the union lets through,
         // so only the values struck out by both remain struck out.
         if (IsUnbounded(left) && IsUnbounded(right))
@@ -84,15 +74,27 @@ internal static class ConstraintMerge
                 null, null, [.. left.Exclusions.Where(value => Excludes(right, value))]);
         }
 
-        // Two ranges only join into one where they overlap or touch; otherwise the union has a hole
-        // in it and no single range describes it.
-        if (left.Exclusions.Count > 0 || right.Exclusions.Count > 0 || !Meet(left, right))
+        if (left.Exclusions.Count > 0 || right.Exclusions.Count > 0)
             return null;
 
-        return LeafConstraint.Range(
-            Wider(left.Lower, right.Lower, isLower: true),
-            Wider(left.Upper, right.Upper, isLower: false),
-            []);
+        // An exact value is a range whose ends have met, so it needs no rule of its own: a value
+        // inside a range is a range the other one swallows, and a value sitting against an exclusive
+        // end is two ranges that touch, which relaxes the end rather than leaving a hole at it.
+        (Bound? leftLow, Bound? leftHigh) = Ends(left);
+        (Bound? rightLow, Bound? rightHigh) = Ends(right);
+
+        // Two ranges only join into one where they overlap or touch; otherwise the union has a hole
+        // in it and no single range describes it.
+        if (!Reaches(leftHigh, rightLow) || !Reaches(rightHigh, leftLow))
+            return null;
+
+        Bound? lower = Wider(leftLow, rightLow, isLower: true);
+        Bound? upper = Wider(leftHigh, rightHigh, isLower: false);
+
+        return lower is Bound low && upper is Bound high
+            && low.Value.CompareTo(high.Value) == 0 && low.Inclusive && high.Inclusive
+            ? LeafConstraint.Exactly(low.Value)
+            : LeafConstraint.Range(lower, upper, []);
     }
 
     /// <summary>
@@ -219,19 +221,28 @@ internal static class ConstraintMerge
         return true;
     }
 
+    /// <summary>
+    /// Reads a constraint as a pair of ends, so an exact value and a range are the same shape.
+    /// </summary>
+    private static (Bound? Lower, Bound? Upper) Ends(LeafConstraint constraint) =>
+        constraint.Kind == ConstraintKind.Equal
+            ? (new Bound(constraint.Value!, true), new Bound(constraint.Value!, true))
+            : (constraint.Lower, constraint.Upper);
+
     /// <summary>Decides whether a constraint strikes out a value.</summary>
     private static bool Excludes(LeafConstraint constraint, ConstraintValue value) =>
         constraint.Exclusions.Any(other => other.CompareTo(value) == 0);
 
-    /// <summary>Decides whether a range has no ends at all.</summary>
+    /// <summary>Decides whether a constraint is a range with no ends at all.</summary>
+    /// <value>
+    /// The kind is part of the question and not a formality: an exact value keeps its value in its
+    /// own field and leaves both ends null, so testing the ends alone would call it unbounded and
+    /// send two exact values down the path meant for two sets of struck-out values -- where they
+    /// would come back as everything.
+    /// </value>
     private static bool IsUnbounded(LeafConstraint constraint) =>
-        constraint.Lower is null && constraint.Upper is null;
-
-    /// <summary>
-    /// Decides whether two ranges overlap or touch, so that their union is one range.
-    /// </summary>
-    private static bool Meet(LeafConstraint left, LeafConstraint right) =>
-        Reaches(left.Upper, right.Lower) && Reaches(right.Upper, left.Lower);
+        constraint.Kind == ConstraintKind.Range
+        && constraint.Lower is null && constraint.Upper is null;
 
     /// <summary>
     /// Decides whether a range ending at one bound reaches a range starting at another.

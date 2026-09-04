@@ -623,6 +623,33 @@ static const QUERYCASE QUERIES[] =
     * parallel array, and only this pair can tell a port's walk order. */
    { "K_LOG .OR. K_NUM > 0",        "T_NUM",   "the mirror of the .OR. above -- the optimizable disjunct is visited FIRST" },
 
+   /* -- what MERGING two terms over one tag has to get right ----------------
+    *
+    * Everything above joins terms over different tags or joins them by .OR.
+    * without their union being one constraint. These are the cases where two
+    * leaves really do become one, and until they existed the whole disjunction
+    * side of the merge algebra was gated by C#-authored tests alone. */
+   { "K_NUM > 0 .OR. K_NUM > 100",     "T_NUM", "overlapping .OR. ranges -- their union is one range" },
+   { "K_NUM <= 0 .OR. K_NUM > 0",      "T_NUM", ".OR. ranges that meet exactly, so the union is everything" },
+   { "K_NUM > 0 .OR. K_NUM = 0",       "T_NUM", "a value sitting on the open end of a range" },
+   { "K_NUM <> 0 .OR. K_NUM <> 2.5",   "T_NUM", "two exclusions joined by .OR. -- no value fails both" },
+   { "UPPER(K_TEXT) > \"S\" .OR. UPPER(K_TEXT) > \"M\"", "T_UPPER",
+     "overlapping .OR. ranges over a character tag, both short constants" },
+
+   /* A bounded range with a value struck out of it. Every other exclusion case
+    * here is unbounded, which the port answers by naming what it leaves out and
+    * inverting -- a different path from walking a range and skipping one key. */
+   { "K_NUM > -100 .AND. K_NUM < 1000 .AND. K_NUM <> 0.125", "T_NUM",
+     "a bounded range with one value struck out, and a run of three .AND. terms on ONE tag" },
+
+   /* 0.125 and 0.135 are adjacent stored values with nothing between them, so
+    * both exclusive ends land on the same pair of neighbouring keys. That is the
+    * shape the reference guards with doCheck (C4CONST.C:591-605): seeking both
+    * ends of a range that contains nothing must yield nothing, not the one
+    * record the two seeks collided on. */
+   { "K_NUM > 0.125 .AND. K_NUM < 0.135", "T_NUM",
+     "a range with nothing in it whose two seeks collide -- doCheck's case" },
+
    /* -- the two degenerate answers ----------------------------------------- */
    { "K_NUM > 1000000000",        "T_NUM", "empty result" },
    { "K_NUM > -1000000000",       "T_NUM", "every record" }

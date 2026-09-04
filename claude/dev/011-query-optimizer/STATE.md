@@ -29,8 +29,8 @@ caller can hold. **The step order changed after sub-step 2** — see Deviations.
 
 `ConstraintMerge` (the algebra), a fold pass in `QueryDecomposer`, `LeafConstraint.Range`, and a leaf
 that answers **several** terms rather than one. Tests: `MergeGoldenTests` for the leaf counts and
-`ConstraintMergeTests` for the algebra as sets. **3202 tests green** (741 golden, 2461 unit), up from
-2066. No corpus file changed.
+`ConstraintMergeTests` for the algebra as sets. **3209 tests green** (748 golden, 2461 unit), up from
+2066. `CDXEXPR.query.dump.txt` is the only corpus file that changed.
 
 **The reorder paid off twice.** Depth 3 went **red the moment merging landed**, and both causes were
 real. The first was a bounds bug: one helper conflated *which end wins* with *what a missing end
@@ -50,10 +50,30 @@ non-matching leaves into sibling branches until same-tag ones sit together; grou
 the same pairs with no shuffle, because a branch here is an array rather than a list to reorder.
 Nothing crosses a connective, which the reference refuses too.
 
-**The disjunction side is deliberately partial** (Decision 9) and **layer 4 never reaches it**: not
-one corpus filter has two terms over one tag joined by an `.OR.` whose union is a single constraint —
-its two cases are a range with a hole and two separate values, and both are refused. The population
-tests are that code's only gate, and `ConstraintMergeTests` says so in as many words.
+**The disjunction side was deliberately partial (Decision 9) and layer 4 did not reach it — so the
+corpus was extended, and that turned out to be the most productive thing in the sub-step.** Seven
+filters were added to `CDXEXPR` (43 to 54; only its query dump changed, everything else regenerates
+byte-identical). Five of them join two terms over one tag by an `.OR.` whose union really is one
+constraint, one is a bounded range with a value struck out of its middle, and one is a range whose
+two exclusive ends bracket no key at all.
+
+**What they said, in order of value:**
+
+- **The reference does fold `.OR.` ranges, and its answers are exactly what the cautious fold
+  produces** — on all five shapes. Decision 9 refused to build on `bmf4OrOt` because it was never
+  transcribed; its *answers* are now witnessed even though its body is not, and `QUERY-OPTIMIZER.md`
+  §12 item 7 narrows a second time.
+- **`doCheck`'s case is in the corpus and the port needs no `doCheck`.** `K_NUM > 0.125 .AND.
+  K_NUM < 0.135` names two adjacent stored values with nothing between; the reference returns
+  nothing, and so does a walk that seeks the lower end and tests the upper, because the first key it
+  looks at is already past the range. §6.1 says so now.
+- **Extending found a gap, and closing the gap found a bug.** `K_NUM > 0 .OR. K_NUM = 0` did not
+  fold: an exact value was only ever treated as sitting *inside* a range, never as extending its
+  edge. Reading an exact value as a range whose ends have met removed three special cases instead of
+  adding one — and immediately broke everything, because `IsUnbounded` tested only the two ends, and
+  an exact value keeps its value in its own field and leaves both ends null. Two exact values took
+  the path meant for two sets of struck-out values and came back as **everything**. Caught by the
+  population test and by depth 3 together; re-introducing it reddens thirteen tests.
 
 **A prediction in the plan was wrong, and the run said so.** Omitting the rule that moves an
 inclusive bound past a value struck out at it was supposed to cost one record. It costs none: a range

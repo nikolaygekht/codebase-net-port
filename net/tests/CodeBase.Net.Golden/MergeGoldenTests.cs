@@ -131,6 +131,59 @@ public sealed class MergeGoldenTests
     }
 
     /// <summary>
+    /// A disjunction whose union really is one constraint folds to one leaf, so the tag is seeked
+    /// once. All five shapes the algebra folds are corpus filters, and the candidate-set gate checks
+    /// each against the reference's own answer -- so this side is no longer gated by hand-written
+    /// expectations alone.
+    /// </summary>
+    [Theory]
+    [InlineData("K_NUM > 0 .OR. K_NUM > 100", "overlapping ranges")]
+    [InlineData("K_NUM <= 0 .OR. K_NUM > 0", "ranges that meet exactly")]
+    [InlineData("K_NUM > 0 .OR. K_NUM = 0", "a value on the open end of a range")]
+    [InlineData("K_NUM <> 0 .OR. K_NUM <> 2.5", "two exclusions, which no value fails together")]
+    [InlineData("UPPER(K_TEXT) > \"S\" .OR. UPPER(K_TEXT) > \"M\"", "overlapping character ranges")]
+    public void ADisjunctionWhoseUnionIsOneConstraintFoldsToOneLeaf(string filter, string shape)
+    {
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
+
+        harness.Plan(filter).LeafCount.Should().Be(1, "{0} is {1}", filter, shape);
+    }
+
+    /// <summary>
+    /// A range with a value struck out of it stays one leaf, and the struck-out value is kept rather
+    /// than folded into an end -- there is no end for it to move.
+    /// </summary>
+    [Fact]
+    public void ABoundedRangeKeepsTheValueStruckOutOfItsMiddle()
+    {
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
+        ConstraintNode leaf =
+            harness.OnlyLeaf("K_NUM > -100 .AND. K_NUM < 1000 .AND. K_NUM <> 0.125");
+
+        leaf.Constraint!.Lower.Should().NotBeNull();
+        leaf.Constraint!.Upper.Should().NotBeNull();
+        leaf.Constraint!.Exclusions.Should().ContainSingle();
+        leaf.SourceNodes.Should().HaveCount(3, "all three terms are answered by the one leaf");
+    }
+
+    /// <summary>
+    /// A range whose two exclusive ends bracket no key at all reaches nothing.
+    /// </summary>
+    /// <value>
+    /// The case the reference guards with a collision check, because seeking both ends of it lands
+    /// them on the same pair of neighbouring keys and a careless range would return the one they
+    /// collided on. This port needs no such guard: it seeks the lower end and tests the upper as it
+    /// walks, so the first key it looks at is already past the range.
+    /// </value>
+    [Fact]
+    public void ARangeWithNothingInItReachesNothing()
+    {
+        using QueryHarness harness = QueryHarness.For("CDXEXPR");
+
+        harness.Reach("K_NUM > 0.125 .AND. K_NUM < 0.135").Count.Should().Be(0);
+    }
+
+    /// <summary>
     /// A merged leaf answers every term it absorbed, which is what the residual filter reads. A term
     /// it forgot would be checked again -- harmless -- and one it invented would be skipped, which is
     /// not.

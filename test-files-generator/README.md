@@ -156,7 +156,7 @@ and its own subdirectory.
 | `CDXBASE.DBF` | `0x30` | the small index case: 32 records, ten tags, one block per tree — one tag per key shape (character, descending, duplicates, unique, sub-`0x20` bytes, numeric, double with `-0.0`, date, integer, filtered) |
 | `CDXDEEP.DBF` | `0x30` | the multi-level index case: 600 records, four tags, one of them three levels deep. Depth comes from a wide incompressible key rather than from record count |
 | `CDXTIME.DBF` | `0x30` | the datetime-key case: 256 datetimes over one `T` field, ascending and descending tags. Chosen so that about a third of the stored keys exercise the set half of `flags4dateTimeFlags` and the rest the clear half, plus the day's edges and the calendar's. Whole seconds only, because `f4assignDateTime` ignores a millisecond part for `T` |
-| `CDXEXPR.DBF` | `0x30` | the expression case: 16 records, 22 tags, and the only `H` field in the corpus. Its records supply what a literal cannot say — the field-loader-only types and a null — because the function semantics are recorded over constants instead. Beside the usual dumps it writes `CDXEXPR.expr.dump.txt` (node arrays, constant and field values, rejections) through `dump-expr.cpp`, and `FUNCTIONS.dump.txt` is written once from `main.cpp`. **Its expression lists are sized by function-table row coverage**: 144 of the 193 rows are reached by some expression and the remaining 49 are unreachable by construction, so adding a case here is how an uncovered row gets covered. Adding one changes only the expression dump — every other file regenerates byte-identical. Since step 011 it also carries **43 query filters** through `dump-query.cpp` |
+| `CDXEXPR.DBF` | `0x30` | the expression case: 16 records, 22 tags, and the only `H` field in the corpus. Its records supply what a literal cannot say — the field-loader-only types and a null — because the function semantics are recorded over constants instead. Beside the usual dumps it writes `CDXEXPR.expr.dump.txt` (node arrays, constant and field values, rejections) through `dump-expr.cpp`, and `FUNCTIONS.dump.txt` is written once from `main.cpp`. **Its expression lists are sized by function-table row coverage**: 144 of the 193 rows are reached by some expression and the remaining 49 are unreachable by construction, so adding a case here is how an uncovered row gets covered. Adding one changes only the expression dump — every other file regenerates byte-identical. Since step 011 it also carries **54 query filters** through `dump-query.cpp` |
 | `CDXCOLL.DBF` | `0x30` | the collation case: cp1252, one `C(20)` field indexed both machine and `GENERAL`, so `keyLen` 20 and 40 and pad bytes `0x20` and `0x00` sit in one file |
 | `IDXONE.DBF` | `0x30` | the single-tag case: a one-tag `.cdx` plus the `.IDX` derived from it, verified by walking both — see below |
 
@@ -194,11 +194,14 @@ each compiled node, `fullyMapped`, the candidate bitset **before** any residual 
 records returned in both orders. Every filter is then run a **second** time with
 `RELATION4.bitmapDisable` set, which disables the optimizer (`m4map.c:341`) and leaves the reference
 evaluating the filter per record — so the dump carries the reference's own scan truth beside its
-optimized answer, and says whether the two agree. Exactly one of the corpus's 70 filters disagrees,
+optimized answer, and says whether the two agree. Exactly one of the corpus's 81 filters disagrees,
 which is the reference demonstrating a known defect on itself. `CDXBASE` supplies the eligibility
 refusals (a unique tag, a filtered tag, an integer tag), `CDXDEEP` the ranges that cross leaf
 boundaries, `CDXEXPR` everything about expression tags. Filters are chosen to cover every row of
-`QUERY-OPTIMIZER.md` §8 and **must not read the clock**: a `CTOD` filter would record a record set
+`QUERY-OPTIMIZER.md` §8, plus every shape the constraint algebra folds — which is what took `CDXEXPR`
+from 43 to 54, because until then no filter joined two terms over one tag by an `.OR.` whose union is
+a single constraint, and that half of the algebra was gated by hand-written tests alone. They **must
+not read the clock**: a `CTOD` filter would record a record set
 that changes with the year.
 
 **The dumps carry seek cases too.** `dump-index.cpp` derives ten to twelve search values per tag from

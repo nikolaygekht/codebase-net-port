@@ -665,6 +665,14 @@ record — the `>3 .AND. <4` case, where the `>3` seek already found key 4 — t
 caller passes `doCheck = 1` **only when neither end is inclusive**: `bmf4AndOt` sets it from
 `!(map->ge.len || map->le.len)` (m4map.c:1802-1805).
 
+**A port that seeks one end and tests the other needs no such guard**, and the corpus now says so:
+`K_NUM > 0.125 .AND. K_NUM < 0.135` names two adjacent stored values with nothing between them, and
+the reference returns no records — expressed, as §6.3 describes, by setting every flag and marking
+the set as its own complement. A walk that seeks the lower end and compares each key against the
+upper one reaches the same answer with no collision test, because the first key it looks at is
+already past the range. The guard exists because the reference seeks *both* ends and has to notice
+when the two landed on each other.
+
 ### 6.2 `bitmap4flagRange` — flag everything between two seeks (m4map.c:1487-1755)
 
 Given a start and an end constraint, seek both and flag every record between. **`startCon` is the
@@ -1058,9 +1066,14 @@ is independent support.
    implementing OR ranges.** **Narrowed 2026-09-04:** §6.5 shows it cannot *mean* anything different
    from the and-side routine, because every leaf starts from a zeroed bitmap — so evaluating a leaf
    needs one routine whichever connective is above it, and this item bears only on **merging** two
-   `.OR.` leaves on one tag.
-8. ~~**No corpus case gates any of this yet**~~ — **as of 2026-09-04 seventy filters do**, across
-   `CDXEXPR` (43), `CDXBASE` (15) and `CDXDEEP` (12), each recorded at five depths including the
+   `.OR.` leaves on one tag. **Narrowed again the same day, from the other side:** five corpus filters
+   now join two terms over one tag by an `.OR.` whose union really is a single constraint —
+   overlapping ranges, ranges that meet exactly, a value against a range's open end, two exclusion
+   sets, and overlapping character ranges — and on all five the reference's record set is exactly
+   what folding them into one constraint produces. Its *answers* are witnessed even though its body
+   is not, and a port that folds only the unambiguous cases matches it.
+8. ~~**No corpus case gates any of this yet**~~ — **as of 2026-09-04 eighty-one filters do**, across
+   `CDXEXPR` (54), `CDXBASE` (15) and `CDXDEEP` (12), each recorded at five depths including the
    reference's own scan truth. **Visual FoxPro cannot supply one.** ADR-44's oracle
    witnesses a value VFP computes and the bytes it writes; the optimizer produces neither, and three
    of the four things worth recording here (`infoReport[i].tag`, `fullyMapped`, `relate->set`) are

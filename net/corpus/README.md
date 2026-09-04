@@ -233,7 +233,7 @@ more for the query optimizer (step `011-query-optimizer`):
   Values are the **raw result bytes**, escaped by the same rules as a key: a numeric result is a
   double, and printing it as text would hide the low bits the key transform depends on.
 
-* **`CDXEXPR.query.dump.txt` (43 filters), `CDXBASE.query.dump.txt` (15) and
+* **`CDXEXPR.query.dump.txt` (54 filters), `CDXBASE.query.dump.txt` (15) and
   `CDXDEEP.query.dump.txt` (12)** — what the reference's **query optimizer** decided about a filter,
   written by `dump-query.cpp`. The optimizer produces no bytes, so it cannot be gated the way a
   format is; what it produces is decisions, and `RELATE4`/`RELATION4` are public structs, so the
@@ -250,7 +250,7 @@ more for the query optimizer (step `011-query-optimizer`):
   the first usable: the reference has a defect that inverts a range bound on a reflected comparison
   nested inside a connective, so on such a filter a correct port is *expected* to disagree with the
   optimized answer. Rather than a hand-written exception list, each case carries `agree yes|no` and
-  the expectation follows from it. **Exactly one of the 70 filters disagrees** —
+  the expectation follows from it. **Exactly one of the 81 filters disagrees** —
   `K_INT > 0 .AND. 4 > K_NUM`, whose two readings are *disjoint* — and it is the case written to
   provoke it.
 

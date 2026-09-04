@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 to 7 of 9 done. A caller can run a query.**
-**Current sub-step:** PLAN.md step 8 — **Gate A is done and it found two wrong record sets**; what
-remains of the sub-step is Gate C, the counted efficiency assertions. **The step order changed after sub-step 2** — see Deviations.
+**Status:** **done 2026-09-04 — all nine sub-steps.** The record of the step is
+[`SUMMARY.md`](SUMMARY.md); this file is the working log behind it.
+**Current sub-step:** none. `QUERY` is closed. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
@@ -18,6 +18,8 @@ remains of the sub-step is Gate C, the counted efficiency assertions. **The step
 - [x] step 5 — combination, 2026-09-04 — **depth 3 green on all 74, four mutations red**
 - [x] step 6 — the merge algebra, 2026-09-04 — **depth 3 stayed green, leaf counts fall**
 - [x] step 7 — residual filter and public surface, 2026-09-04 — **depth 4 green, both orders**
+- [x] step 8 — equivalence, widened scope, efficiency, 2026-09-04 — **Gate A found two wrong record sets**
+- [x] step 9 — close, 2026-09-04 — the selectivity sweep settled Decision 8 with a number
 - [ ] step 3 — decomposition
 - [ ] step 4 — the merge algebra
 - [ ] step 5 — leaf evaluation

@@ -1,115 +1,58 @@
 # Project state
 
-**Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**Gate A — full-scan equivalence — and it found two wrong record sets that nothing else could have.**
-Every filter's records are now compared against a scan of the same compiled filter, in both orders,
-in both tag scopes, over four tables including `CDXCOLL`, which has no query dump and needs none.
-**3246 tests green** (785 golden, 2461 unit). It retired half of **ADR-52**: a collated tag may never
-answer a query, in either scope (**ADR-54**), because `K_TEXT > "M"` over `CDXCOLL` lost six records
-whose bytes are above `M` and whose collation weights are below it.
-**Before it, sub-step 7 — the residual filter and the public surface**, so **a caller can run a
-query**: `table.Query("UPPER(NAME) = \"SM\" .AND. SALARY > 50000")`, walked in the selected tag's
-order or in record-number order, with a count that reads no record when the plan answers the whole
-filter. **Depth 4 of the gate is green on its first run** — all 81 filters, both orders, counts and
-backwards walks — and **ADR-53's second divergence is proved**: the port's residual checks strictly
-fewer terms than the reference's and returns the same records. `dotnet test` green on **3225 tests**
-(764 golden, 2461 unit). No corpus file changed.
-**Before it, sub-step 6 — the merge algebra**: two terms over one tag now become one seek, and
-**depth 3 stayed green through it**, which is what the whole reorder was for. It went red the moment
-merging landed and caught two real bugs, one of them a shared-buffer alias that nothing before
-merging could have exposed. `dotnet test` green on **3209 tests** (748 golden, 2461 unit), up from
-2066. Five mutations, all red. `CDXEXPR` gained seven query filters and its dump is the only
-corpus file that changed.
-**Before it, sub-step 5 — combination**, which made **the optimizer complete and correct**:
-**depth 3 of the gate is green on all 74 filters**, meaning the candidate set this port builds holds
-exactly the records the reference's own bitmap holds — compared before any residual filtering and
-before any merging exists. `dotnet test` green on **2066 tests** (732 golden, 1334 unit). Four
-mutations run, all red. No corpus file changed. It corrected a spec claim that would have cost the
-whole gate.
-**Before it, sub-step 4 — leaf evaluation**: one constraint reached its records by seeking.
-`ITagProbe` (the step's one seam) with a contract test run against **both** implementations,
-`TagProbe`, `RecordSet` and `ConstraintSeeker`. **41 single-leaf filters reach exactly the records
-the reference's own bitmap holds** — the first end-to-end signal — and `dotnet test` is green on
-**2054 tests** (720 golden, 1334 unit). Four of five mutations reddened; **the fifth found dead
-code**, which was removed. No corpus file changed.
-**Before it, sub-step 3 — decomposition**: a filter became a constraint tree.
-`net/CodeBase.Net/Query/` gained `ConstraintValue`, `LeafConstraint`, `ConstraintNode`, `QueryPlan`
-and a grown `QueryDecomposer`; **depth 2 of the gate is green on all 74 filters** and `dotnet test`
-is green on **2006 tests** (714 golden, 1292 unit). Four of five mutations reddened; **the fifth is
-inert for a reason worth knowing** — see §2. No corpus file changed.
-**Before it, sub-step 2 — eligibility and subexpression identity**: `net/CodeBase.Net/Query/` now
-holds `QueryTagScope` (public), `QueryTag`, `TagEligibility`, `SubtreeMatch` and `QueryDecomposer`,
-and **depth 1 of the gate is green on its first run** — every node of all 74 filters matching the
-reference's own parallel array, with **five mutations run against it and all five red**. `dotnet
-test` green on **1968 tests** (676 golden, 1292 unit). It corrected the spec's type gate, which would
-have cost three kinds of tag.
-**Before it, sub-step 1 — the query oracle**: `test-files-generator/src/dump-query.h/.cpp` and query
-filter lists on three cases, three new `net/corpus/*.query.dump.txt` files holding **70 filters at
-five depths each**, and the C# that reads them. **No C# of the optimizer.** `dotnet test` green on
-**1936 tests** (666 golden, up from 639), and **all 48 pre-existing corpus files regenerated
-byte-identical**. The run **witnessed the reference's range-inverting defect** and confirmed three
-predictions nothing had ever checked; §2 has what it found.
-**Before it, step 011 was designed and planned** — [`claude/dev/011-query-optimizer/`](claude/dev/011-query-optimizer/)
-(`DESIGN.md`, `PLAN.md`, `STATE.md`), with **ADR-52** and **ADR-53** closing ADR-46, corrections
-to `claude/specs/QUERY-OPTIMIZER.md` (§3.4, §4.4, §7.3, §11.1 and §12 items 1, 2 and 8),
-`claude/PORTING-PLAN.md` (§5's `QUERY` row and section, §8's benign divergences),
-`claude/dev/README.md` and this file. **No `.cs` file was touched and no test was run** — the step is
-at phase 5 of `DEV_APPROACH.md`, and phase 6 is the only one that writes code. `dotnet test` remains
-where step 010 left it, green on **1909 tests**.
-**Before it, step 010 closed** —
-the expression engine in `net/CodeBase.Net/Expressions/` and the tag path wired through it. All seven
-gate assertions hold and twenty-three mutations were run against them. `dotnet test` is green on
-**1909 tests** (639 golden + 1270 unit), up from 1450, with **no golden expectation changed**.
-**Step 010 is complete and `EXPR` is done.** An expression tag is an ordinary tag: **every key of
-every expression tag in `CDXEXPR.cdx` is rebuilt byte for byte — 22 tags, 338 stored keys** — each
-tag **walks the records the reference stored in its order**, and moving to a record by number
-rebuilds that record's key and descends to it. **ADR-28's refusal is gone.** And the **thirteen
-functions Visual FoxPro has that CodeBase refuses** are supported, gated by Visual FoxPro's own
-answers in a VM (**ADR-43**, **ADR-44**) — 36 values on stored bits and 16 tag key lengths against
-its own headers, which answers ADR-43's named risk.
-**Every constant expression and every field expression at every record now evaluates to the
-reference's own bytes**, and the compiled form is gated node for node against its `E4INFO`
-arrays — row, length and the conditional's second length, plus each expression's result type and
-trim marking, over all 212 expressions the reference compiled. **A second generator run closed the
-gate's row coverage**: 46 expressions were added for rows nothing reached, so **144 of the 193 table
-rows are oracle-gated and the other 49 are declared unreachable with a reason**. The corpus
-regenerated byte-identical except the expression dump.
-`net/corpus/CDXEXPR.expr.dump.txt` is therefore modified, and it is the only corpus file that is.
-**Before that:** **`claude/specs/QUERY-OPTIMIZER.md`** was written, the eighth spec and the last gap,
-and read back against step 010's design: `claude/PORTING-PLAN.md` (**R13 retired**),
-`claude/ARCHITECTURE-DECISIONS.md` (**ADR-46**), `dev/010-expr/`'s `DESIGN.md` (**new §6**, and §2b
-corrected), `PLAN.md`, `STATE.md`, and this file.
-**Before that:** the VFP oracle — its scripts
-in `test-files-generator/vfp/`, its output in `net/corpus/vfp/` — was committed together with the
-documentation that names it, across `CLAUDE.md`, `FOR-DEVELOPERS.md`, `.gitignore`,
-`ARCHITECTURE-DECISIONS.md` (**ADR-44**, **ADR-45**), `PORTING-PLAN.md`, `specs/EXPRESSIONS.md`,
-`specs/CDX-FORMAT.md`, `net/corpus/README.md`, `dev/010-expr/` and this file. **The oracle has been
-run** and no `.cs` file was touched.
-**Step [`010-expr`](claude/dev/010-expr/) is under way and its first five sub-steps are done.** The
-step is designed *and* planned, and **the oracle exists**: `net/corpus/CDXEXPR.*` plus
-`FUNCTIONS.dump.txt` record what the C library's own parser and evaluator answer. The engine's first
-five pieces are built against it: the function table, **gated row for row**; the scanner, gated on
-every expression the C compiled and on the seven refusals it owns; the parser, gated on every compiled
-node array's shape and on the seven refusals *it* owns; overload resolution, gated on every node's row
-and length with **row coverage closed**; and the evaluator, gated on the reference's own result bytes
-for every expression and every record. **Sub-step 5 was the step's designed stop point and it has been
-reached.** **Next is sub-step 6**, the four functions that format text, which is where the corpus
-leads because the source states no answer.
-**The design changed shape twice on 08-28, and both changes are recorded as ADRs.** The gate is
-now **two axes** — what a function *computes* (C#-authored semantics, tested over **constants**) and
-what a value *becomes on disk* (stored key bytes, driven from the C library's recorded value so the
-two can never cancel). And the engine takes an explicit date policy (**ADR-42**) and supports
-**Visual FoxPro's functions** although CodeBase has none of them (**ADR-43**). Since 08-29,
-**ADR-44** adds a **second offline oracle** — Visual FoxPro 9, in a VM — for what CodeBase cannot
-generate at all; **its first script has been run and its output is committed**, and **ADR-45**
-records the two divergences it decided.
-**The headline finding: the reference has no arithmetic function at all.** 35 named functions, whole
-numeric surface `+ - * / ** ^` — a key-building vocabulary, not an expression language. Beside it:
-`STR` rounds **half away from zero on the decimal digits**, `CTOD` reads the century **off the system
-clock**, `TRIM` returns the source width **NUL-padded**, and **promotion beats the exact-type
-overload row**, which makes all six currency comparison rows dead.
-`dotnet test` is green on **1909 tests** (639 golden + 1270 unit), up from 1450, with **no golden
-expectation changed**.
+**Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is **step 011
+closed — `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
+a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3260
+tests** (799 golden, 2461 unit), up from 1909 at the start of the step, and **no existing corpus file
+changed at any point** — the three `*.query.dump.txt` files were pure addition.
+
+```csharp
+table.SelectTag(table.Tags["NAME"]);
+Query q = table.Query("UPPER(NAME) = \"SM\" .AND. SALARY > 50000");
+
+for (GoResult go = q.Top(); go == GoResult.Ok; go = q.Next())
+    Console.WriteLine(table.GetString(name));
+
+int howMany = q.Count;      // reads no record at all when the tags answer the whole filter
+```
+
+**Three gates that fail differently, and all three green.** Full-scan **equivalence** on every filter
+in both tag scopes, which needs no reference at all; the reference's **own answers at five depths**
+over 81 filters — including the candidate bitset *before* residual filtering, and a **depth 0** taken
+with the reference's own optimizer switched off; and **counted work**, because every correctness
+check in the suite passes on an optimizer that never optimizes.
+
+**Risk R12 — "the optimizer returns a wrong record set" — is retired, and it was real.** The gates
+caught one three times.
+
+- **The reference inverts a range bound.** `K_INT > 0 .AND. 4 > K_NUM` returns
+  **{3, 9, 11, 12, 14, 15}** optimized and **{5, 6, 8}** scanned — *disjoint*. Its four reflection
+  sites test an assignment rather than a comparison, so the port implements the intent (**ADR-53**).
+  Witnessed, not inferred, because every filter is dumped twice.
+- **A collated tag lost six records.** `K_TEXT > "M"` dropped `alpha`, `cafe`, `café`, `Æther`,
+  `æon`, `aeon` — each begins with a byte above `M`'s and each collates below it. A filter's
+  comparisons are defined in byte order and a collated tag is not, so answering one from the other
+  swaps the question. **ADR-54** supersedes ADR-52's collation half: refused in both scopes.
+- **A shared-buffer alias** in the key converter, which nothing before merging could expose, because
+  a range with two ends is the first thing that holds two comparands at once.
+
+**The first two were found by gates the other half of the suite is blind to** — the defect by dumping
+every query twice, the collation by an expectation that owes the reference nothing. That is the
+step's transferable lesson, along with the reorder: the merge algebra was moved to land **after** the
+record sets were green, which is why it went red the instant it was wrong.
+
+**Four spec corrections**, each of which would have cost something: the `.AND.` fold is an
+**intersection** and the source's own comment beside it says otherwise (§6.4); the type gate is a
+**blacklist of four**, so date and logical tags are eligible where its comment names three (§3.4); a
+leaf's set does not depend on the connective above it, so one routine replaces four (§6.5); and the
+partial-string widening is complete rather than asymmetric (§4.4). §12 items 1, 2 and 3 are resolved
+and item 7 is narrowed twice.
+
+**The omitted go-around is settled by measurement, not preference.** A selectivity sweep over
+`PERF10K`: 0.1% of the table costs **0.001×** a full scan, 10% costs 0.101×, and the crossover is at
+**total** selectivity, where the loss is **1.2%** — the descent and the leaf walk, about 121 reads of
+10 121. The go-around could recover at most that.
+
 
 State only: what is ready, what changed last session, what is next. Decisions and their reasoning
 live in [`claude/ARCHITECTURE-DECISIONS.md`](claude/ARCHITECTURE-DECISIONS.md); per-capability status

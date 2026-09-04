@@ -1,6 +1,14 @@
 # Project state
 
-**Updated:** 2026-09-03 · **the tree is clean and pushed.** The last commit is **step 010 closed** —
+**Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
+**step 011 designed and planned** — [`claude/dev/011-query-optimizer/`](claude/dev/011-query-optimizer/)
+(`DESIGN.md`, `PLAN.md`, `STATE.md`), with **ADR-52** and **ADR-53** closing ADR-46, corrections
+to `claude/specs/QUERY-OPTIMIZER.md` (§3.4, §4.4, §7.3, §11.1 and §12 items 1, 2 and 8),
+`claude/PORTING-PLAN.md` (§5's `QUERY` row and section, §8's benign divergences),
+`claude/dev/README.md` and this file. **No `.cs` file was touched and no test was run** — the step is
+at phase 5 of `DEV_APPROACH.md`, and phase 6 is the only one that writes code. `dotnet test` remains
+where step 010 left it, green on **1909 tests**.
+**Before it, step 010 closed** —
 the expression engine in `net/CodeBase.Net/Expressions/` and the tag path wired through it. All seven
 gate assertions hold and twenty-three mutations were run against them. `dotnet test` is green on
 **1909 tests** (639 golden + 1270 unit), up from 1450, with **no golden expectation changed**.
@@ -237,8 +245,13 @@ and the decision log. `EXPRESSIONS.md` gained §5.1 (the 35-function set and the
 arithmetic) and §7.7 (the 47 comparison rows), and had §7.3's date-format claim corrected — it said
 the default picture was set outside this source drop; it is at `C4CODE.C:1126`, which
 `API-ERRORS.md` had cited all along.
-**`claude/specs/QUERY-OPTIMIZER.md` now exists** (2026-09-03, 911 lines, 171 cited lines), so every
-in-scope subsystem has a source-cited spec and **risk R13 is retired**.
+**`claude/specs/QUERY-OPTIMIZER.md` now exists** (2026-09-03), so every in-scope subsystem has a
+source-cited spec and **risk R13 is retired**. Step 011's design pass then corrected it in three
+places: §4.4 gains the slot table showing **which two operator branches widen a short constant and
+why exactly those**, plus the argument that the widening is *exact* rather than a safety margin;
+§7.3 gains the finding that `log4true` reads the wrong two positions and is conservative as a result;
+§11.1 and §3.4 now point at **ADR-52**; and **§12 item 2 is resolved** — the widening asymmetry is
+not a second defect.
 `EXPRESSIONS.md` §3 and §4 were then corrected against the scanner as it was ported: whitespace is
 **three rules and not one** — only the space character counts where a *value* is expected, and the
 spec had cited that very site for the opposite claim — an **empty parameter list is empty only when
@@ -246,7 +259,92 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-09-03), the one before it, and the four before that
+## 2. This session (2026-09-04), the ones before it, and the four before those
+
+**Step 011 is designed and planned, and nothing else happened.** `claude/dev/011-query-optimizer/`
+holds `DESIGN.md` (five stages, seventeen classes, eleven decisions, four open questions) and
+`PLAN.md` (four test layers, nine sub-steps, seven named mutations, two gates). No C# exists.
+
+**Visual FoxPro is not an oracle for this step, and the reason is worth carrying.** ADR-44's rule is
+that VFP witnesses a value it computes and the bytes it writes; the optimizer writes nothing, and
+three of the four things worth recording are CodeBase's own internal state. The fourth, a record
+sequence, VFP *would* answer — under **its** prefix `=` semantics, which the VFP oracle itself showed
+run the opposite way from CodeBase's (ADR-45, ADR-50) and which this port deliberately does not
+follow. A VFP result set would redden a correct implementation. **CodeBase is the only oracle here —
+and it can be asked twice.**
+
+**`RELATION4.bitmapDisable` is a plain struct member** (m4map.c:341), and setting it makes
+`bitmap4can` return 0 at once, after which `log4true` re-evaluates every conjunct per record. So each
+filter is dumped twice: the reference's optimized answer, and **the reference's own scan truth** with
+the optimizer out of the circuit. That is **depth 0**, and it is what makes ADR-53 checkable —
+on the `.AND.`-nested reflected comparison the reference's defect can invert a bound, so a *correct*
+port is expected to disagree with `relate->set` there. Without a second reading the gate cannot tell
+"we decompose differently" from "the reference is wrong here", and would have needed a hand-written
+exception; with it, the disagreeing filters are **read from the dump, never listed in the C#**. It
+also closes `QUERY-OPTIMIZER.md` §12 item 1, which had the `tagPos = 1` intent as inferred from four
+source comments and never observed.
+
+**The design pass found a much better oracle than the plan assumed, and it changed the gate's
+shape.** `RELATE4` and `RELATION4` are **public structs in `R4RELATE.H`**, so the generator can dump
+what the reference decided at **four depths** instead of only comparing final record sets:
+`log.infoReport[i].tag` per node, `relation->fullyMapped`, **`relate->set` — the candidate bitset
+before any residual filtering** — and the `relate4top`/`skip`/`count` sequence. Depth 3 is the one
+that matters: it compares the set a decomposition error cannot hide from, because no residual pass
+has run yet to remove the same records by accident. Beside it runs **full-scan equivalence**, which
+needs no reference at all, on every case, always.
+
+**Two decisions were taken and are ADRs rather than notes.** **ADR-52**: tag eligibility replicates
+CodeBase's four refusals by default (`QueryTagScope.Compatible`) and widens the **type and collation**
+gates under `AllSeekable` — the filter and unique gates are **never** widened, because a filtered tag
+indexes a subset of the table and a unique tag stores one key per duplicate group, so both are
+structural. The default is what keeps three of the four gate depths meaningful, since the reference is
+an oracle only where both sides used the same tags. **ADR-53**: the reference's
+`if ( tagPos = 1 && constPos == 0 )` is an assignment C# cannot even compile, so the port implements
+the **intent**; and the residual filter trusts a term when decomposition produced a leaf for it, not
+by reading two fixed positions. Both **close ADR-46**, which was open on exactly them.
+
+**Reading the C settled two things the spec had left open or wrong.**
+
+- **`QUERY-OPTIMIZER.md` §12 item 2 is resolved and is not a defect.** The partial-string widening
+  looks asymmetric because only two of six operator branches apply it — but those two are exactly the
+  two that write the `gt` slot, and they are the only two that write it (m4map.c:211-283). Only an
+  exclusive *lower* bound can wrongly drop a prefix group. And the widening is **exact rather than a
+  safety margin**, because `EXPRESSIONS.md` §8's tie-break — which the corpus found in step 010 —
+  already makes `"SM" + 18 blanks > "SM"` true. That is what makes a widened leaf safe to trust with
+  no residual re-check, so it is load-bearing for ADR-53 and not a footnote.
+- **`log4true` reads the wrong two positions.** It tests the nodes at `-1` and `-2` from a conjunct's
+  root, which are the operand roots only when the right operand occupies a single node (r4log.c:770).
+  Where it does not, the reference **re-evaluates a term its own bitmap already answered** — slower,
+  never wrong. Now in the spec's §7.3.
+
+**And a third gate, because the first two are blind to the thing the step is for.** A `QUERY` that
+decomposes nothing and scans every time is **perfectly correct** — a null bitmap answers yes for
+every record (r4relate.c:82-91) — so Gate A compares a scan against a scan and passes. That is
+**ADR-40's failure repeating in a second module**, and it takes ADR-40's answer: gate the speed-up
+itself, and **count rather than time**, because a read count is exact and identical on every machine.
+Gate C is five assertions, three of them exact numbers rather than thresholds: a fully-mapped `Count`
+reads **zero** records (the reference's own headline claim, r4relate.c:6780-6781), a fully-mapped
+query runs **zero** residual evaluations and reads **exactly** what it returns, `x > 5 .AND. x < 10`
+compiles to **one** leaf — leaf count is seek count, and the merge algebra's stated purpose is that
+the tag is seeked once (C4CONST.C:300-307) — and a selective query's block reads are a small fraction
+of a scan's. Step 009 already left the instrumentation: `CountingSource` plus `CodeBaseEngine`'s
+factory constructor. Two of the plan's mutations exist only for this gate, and **Gate A stays green
+under both of them**.
+
+Separately measured and deliberately **not** gated: a selectivity sweep over `PERF10K` locating where
+the optimizer stops beating a scan. That is the measurement that would reverse Decision 8's omission
+of the go-around complement — with a number rather than a preference. `PERF10K` stays benchmark data.
+
+**What step 010 already discharged, so step 011 does not.** `OptimizerContractGoldenTests` gates all
+four things `QUERY-OPTIMIZER.md` §3 asks of the compiled form. Step 011 owes structural equality
+between two node arrays, tag eligibility, the `BITMAP4` tree, the merge algebra, the four seek
+positions, the `F4FLAG` bitset, the residual filter and the public surface — and nothing else.
+
+**One housekeeping defect was fixed.** Step 010's close wrote its `claude/dev/README.md` row into the
+**renumbering table** rather than the steps table, so the index still said 010 was "in progress —
+sub-steps 1-2 of 8". Both rows are now what they should be.
+
+### The five sessions before it
 
 **Step 010's sub-step 5 landed: the evaluator, and the step is at its designed stop point.**
 `net/CodeBase.Net/Expressions/` gained `ExpressionValue` (the closed union over the ten types),
@@ -508,7 +606,22 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 010 is closed; what is next
+### Step 011 is designed and planned; execution starts at its sub-step 1
+
+**The next command is a Windows one.** [`claude/dev/011-query-optimizer/PLAN.md`](claude/dev/011-query-optimizer/PLAN.md)
+sub-step 1 is the query oracle: `dump-query.h/.cpp` in `test-files-generator/`, plus filter lists on
+`CDXEXPR`, `CDXBASE` and `CDXDEEP`, producing three `*.query.dump.txt` files with the four depths.
+**It writes no C# of the optimizer**, exactly as step 010's sub-step 1 did, and every sub-step after
+it is gated by part of what it produces — so it lands first and separately.
+
+Fold into the same run the two things the corpus is already owed: the **second rejection pass with a
+real `TAG4FILE`** (so `e4tagExpr` (−510) and the alias refusals stop being unobservable), and a **run
+of three or more `.AND.`/`.OR.` operators**, which the whole `CDXEXPR` dump lacks. `PLAN.md` also
+names the three cases `QUERY-OPTIMIZER.md` §12 wants — an `.AND.`-nested reflected comparison, an
+`H`-field comparison, and an OR range — and `DESIGN.md`'s open questions 1-3 are answered from the
+dump rather than from reading.
+
+### Step 010 is closed; what came before
 
 **`EXPR` is done and step 010 needs nothing further — all nine sub-steps.** An expression tag is an
 ordinary tag, every key of every one in the corpus is rebuilt byte for byte, Visual FoxPro's thirteen
@@ -516,8 +629,8 @@ extra functions are supported and gated by Visual FoxPro, and `PORTING-PLAN.md` 
 capability closed and **R5 retired**. One thing is owed and named: the Windows ANSI case mapping,
 which no corpus table can witness. The step's record is [`SUMMARY.md`](claude/dev/010-expr/SUMMARY.md).
 
-**The natural next step is `QUERY`** — the bitmap optimizer, which is what the whole port exists for
-and is specified in [`specs/QUERY-OPTIMIZER.md`](claude/specs/QUERY-OPTIMIZER.md). Step 010 built it
+**`QUERY` is step 011, now designed and planned above.** It is the bitmap optimizer, what the whole
+port exists for, specified in [`specs/QUERY-OPTIMIZER.md`](claude/specs/QUERY-OPTIMIZER.md). Step 010 built it
 the compiled form it walks and **gated the contract**: the node table with all six fields per node,
 evaluation **at a node** with no record for a constant subtree, the per-node is-constant predicate
 checked against the evaluator's own behaviour rather than against a copy of its rule, and a `Tag`
@@ -554,8 +667,8 @@ that can turn an existing test red. The stop point after sub-step 5 is real.
 
 ### Two things that depend on nothing
 
-**~~Write `claude/specs/QUERY-OPTIMIZER.md`~~ — done 2026-09-03.** R13 retired. What it leaves behind
-is three generator cases, listed in the spec's §12 and worth adding before any `QUERY` C#: a
+**~~Write `claude/specs/QUERY-OPTIMIZER.md`~~ — done 2026-09-03**, and **~~its three generator
+cases~~ are now step 011's sub-step 1**. R13 retired. The three, listed in the spec's §12: a
 **reflected comparison nested in an `.AND.`** (`4 > K_NUM` beside `K_NUM < 4`, which is where the
 reference's `tagPos = 1` defect could invert a bound), an **`H`-field comparison** (predicted
 un-optimizable because `E4FLOAT` is missing from `e4isConstant`, and `CDXEXPR` has the corpus's only

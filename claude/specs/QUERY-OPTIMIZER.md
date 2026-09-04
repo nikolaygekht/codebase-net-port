@@ -302,7 +302,9 @@ it is 0 by the constructor's `memset` ([`API-ERRORS.md`](API-ERRORS.md) §6, C4C
 The net effect is that **CodeBase's optimizer can only use plain, unfiltered, machine-or-none-collated
 tags over `r4double`, `r4charBin` or `r4memoBin` keys.** For this port that excludes the integer,
 currency, datetime and `GENERAL` tags that steps 004-008 built and gated. Whether the port keeps the
-restriction is a decision, not a fact; §11.1 states the case each way.
+restriction is a decision, not a fact; §11.1 states the case each way, and **ADR-52 decided it**:
+replicate all four by default, widen the type and collation gates under an explicit setting, never
+widen the filter and unique gates.
 
 ---
 
@@ -434,6 +436,29 @@ m4map.c:222-236. The reasoning is prefix semantics: `NAME > "SM"` must still adm
 padded out to the key width — `"SM      "` is *not* greater than `"SM"` under a prefix comparison,
 so an exclusive lower bound would wrongly drop the whole `"SM…"` group. Widening to `>=` keeps them
 and lets §7's residual comparison decide.
+
+**Which paths widen, and why exactly those.** The widening is applied at two of the six operator
+branches, and the reason is the slot each writes, not the operator each names:
+
+| Path | Slot written | Widens? |
+|---|---|---|
+| `>` tag left | `gt` | **yes** (m4map.c:222-236) |
+| `<` constant left | `gt` | **yes** (m4map.c:252-271) |
+| `<` tag left, `>` constant left | `lt` | no |
+| `>=` tag left, `<=` constant left | `ge` | no |
+| `<=` tag left, `>=` constant left | `le` | no |
+
+Only an exclusive *lower* bound can wrongly drop the prefix group, so only the two `gt`-producing
+paths need the adjustment, and they are the only two that produce it. §12 item 2 asked whether the
+remaining four were a second defect of §10.1's family; they are not.
+
+**And the widening is exact, not a safety margin.** `NAME > "SM"` on a `C(20)` field compares a
+20-wide left operand against a 2-wide right one, and [`EXPRESSIONS.md`](EXPRESSIONS.md) §8's
+tie-break — the strict comparisons break a tie on width — makes `"SM" + 18 blanks > "SM"` **true**.
+So the expression itself admits the whole `"SM…"` group; an exclusive byte seek would skip it, and
+`ge` restores exactly it and nothing more. An equal-width constant never reaches the widening,
+because `hold.len < keyLen` is false. This matters beyond the seek: it is what makes a widened leaf
+safe to trust without a residual re-check (§7.3).
 
 This is the same prefix rule that **ADR-45** settled for the `=` operator, arriving from the
 optimizer's side. It has a direct consequence the plan already anticipated: `NAME = "SM"` is a
@@ -715,6 +740,20 @@ Returning 0 rejects the record. So the rule, stated once:
 That is the fall-back boundary, and it is per *term*, not per query. A filter with three conjuncts of
 which one is optimizable seeks one tag and evaluates the other two on every candidate.
 
+**But the code reads the wrong two positions, and is conservative as a result.** The test is
+`(infoReportPtr-1)->tag == 0 && (infoReportPtr-2)->tag == 0` (r4log.c:770). `infoReportPtr-1` is
+always the right operand's root; **`-2` is the node before it, which is the left operand's root only
+when the right operand occupies a single node.** For a term whose left operand matched a tag and
+whose right operand is more than one node — `K_TEXT+K_CITY = UPPER("x")`, where the constant subtree
+is two nodes — both positions read zero and the term is re-evaluated per candidate even though the
+bitmap already answered it. Slower, never wrong, because re-evaluating a term the bitmap got right
+removes nothing.
+
+A port should express the rule as §11.5 says — a property of the plan, "trusted iff decomposition
+produced a surviving leaf for this term" — which trusts strictly more terms and is safe for the
+reason §4.4 gives: the only leaf that could be a superset is a widened one, and the widening is
+exact. **ADR-53** records the divergence.
+
 **CodeBase ships the equivalence check we planned.** Under `S4TEST && S4DEBUG`, `log4true` evaluates
 a tag-backed term anyway and raises `e4info` if it comes out false (r4log.c:756-768) — the reference's
 own version of the full-scan equivalence gate, and independent support for making ours permanent
@@ -845,6 +884,12 @@ This is an ADR, not a spec decision. Note that it interacts with the equivalence
 safe *because* the full-scan gate is the real check, and unlike CodeBase's, ours is not behind a
 debug flag.
 
+**Decided by ADR-52: both, selected by `CodeBaseEngine.QueryTagScope`.** `Compatible` (the default)
+replicates, which is what keeps the reference usable as an oracle at three of the four gate depths;
+`AllSeekable` widens the type and collation gates. The **filter and unique gates are never widened**
+— a filtered tag indexes a subset of the table and a unique tag stores one key per duplicate group,
+so both refusals are structural rather than conservative.
+
 ### 11.2 Model the canonical leaf as a type
 
 §5.3's invariants make a leaf one of: `Eq(value)`, `NotIn(values)`, or
@@ -884,11 +929,17 @@ is independent support.
    by the four `AS Feb 19/13` comments, but no corpus case exercises a reflected comparison inside a
    larger expression, which is the only place the buggy and intended conditions differ. **Wants a
    generator case**: `.AND.`-nested `4 > K_NUM` and `K_NUM < 4`, checked to return the same records.
-2. **The partial-widening asymmetry (§4.3) is unexplained.** Only `>` tag-left and `<` constant-left
-   widen a short string constant to an inclusive bound; the four other reflected paths do not. Either
-   the other four are unreachable for `r4str`, or this is a second defect of the same family as
-   §10.1. Resolvable by reasoning about which slots a string comparison can reach, and worth doing
-   before implementing §4.3's table.
+   **And it can be witnessed rather than inferred**, because `RELATION4.bitmapDisable` is a plain
+   struct member and setting it makes `bitmap4can` return 0 at once (m4map.c:341), after which
+   `log4true`'s `|| bitmapsFreed` arm re-evaluates every conjunct per record. Running the same query
+   twice — optimized and disabled — asks the reference for its optimized answer and for **its own
+   scan truth**, and where those differ on this case the defect has demonstrated itself. Planned as
+   step 011's sub-step 1 (`dev/011-query-optimizer/DESIGN.md` Decision 12).
+2. ~~**The partial-widening asymmetry (§4.3) is unexplained.**~~ **RESOLVED 2026-09-04, and it is
+   not a defect.** Reading the four reflected branches together (m4map.c:211-283): the two paths that
+   widen are `>` tag-left and `<` constant-left, and those are **exactly the two that write the `gt`
+   slot — the only two that write it.** The other four write `lt`, `ge` or `le`, where a short
+   constant needs no adjustment. The asymmetry is complete rather than partial. See §4.4.
 3. **`E4FLOAT` absent from `e4isConstant` (§3.2) predicts that no `H`-field comparison optimizes.**
    Unwitnessed. `CDXEXPR` has the corpus's only `H` field, so a case is cheap.
 4. **`u4allocAgain` is not in this source drop**, so §10.3's `bufLen`-vs-`bufPos` question cannot be
@@ -906,6 +957,12 @@ is independent support.
    largest single routine in the module and handles OR ranges with their own position/flip logic. Its
    rules are believed to mirror `bmf4AndOt` with the flip polarity inverted; **verify before
    implementing OR ranges.**
-8. **No corpus case gates any of this yet.** `CDXEXPR` (step 010) gates expression *evaluation*;
+8. **No corpus case gates any of this yet, and Visual FoxPro cannot supply one.** ADR-44's oracle
+   witnesses a value VFP computes and the bytes it writes; the optimizer produces neither, and three
+   of the four things worth recording here (`infoReport[i].tag`, `fullyMapped`, `relate->set`) are
+   CodeBase's own internal state. The fourth, a record sequence, VFP would answer under *its* prefix
+   `=` semantics, which ADR-45 established run the opposite way from CodeBase's — so a VFP result set
+   is not this port's expected answer. CodeBase is the only oracle for this module, and item 1 above
+   is how it becomes two. `CDXEXPR` (step 010) gates expression *evaluation*;
    nothing gates decomposition, merging, or the record sets. The `QUERY` gate in `PORTING-PLAN.md` §5
    is the plan, and §7.3 shows the reference validating itself the same way.

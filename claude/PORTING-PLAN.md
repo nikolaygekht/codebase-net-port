@@ -312,7 +312,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 | `CDX-READ` | CDX reading & navigation | **P1** | **done** — decode and traversal (004), seek by key bytes (005), tags on a `Table` (006), seek by value (008), and a non-field key expression (010) | **R1** retired |
 | `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (008 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | **done** 2026-09-03 ([`010-expr`](dev/010-expr/)) — table, scanner, parser, overload resolution, evaluator, key conversion, and wired into the tag path. **Every key of every expression tag in `CDXEXPR.cdx` is rebuilt byte for byte** (22 tags, 338 keys), each tag walks the records the reference stored in its order, and ADR-28's refusal is gone. Also **the thirteen functions Visual FoxPro has and CodeBase refuses** (ADR-43), gated by Visual FoxPro's own answers in a VM (ADR-44) — 36 values on stored bits and 16 tag key lengths against its own headers. Outstanding and named: the Windows ANSI case mapping for `UPPER` and `LOWER`, which no corpus table can witness | **R5** retired |
-| `QUERY` | **Bitmap query optimizer** | **P1** | not started — **spec written** ([`QUERY-OPTIMIZER.md`](specs/QUERY-OPTIMIZER.md), 2026-09-03); no C# exists | **R12**, ~~R13~~ |
+| `QUERY` | **Bitmap query optimizer** | **P1** | **designed and planned** 2026-09-04 ([`dev/011-query-optimizer/`](dev/011-query-optimizer/)) — spec written 2026-09-03, no C# exists yet; eligibility and the reference's range defect decided (**ADR-52**, **ADR-53**) | **R12**, ~~R13~~ |
 | `WRITE` | Single-user write & round-trip | **P2** | not started — **owes the block cache, see §5's cross-capability obligation** | R4, R9, **R6** |
 | `LOCKING` | Locking & multi-user | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | R3, R10, **R6** |
 | `TRANS` | Transactions & recovery | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | **R6** |
@@ -482,7 +482,15 @@ which is why it is P1 and write support is P2.
   (some terms have no tag — the remainder must fall back to scanning without dropping records),
   non-optimizable ones, `.AND.`/`.OR.` nesting, negation, open and closed ranges, `ne` lists,
   empty results, and full-table results. Additionally, the generator records the C library's own
-  result set per case so we detect where our decomposition diverges from CodeBase's.
+  answers per case so we detect where our decomposition diverges from CodeBase's — and step 011's
+  design found that it can record them at **four depths**, not one, because `RELATE4` and `RELATION4`
+  are public in `R4RELATE.H`: the tag matched to each node (`log.infoReport[i].tag`, which gates
+  eligibility and `e4isTag`), `relation->fullyMapped`, **`relate->set` — the candidate bitset before
+  any residual filtering** — and the final `relate4top`/`skip`/`count` sequence. The third matters
+  most: it compares the set a decomposition error cannot hide from, because no residual pass has run
+  yet to remove the same records by accident. Depths 1-3 are meaningful only where both sides used
+  the same tags, so they run under `QueryTagScope.Compatible` (**ADR-52**); the equivalence check
+  above runs in both scopes, on every case, always.
 - **Correctness rule:** a wrong record set is far worse than a slow one. If the optimizer cannot
   prove a term is safe to optimize, it must fall back to scanning. The full-scan equivalence gate
   above is non-negotiable and runs on every case, always.
@@ -491,7 +499,15 @@ which is why it is P1 and write support is P2.
   the optimizer decomposes the **compiled** expression, identifying operators by row-index range
   over `v4functions` and matching a subexpression to a tag by comparing compiled node arrays
   node-for-node — so the expression engine's compiled form is part of this contract
-  (`QUERY-OPTIMIZER.md` §3).
+  (`QUERY-OPTIMIZER.md` §3). **Step 010 discharged that contract and gates it**
+  (`OptimizerContractGoldenTests`), so all four things §3 asks for — the retained node table with its
+  six fields, operator classification by row band, evaluate-at-a-node with no record for a constant
+  subtree, and a `Tag` that keeps its `CompiledExpression` — are in place before step 011 starts.
+- **Designed and planned:** [`claude/dev/011-query-optimizer/`](dev/011-query-optimizer/), 2026-09-04.
+  Nine sub-steps; the first is the oracle and writes no C# of the optimizer. Two decisions taken at
+  design time: **ADR-52** (tag eligibility replicates by default, widens under `QueryTagScope`) and
+  **ADR-53** (the reference's `tagPos = 1` assignment is not replicated, and the residual filter
+  trusts per term rather than by position). Both close ADR-46.
 
 ### `WRITE` — single-user write & round-trip · P2
 
@@ -757,6 +773,19 @@ something different. Never use it for keys, indexes, or memos.
   copied exactly, including reading a neighbouring field's bytes. (Step 001.)
 - The `W`-field blank byte-order upstream quirk (`0x00,0x20` per char) — decide replicate vs fix and
   test the chosen behavior (`DBF-FORMAT.md` §11.2). Out of scope for v1 creation regardless.
+- **The optimizer reflects a constant-left comparison the way the reference *meant* to, not the way
+  it does.** `if ( tagPos = 1 && constPos == 0 )` at m4map.c:216/243/251/278 is an assignment, so the
+  condition C actually evaluates is `constPos == 0` alone. C# cannot compile the letter of it, so the
+  port implements the intent (**ADR-53**). The two agree for every comparison whose operands are
+  single nodes and differ only for one nested inside a larger expression, where the reference's
+  reading can invert a bound — so this is a divergence *from a defect*, gated by an `.AND.`-nested
+  reflected comparison in the corpus.
+- **The optimizer's residual filter trusts more terms than the reference's.** `log4true` tests the
+  two nodes immediately before a conjunct's root (r4log.c:770), which are the operand roots only when
+  the right operand is a single node; where they are not, it re-evaluates a term its own bitmap
+  already answered. The port trusts a term exactly when decomposition produced a surviving leaf for
+  it, which is safe because the only leaf that could be a superset is a widened prefix bound and the
+  widening is exact (`QUERY-OPTIMIZER.md` §4.4). Same record set, fewer evaluations (**ADR-53**).
 
 ---
 

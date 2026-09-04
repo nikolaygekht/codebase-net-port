@@ -1559,7 +1559,7 @@ settles that CodeBase governs behaviour and VFP governs bytes, and nothing here 
 
 ---
 
-## ADR-46 — The optimizer's spec is written, and it leaves two decisions the port must make · open
+## ADR-46 — The optimizer's spec is written, and it leaves two decisions the port must make · closed by ADR-52 and ADR-53
 
 **Date.** 2026-09-03.
 
@@ -1737,3 +1737,121 @@ the smallest surface that makes the policy sayable.
 
 **Consequence.** Its documentation is now API documentation and follows docgen's rules, and the
 default it advertises — infer no century — is the behaviour most callers will meet first.
+
+## ADR-52 — The optimizer replicates CodeBase's tag refusals by default and widens by an explicit setting · accepted
+
+**Date.** 2026-09-04. Closes the first half of **ADR-46**.
+
+**Context.** `e4isTag` (r4log.c:64-255) skips a tag entirely unless it is unfiltered, not
+unique-or-candidate under the default `errDefaultUnique`, collated `none` or `machine`, and of key
+type `r4double`, `r4charBin` or `r4memoBin` — so **CodeBase's optimizer cannot use an integer,
+currency, datetime or `GENERAL` tag**, which is most of what steps 004-008 built and gated. Its
+stated reason for the type refusal (r4log.c:71-91) is that "the constant `6` cannot be converted to
+an int which would be able to be looked up in the index file". Step 008 converts exactly that, gated
+on 3364 keys, so the reason does not hold here.
+
+**Decision.** `CodeBaseEngine.QueryTagScope`, two values.
+
+- **`Compatible`** — the default — replicates all four refusals exactly.
+- **`AllSeekable`** widens the **type and collation** gates to every tag this port can seek.
+
+The **filter and unique gates are not widened in either scope.** A filtered tag indexes a subset of
+the table, so seeking it answers a different question; a `unique` tag stores one key per duplicate
+group, so it cannot enumerate a range's records at all. Those two refusals are structural, not
+conservatism, and CodeBase's reason for them is the port's reason too.
+
+**Why a default that refuses more than the port can do.** The reference is only an oracle where both
+sides used the same tags. Three of the four depths of step 011's gate — the per-node tag match, the
+`fullyMapped` flag and the candidate bitset compared bit for bit — are meaningless on a tag CodeBase
+would have skipped. Defaulting to `Compatible` keeps the strongest gate this project has pointed at
+the code that most needs it.
+
+**Why widen at all.** Refusing the integer, currency, datetime and `GENERAL` tags would make the
+library's headline feature unusable on most of the corpus for a reason the port has already
+disproved. And the widening is safe for the reason `PORTING-PLAN.md` §5 already relies on: the real
+check was never the reference, it is the **full-scan equivalence gate**, which runs on every case in
+both scopes and — unlike CodeBase's own version of it (r4log.c:756-768) — is not behind a debug flag.
+
+**The collation refusal deserves its own note**, because it is the one with a real correctness
+argument behind it: `GENERAL` tags are skipped because the residual comparison in `log4true` uses
+`memcmp` order and a `GENERAL` tag does not, so results "could differ depending on if a tag was
+available" (AS 04/26/00). That argument is inert here. Under the port's trust rule
+(**ADR-53**) a term backed by a tag is never re-compared, and a term not backed by one never
+consults the tag's order — so the two orders never meet in one answer.
+
+**Rejected — widening by default.** It leaves three of the four gate depths with nothing to compare
+against on precisely the tags this port is best at, which is where a decomposition bug is both most
+likely and least visible.
+
+**Rejected — replicating with no way out.** It makes the refusals permanent on the authority of a
+comment the port has disproved, and there is no cost to the switch: both settings run the same
+equivalence gate.
+
+**Consequences.** `QueryTagScope` is the port's third public setting, after `ExpressionOptions`
+(ADR-51) and the `BlockCache` pair (ADR-37). Step 011's gate runs Gate A in both scopes and Gate B in
+`Compatible` only. `PORTING-PLAN.md` §5's `QUERY` row records the switch.
+
+## ADR-53 — Two reference behaviours the port does not replicate: an assignment that inverts ranges, and a residual check that reads the wrong positions · accepted
+
+**Date.** 2026-09-04. Closes the second half of ADR-46, and adds a second finding of the same family
+that ADR-46 did not know about.
+
+**Context — the first.** At m4map.c:216, 243, 251 and 278 the reference writes
+`if ( tagPos = 1 && constPos == 0 )`. It is an **assignment**: C evaluates the condition as
+`constPos == 0` alone, discards the intended `tagPos == 1` half, and clobbers `tagPos`, which is
+never read again. The four sites are the operand-order reflections — `4 > K_NUM` meaning
+`K_NUM < 4` — added deliberately under four `AS Feb 19/13` comments, so the intent is not in doubt.
+The two readings agree whenever a comparison's operands are single nodes, and diverge only for a
+comparison nested inside a larger expression. **C# will not compile the letter of it**, so this
+cannot be inherited by accident.
+
+**Decision.** The port implements the **intent**: reflect when the constant is the left operand. And
+the corpus gets the case that tells the two apart — an `.AND.`-nested `4 > K_NUM` beside
+`K_NUM < 4`, checked to return the same records. Getting it wrong swaps `lt` for `gt`, which is a
+wrong record set and R12's most concrete instance, so it is gated rather than argued.
+
+**Context — the second, found while designing step 011 and new since ADR-46.** `log4true`'s residual
+rule is "trust a term to the bitmap exactly when `e4isTag` matched one of its operands"
+(`QUERY-OPTIMIZER.md` §7.3), and the reference expresses it as
+`(infoReportPtr-1)->tag == 0 && (infoReportPtr-2)->tag == 0` (r4log.c:770). **Those two positions are
+not the operand roots.** `infoReportPtr-1` is always the right operand's root; `-2` is the node
+before it, which is the *left* operand's root only when the right operand occupies a single node. For
+a term whose left operand matched a tag and whose right operand is more than one node — say
+`K_TEXT+K_CITY = UPPER("x")` — both positions read zero and the reference **re-evaluates a term its
+own bitmap already answered**. Slower, never wrong.
+
+**Decision.** The trust rule becomes a property of the query plan: **a term is trusted exactly when
+decomposition produced a surviving leaf for it**, which is §11.5's own recommendation and which
+trusts strictly more terms than the reference — only where the reference was being conservative by
+accident of positional addressing.
+
+**Why that is safe, stated rather than assumed.** Trusting a term is sound only if its leaf is exact
+rather than a superset, and the two candidates for a superset both fail to be one. A **dropped
+conjunct** widens the *branch* and not a leaf (m4map.c:117-121); it produced no leaf, so it is not
+trusted, so it is re-evaluated — the rule handles it by construction. And the **partial-string
+widening** turns out to be exact: `NAME > "SM"` on a `C(20)` field compares a 20-wide operand against
+a 2-wide one, and `EXPRESSIONS.md` §8's tie-break — witnessed by the corpus in step 010 — makes
+`"SM" + 18 blanks > "SM"` **true**, so the expression admits the whole `"SM…"` group that an exclusive
+byte seek would have skipped and that `ge` restores exactly.
+
+**And one thing that stops being an open question.** `QUERY-OPTIMIZER.md` §12 item 2 asked why only
+two of the six operator branches widen a short string constant, and left open whether the asymmetry
+was a second defect. Reading the four reflected branches together (m4map.c:211-283) answers it:
+**the two branches that widen are exactly the two that write the `gt` slot, and they are the only two
+that write it.** The other four write a slot where a short constant needs no adjustment. The
+asymmetry is complete, not partial, and it is not a defect. §12 item 2 is resolved.
+
+**Rejected — replicating the effective condition (`constPos == 0` alone).** It would mean choosing to
+reproduce a typo, and the two readings differ only where the reference's answer is wrong. The port's
+compatibility target is the bytes CodeBase writes and the records it returns for expressions it gets
+right, not its defects — the same line ADR-33 drew when the C library's own comment was wrong about
+year zero.
+
+**Rejected — replicating `log4true`'s positional read.** It costs a residual evaluation per candidate
+record on exactly the terms the bitmap already answered, to reproduce a slowdown.
+
+**Consequences.** Both divergences are gated by step 011's Gate B depth 4 — the record sequence must
+equal the reference's even though the port's residual filter ran on fewer terms — and by Gate A,
+which needs no reference at all. `QUERY-OPTIMIZER.md` §10.1 already recommended the first; §7.3 and
+§12 item 2 are updated with the second and the resolution. `PORTING-PLAN.md` §8's benign-divergence
+list gains both.

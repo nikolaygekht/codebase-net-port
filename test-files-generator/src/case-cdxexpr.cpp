@@ -40,6 +40,7 @@
 #include "util.h"
 #include "dump-index.h"
 #include "dump-expr.h"
+#include "dump-query.h"
 #include "cases.h"
 
 #define ROWS 16
@@ -516,6 +517,96 @@ static const EXPRCASE VFPONLY[] =
    { "REPLICATE(\"A\",3)",           "r4str -- result length is n x operand, and 9 chars besides" }
 };
 
+/* ------------------------------------------------------ query filters */
+
+/* Axis C, the query optimizer (claude/dev/011-query-optimizer). These are not
+ * expressions to evaluate but FILTERS to optimize, and what is recorded is what
+ * the reference's optimizer decided about each -- see dump-query.h.
+ *
+ * The list is sized by section 8 of specs/QUERY-OPTIMIZER.md: every row of its
+ * optimizable/not table wants a case, because "not optimizable" is a decision
+ * the port has to reproduce and not merely a gap. `tagName` selects a tag before
+ * relate4top, which changes the ORDER records come out in.
+ *
+ * Nothing here reads the clock. CTOD and the date pictures take their century
+ * from the system clock (D4DATE.C:580-601), so a filter over one would record a
+ * record set that changes with the year -- which is exactly what a corpus file
+ * must not do. Dates are compared through DTOS as text. */
+static const QUERYCASE QUERIES[] =
+{
+   /* -- the six operators, tag on the left, over a plain numeric tag ------- */
+   { "K_NUM > 0",                 "T_NUM",   "gt" },
+   { "K_NUM >= 0",                "T_NUM",   "ge" },
+   { "K_NUM < 0",                 "T_NUM",   "lt" },
+   { "K_NUM <= 0",                "T_NUM",   "le" },
+   { "K_NUM = 0",                 "T_NUM",   "eq" },
+   { "K_NUM <> 0",                "T_NUM",   "ne -- an exclusion list of one" },
+
+   /* -- the constant on the left: each must reflect to its mirror slot ----- */
+   { "0 < K_NUM",                 "T_NUM",   "reflected -- same set as K_NUM > 0" },
+   { "0 <= K_NUM",                "T_NUM",   "reflected -- same set as K_NUM >= 0" },
+   { "0 > K_NUM",                 "T_NUM",   "reflected -- same set as K_NUM < 0" },
+   { "0 >= K_NUM",                "T_NUM",   "reflected -- same set as K_NUM <= 0" },
+
+   /* -- THE case: a reflected comparison nested inside an .AND. ------------
+    *
+    * m4map.c:216/243/251/278 write `if ( tagPos = 1 && constPos == 0 )`, an
+    * assignment, so the condition actually evaluated is `constPos == 0` alone.
+    * For a comparison whose operands are single nodes and which sits at the
+    * start of the postfix array the two readings agree; nested behind another
+    * term they need not. These two filters denote the same records, so the
+    * reference disagreeing with ITSELF between its optimized and bitmapDisable
+    * runs is the defect witnessing itself (ADR-53). */
+   { "K_INT > 0 .AND. 4 > K_NUM", "T_NUM",   "reflected INSIDE an .AND. -- where the tagPos=1 defect can bite" },
+   { "K_INT > 0 .AND. K_NUM < 4", "T_NUM",   "the same filter written tag-first -- must denote the same records" },
+   { "4 > K_NUM",                 "T_NUM",   "the same comparison un-nested -- both readings agree here" },
+
+   /* -- an expression tag is an ordinary tag ------------------------------- */
+   { "UPPER(K_TEXT) = \"SMITH\"",       "T_UPPER",  "a whole subexpression matched to a tag" },
+   { "UPPER(K_TEXT) > \"S\"",           "T_UPPER",  "a SHORT constant against keyLen 20 -- the partial-string widening, gt becomes ge" },
+   { "UPPER(K_TEXT) >= \"S\"",          "T_UPPER",  "the same bound already inclusive -- no widening to do" },
+   { "\"S\" < UPPER(K_TEXT)",           "T_UPPER",  "the widening's other path: constant-left < also produces gt" },
+   { "SUBSTR(K_TEXT,1,5) = \"SMITH\"",  "T_SUBSTR", "a folded constant parameter, so two nodes and not four" },
+   { "K_TEXT+K_CITY > \"S\"",           "T_CONCAT", "a two-field subexpression matched whole" },
+   { "DTOS(K_DATE) > \"20100101\"",     "T_DTOS",   "a date compared as text, so the clock is never read" },
+
+   /* -- runs of three, which no other dump in the corpus holds --------------
+    * .AND. and .OR. are variadic in the compiled form, so a run of three is
+    * ONE node with three parameters. Step 010 found this gated by C#-authored
+    * tests alone. */
+   { "K_NUM > -100 .AND. K_NUM < 100 .AND. K_TEXT > \"A\"", "T_NUM", "a three-term .AND. -- the variadic collapse" },
+   { "K_NUM = 0 .OR. K_NUM = 2.5 .OR. K_NUM = 0.125",       "T_NUM", "a three-term .OR. -- the variadic collapse" },
+
+   /* -- merging: several constraints on one tag become one range ----------- */
+   { "K_NUM > 0 .AND. K_NUM < 100",       "T_NUM", "two bounds on one tag -- one leaf, one seek pair" },
+   { "K_NUM >= 0 .AND. K_NUM <= 0",       "T_NUM", "bounds that meet -- collapses to eq" },
+   { "K_NUM > 100 .AND. K_NUM < 0",       "T_NUM", "bounds that cross -- provably empty before any I/O" },
+   { "K_NUM <> 0 .AND. K_NUM <> 2.5",     "T_NUM", "an exclusion list of two" },
+   { "K_NUM >= 0 .AND. K_NUM <> 0",       "T_NUM", "an exclusion equal to the bound -- ge must tighten to gt" },
+
+   /* -- OR, whose failure mode is the opposite of AND's --------------------- */
+   { "K_NUM < 0 .OR. K_NUM > 100",        "T_NUM", "an OR range -- section 12 item 7, bmf4OrOt was never transcribed" },
+   { "K_NUM = 0 .OR. K_NUM = 2.5",        "T_NUM", "two equalities on one tag" },
+   { "K_NUM > 0 .AND. K_LOG",             "T_NUM", "partly optimizable .AND. -- the leaf survives, K_LOG re-evaluates" },
+   { "K_NUM > 0 .OR. K_LOG",              "T_NUM", "partly optimizable .OR. -- the WHOLE disjunction must fall back" },
+
+   /* -- terms no tag can answer, and the reasons differ -------------------- */
+   { "K_FLT > 0",                 0, "an H field: E4FLOAT is absent from e4isConstant, so predicted never optimizable" },
+   { "K_INT > 0",                 0, "an integer tag, refused by type (r4log.c:127-139)" },
+   { "K_CUR > 0",                 0, "a currency tag, refused by type" },
+   { "K_NNUM > 0",                0, "a nullable field -- its tag T_NULL is plain, so this one should optimize" },
+   { "EMPTY(K_TEXT)",             0, "a function call at the top of a term -- not a comparison" },
+   { "K_LOG",                     0, "a bare logical field" },
+   { "DELETED()",                 0, "DELETED() -- neither connective nor comparison" },
+   { ".NOT. K_NUM > 0",           0, "E4NOT is neither connective nor comparison, so the whole term falls back" },
+   { "1 = 1",                     0, "both sides constant -- neither matches a tag" },
+   { "K_NUM > K_DBL",             0, "both sides fields -- no constant" },
+
+   /* -- the two degenerate answers ----------------------------------------- */
+   { "K_NUM > 1000000000",        "T_NUM", "empty result" },
+   { "K_NUM > -1000000000",       "T_NUM", "every record" }
+};
+
 /* ------------------------------------------------------------------- case */
 
 int caseCdxExpr( CODE4 *cb, const char *outDir )
@@ -655,6 +746,9 @@ int caseCdxExpr( CODE4 *cb, const char *outDir )
                             CLOCKEXPRS, (int)( sizeof( CLOCKEXPRS ) / sizeof( CLOCKEXPRS[0] ) ),
                             REJECTIONS, (int)( sizeof( REJECTIONS ) / sizeof( REJECTIONS[0] ) ),
                             VFPONLY,    (int)( sizeof( VFPONLY    ) / sizeof( VFPONLY[0]    ) ) );
+   if ( rc == 0 )
+      rc = dumpQueries( cb, outDir, "CDXEXPR.DBF",
+                        QUERIES, (int)( sizeof( QUERIES ) / sizeof( QUERIES[0] ) ) );
 
    return rc;
 }

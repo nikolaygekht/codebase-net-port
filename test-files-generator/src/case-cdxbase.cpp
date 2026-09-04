@@ -43,6 +43,7 @@
 
 #include "util.h"
 #include "dump-index.h"
+#include "dump-query.h"
 #include "cases.h"
 
 #define ROWS 32          /* records in this table */
@@ -151,6 +152,44 @@ static long intFor( int i )
 
 /* ------------------------------------------------------------------- case */
 
+/* ------------------------------------------------------ query filters */
+
+/* This table is where the optimizer's four ELIGIBILITY refusals can each be
+ * seen (specs/QUERY-OPTIMIZER.md section 3.4), because its ten tags include one
+ * of each awkward kind: T_UNIQ is unique, T_FILT carries a filter, T_INT is an
+ * integer key, T_TEXTD is descending. Two of those refusals the port keeps
+ * whatever the scope setting (unique and filtered are structural), two it can
+ * widen (type and collation) -- ADR-52. */
+static const QUERYCASE QUERIES[] =
+{
+   /* -- eligible tags, so these are the controls --------------------------- */
+   { "K_C > \"M\"",                  "T_TEXT", "a plain character tag, short constant -- the prefix widening" },
+   { "K_C = \"BANANA\"",             "T_TEXT", "eq on a character tag" },
+   { "K_N > 0",                      "T_NUM",  "a plain numeric tag" },
+   { "K_N > 0 .AND. K_N < 5000",     "T_NUM",  "a closed range on one tag" },
+   { "K_B > 0",                      "T_DBL",  "a double tag -- r4double is one of the three types the reference allows" },
+   { "DTOS(K_D) > \"20000101\"",     "T_DATE", "a date tag reached as text, so no clock is read" },
+
+   /* -- the four refusals, one per tag -------------------------------------
+    * K_DUP has TWO tags over it, T_DUP (plain) and T_UNIQ (unique). The
+    * optimizer walks tags in d4tagNext order and takes the first that matches,
+    * so this pair records whether a usable tag beside an unusable one is
+    * found -- which a single-tag case could never show. */
+   { "K_DUP = \"CHERRY\"",           "T_DUP",  "a duplicate-heavy tag, with a UNIQUE tag over the same field beside it" },
+   { "K_I > 0",                      "T_INT",  "an integer tag -- refused by type under Compatible, eligible under AllSeekable" },
+   { "K_BIN > \"A\"",                "T_BIN",  "a character tag holding sub-0x20 bytes" },
+
+   /* -- descending: the tag's order is inverted but its keys are not -------- */
+   { "K_C < \"M\"",                  "T_TEXTD", "a descending tag selected for the walk -- the ORDER changes, the set must not" },
+
+   /* -- merging, and the two degenerate answers ---------------------------- */
+   { "K_N <> 0 .AND. K_N <> 4242.424", "T_NUM", "an exclusion list of two, over a value that repeats" },
+   { "K_N > 0 .OR. K_C > \"M\"",       "T_NUM", "an .OR. across TWO tags -- two leaves that cannot merge" },
+   { "K_N > 0 .AND. K_C > \"M\"",      "T_NUM", "an .AND. across two tags -- two leaves, two seeks, one intersection" },
+   { "K_N > 99999999",                 "T_NUM", "empty result" },
+   { "K_N > -99999999",                "T_NUM", "every record" }
+};
+
 int caseCdxBase( CODE4 *cb, const char *outDir )
 {
    static FIELD4INFO fields[] =
@@ -237,6 +276,9 @@ int caseCdxBase( CODE4 *cb, const char *outDir )
        * a case-sensitive filesystem has to resolve the companion accordingly. */
       rc = dumpIndex( cb, outDir, "CDXBASE.DBF", "CDXBASE.cdx" );
    }
+   if ( rc == 0 )
+      rc = dumpQueries( cb, outDir, "CDXBASE.DBF",
+                        QUERIES, (int)( sizeof( QUERIES ) / sizeof( QUERIES[0] ) ) );
 
    return rc;
 }

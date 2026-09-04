@@ -299,6 +299,12 @@ it is 0 by the constructor's `memset` ([`API-ERRORS.md`](API-ERRORS.md) §6, C4C
 - a plain tag → `t4unique` = 0 ≠ 25 → **eligible**
 - a `unique` or `candidate` tag → `t4unique` = 25 → **skipped**, under the default
 
+**A skipped tag does not end the search.** `CDXBASE` carries both a plain tag (`T_DUP`) and a unique
+one (`T_UNIQ`) over the same field, and `K_DUP = "CHERRY"` matches `T_DUP`
+(`CDXBASE.query.dump.txt`) — so the `d4tagNext` walk continues past the refusal to the next
+candidate rather than stopping at the first tag whose expression would have matched. A table with
+one tag per field could not distinguish the two behaviours.
+
 The net effect is that **CodeBase's optimizer can only use plain, unfiltered, machine-or-none-collated
 tags over `r4double`, `r4charBin` or `r4memoBin` keys.** For this port that excludes the integer,
 currency, datetime and `GENERAL` tags that steps 004-008 built and gated. Whether the port keeps the
@@ -648,6 +654,12 @@ Two mechanisms deserve porting attention:
   from both ends — and returns `doFlip = -1` so the caller inverts (m4map.c:1668-1684). Cost is
   bounded by the smaller of the range and its complement.
 
+  **It fires readily, so a port that omits it will differ in the stored bits.** `K_NUM > 0` on
+  `CDXEXPR` — 12 records of 16 — is already stored as its 4-bit complement, and on `CDXDEEP`
+  `K_N > -400000` stores 599 records as **one** raw bit. A gate over these dumps must therefore
+  compare the *effective* set (the bits read through `isFlip`), not the raw bits; `isFlip` itself is
+  a cost decision and not an answer.
+
 `doFlip` is the return value and threads through everything: 0 = nothing flipped yet, 1 = flags mean
 what they say, −1 = flags are the complement, −2 = **no matches at all**, −999 = handled, −1000 =
 error. A port is free to represent this as a `(bitset, isComplement)` pair, which is what `F4FLAG`
@@ -705,6 +717,14 @@ static int f4flagIsSetFlip( F4FLAG *flagPtr, const unsigned long r )
 r4relate.c:82-91. **An unbuilt bitmap answers "yes" for every record**, so the pure-scan fallback
 needs no special-casing at any call site. `relation->bitmapsFreed` is set when `log4bitmapDo` fails
 (r4relate.c:6045-6046) and the same code path then scans.
+
+**`bitmapsFreed` does not mean "there is no bitmap", and the corpus shows it.** It means bitmapping
+*failed* — the memory pool, the record-count guard, or `bitmapDisable`. A filter that simply holds
+nothing optimizable leaves it **clear** while `set.flags` stays null: across all 70 corpus filters,
+ten optimize nothing at all and **not one sets the flag** (the three `*.query.dump.txt` files).
+Correctness on that path is carried entirely by §7.3's per-term tag test, which reads zero for every
+term when no tag matched anything. A port that treated the flag as "no bitmap" would be reading a
+condition that never occurs.
 
 ### 7.2 Skipping — two strategies
 
@@ -935,13 +955,24 @@ is independent support.
    twice — optimized and disabled — asks the reference for its optimized answer and for **its own
    scan truth**, and where those differ on this case the defect has demonstrated itself. Planned as
    step 011's sub-step 1 (`dev/011-query-optimizer/DESIGN.md` Decision 12).
+   **RUN 2026-09-04, and the defect is real.** `net/corpus/CDXEXPR.query.dump.txt` holds both
+   readings of `K_INT > 0 .AND. 4 > K_NUM`: optimized it returns records **{3, 9, 11, 12, 14, 15}**
+   and under `bitmapDisable` it returns **{5, 6, 8}** — *disjoint*, so the bound was **inverted and
+   not merely loosened**. The mechanism is visible in the dump: the leaf carries the same raw bits
+   as the correct `K_NUM < 4` leaf but with `isFlip` set, i.e. the complement. Written tag-first
+   (`K_INT > 0 .AND. K_NUM < 4`) and un-nested (`4 > K_NUM`) the reference is correct, which is what
+   confines the defect to the nested reflected form exactly as §4.3 predicted. It is the **only**
+   filter of the corpus's 70 where the reference contradicts itself. R12's most concrete instance,
+   demonstrated in the reference rather than argued from four comments.
 2. ~~**The partial-widening asymmetry (§4.3) is unexplained.**~~ **RESOLVED 2026-09-04, and it is
    not a defect.** Reading the four reflected branches together (m4map.c:211-283): the two paths that
    widen are `>` tag-left and `<` constant-left, and those are **exactly the two that write the `gt`
    slot — the only two that write it.** The other four write `lt`, `ge` or `le`, where a short
    constant needs no adjustment. The asymmetry is complete rather than partial. See §4.4.
-3. **`E4FLOAT` absent from `e4isConstant` (§3.2) predicts that no `H`-field comparison optimizes.**
-   Unwitnessed. `CDXEXPR` has the corpus's only `H` field, so a case is cheap.
+3. ~~**`E4FLOAT` absent from `e4isConstant` (§3.2) predicts that no `H`-field comparison
+   optimizes.**~~ **WITNESSED 2026-09-04.** `K_FLT > 0` builds **no bitset at all** and matches no
+   tag on any node (`CDXEXPR.query.dump.txt`), even though `e4isTag` does not refuse an `r4floatBin`
+   tag — so the refusal does come from the constant side, as §3.2 read it.
 4. **`u4allocAgain` is not in this source drop**, so §10.3's `bufLen`-vs-`bufPos` question cannot be
    settled from the source. It does not matter if the port indexes from used length, which it should.
 5. **`tfile4position`'s exact normalisation** (§6.2) is what the `> 0.5` go-around test compares
@@ -957,7 +988,9 @@ is independent support.
    largest single routine in the module and handles OR ranges with their own position/flip logic. Its
    rules are believed to mirror `bmf4AndOt` with the flip polarity inverted; **verify before
    implementing OR ranges.**
-8. **No corpus case gates any of this yet, and Visual FoxPro cannot supply one.** ADR-44's oracle
+8. ~~**No corpus case gates any of this yet**~~ — **as of 2026-09-04 seventy filters do**, across
+   `CDXEXPR` (43), `CDXBASE` (15) and `CDXDEEP` (12), each recorded at five depths including the
+   reference's own scan truth. **Visual FoxPro cannot supply one.** ADR-44's oracle
    witnesses a value VFP computes and the bytes it writes; the optimizer produces neither, and three
    of the four things worth recording here (`infoReport[i].tag`, `fullyMapped`, `relate->set`) are
    CodeBase's own internal state. The fourth, a record sequence, VFP would answer under *its* prefix

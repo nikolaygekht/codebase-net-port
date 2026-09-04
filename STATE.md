@@ -1,7 +1,13 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011 designed and planned** — [`claude/dev/011-query-optimizer/`](claude/dev/011-query-optimizer/)
+**step 011's sub-step 1 — the query oracle**: `test-files-generator/src/dump-query.h/.cpp` and query
+filter lists on three cases, three new `net/corpus/*.query.dump.txt` files holding **70 filters at
+five depths each**, and the C# that reads them. **No C# of the optimizer.** `dotnet test` green on
+**1936 tests** (666 golden, up from 639), and **all 48 pre-existing corpus files regenerated
+byte-identical**. The run **witnessed the reference's range-inverting defect** and confirmed three
+predictions nothing had ever checked; §2 has what it found.
+**Before it, step 011 was designed and planned** — [`claude/dev/011-query-optimizer/`](claude/dev/011-query-optimizer/)
 (`DESIGN.md`, `PLAN.md`, `STATE.md`), with **ADR-52** and **ADR-53** closing ADR-46, corrections
 to `claude/specs/QUERY-OPTIMIZER.md` (§3.4, §4.4, §7.3, §11.1 and §12 items 1, 2 and 8),
 `claude/PORTING-PLAN.md` (§5's `QUERY` row and section, §8's benign divergences),
@@ -261,7 +267,44 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011 is designed and planned, and nothing else happened.** `claude/dev/011-query-optimizer/`
+**Step 011's sub-step 1 landed: the query oracle exists, and it overturned two things on its first
+run.** `dump-query.cpp` sets each filter on a real `RELATE4` and reads what the optimizer decided out
+of `RELATE4`/`RELATION4`; each filter is then run a **second** time with `RELATION4.bitmapDisable`
+set, so the dump carries the reference's own scan truth beside its optimized answer. 43 filters on
+`CDXEXPR`, 15 on `CDXBASE`, 12 on `CDXDEEP`. **All 48 pre-existing corpus files regenerate
+byte-identical**, and two independent generator runs produce identical bytes.
+
+**The defect is witnessed, and it is worse than a bound off by one.**
+`K_INT > 0 .AND. 4 > K_NUM` returns **{3, 9, 11, 12, 14, 15}** optimized and **{5, 6, 8}** scanned —
+**disjoint**. The bound was *inverted*: the dump shows the leaf holding the same raw bits as the
+correct `K_NUM < 4` leaf with `isFlip` set, so the complement was taken, and the residual filter then
+trusted the term because its operand had matched a tag. Written tag-first, or un-nested, the
+reference is correct. **One filter of seventy** disagrees, and it is the one written to provoke it.
+ADR-53's choice is evidence now, not inference, and `QUERY-OPTIMIZER.md` §12 item 1 is closed.
+
+**Three more predictions confirmed, none previously checked:** an `H`-field comparison **never**
+optimizes (§12 item 3 closed — the refusal comes from the constant side, as §3.2 read it); a
+**skipped tag does not end the search**, since `K_DUP = "CHERRY"` matches the plain tag sitting
+beside a unique one; and the **short-constant widening changes no records**, which is Decision 6's
+"exact, not a safety margin" made a test and is what ADR-53's trust rule rests on.
+
+**Two things the design had wrong, both corrected.** **`bitmapsFreed` is not "there is no bitmap"** —
+it means bitmapping *failed*, and across all 70 filters it is **never set**, including the ten that
+optimize nothing; a port treating it as the fall-back signal would read a condition that never
+occurs. And **the go-around complement fires constantly** — 599 of `CDXDEEP`'s 600 records come back
+as **one** raw bit — so depth 3 compares the *effective* set, not the stored bits. `DESIGN.md`
+Decision 8 already said that; `PLAN.md`'s "bit for bit" was the loose wording and now says effective.
+
+**Open question 1 answered by the dump rather than by reasoning:** the bitset survives the walk. It
+is taken twice and compared, and `setStable` is yes for all 70.
+
+**One thing the corpus still cannot isolate, and it is a decision rather than an oversight:** the
+**filtered-tag refusal**. Every filtered tag in the corpus shares its field with a plain tag found
+first, so no dump separates "refused" from "something else was found first". Isolating it needs a new
+tag, hence a rewritten `.cdx` and every index dump with it — not worth that for one branch of a pure
+predicate that sub-step 2 tests exhaustively at layer 1.
+
+**Before that in the same session — step 011 was designed and planned.** `claude/dev/011-query-optimizer/`
 holds `DESIGN.md` (five stages, seventeen classes, eleven decisions, four open questions) and
 `PLAN.md` (four test layers, nine sub-steps, seven named mutations, two gates). No C# exists.
 
@@ -606,20 +649,19 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is designed and planned; execution starts at its sub-step 1
+### Step 011 is under way: sub-step 1 is done, sub-step 2 is next
 
-**The next command is a Windows one.** [`claude/dev/011-query-optimizer/PLAN.md`](claude/dev/011-query-optimizer/PLAN.md)
-sub-step 1 is the query oracle: `dump-query.h/.cpp` in `test-files-generator/`, plus filter lists on
-`CDXEXPR`, `CDXBASE` and `CDXDEEP`, producing three `*.query.dump.txt` files with the four depths.
-**It writes no C# of the optimizer**, exactly as step 010's sub-step 1 did, and every sub-step after
-it is gated by part of what it produces — so it lands first and separately.
+**Next is sub-step 2 — eligibility and subexpression identity**, and it needs **no generator run**:
+the oracle it is gated by is committed. `QueryTag`, `QueryTagScope`, `TagEligibility` and
+`SubtreeMatch`, gated by **depth 1** — for every filter, every node and every tag of the table, our
+answer to "does this tag's key expression equal this subtree?" must equal the reference's, under
+`Compatible`. `net/tests/CodeBase.Net.Golden/CorpusQueryDump.cs` already reads it.
 
-Fold into the same run the two things the corpus is already owed: the **second rejection pass with a
-real `TAG4FILE`** (so `e4tagExpr` (−510) and the alias refusals stop being unobservable), and a **run
-of three or more `.AND.`/`.OR.` operators**, which the whole `CDXEXPR` dump lacks. `PLAN.md` also
-names the three cases `QUERY-OPTIMIZER.md` §12 wants — an `.AND.`-nested reflected comparison, an
-`H`-field comparison, and an OR range — and `DESIGN.md`'s open questions 1-3 are answered from the
-dump rather than from reading.
+**Still owed to the corpus, and deliberately not folded into this run:** the second rejection pass
+with a real `TAG4FILE`, so `e4tagExpr` (−510) and the alias refusals stop being unobservable. It is a
+change to the *rejection* dump rather than the query one, and mixing the two would have made this
+run's byte-identical check ambiguous. The three-or-more `.AND.`/`.OR.` run that step 010 also owed
+**is** now covered, by two query filters.
 
 ### Step 010 is closed; what came before
 

@@ -203,7 +203,8 @@ requires the same 300 keys and record numbers from each. See ADR-25.
 
 ## The expression dumps
 
-Two files that are not table dumps, written for the expression engine (step `010-expr`):
+Two files that are not table dumps, written for the expression engine (step `010-expr`), and three
+more for the query optimizer (step `011-query-optimizer`):
 
 * **`FUNCTIONS.dump.txt`** — the reference library's own `v4functions[193]`, printed from the array:
   per row, its name, code, name length, priority, parameter count, return type and parameter types.
@@ -231,6 +232,34 @@ Two files that are not table dumps, written for the expression engine (step `010
   overload row does not fail loudly, it selects the neighbouring row and returns a plausible value.
   Values are the **raw result bytes**, escaped by the same rules as a key: a numeric result is a
   double, and printing it as text would hide the low bits the key transform depends on.
+
+* **`CDXEXPR.query.dump.txt` (43 filters), `CDXBASE.query.dump.txt` (15) and
+  `CDXDEEP.query.dump.txt` (12)** — what the reference's **query optimizer** decided about a filter,
+  written by `dump-query.cpp`. The optimizer produces no bytes, so it cannot be gated the way a
+  format is; what it produces is decisions, and `RELATE4`/`RELATION4` are public structs, so the
+  decisions are read out directly rather than inferred from the records that come out at the end.
+  Per filter: the compiled node array with **the tag the optimizer matched to each node**,
+  `fullyMapped`, `bitmapsFreed`, the **candidate bitset before any residual filtering** (taken
+  immediately after the query is prepared *and* again after the walk, so the file itself says whether
+  the set survives being consumed — it does), the records returned in record-number order, the same
+  in tag order with a tag selected, `relate4count`, and an `agree` verdict.
+
+  **Every filter is run twice**, the second time with `RELATION4.bitmapDisable` set, which takes the
+  optimizer out of the circuit entirely (`m4map.c:341`) and leaves the reference evaluating the
+  filter per record. That second reading is the reference's own **scan truth**, and it is what makes
+  the first usable: the reference has a defect that inverts a range bound on a reflected comparison
+  nested inside a connective, so on such a filter a correct port is *expected* to disagree with the
+  optimized answer. Rather than a hand-written exception list, each case carries `agree yes|no` and
+  the expectation follows from it. **Exactly one of the 70 filters disagrees** —
+  `K_INT > 0 .AND. 4 > K_NUM`, whose two readings are *disjoint* — and it is the case written to
+  provoke it.
+
+  Two things to know before reading the bits. The bitset is often stored as its **complement**
+  (`isFlip=1`), because the reference flags the complement whenever a range covers more than half a
+  tag — 599 of `CDXDEEP`'s 600 records are stored as one raw bit — so a comparison must read the bits
+  *through* the flag. And a filter that optimizes nothing has **no bitset** (`set absent`) while
+  `bitmapsFreed` stays **0**: that flag means bitmapping *failed*, not that there is no bitmap, and
+  no corpus filter sets it.
 
   The C's `resultPos` and `i1` are deliberately absent — positions in its evaluation stack and
   constant pool, artefacts of a stack machine that returns pointers.

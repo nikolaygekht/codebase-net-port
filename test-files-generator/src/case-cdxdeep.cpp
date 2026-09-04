@@ -35,6 +35,7 @@
 
 #include "util.h"
 #include "dump-index.h"
+#include "dump-query.h"
 #include "cases.h"
 
 #define ROWS 600         /* records in this table */
@@ -81,6 +82,43 @@ static double numFor( int i )
 }
 
 /* ------------------------------------------------------------------- case */
+
+/* ------------------------------------------------------ query filters */
+
+/* 600 records under two levels of branch, which is what this table alone can
+ * say about the optimizer: a range walk here CROSSES LEAF BOUNDARIES in both
+ * directions, a result set is large enough for the bitset's byte-scanning skip
+ * path to actually run, and D_DUP's runs of about sixty equal keys straddle a
+ * boundary so an eq seek has to gather across blocks.
+ *
+ * It is also where the counted efficiency gate runs (DESIGN.md Decision 13):
+ * a selective filter here must read a small fraction of the blocks a full scan
+ * reads, and a fully-mapped count must read no records at all. */
+static const QUERYCASE QUERIES[] =
+{
+   /* -- selective, which is the shape the whole optimizer exists for ------- */
+   { "K_PFX = \"CUSTOMER-ACCT-0042\"",  "D_PFX",  "one record out of 600 -- fully mapped, so the count needs no record read" },
+   { "K_DUP = \"DELTA\"",               "D_DUP",  "about sixty equal keys, whose run spills across leaf boundaries" },
+   { "K_N > 900000",                    "D_NUM",  "a numeric range walked from one end" },
+   { "K_N > 100000 .AND. K_N < 200000", "D_NUM",  "a closed range, one leaf and one seek pair, crossing blocks" },
+   { "K_PFX > \"CUSTOMER-ACCT-0500\"",  "D_PFX",  "an open range over a hundred records" },
+
+   /* -- wide, which is where an optimizer can be WORSE than a scan ---------
+    * The reference answers this with the go-around complement (section 6.2),
+    * which the port omits by Decision 8. Recorded so the omission has a
+    * measurement behind it rather than a preference. */
+   { "K_N > -400000",                   "D_NUM",  "nearly every record -- the go-around's territory" },
+   { "K_PFX > \"A\"",                   "D_PFX",  "every record, through a short constant" },
+
+   /* -- exclusions and multi-tag, at a size where the merge matters -------- */
+   { "K_DUP <> \"DELTA\" .AND. K_DUP <> \"ECHO\"", "D_DUP", "two exclusions, each removing about sixty records" },
+   { "K_N > 500000 .AND. K_DUP = \"ALPHA\"",       "D_NUM", "two tags -- two seeks and one intersection" },
+   { "K_N < 100000 .OR. K_N > 900000",             "D_NUM", "an OR range at a size where leaving it as two leaves is visible" },
+
+   /* -- a descending tag over a deep tree, and the empty answer ------------ */
+   { "K_PFX < \"CUSTOMER-ACCT-0100\"",  "D_PFX",  "a descending tag walked backwards across two levels" },
+   { "K_N > 999999999",                 "D_NUM",  "empty result over a deep tree" }
+};
 
 int caseCdxDeep( CODE4 *cb, const char *outDir )
 {
@@ -153,6 +191,9 @@ int caseCdxDeep( CODE4 *cb, const char *outDir )
    rc = finish( cb, data, outDir, "CDXDEEP.DBF" );
    if ( rc == 0 )
       rc = dumpIndex( cb, outDir, "CDXDEEP.DBF", "CDXDEEP.cdx" );
+   if ( rc == 0 )
+      rc = dumpQueries( cb, outDir, "CDXDEEP.DBF",
+                        QUERIES, (int)( sizeof( QUERIES ) / sizeof( QUERIES[0] ) ) );
 
    return rc;
 }

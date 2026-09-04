@@ -1,7 +1,12 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011's sub-step 2 — eligibility and subexpression identity**: `net/CodeBase.Net/Query/` now
+**step 011's sub-step 3 — decomposition**: a filter now becomes a constraint tree.
+`net/CodeBase.Net/Query/` gained `ConstraintValue`, `LeafConstraint`, `ConstraintNode`, `QueryPlan`
+and a grown `QueryDecomposer`; **depth 2 of the gate is green on all 74 filters** and `dotnet test`
+is green on **2006 tests** (714 golden, 1292 unit). Four of five mutations reddened; **the fifth is
+inert for a reason worth knowing** — see §2. No corpus file changed.
+**Before it, sub-step 2 — eligibility and subexpression identity**: `net/CodeBase.Net/Query/` now
 holds `QueryTagScope` (public), `QueryTag`, `TagEligibility`, `SubtreeMatch` and `QueryDecomposer`,
 and **depth 1 of the gate is green on its first run** — every node of all 74 filters matching the
 reference's own parallel array, with **five mutations run against it and all five red**. `dotnet
@@ -273,7 +278,29 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011's sub-step 2 landed: the port matches tags exactly where the reference does.** Depth 1
+**Step 011's sub-step 3 landed: a filter decomposes into a constraint tree.** `ConstraintValue`,
+`LeafConstraint` as the closed union Decision 2 asked for, `ConstraintNode`, `QueryPlan` and a
+`QueryDecomposer` grown from matching tags to building constraints. **Depth 2 green on all 74
+filters, asserted unconditionally** — the reference's defect changes which *slot* a constant lands
+in, not which *terms* were optimized, so `fullyMapped` agrees even where its records are wrong.
+
+**Four of five mutations reddened; the fifth is inert, and that is a fact rather than a hole.**
+Taking the evaluated width instead of the declared length — Decision 4's rule, and the thing that
+decides whether a character constant is a prefix — changed **nothing**. Across all 74 filters the
+corpus reaches **93 constants and the two numbers never differ**, because only six kinds of node are
+constants at all (a number, a string, the four logical words, and the two functions that read a date
+out of text) and each is compiled at its own natural width, so none truncates. The rule is kept
+because it is right if they ever diverge, and a new assertion **pins the agreement** so that the day
+they do, something goes red instead of quietly changing behaviour. The other four reddened as
+designed: reflecting `>` the wrong way (eight tests), never widening a short constant, not clearing
+`fullyMapped` on an unoptimizable conjunct, and an `.OR.` keeping the operands it could optimize.
+
+**Nothing merges yet, deliberately.** `K_NUM > 0 .AND. K_NUM < 100` is two leaves that seek one tag
+twice and intersect — the right answer reached the slow way, and what lets sub-step 5 gate the record
+sets before any merge code exists to change them.
+
+**Before that in the same session — sub-step 2: the port matches tags exactly where the reference
+does.** Depth 1
 green on its first run across all 74 filters and every node, and five mutations reddened it —
 widening eligibility under `Compatible`, visiting a connective's operands forwards, an `.OR.` that
 does not abandon its branch, dropping the field-loader row exemption, and dropping the field-identity
@@ -681,12 +708,13 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-steps 1 and 2 are done, and the order of the next four changed
+### Step 011 is under way: sub-steps 1 to 3 are done, and the order of the rest changed
 
-**Next is sub-step 3 — decomposition**, and it needs **no generator run**. `ConstraintValue`,
-`LeafConstraint`, `ConstraintNode`, `QueryPlan`, and `QueryDecomposer` grown to build constraints
-rather than only match tags — the walk is already there and already gated, so what is new is the
-operator-to-slot mapping in both operand orders and the partial-string widening.
+**Next is sub-step 4 — leaf evaluation**, and it needs **no generator run**. `ITagProbe` and its
+contract-test pair, `TagProbe` over a real tag, `RecordSet` (the bitset with its complement flag), and
+`ConstraintSeeker`: the four seek positions and the range walk. It is the step's one seam, so the
+whole of leaf evaluation becomes testable at layer 2 over a sorted key list with no index file. Then
+sub-step 5 combines, and **depth 3 goes green there** — the first end-to-end record sets.
 
 **The merge algebra moved from sub-step 4 to sub-step 6.** The first plan gated sub-step 3 on
 `FullyMapped` alone — one bit per filter, which cannot see a swapped bound — and then left the

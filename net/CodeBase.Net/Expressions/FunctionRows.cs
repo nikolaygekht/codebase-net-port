@@ -110,6 +110,15 @@ internal static class FunctionRows
     /// <summary>The first of the nine rows that answer inequality.</summary>
     public const int FirstComparison = 51;
 
+    /// <summary>The first of the eight rows that answer greater-or-equal.</summary>
+    public const int GreaterOrEqual = 60;
+
+    /// <summary>The first of the eight rows that answer less-or-equal.</summary>
+    public const int LessOrEqual = 68;
+
+    /// <summary>The first of the eight rows that answer equality.</summary>
+    public const int Equal = 76;
+
     /// <summary>Greater than, which needs to know which operand was longer.</summary>
     public const int Greater = 84;
 

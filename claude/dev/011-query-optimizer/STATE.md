@@ -4,15 +4,16 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 and 2 of 9 done**
-**Current sub-step:** PLAN.md step 3, decomposition. The walk exists and matches tags; what it does
-not yet do is build constraints. **The step order changed after sub-step 2** — see Deviations.
+**Status:** in progress — **sub-steps 1 to 3 of 9 done**
+**Current sub-step:** PLAN.md step 4, leaf evaluation. A filter decomposes into a constraint tree;
+nothing seeks yet. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
 - [x] phases 1-5 — [`DESIGN.md`](DESIGN.md) and [`PLAN.md`](PLAN.md) written, 2026-09-04
 - [x] step 1 — the query oracle, 2026-09-04 — **74 filters, five depths each, run and committed**
 - [x] step 2 — eligibility and subexpression identity, 2026-09-04 — **depth 1 green, five mutations**
+- [x] step 3 — decomposition, 2026-09-04 — **depth 2 green, four of five mutations red**
 - [ ] step 3 — decomposition
 - [ ] step 4 — the merge algebra
 - [ ] step 5 — leaf evaluation
@@ -20,6 +21,41 @@ not yet do is build constraints. **The step order changed after sub-step 2** —
 - [ ] step 7 — the residual filter and the public surface
 - [ ] step 8 — the equivalence gate, and the widened scope
 - [ ] step 9 — close
+
+## What sub-step 3 landed
+
+`net/CodeBase.Net/Query/` gained `ConstraintValue`, `LeafConstraint` (with `Bound` and
+`ConstraintKind`), `ConstraintNode`, `QueryPlan`, and `QueryDecomposer` grown from matching tags to
+building constraints; `FunctionRows` gained the three band starts the operator mapping reads.
+`DecompositionGoldenTests` and a `QueryHarness` extracted from sub-step 2's tests. **2006 tests
+green** (714 golden, 1292 unit), up from 1968. **No corpus file changed.**
+
+**Depth 2 green on all 74 filters, asserted unconditionally** — the reference's range-inverting
+defect changes which slot a constant lands in, not which terms were optimized, so `fullyMapped`
+agrees even on the one filter whose records are wrong.
+
+**Four of five mutations reddened, and the fifth is the finding.** Reflecting `>` the wrong way
+reddened eight tests; never widening a short constant, one; not clearing `fullyMapped` on an
+unoptimizable conjunct, one; an `.OR.` keeping the operands it could optimize, three.
+
+**The fifth — taking the evaluated width instead of the declared length — changed nothing, and that
+is a fact about the language rather than a hole in the gate.** `DESIGN.md` Decision 4 keeps the
+declared length because it is what decides whether a character constant is a prefix. Across all 74
+filters the corpus reaches **93 constants and the two numbers never differ**, because only six kinds
+of node are constants at all — a number, a string, the four logical words, and the two functions that
+read a date out of text — and each is compiled at its own natural width, so none truncates. The
+mutation is inert rather than uncaught. `AConstantIsAsWideAsItsNodeSaysItIs` now pins it, so the day
+the two diverge the distinction stops being theoretical and something goes red.
+
+**Two decisions are now code and both were free of surprises.** The operator-to-slot mapping reads
+the row band and reflects when the constant came first (ADR-53's intent, not the reference's
+assignment), and the short-constant widening applies to the two paths that produce a lower bound and
+to no others — which the tests state as *meaning* rather than as which field was set, so a
+well-formed constraint pointing the wrong way still fails.
+
+**Nothing merges.** `K_NUM > 0 .AND. K_NUM < 100` is two leaves that will seek one tag twice and
+intersect, which is the right answer reached the slow way, and it is what lets sub-step 5 gate the
+record sets before any merge code exists.
 
 ## What sub-step 2 landed
 
@@ -170,4 +206,4 @@ it. Question 3 is the `e4tagExpr` one above.
 
 ## Blockers
 
-None. Sub-step 3 needs no generator run either.
+None. Sub-step 4 needs no generator run either.

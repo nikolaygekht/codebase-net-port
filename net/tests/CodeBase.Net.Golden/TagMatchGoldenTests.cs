@@ -1,7 +1,6 @@
 using AwesomeAssertions;
 using CodeBase.Net.Expressions;
 using CodeBase.Net.Query;
-using CodeBase.Net.TestUtils;
 using Xunit;
 
 namespace CodeBase.Net.Golden;
@@ -35,7 +34,7 @@ public sealed class TagMatchGoldenTests
     [MemberData(nameof(Tables))]
     public void EveryNodeMatchesTheTagTheReferenceMatched(string table)
     {
-        Harness harness = Harness.For(table);
+        QueryHarness harness = QueryHarness.For(table);
 
         foreach (DumpQueryCase filter in harness.Dump.Cases)
         {
@@ -55,7 +54,7 @@ public sealed class TagMatchGoldenTests
     [MemberData(nameof(Tables))]
     public void TheGateHasSomethingToProve(string table)
     {
-        Harness harness = Harness.For(table);
+        QueryHarness harness = QueryHarness.For(table);
 
         harness.Dump.Cases
             .SelectMany(c => c.Nodes)
@@ -71,7 +70,7 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void AnOrAbandonsItsBranchBeforeReachingAnOperandWrittenFirst()
     {
-        Harness harness = Harness.For("CDXEXPR");
+        QueryHarness harness = QueryHarness.For("CDXEXPR");
 
         DumpQueryCase written = harness.Dump.Cases.Single(c => c.Filter == "K_NUM > 0 .OR. K_LOG");
         DumpQueryCase mirrored = harness.Dump.Cases.Single(c => c.Filter == "K_LOG .OR. K_NUM > 0");
@@ -96,7 +95,7 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void ARefusedTagDoesNotStopTheSearch()
     {
-        Harness harness = Harness.For("CDXBASE");
+        QueryHarness harness = QueryHarness.For("CDXBASE");
         QueryTag?[] matched = harness.Match("K_DUP = \"CHERRY\"");
 
         matched.Should().Contain(t => t != null && t.Value.Name == "T_DUP");
@@ -110,7 +109,7 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void DateAndLogicalTagsAreEligible()
     {
-        Harness harness = Harness.For("CDXEXPR");
+        QueryHarness harness = QueryHarness.For("CDXEXPR");
 
         harness.Match("K_DATE = STOD(\"20200101\")")
             .Should().Contain(t => t != null && t.Value.Name == "T_DATE");
@@ -125,8 +124,8 @@ public sealed class TagMatchGoldenTests
     [Fact]
     public void WideningTheScopeOnlyEverAddsTags()
     {
-        Harness compatible = Harness.For("CDXEXPR");
-        Harness wide = Harness.For("CDXEXPR", QueryTagScope.AllSeekable);
+        QueryHarness compatible = QueryHarness.For("CDXEXPR");
+        QueryHarness wide = QueryHarness.For("CDXEXPR", QueryTagScope.AllSeekable);
 
         foreach (DumpQueryCase filter in compatible.Dump.Cases)
         {
@@ -143,42 +142,5 @@ public sealed class TagMatchGoldenTests
         // And it does add: an integer tag is refused by default and usable when widened.
         compatible.Match("K_INT > 0").Should().AllSatisfy(t => t.Should().BeNull());
         wide.Match("K_INT > 0").Should().Contain(t => t != null && t.Value.Name == "T_INT");
-    }
-
-    /// <summary>
-    /// One table, its tags projected once, and a filter compiler over its fields.
-    /// </summary>
-    private sealed class Harness
-    {
-        private readonly IFieldMetadata fields;
-        private readonly IReadOnlyList<QueryTag> tags;
-        private readonly QueryTagScope scope;
-
-        private Harness(
-            CorpusQueryDump dump, IFieldMetadata fields, IReadOnlyList<QueryTag> tags, QueryTagScope scope)
-        {
-            Dump = dump;
-            this.fields = fields;
-            this.tags = tags;
-            this.scope = scope;
-        }
-
-        public CorpusQueryDump Dump { get; }
-
-        public static Harness For(string table, QueryTagScope scope = QueryTagScope.Compatible)
-        {
-            using var engine = new CodeBaseEngine();
-            using Table opened = engine.OpenTable(Corpus.PathOf(table + ".DBF"));
-
-            return new Harness(
-                CorpusQueryDump.Load(table),
-                new TableFieldMetadata([.. opened.Fields], table),
-                opened.QueryTags(),
-                scope);
-        }
-
-        public QueryTag?[] Match(string filter) =>
-            new QueryDecomposer(tags, scope)
-                .MatchTags(TypeResolver.Resolve(ExpressionParser.Parse(filter, fields)));
     }
 }

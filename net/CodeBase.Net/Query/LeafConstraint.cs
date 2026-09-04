@@ -100,6 +100,22 @@ internal sealed class LeafConstraint
         new(ConstraintKind.Range, null, null, new Bound(value, inclusive), None);
 
     /// <summary>
+    /// Builds a range from its ends and the values struck out of it.
+    /// </summary>
+    /// <param name="lower">The lower end, or null where it is open.</param>
+    /// <param name="upper">The upper end, or null where it is open.</param>
+    /// <param name="exclusions">The values struck out.</param>
+    /// <returns>The constraint.</returns>
+    /// <value>
+    /// Used by merging, which is the only thing that produces a range with two ends or with more than
+    /// one value struck out. Decomposing a single term never does: one comparison gives one end or
+    /// one exclusion.
+    /// </value>
+    public static LeafConstraint Range(
+        Bound? lower, Bound? upper, IReadOnlyList<ConstraintValue> exclusions) =>
+        new(ConstraintKind.Range, null, lower, upper, exclusions);
+
+    /// <summary>
     /// Builds a constraint admitting everything except one value.
     /// </summary>
     /// <param name="value">The value to strike out.</param>

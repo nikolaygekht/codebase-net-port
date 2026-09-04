@@ -27,16 +27,18 @@ internal sealed class ConstraintNode
 {
     private static readonly ConstraintNode[] NoChildren = [];
 
+    private static readonly int[] NoSources = [];
+
     private ConstraintNode(
         QueryTag? tag,
         LeafConstraint? constraint,
-        int sourceNode,
+        IReadOnlyList<int> sourceNodes,
         ConstraintCombination combination,
         IReadOnlyList<ConstraintNode> children)
     {
         Tag = tag;
         Constraint = constraint;
-        SourceNode = sourceNode;
+        SourceNodes = sourceNodes;
         Combination = combination;
         Children = children;
     }
@@ -47,8 +49,14 @@ internal sealed class ConstraintNode
     /// <summary>Gets what a leaf constrains its tag to, or null for a branch.</summary>
     public LeafConstraint? Constraint { get; }
 
-    /// <summary>Gets the filter node a leaf came from, or minus one for a branch.</summary>
-    public int SourceNode { get; }
+    /// <summary>Gets the filter terms a leaf answers, which is empty for a branch.</summary>
+    /// <value>
+    /// More than one once leaves merge: two terms over one tag become a single range, and both of
+    /// them are then answered by it. The residual filter reads this to know which terms it need not
+    /// check again, so a merge that forgot one would have that term checked twice -- harmless -- and
+    /// a merge that invented one would have a term skipped, which is not.
+    /// </value>
+    public IReadOnlyList<int> SourceNodes { get; }
 
     /// <summary>Gets how a branch combines its children; meaningless on a leaf.</summary>
     public ConstraintCombination Combination { get; }
@@ -67,7 +75,18 @@ internal sealed class ConstraintNode
     /// <param name="sourceNode">The filter node the term was rooted at.</param>
     /// <returns>The leaf.</returns>
     public static ConstraintNode Leaf(QueryTag tag, LeafConstraint constraint, int sourceNode) =>
-        new(tag, constraint, sourceNode, ConstraintCombination.All, NoChildren);
+        new(tag, constraint, [sourceNode], ConstraintCombination.All, NoChildren);
+
+    /// <summary>
+    /// Builds a leaf that answers several terms at once, which is what merging produces.
+    /// </summary>
+    /// <param name="tag">The tag it constrains.</param>
+    /// <param name="constraint">What it constrains the tag to.</param>
+    /// <param name="sourceNodes">The filter terms it answers.</param>
+    /// <returns>The leaf.</returns>
+    public static ConstraintNode Leaf(
+        QueryTag tag, LeafConstraint constraint, IReadOnlyList<int> sourceNodes) =>
+        new(tag, constraint, sourceNodes, ConstraintCombination.All, NoChildren);
 
     /// <summary>
     /// Builds a branch.
@@ -77,7 +96,7 @@ internal sealed class ConstraintNode
     /// <returns>The branch.</returns>
     public static ConstraintNode Branch(
         ConstraintCombination combination, IReadOnlyList<ConstraintNode> children) =>
-        new(null, null, -1, combination, children);
+        new(null, null, NoSources, combination, children);
 
     /// <summary>
     /// Walks this node and everything under it.

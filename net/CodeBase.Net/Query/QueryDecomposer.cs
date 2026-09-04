@@ -17,10 +17,9 @@ namespace CodeBase.Net.Query;
 /// ones it could not be checked per record afterwards. Widening a candidate set is safe because a
 /// later check narrows it again; narrowing one loses records that nothing recovers.
 ///
-/// Nothing here merges. Two terms over one tag become two leaves that will seek that tag twice and
-/// intersect, which is the right answer reached the slow way -- turning them into one range is a
-/// later and separate concern, and keeping it separate is what lets the record sets be gated before
-/// any merging exists to change them.
+/// The walk itself never merges: two terms over one tag come out as two leaves. A second pass over
+/// the finished tree folds those together where it can, and keeping the two apart is what let the
+/// record sets be gated before any merging existed to move them.
 ///
 /// Governing specification: QUERY-OPTIMIZER.md sections 3 and 4.
 /// </summary>
@@ -61,6 +60,9 @@ internal sealed class QueryDecomposer
         int cursor = filter.Nodes.Count - 1;
         ConstraintNode? root = walk.Visit(ref cursor);
 
+        if (root is not null)
+            root = Merged(root);
+
         // A whole filter that yields nothing is not fully mapped, whatever the walk decided on the
         // way down -- the reference sets the same flag at the same point (m4map.c:375-377).
         return QueryPlan.For(root, root is not null && walk.FullyMapped);
@@ -85,6 +87,78 @@ internal sealed class QueryDecomposer
 
         walk.Visit(ref cursor);
         return walk.Matches;
+    }
+
+    /// <summary>
+    /// Folds the leaves of a branch that name one tag into as few leaves as they can become.
+    /// </summary>
+    /// <param name="node">The node to fold, and everything under it.</param>
+    /// <returns>The folded node.</returns>
+    /// <value>
+    /// Leaves meet where they sit under one connective and name one tag, which is the same set of
+    /// pairs the reference arrives at by a longer route: it can only fold [i]adjacent[/i] children,
+    /// so it first shuffles same-tag leaves next to each other by lifting the others into sibling
+    /// branches. Grouping by tag reaches the same pairs without the shuffle, because a tree here is
+    /// an array of children rather than a list it has to reorder.
+    ///
+    /// Nothing crosses a connective. Two terms under an and and a third under an or below it are not
+    /// the same question, and the reference refuses that pairing too.
+    /// </value>
+    private static ConstraintNode Merged(ConstraintNode node)
+    {
+        if (node.IsLeaf)
+            return node;
+
+        List<ConstraintNode> folded = [.. node.Children.Where(child => !child.IsLeaf).Select(Merged)];
+
+        foreach (IGrouping<int, ConstraintNode> sharing in node.Children
+            .Where(child => child.IsLeaf)
+            .GroupBy(child => child.Tag!.Value.Ordinal))
+        {
+            folded.AddRange(Fold(sharing, node.Combination));
+        }
+
+        return folded.Count == 1 ? folded[0] : ConstraintNode.Branch(node.Combination, folded);
+    }
+
+    /// <summary>
+    /// Folds the leaves over one tag into as few as the algebra allows.
+    /// </summary>
+    /// <value>
+    /// A conjunction always folds to one leaf; a disjunction folds only where the union of two
+    /// constraints is itself one constraint, so what comes back may still be several. A leaf that
+    /// absorbed another answers both of their terms, which is what the residual filter reads.
+    /// </value>
+    private static IEnumerable<ConstraintNode> Fold(
+        IEnumerable<ConstraintNode> leaves, ConstraintCombination combination)
+    {
+        List<ConstraintNode> standing = [];
+
+        foreach (ConstraintNode leaf in leaves)
+        {
+            ConstraintNode absorbing = leaf;
+
+            for (int index = standing.Count - 1; index >= 0; index--)
+            {
+                LeafConstraint? together = combination == ConstraintCombination.All
+                    ? ConstraintMerge.And(standing[index].Constraint!, absorbing.Constraint!)
+                    : ConstraintMerge.Or(standing[index].Constraint!, absorbing.Constraint!);
+
+                if (together is null)
+                    continue;
+
+                absorbing = ConstraintNode.Leaf(
+                    absorbing.Tag!.Value,
+                    together,
+                    [.. standing[index].SourceNodes, .. absorbing.SourceNodes]);
+
+                standing.RemoveAt(index);
+            }
+
+            standing.Add(absorbing);
+        }
+
+        return standing;
     }
 
     /// <summary>

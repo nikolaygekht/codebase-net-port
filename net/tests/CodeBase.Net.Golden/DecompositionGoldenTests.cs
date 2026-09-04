@@ -77,8 +77,13 @@ public sealed class DecompositionGoldenTests
 
             foreach (ConstraintNode leaf in plan.Root.Walk().Where(node => node.IsLeaf))
             {
-                leaf.SourceNode.Should().BeInRange(0, filter.Nodes.Count - 1);
-                plan.Answers(leaf.SourceNode).Should().BeTrue();
+                leaf.SourceNodes.Should().NotBeEmpty();
+
+                foreach (int term in leaf.SourceNodes)
+                {
+                    term.Should().BeInRange(0, filter.Nodes.Count - 1);
+                    plan.Answers(term).Should().BeTrue();
+                }
             }
         }
     }
@@ -226,17 +231,5 @@ public sealed class DecompositionGoldenTests
 
         divergent.Should().BeEmpty();
         seen.Should().BeGreaterThan(0, "the check needs constants to have looked at");
-    }
-
-    /// <summary>
-    /// Without merging, two terms over one tag are two leaves that will seek it twice. Correct, and
-    /// slower -- which is what makes the record sets checkable before any merge code exists.
-    /// </summary>
-    [Fact]
-    public void TwoTermsOverOneTagAreTwoLeavesUntilTheyAreMerged()
-    {
-        using QueryHarness harness = QueryHarness.For("CDXEXPR");
-
-        harness.Plan("K_NUM > 0 .AND. K_NUM < 100").LeafCount.Should().Be(2);
     }
 }

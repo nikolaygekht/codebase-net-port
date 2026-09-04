@@ -69,7 +69,10 @@ internal sealed class QueryPlan
         if (root is not null)
         {
             foreach (ConstraintNode node in root.Walk().Where(node => node.IsLeaf))
-                trusted.Add(node.SourceNode);
+            {
+                foreach (int term in node.SourceNodes)
+                    trusted.Add(term);
+            }
         }
 
         return new QueryPlan(root, fullyMapped, trusted);

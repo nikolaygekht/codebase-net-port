@@ -583,8 +583,16 @@ representative. Folding `map2->le` into `map1`:
 | nothing | take `map2->le` | — |
 
 and `map2->le` is cleared in every path. The `ne`-equals-bound case turning `le` into `lt` is the
-only place the algebra strengthens an operator, and it is the kind of rule that is easy to omit and
-produces one extra record.
+only place the algebra strengthens an operator.
+
+**Whether omitting it costs a record depends on the seeker, and for a faithful one it does not.**
+`bmf4AndOt` walks the range and then removes each `ne` (§6.3), so a value struck out at an inclusive
+bound is dropped by the exclusion pass whether or not the bound was tightened first. Tested by
+omitting it in a port whose range walk also drops excluded values: **no record set moved**, on any
+corpus filter. What the tightening buys there is that the walk can *start* past the value instead of
+visiting and rejecting it, and that the merged constraint has one canonical form rather than two
+equivalent ones. It is a cost and tidiness rule, not a correctness one — which matters when deciding
+what gates it, because no record-set comparison ever will.
 
 Constant comparison is by `map->type`, and **for `r4num`/`r4str` it is a prefix comparison over the
 shorter length** (`const4less`, C4CONST.C:998-1027):

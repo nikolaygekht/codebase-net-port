@@ -1,7 +1,12 @@
 # Project state
 
 **Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit is
-**step 011's sub-step 5 — combination**, and with it **the optimizer is complete and correct**:
+**step 011's sub-step 6 — the merge algebra**: two terms over one tag now become one seek, and
+**depth 3 stayed green through it**, which is what the whole reorder was for. It went red the moment
+merging landed and caught two real bugs, one of them a shared-buffer alias that nothing before
+merging could have exposed. `dotnet test` green on **3202 tests** (741 golden, 2461 unit), up from
+2066. Five mutations, all red. No corpus file changed.
+**Before it, sub-step 5 — combination**, which made **the optimizer complete and correct**:
 **depth 3 of the gate is green on all 74 filters**, meaning the candidate set this port builds holds
 exactly the records the reference's own bitmap holds — compared before any residual filtering and
 before any merging exists. `dotnet test` green on **2066 tests** (732 golden, 1334 unit). Four
@@ -290,7 +295,36 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ## 2. This session (2026-09-04), the ones before it, and the four before those
 
-**Step 011's sub-step 5 landed, and the optimizer is now complete and correct.** `QueryExecutor`
+**Step 011's sub-step 6 landed: two terms over one tag become one seek.** `ConstraintMerge`, a fold
+pass in the decomposer, and a leaf that answers several terms rather than one. **Depth 3 stayed
+green**, which is the claim merging has to make, and `MergeGoldenTests` counts leaves, which is the
+claim no correctness check can see — a merge that is perfectly correct and never merges passes every
+record-set assertion in the suite.
+
+**The reorder paid off twice on the day it was meant to.** Depth 3 went **red the moment merging
+landed**, and both causes were real. One helper conflated *which end wins* with *what a missing end
+means*, so every conjunction came back too wide. And `TagProbe.KeyFor` returned searches over a
+**shared buffer**, so a second call clobbered the first — nothing before merging ever held two
+comparands at once, and a range with two ends is the first thing that does. The probe contract gained
+the promise that would have caught it, which is the kind a stand-in passes by accident, because it
+allocates, while an implementation careful about allocation fails.
+
+**Where the reference shuffles, this groups.** It can only fold *adjacent* children, so it lifts
+non-matching leaves into sibling branches until same-tag ones sit together; grouping by tag reaches
+the same pairs with no shuffle, because a branch here is an array rather than a list to reorder.
+
+**The disjunction side is deliberately partial and layer 4 never reaches it**: not one corpus filter
+has two `.OR.` terms over one tag whose union is a single constraint. The population tests — every
+pair from a fifteen-constraint set, checked value by value — are that code's only gate, and they say
+so in as many words.
+
+**And a prediction in the plan was wrong, which the run said out loud.** Omitting the rule that moves
+an inclusive bound past a value struck out at it was supposed to cost one record. It costs none: a
+range walk that also drops excluded values drops this one whether or not the bound moved first. So it
+is a cost and tidiness rule, not a correctness one, gated by the structural assertion and nothing
+else. `QUERY-OPTIMIZER.md` §5.4 now says that rather than repeating the reference's implication.
+
+**Before that in the same session — sub-step 5: the optimizer became complete and correct.** `QueryExecutor`
 walks the plan, seeks each leaf and folds the children, and **depth 3 is green on all 74 filters
 across three tables** — before any residual filtering, so a decomposition error cannot hide behind a
 later pass, and before any merging, so what it measures is decomposition, seeking and combination
@@ -771,14 +805,14 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-steps 1 to 5 are done, and the optimizer works
+### Step 011 is under way: sub-steps 1 to 6 are done, and the optimizer seeks once
 
-**Next is sub-step 6 — the merge algebra**, and it needs **no generator run**. `ConstraintMerge` plus
-the reduce and redistribute passes that decide which leaves meet: two terms over one tag become one
-range, so the tag is seeked once instead of twice. Its gate is two assertions that fail differently —
-**depth 3 must stay green**, because merging must move no record set at all, and the **leaf count
-must fall**, because a merge that is correct and never merges passes the first and is useless. Then
-sub-step 7 adds the residual filter and the public surface.
+**Next is sub-step 7 — the residual filter and the public surface**, and it needs **no generator
+run**. `ResidualFilter` (evaluate the terms no tag answered, per candidate), `QueryPlanner`, the
+public `Query` with both skip strategies, `Table.Query` and `CodeBaseEngine.QueryTagScope`. Gated by
+**depth 4**: the record sequence and the count must equal the reference's, in tag order with a tag
+selected and in record-number order without one. It is also where ADR-53's second divergence is
+proved safe — the port's residual runs on **fewer** terms than the reference's and must still agree.
 
 **The merge algebra moved from sub-step 4 to sub-step 6.** The first plan gated sub-step 3 on
 `FullyMapped` alone — one bit per filter, which cannot see a swapped bound — and then left the

@@ -119,6 +119,30 @@ public abstract class TagProbeContract
             .Should().Be(0, "{0} begins with {1}", Text(probe), whole[..1]);
     }
 
+    /// <summary>
+    /// Two comparands taken from one probe are both still valid, because a caller holds several at
+    /// once: a range has two ends, and every value struck out of it is a third.
+    /// </summary>
+    /// <value>
+    /// The promise that a buffer reused between calls would break, and the one a stand-in gets right
+    /// by accident -- it allocates -- while an implementation careful about allocation does not. That
+    /// asymmetry is exactly what a shared contract is for.
+    /// </value>
+    [Fact]
+    public void TwoComparandsTakenFromOneProbeAreBothStillValid()
+    {
+        ITagProbe probe = CreateProbe();
+        string low = KeysHeld[0];
+        string high = KeysHeld[^1];
+
+        KeySearch first = probe.KeyFor(QueryValues.Text(low));
+        KeySearch second = probe.KeyFor(QueryValues.Text(high));
+
+        probe.First().Should().BeTrue();
+        first.Compare(probe.Current.Key).Should().Be(0, "the lowest key still matches the first");
+        second.Compare(probe.Current.Key).Should().BeLessThan(0, "and the last key is above it");
+    }
+
     /// <summary>A value that sorts at or below every printable key.</summary>
     private static KeySearch Below(ITagProbe probe) => probe.KeyFor(QueryValues.Text(" "));
 

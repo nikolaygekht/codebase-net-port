@@ -4,9 +4,9 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — **sub-steps 1 to 5 of 9 done. The optimizer is complete and correct.**
-**Current sub-step:** PLAN.md step 6, the merge algebra — which now lands against a green
-end-to-end gate, which is what the reorder after sub-step 2 was for. **The step order changed after sub-step 2** — see Deviations.
+**Status:** in progress — **sub-steps 1 to 6 of 9 done**
+**Current sub-step:** PLAN.md step 7, the residual filter and the public surface — the first thing a
+caller can hold. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
@@ -16,6 +16,7 @@ end-to-end gate, which is what the reorder after sub-step 2 was for. **The step 
 - [x] step 3 — decomposition, 2026-09-04 — **depth 2 green, four of five mutations red**
 - [x] step 4 — leaf evaluation, 2026-09-04 — **the contract pair passes, 41 filters reach depth 3**
 - [x] step 5 — combination, 2026-09-04 — **depth 3 green on all 74, four mutations red**
+- [x] step 6 — the merge algebra, 2026-09-04 — **depth 3 stayed green, leaf counts fall**
 - [ ] step 3 — decomposition
 - [ ] step 4 — the merge algebra
 - [ ] step 5 — leaf evaluation
@@ -23,6 +24,47 @@ end-to-end gate, which is what the reorder after sub-step 2 was for. **The step 
 - [ ] step 7 — the residual filter and the public surface
 - [ ] step 8 — the equivalence gate, and the widened scope
 - [ ] step 9 — close
+
+## What sub-step 6 landed
+
+`ConstraintMerge` (the algebra), a fold pass in `QueryDecomposer`, `LeafConstraint.Range`, and a leaf
+that answers **several** terms rather than one. Tests: `MergeGoldenTests` for the leaf counts and
+`ConstraintMergeTests` for the algebra as sets. **3202 tests green** (741 golden, 2461 unit), up from
+2066. No corpus file changed.
+
+**The reorder paid off twice.** Depth 3 went **red the moment merging landed**, and both causes were
+real. The first was a bounds bug: one helper conflated *which end wins* with *what a missing end
+means*, so narrowing an open upper bound against a real one kept the open side and every conjunction
+came back too wide. The second is the one worth carrying — `TagProbe.KeyFor` returned searches over a
+**shared buffer**, so a second call silently clobbered the first. Nothing before merging ever held two
+comparands at once; a range with two ends is the first thing that does. `TagProbeContract` gained the
+promise that would have caught it, and it is the kind a stand-in passes by accident (it allocates)
+while an implementation careful about allocation fails.
+
+**Two terms over one tag now become one seek**, and the gate for that is structural, because no
+correctness check can see it: a merge that is perfectly correct and never merges passes every
+record-set assertion in the suite. `MergeGoldenTests` counts leaves.
+
+**Where the reference shuffles, this groups.** It can only fold *adjacent* children, so it lifts
+non-matching leaves into sibling branches until same-tag ones sit together; grouping by tag reaches
+the same pairs with no shuffle, because a branch here is an array rather than a list to reorder.
+Nothing crosses a connective, which the reference refuses too.
+
+**The disjunction side is deliberately partial** (Decision 9) and **layer 4 never reaches it**: not
+one corpus filter has two terms over one tag joined by an `.OR.` whose union is a single constraint —
+its two cases are a range with a hole and two separate values, and both are refused. The population
+tests are that code's only gate, and `ConstraintMergeTests` says so in as many words.
+
+**A prediction in the plan was wrong, and the run said so.** Omitting the rule that moves an
+inclusive bound past a value struck out at it was supposed to cost one record. It costs none: a range
+walk that also drops excluded values drops this one whether or not the bound moved first. So it is a
+cost and tidiness rule rather than a correctness one, gated by the structural assertion and by
+nothing else. `QUERY-OPTIMIZER.md` §5.4 and `PLAN.md`'s mutation table both now say that.
+
+**Five mutations, all red, and two exactly as designed.** Never merging reddened **only** the leaf
+counts and left every correctness gate green — which is the argument for having them. Folding across
+tags, folding a disjunction with the conjunction rules, and widening where a conjunction must narrow
+all reddened depth 3.
 
 ## What sub-step 5 landed
 
@@ -282,4 +324,4 @@ it. Question 3 is the `e4tagExpr` one above.
 
 ## Blockers
 
-None. Sub-step 6 needs no generator run either.
+None. Sub-step 7 needs no generator run either.

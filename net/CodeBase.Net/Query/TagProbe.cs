@@ -22,7 +22,6 @@ internal sealed class TagProbe : ITagProbe
     private readonly TagCursor cursor;
     private readonly SeekConverter converter;
     private readonly bool descending;
-    private readonly byte[] buffer;
 
     /// <summary>
     /// Opens a probe over a tag.
@@ -34,7 +33,6 @@ internal sealed class TagProbe : ITagProbe
         cursor = tag.OpenCursor();
         this.converter = converter;
         descending = tag.Descending;
-        buffer = new byte[converter.KeyLength];
     }
 
     /// <inheritdoc/>
@@ -52,9 +50,17 @@ internal sealed class TagProbe : ITagProbe
     /// A character constant shorter than the key stays short, and that is the whole of what makes it
     /// a prefix: comparing a stored key against it then compares only its own bytes, so it names the
     /// group of keys that begin with it rather than one key padded out to the width.
+    ///
+    /// Each answer gets its own bytes rather than a buffer reused between calls, because a caller
+    /// holds more than one at a time: a range has two ends and any number of struck-out values, and
+    /// all of them are compared against the same key as the walk passes it. Sharing a buffer would
+    /// have each answer quietly become the last one asked for. It is built once per leaf, not once
+    /// per record, so the allocation is not on any path that repeats.
     /// </value>
     public KeySearch KeyFor(ConstraintValue value)
     {
+        byte[] buffer = new byte[converter.KeyLength];
+
         if (converter.Kind == KeyKind.CollatedCharacter && value.Length < converter.Compiled.Length)
         {
             int weighed = CollatedKey.WriteSearch(

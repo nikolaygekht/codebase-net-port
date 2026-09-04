@@ -1,7 +1,8 @@
 # Project state
 
-**Updated:** 2026-09-04 · **the tree is clean; not yet pushed.** The last commit fixes an `EXPR`
-gap step 011 exposed — a field may be qualified by the table's own name. **Before it, step 011
+**Updated:** 2026-09-04 · **the tree is clean and pushed.** The last commit is this file saying so;
+the one before it fixes an `EXPR` gap step 011 exposed — a field may be qualified by the table's own
+name. **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
 tests** (801 golden, 2461 unit), up from 1909 at the start of the step, and **no existing corpus file

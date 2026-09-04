@@ -6,7 +6,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 
 **Status:** in progress — **sub-steps 1 and 2 of 9 done**
 **Current sub-step:** PLAN.md step 3, decomposition. The walk exists and matches tags; what it does
-not yet do is build constraints.
+not yet do is build constraints. **The step order changed after sub-step 2** — see Deviations.
 
 ## Done so far
 
@@ -152,6 +152,15 @@ it. Question 3 is the `e4tagExpr` one above.
   filters — so raw-bit equality would fail a correct port that omits the go-around (Decision 8).
   `DESIGN.md` Decision 8 already said depth 3 compares sets and not the flag, so this is `PLAN.md`
   catching up with `DESIGN.md`, not a change of intent. Both now say effective.
+- **The merge algebra moved from sub-step 4 to sub-step 6, so depth 3 arrives before it.** The
+  first plan gated sub-step 3 on `FullyMapped` alone — one bit per filter, blind to a swapped bound —
+  and left the operand-order reflection unchecked until sub-step 6. Merging turns out to be an
+  optimization rather than a correctness requirement (unmerged, `K_NUM > 0 .AND. K_NUM < 100` is two
+  leaves that seek separately and intersect, which is the right answer), so decomposition, seeking
+  and combination form a complete optimizer and **depth 3 can be green on all 74 filters before any
+  merge code exists**. The merge then lands against a green end-to-end gate and gets a sharper gate
+  of its own: the record sets must not move and the leaf count must fall. `PLAN.md`'s steps table,
+  its mutation table and the note under it all say so.
 - **The decomposition walk landed in sub-step 2, not sub-step 3.** Depth 1 is sub-step 2's gate and
   depth 1 is a property of the walk, so `QueryDecomposer` exists now and returns the tag array;
   sub-step 3 grows the same walk to build constraints rather than writing a second one.

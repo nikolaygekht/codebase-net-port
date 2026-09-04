@@ -681,13 +681,34 @@ CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields,
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.
 
-### Step 011 is under way: sub-steps 1 and 2 are done, sub-step 3 is next
+### Step 011 is under way: sub-steps 1 and 2 are done, and the order of the next four changed
 
 **Next is sub-step 3 — decomposition**, and it needs **no generator run**. `ConstraintValue`,
 `LeafConstraint`, `ConstraintNode`, `QueryPlan`, and `QueryDecomposer` grown to build constraints
 rather than only match tags — the walk is already there and already gated, so what is new is the
-operator-to-slot table in both operand orders and the partial-string widening. Gated by **depth 2**:
-`FullyMapped` must equal the reference's `fullyMapped` on every case.
+operator-to-slot mapping in both operand orders and the partial-string widening.
+
+**The merge algebra moved from sub-step 4 to sub-step 6.** The first plan gated sub-step 3 on
+`FullyMapped` alone — one bit per filter, which cannot see a swapped bound — and then left the
+operand-order reflection unchecked for four sub-steps. That is R12's most concrete instance and the
+one thing the reference itself gets wrong, so it was the plan's weakest point.
+
+What makes the reorder work is that **merging is an optimization, not a correctness requirement**:
+unmerged, `K_NUM > 0 .AND. K_NUM < 100` decomposes into two leaves that seek separately and
+intersect, which is the right answer reached by seeking one tag twice. So decomposition, seeking and
+combination are a complete optimizer on their own, and **depth 3 can be green on all 74 filters
+before any merge code exists**. The twelve routines of merge case analysis then get written against a
+green end-to-end gate, with a sharper gate of their own: the record sets must not move, and the leaf
+count must fall. Those two fail differently — a wrong merge fails the first, a merge that never
+happens fails the second.
+
+Order now: 3 decomposition, 4 leaf evaluation, 5 combination (**depth 3 green here**), 6 the merge
+algebra, 7 residual filter and public surface, 8 the equivalence and efficiency gates, 9 close.
+
+**Three of `DESIGN.md`'s four open questions are closed** by sub-step 1's run: the bitset survives
+the walk, a filter with nothing optimizable records `set absent` (and `bitmapsFreed` is never set,
+which that question had assumed the opposite of), and no wider corpus table is needed. Only
+`e4tagExpr` (−510) stays open, with the rejection pass step 010 owes.
 
 **Still owed to the corpus, and deliberately not folded into this run:** the second rejection pass
 with a real `TAG4FILE`, so `e4tagExpr` (−510) and the alias refusals stop being unobservable. It is a

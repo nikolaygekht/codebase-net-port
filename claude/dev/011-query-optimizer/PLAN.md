@@ -75,20 +75,39 @@ stop being unobservable.
 
 ## Steps
 
-Nine. Sub-steps 1–4 build the pure half and cannot produce a record set; 5–8 build the half that can,
-each closing under a deeper part of the same gate.
+Nine, and the order was changed after sub-step 2 landed — see the note below the table. Sub-steps 1–3
+build the pure half and cannot produce a record set; 4–8 build the half that can, each closing under a
+deeper part of the same gate.
 
 | # | Step | Verify by |
 |---|---|---|
 | 1 ✅ | **The query oracle.** *(done 2026-09-04 — 70 filters, 48 of 48 corpus files byte-identical, 1936 tests green)* `dump-query.h/.cpp` in the generator, plus filter lists on `CDXEXPR`, `CDXBASE` and `CDXDEEP`. Per filter, **each query run twice** — optimized, and again with `RELATION4.bitmapDisable` set — giving the four depths plus **depth 0, the reference's own scan truth** (`DESIGN.md` Decision 12). Also answers `DESIGN.md`'s open questions 1–3. **No C# of the optimizer.** | The three `*.query.dump.txt` files exist and parse into typed cases; **every other corpus file regenerates byte-identical**; the C# reader round-trips the dump; and the dump **names every filter where the two readings disagree**, which is the reference witnessing its own §10.1 defect rather than us inferring it |
 | 2 ✅ | **Eligibility and subexpression identity.** `QueryTag`, `QueryTagScope`, `TagEligibility`, `SubtreeMatch`, **and the walk that decides which nodes are tested at all** *(done 2026-09-04 — depth 1 green on all 74 filters, five mutations run)* | **Depth 1**: for every filter, every node and every tag of the table, our answer to "does this tag's key expression equal this subtree?" equals the reference's `infoReport[i].tag`, under `Compatible`. Plus layer 1 over hand-built node arrays for the promotion exemption and the field-identity rule |
-| 3 | **Decomposition.** `ConstraintValue`, `LeafConstraint`, `ConstraintNode`, `QueryPlan`, `QueryDecomposer` — no merging yet | **Depth 2**: `FullyMapped` equals the reference's `fullyMapped` on every case. Plus layer 1 on the operator-to-slot table in both operand orders, and on the partial-string widening (Decision 6) |
-| 4 | **The merge algebra.** `ConstraintMerge`, and the reduce/redistribute placement that decides which leaves meet | Layer 1, two assertions that fail differently. **Correct:** by accepted-value population — `And`/`Or` of two constraints accept exactly the intersection/union of what the inputs accept, over an enumerated domain per type; the §5.3 invariants hold for every result; `Empty` is produced for every provably-empty pair. **And useful:** the plan for `x > 5 .AND. x < 10` has **one leaf**, and for a two-tag filter exactly two — because the population test passes on a merge that is correct and never merges, and leaf count is seek count (`DESIGN.md` Decision 13, tier 1) |
-| 5 | **Leaf evaluation.** `ITagProbe`, `TagProbe`, `RecordSet`, `ConstraintSeeker` | The `TagProbeContract` pair passes for both implementations; layer 2 covers the four positions, `doCheck`, the empty and half-open ranges, and the exclusion list. First end-to-end signal: a single-leaf plan's set matches **depth 3** |
-| 6 | **Combination.** `QueryExecutor` — the `And`/`Or` fold, the complement flag, the `noMatch` short-circuit | **Depth 3 in full**: our candidate bitset selects exactly the records `relate->set` selects, for every case, under `Compatible`. This is the assertion that covers decomposition, merging, seeking and combining as one, and it runs before any residual filtering exists to hide a mistake |
+| 3 | **Decomposition.** `ConstraintValue`, `LeafConstraint`, `ConstraintNode`, `QueryPlan`, and `QueryDecomposer` grown from matching tags to building constraints — **no merging**, so `x > 5 .AND. x < 10` is two leaves under an and | **Depth 2**: `FullyMapped` equals the reference's `fullyMapped` on every case, asserted **unconditionally** — the reference's §10.1 defect changes which *slot* a constant lands in, not which *terms* were optimized, so `fullyMapped` agrees even on the filter where the record sets do not. Plus layer 1 stating what each constraint **means** rather than which field it set: for `4 > K_NUM` the leaf must bound K_NUM above by 4, in both operand orders and for all six operators, and a short character constant must widen an exclusive lower bound (Decision 6). Depth 3 arrives two sub-steps later and is what really settles the reflection |
+| 4 | **Leaf evaluation.** `ITagProbe`, `TagProbe`, `RecordSet`, `ConstraintSeeker` | The `TagProbeContract` pair passes for both implementations; layer 2 covers the four positions, the empty and half-open ranges, and the exclusion list. First end-to-end signal: a single-leaf plan's set matches **depth 3**. `doCheck` is layer 2 only and cannot be reached at layer 4 until sub-step 6, because it fires only when a range has two exclusive bounds and nothing produces one until leaves merge |
+| 5 | **Combination.** `QueryExecutor` — the `And`/`Or` fold, the complement flag, the `noMatch` short-circuit | **Depth 3 in full**: our candidate bitset selects exactly the records `relate->set` selects, for every case, under `Compatible`. It runs before any residual filtering exists to hide a mistake — and **before merging exists**, so it is measuring decomposition, seeking and combination alone. At this point the optimizer is complete and correct, and every remaining sub-step has a green end-to-end gate to work against |
+| 6 | **The merge algebra.** `ConstraintMerge`, and the reduce/redistribute placement that decides which leaves meet | **Depth 3 must stay green**, which is the whole point of doing this after it is green rather than before: merging changes how many times a tag is seeked and must change no record set at all. Plus layer 1, two assertions that fail differently. **Correct:** by accepted-value population — `And`/`Or` of two constraints accept exactly the intersection/union of what the inputs accept, over an enumerated domain per type; the §5.3 invariants hold for every result; `Empty` is produced for every provably-empty pair. **And useful:** the plan for `x > 5 .AND. x < 10` has **one leaf** and a two-tag filter exactly two, because the population test passes on a merge that is correct and never merges, and leaf count is seek count (`DESIGN.md` Decision 13, tier 1) |
 | 7 | **The residual filter and the public surface.** `ResidualFilter`, `QueryPlanner`, `Query`, `Table.Query`, `CodeBaseEngine.QueryTagScope`, both skip strategies, `Count` | **Depth 4**: the record sequence and the count equal the reference's, in tag order with a tag selected and in record-number order without one. This is also where Decision 5's divergence is proved safe — our residual runs on fewer terms and must still agree |
 | 8 | **The equivalence gate, the widened scope, and the efficiency gate.** `AllSeekable`; the full-scan comparison as a permanent, always-on assertion over every case; and `CountingSource` wired into the test engine to count the work | **Gate A** green in **both** scopes on all three tables. Under `AllSeekable` the integer, currency, datetime and `GENERAL` tags become eligible and have no reference answer — equivalence is their only check, which is the arrangement Decision 1 argues for, and **Gate C is the only thing that can see them being optimized at all rather than merely answered correctly**. **Gate C** green: the three exact counts and the block-read ratio |
 | 9 | **Close.** The selectivity sweep over `PERF10K` (0.01% to 100% matched, block reads and wall time on both arms) recorded in `SUMMARY.md` — measured, **not** gated, and `PERF10K` stays benchmark data; mutation checks; then `PORTING-PLAN.md` §5 (`QUERY` done, **R12** addressed), ADR-52 and ADR-53, `QUERY-OPTIMIZER.md` §12's resolved items, `net/corpus/README.md`, `test-files-generator/README.md`, `SUMMARY.md`, `dev/README.md`, root `STATE.md` | Every planned mutation reddens **exactly** the tests named for it, and the restore is verified by checksum from a copy — never by `git` (`DEV_APPROACH.md` §4) |
+
+**Why merging comes last of the three, and what it buys.** The order above was changed after
+sub-step 2 landed, because the first draft gated sub-step 3 on `FullyMapped` alone — one bit per
+filter, which cannot see a swapped bound at all — and then left the operand-order reflection
+unchecked for four sub-steps. It is R12's most concrete instance and the one thing the reference
+itself gets wrong, so leaving it uncovered that long was the plan's weakest point.
+
+Merging is what makes the reorder possible, because **merging is an optimization and not a
+correctness requirement**. Without it `K_NUM > 0 .AND. K_NUM < 100` decomposes into *two* leaves under
+an and; each seeks its own tag and the two record sets intersect. That is the right answer, reached
+by seeking one tag twice instead of once. So decomposition, seeking and combination are a complete
+optimizer on their own, and **depth 3 can be asserted on all 74 filters before any merge code
+exists**.
+
+Which means the merge algebra — twelve routines of case analysis, the most intricate thing in the
+step — is written against a green end-to-end gate rather than into the dark, and its own gate becomes
+sharp: the record sets must not move, and the leaf count must fall. Those two fail differently, and a
+merge that is wrong fails the first while a merge that never happens fails the second.
 
 ### The mutations planned, and what each must redden
 
@@ -97,11 +116,11 @@ a formality:
 
 | Mutation | Must redden |
 |---|---|
-| Reflect the wrong way for a constant-left comparison (Decision 7) | **depth 0** and Gate A on the `.AND.`-nested `4 > K_NUM` case, **and only there** — the un-nested cases agree under both readings, which is the whole reason that case exists. Note it must *not* redden depth 3 there, since the mutation reproduces what the reference's optimized run did |
+| Reflect the wrong way for a constant-left comparison (Decision 7) | **depth 3 from sub-step 5** on every un-nested reflected filter — `0 < K_NUM`, `0 >= K_NUM` and the rest, where the port and the reference agree and a swapped bound shows immediately. On the `.AND.`-nested `4 > K_NUM` case it must *not* redden depth 3, because there the mutation reproduces exactly what the reference's own optimized run did; that one is caught by **depth 0** and Gate A instead. The pair is what tells a swapped bound from a faithful reproduction of the reference's defect |
 | Drop the partial-string widening (`ge` back to `gt`) | depth 3 on the short-constant `>` case; equivalence on the same |
 | Drop an `.OR.` disjunct instead of destroying the branch | equivalence — records lost, which is the failure class `CLAUDE.md` ranks worst |
 | Trust a term that produced no leaf | equivalence on every partially-optimizable filter |
-| Stop tightening `le` to `lt` when an exclusion equals the bound (§5.4) | layer 1's population test, and equivalence by exactly one record |
+| Stop tightening `le` to `lt` when an exclusion equals the bound (§5.4) | layer 1's population test at sub-step 6, **and depth 3 by exactly one record** — which is the reorder paying off, since under the old order nothing but a hand-written population test would have seen it |
 | Widen eligibility under `Compatible` | depth 1 by tag name, immediately |
 | Count from 0 rather than 1 in `RecordSet` | depth 3, everywhere at once — which is the sign the gate is **not** localised enough, so this one is a control |
 | **Make the optimizer inert** — decompose nothing and fall back to scanning always | Gate B depths 1 and 2 under `Compatible`, **and Gate C under both scopes** — while Gate A stays green throughout, which is the entire argument for Gate C existing |

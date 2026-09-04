@@ -467,22 +467,29 @@ preference.
 
 ## Open questions
 
-1. **Is `relate->set` populated and readable at the moment the generator wants to dump it?** The
+**Three of the four are answered; the fourth is not blocking.** Sub-step 1's run settled 1, 2 and 4
+from the dump rather than from reasoning, which is what they were written to be answered by.
+
+1. ~~**Is `relate->set` populated and readable at the moment the generator wants to dump it?**~~
+   **ANSWERED: yes, and it survives the walk.** The dump takes it immediately after the query is
+   prepared and again after the whole result is consumed, and `setStable` is yes for all 74 filters.
+   *(Original text below, kept because the reasoning is what designed the check.)*
+   **Is `relate->set` populated and readable at the moment the generator wants to dump it?** The
    bitset is copied into `relate->set` at m4map.c:2465 during `relate4top`, and `RELATE4.set` is a
    plain `F4FLAG` member of a struct the header exposes — so the read is straightforward. What is not
    certain is whether it survives to the end of the scan unchanged, or whether the two skip paths
    mutate it. **Answered by sub-step 1**, by dumping it immediately after `relate4top` and again
    after the scan and comparing. If it does not survive, the dump takes it at the first point only.
-2. **What does the C library report for a query with no optimizable term at all?** `bitmapsFreed`
-   is set and `f4flagIsSetFlip` answers yes for every record from a null `flags` pointer
-   (r4relate.c:82-91). The dump must distinguish "the bitset is every record" from "there is no
-   bitset", because the port's `QueryPlan` distinguishes them and only one of them is `FullyMapped`
-   false with a root of none. Sub-step 1.
-3. **Does `e4tagExpr` (−510) become reachable now?** Step 010 left it named as unreachable because
+2. ~~**What does the C library report for a query with no optimizable term at all?**~~
+   **ANSWERED, and the premise was wrong.** The dump does distinguish the two — it records
+   `set absent` rather than an all-set bitset — but `bitmapsFreed` is **not** set, which this question
+   assumed it would be. Across all 74 filters it is never set, including the ten that optimize
+   nothing: it means bitmapping *failed*, not that there is no bitmap. `QUERY-OPTIMIZER.md` §7.1.
+3. **STILL OPEN — does `e4tagExpr` (−510) become reachable now?** Step 010 left it named as unreachable because
    every recorded rejection was parsed with `tagPtr = 0`. A filter expression is still parsed without
    a tag context, so probably not — but the second rejection pass step 010 owes the corpus is cheap
    to fold into this step's generator run, and sub-step 1 is the moment to do it.
-4. **Does the corpus need a table wide enough for the bitset to matter?** Every gate here is
-   correctness and `CDXEXPR`'s 16 records answer all of them. `PERF10K` exists and is not a gate, so
-   a `Query` benchmark is available for free if wanted — but ADR-40's performance gate is on the read
-   path, and extending it to queries is not this step's promise.
+4. ~~**Does the corpus need a table wide enough for the bitset to matter?**~~ **ANSWERED: no for
+   correctness, and `CDXDEEP` covers the rest.** Its 600 records carry the ranges that cross leaf
+   boundaries and are where Gate C's counted work runs (Decision 13). `PERF10K` stays benchmark data
+   and is used only for sub-step 9's selectivity sweep, which is measured and not gated.

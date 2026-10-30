@@ -78,8 +78,10 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - **OLE-DB `r5*` field types** (`O, P, Q, R, V(GUID), W, 1, 2, 3, 4, 5, 6`) beyond *read-tolerant
   recognition where a real VFP9 file demands it* — creation of these is not supported in v1.
 - **Report writer / styles / totals** (`report4*`, `style4*`, `area4*`, `group4*`, `obj4*`).
-- **Compressed DBF data and compressed memos** (type-3 FPT entries) — CodeBase-proprietary, VFP-
-  incompatible. Read as an error/opt-in; never written by default.
+- **Compressed DBF data** — CodeBase-proprietary, VFP-incompatible; refused at open, never written
+  (ADR-56). **Compressed
+  memos** (type-3 FPT entries), equally VFP-incompatible, **are read**, decompressed (ADR-55), and
+  never written.
 - **Encryption** (Rijndael DLL), **Palm OS / WinCE / big-endian** targets, the pooled allocator,
   and the intrusive `LIST4`/`mem4` machinery (GC + `List<T>` replace them).
 - **`largeFileOffset` proprietary lock scheme** (>4 GB via 64-bit lock offsets) — breaks VFP
@@ -375,8 +377,8 @@ VFP reserved area, the `t4dblToFox` sign rule.
   `claude/dev/002-dbf-records-and-fields/SUMMARY.md`; then memo payloads in both reference
   encodings and the binary types —
   `claude/dev/003-memo-and-binary-types/SUMMARY.md`. **The read half is complete:** the gate asserts
-  every field of every record of all seven corpus dumps with nothing skipped. The one refusal is a
-  compressed memo entry, which no corpus case can gate yet (ADR-23, open).
+  every field of every record of all seven corpus dumps with nothing skipped. Compressed memo
+  entries, refused until step 012 (ADR-23), are now read and gated by `CMPMEMO` (ADR-55).
 - **Gate:** for every DBF in `net/corpus/`, C# decodes every field of every record identically to the
   checked-in dump (byte/value-exact including blank/`00000000` dates, currency ×10⁴, datetime
   julian+ms, 4-byte memo refs read as ints).

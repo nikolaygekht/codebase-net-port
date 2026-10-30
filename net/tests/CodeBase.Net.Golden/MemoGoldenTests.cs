@@ -20,7 +20,7 @@ public sealed class MemoGoldenTests
     [Fact]
     public void TheGateCoversEveryTableThatHasAMemoFile()
     {
-        MemoTables().Should().HaveCount(6);
+        MemoTables().Should().HaveCount(7);
     }
 
     [Fact]
@@ -139,6 +139,7 @@ public sealed class MemoGoldenTests
     public void EveryMemoOfEveryRecord_ReportsTheBlockAndLengthTheDumpRecords(string tableName)
     {
         CorpusDump dump = CorpusDump.Load(tableName);
+        CorpusMemoDump stored = CorpusMemoDump.Load(tableName);
         using Reader reader = new(tableName);
 
         int asserted = 0;
@@ -154,7 +155,7 @@ public sealed class MemoGoldenTests
 
                 reader.Table.GetMemoBlock(field).Should().Be(MemoReference.Read(value.Bytes));
                 reader.Table.GetMemoLength(field).Should().Be((int)value.MemoLength!.Value);
-                reader.Table.GetMemoType(field).Should().Be(MemoType.Text);
+                reader.Table.GetMemoType(field).Should().Be(stored.TypeOf(record.Number, value.Name));
                 asserted++;
 
                 if (value.MemoLength > 0)
@@ -166,6 +167,27 @@ public sealed class MemoGoldenTests
             dump.Records[0].Values.Count(v => v.IsMemo) * dump.RecordCount,
             "every memo field of every record is asserted");
         nonEmpty.Should().BeGreaterThan(0, "a table with no non-empty memo would prove nothing");
+    }
+
+    [Fact]
+    public void TheCompressedTable_HoldsEntriesTheReferenceStoredBothWays()
+    {
+        // Without this the gate above could pass over a table where compression was never taken,
+        // and the decompressor would be proved by nothing. The reference's own listing says which
+        // entries it compressed: the ones longer than a block, and only those.
+        CorpusMemoDump stored = CorpusMemoDump.Load("CMPMEMO");
+        CorpusDump dump = CorpusDump.Load("CMPMEMO");
+
+        stored.Entries.Count(e => e.Type == MemoType.Compressed).Should().BeGreaterThan(0);
+        stored.Entries.Count(e => e.Block > 0 && e.Type == MemoType.Text).Should().BeGreaterThan(0);
+
+        foreach (DumpMemoEntry entry in stored.Entries.Where(e => e.Block > 0))
+        {
+            long length = dump.Records.Single(r => r.Number == entry.Record)[entry.Field].MemoLength!.Value;
+            entry.Type.Should().Be(
+                length > 512 ? MemoType.Compressed : MemoType.Text,
+                "record {0} {1} holds {2} bytes against a 512-byte block", entry.Record, entry.Field, length);
+        }
     }
 
     [Fact]

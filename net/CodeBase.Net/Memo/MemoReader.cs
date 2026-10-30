@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.IO.Compression;
 using CodeBase.Net.IO;
 
 namespace CodeBase.Net.Memo;
@@ -12,7 +14,10 @@ namespace CodeBase.Net.Memo;
 /// its payload, contiguous, however many block boundaries that crosses. Blocks matter for finding
 /// an entry and for allocating one, and allocation belongs to the write path.
 ///
-/// Governing specification: FPT-MEMO.md section 3.6.
+/// A compressed entry, which only CodeBase writes, is decompressed here, so every caller sees the
+/// payload the writer was given.
+///
+/// Governing specification: FPT-MEMO.md sections 3.6 and 3.9.
 /// </summary>
 internal sealed class MemoReader
 {
@@ -35,9 +40,13 @@ internal sealed class MemoReader
     /// </remarks>
     private const uint LengthWorthAsking = 64 * 1024;
 
+    /// <summary>
+    /// The bytes a compressed entry spends on its uncompressed length, ahead of the zlib stream.
+    /// </summary>
+    private const int CompressedLengthSize = 4;
+
     private readonly IRandomAccessSource source;
     private readonly int blockSize;
-    private readonly bool mayHaveCompressedMemos;
 
     /// <summary>
     /// Initializes a new instance over an open memo file.
@@ -47,15 +56,10 @@ internal sealed class MemoReader
     /// Bytes per block, from the file header. Zero is legal and means byte granularity rather than
     /// an error.
     /// </param>
-    /// <param name="mayHaveCompressedMemos">
-    /// Whether the table was created with the compressed-memo extension enabled, so that meeting a
-    /// compressed entry can be explained rather than merely refused.
-    /// </param>
-    public MemoReader(IRandomAccessSource source, int blockSize, bool mayHaveCompressedMemos)
+    public MemoReader(IRandomAccessSource source, int blockSize)
     {
         this.source = source;
         this.blockSize = blockSize;
-        this.mayHaveCompressedMemos = mayHaveCompressedMemos;
     }
 
     /// <summary>
@@ -79,9 +83,12 @@ internal sealed class MemoReader
     /// </summary>
     /// <param name="blockNumber">The block, or zero where the record has no memo.</param>
     /// <param name="what">What is being read, for the message if it cannot be.</param>
-    /// <returns>The entry, or an absent one where the block number says there is none.</returns>
+    /// <returns>
+    /// The entry, or an absent one where the block number says there is none. A compressed entry is
+    /// returned decompressed, still reporting its type as compressed.
+    /// </returns>
     /// <exception cref="CodeBaseException">
-    /// The entry lies outside the file, declares an impossible length, or is compressed.
+    /// The entry lies outside the file, declares an impossible length, or is compressed and damaged.
     /// </exception>
     public MemoEntry Read(int blockNumber, string what)
     {
@@ -95,19 +102,6 @@ internal sealed class MemoReader
         // field access (ADR-35, and results-length-syscall.txt section 7 for what it cost here). The
         // header is a fixed few bytes, so nothing is sized from the file before the read.
         MemoBlockHeader header = MemoBlockHeader.Parse(ReadBlockHeader(offset, blockNumber));
-
-        if (header.Type == MemoType.Compressed)
-        {
-            throw new CodeBaseException(
-                ErrorCode.NotSupported,
-                $"{what} is a compressed memo, at block {blockNumber}. Compressed entries are a " +
-                "CodeBase extension that Visual FoxPro cannot read, and this library does not read " +
-                "them yet: no file it can generate contains one, so a decoder for them could not be " +
-                "checked against the reference implementation. " +
-                (mayHaveCompressedMemos
-                    ? "The table was created with compressed memos enabled, so others are likely."
-                    : "The table does not declare compressed memos, so this entry is unexpected."));
-        }
 
         // Unlike the header, the payload's size comes out of the file and sizes an allocation, so it
         // cannot simply be left to the read: a corrupt header claiming half a gigabyte would have the
@@ -129,7 +123,88 @@ internal sealed class MemoReader
             ? []
             : ReadPayload(offset + MemoBlockHeader.Size, (int)header.Length, blockNumber);
 
+        // The reference decompresses whatever says it is compressed, whether or not the table declares
+        // the extension (m4file.c:207, 268-282), and keeps reporting the type as stored (m4file.c:256).
+        if (header.Type == MemoType.Compressed)
+            payload = Decompress(payload, blockNumber, what);
+
         return new MemoEntry(header.Type, payload);
+    }
+
+    /// <summary>
+    /// Decompresses the payload of a compressed entry.
+    /// </summary>
+    /// <param name="stored">
+    /// The payload as stored: the uncompressed length as a 4-byte little-endian integer, then a zlib
+    /// stream (C4CODE.C:402-444).
+    /// </param>
+    /// <param name="blockNumber">Which block, for the message when it is damaged.</param>
+    /// <param name="what">What is being read, for the message when it is damaged.</param>
+    /// <returns>The uncompressed payload, exactly as long as the entry says.</returns>
+    /// <exception cref="CodeBaseException">
+    /// The entry is too short, declares an impossible length, is not a zlib stream, or does not
+    /// decompress to exactly the length it declares.
+    /// </exception>
+    private static byte[] Decompress(byte[] stored, int blockNumber, string what)
+    {
+        // The reference ignores what uncompress() returns (m4file.c:281), so a damaged entry would come
+        // back as a buffer of whatever had been written into it. A wrong memo that reads as a right one
+        // is the worst outcome available here; every way the entry can disagree with itself is refused.
+        string where = $"{what} is a compressed memo at block {blockNumber}";
+
+        if (stored.Length < CompressedLengthSize + 2)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"{where}, but its {stored.Length} bytes cannot hold a length and a zlib stream.");
+        }
+
+        uint declared = BinaryPrimitives.ReadUInt32LittleEndian(stored);
+        if (declared > MaximumLength)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"{where} declaring {declared} bytes, more than any memo entry can hold.");
+        }
+
+        // The zlib header: deflate with a window the format allows, and a check value that makes the
+        // two bytes a multiple of 31 (RFC 1950 section 2.2). An entry from a CodeBase built with QuickLZ
+        // carries the same type and the same length prefix, and fails here instead of inflating to
+        // noise.
+        byte method = stored[CompressedLengthSize];
+        byte flags = stored[CompressedLengthSize + 1];
+        if ((method & 0x0F) != 8 || (method >> 4) > 7 || ((method << 8) | flags) % 31 != 0)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"{where}, but its data is not a zlib stream. It may have been written by a CodeBase " +
+                "built with a different compression library.");
+        }
+
+        byte[] payload = new byte[declared];
+        try
+        {
+            using MemoryStream compressed = new(
+                stored, CompressedLengthSize, stored.Length - CompressedLengthSize, writable: false);
+            using ZLibStream inflater = new(compressed, CompressionMode.Decompress);
+
+            int got = inflater.ReadAtLeast(payload, payload.Length, throwOnEndOfStream: false);
+
+            // Reading one byte past the declared length is what reaches the end of the stream, and so
+            // what has the trailing Adler-32 checked.
+            if (got == payload.Length && inflater.ReadByte() < 0)
+                return payload;
+
+            throw new CodeBaseException(
+                ErrorCode.Data,
+                $"{where} declaring {declared} bytes, but its data " +
+                (got < payload.Length ? $"ends after {got}." : "holds more."));
+        }
+        catch (InvalidDataException failure)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Data, $"{where}, and its data is damaged: {failure.Message}", failure);
+        }
     }
 
     /// <summary>

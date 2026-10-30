@@ -33,6 +33,7 @@ turns out to be untested, add a generator case and regenerate.
 | `CDXEXPR.DBF` + `.cdx` + `.fpt` | `0x30` | **Index, expression keys.** 16 records and 22 tags, the corpus's first tags whose key is not a bare field. Ten are function *shapes* whose key rules differ (`UPPER`, `TRIM`, `SUBSTR`, both concat forms, `STR` over an int and over a numeric, `DTOS`, `DTOC`, `DESCEND`); five are one per result *type* a function can return (`VAL` → r4numDoub, `CTOD` → r4dateDoub, `EMPTY` → r4log, `K_FLT*1` → r4floatBin, `DATETIME` → r4dateTime); five are the types **no function returns** and so can only be bare fields (`N`, `D`, `I`, `Y`, `T`); one is over a nullable field, for the leading `0x80` indicator; one carries a `FOR` filter using `.AND.`, `$` and a function. It is also the only table with an `H` field, which `d4create` forces to 4 bytes. |
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **Index, collation.** cp1252, one `C(20)` field indexed twice — machine (`keyLen` 20, pad `0x20`) and `GENERAL` (`keyLen` 40, pad `0x00`) — over accented text and the `œ`/`ß`/`þ` expansions. See below. |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
+| `CMPMEMO.DBF` + `.fpt` | `0x31` | **Compressed memo entries**, a CodeBase extension Visual FoxPro cannot read. Created with `code4memoCompress` on, so the header carries `flags[1] = 1`; every entry longer than one block is stored as type 3 — a 4-byte length, then a zlib stream. Its `CMPMEMO.memo.dump.txt` says which. See below. |
 
 ## Benchmark data — `benchmark/`
 
@@ -99,7 +100,22 @@ swept into every data-driven golden test. The gates that want these name them.
 
 The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
-records, and a wide key needs fewer of them.
+records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters.
+
+### What `CMPMEMO` pins down
+
+The compression rule and the stored layout, from the reference writing them. Payload lengths are 0,
+1, 511, **512** and **513** — the block size, which stays type 1, and one past it, the first type 3 —
+then 4096 and 66000 (whose length prefix needs 17 bits) of compressible text, and pseudo-random
+binary that **grows** when compressed and is stored as type 3 anyway (513 bytes stored as 528).
+
+The ordinary dump records every memo **decompressed**, because that is what a reader sees, so it
+cannot say how an entry was stored. `CMPMEMO.memo.dump.txt` can: the generator reads each entry back
+through `memo4fileReadPart` with decompression off and writes one line per memo field per record —
+`rec 5 NOTES block=10 type=3 stored=69` — the block, the type on disk and the length on disk. A
+record with no memo shows `block=0 type=0 stored=0`. Only this table has one.
+
+`CMPMEMO.fpt`'s compressed bytes are what zlib 1.3.1 produced; see the generator README.
 
 `CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME` and `IDXONE` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own

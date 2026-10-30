@@ -13,7 +13,8 @@ test CodeBase.NET. Run it only when the corpus needs new cases.
 - Windows with **MSVC** (Visual Studio 2019 or later — verified on 19.51).
 - The `original/source/` tree in this repository (read-only; never modified).
 
-Nothing else. No zlib, no Windows SDK OLE-DB headers, no 32-bit-only SDK.
+Nothing else. No Windows SDK OLE-DB headers, no 32-bit-only SDK. zlib is vendored
+(below), so it needs no install.
 
 ## Usage
 
@@ -72,10 +73,12 @@ test-files-generator/
 │  ├─ case-cdxdeep.cpp
 │  ├─ case-cdxcoll.cpp
 │  ├─ case-idxone.cpp
+│  ├─ case-cmpmemo.cpp
 │  ├─ util.h/.cpp      shared: error reporting, byte-run assignment, frozen date
 │  │                   stamp, close+dump tail, byte escaping
 │  ├─ dump.h/.cpp      shared: the <NAME>.dump.txt writer
 │  └─ dump-index.h/.cpp shared: the <NAME>.cdx.dump.txt writer
+├─ third_party/zlib/   zlib 1.3.1, compiled into codebase.lib (see below)
 ├─ obj/                intermediates + per-file compile logs   [gitignored]
 ├─ bin/                testgen.exe, and bin\out\ default output [gitignored]
 └─ vfp/                the VFP 9 oracle — a different engine, see below
@@ -117,6 +120,9 @@ rot. Hence `/TP`.
 for a DLL build with WinSock and zlib. Rather than patch it, `src/cb-config.h`
 is force-included ahead of everything (`cl /FI`) and defines the `D4ALL_INC`
 guard itself, so the shipped header expands to nothing and our switches win.
+That also bypasses the block of `D4all.h` that picks a compression library, so
+`cb-config.h` names `S4COMPRESS_ZLIB` itself; without one, `d4defs.h:556-557`
+stops the build with `#error`.
 
 **3. Build x86, not x64.** The library writes native structs to disk. The x86
 build is clean; the x64 (`S464BIT`) path has unresolved rot in the 64-bit
@@ -127,6 +133,27 @@ Four source files are excluded from the build — `c4long.c`, `COLL4ARR.C` and
 `e4str2.c` are `#include`d by other translation units rather than compiled
 standalone, and `M4MEM2.C` is OLE-DB-only (its whole body is `#ifdef
 OLEDB5BUILD`, and it needs `defs5.hpp`, which is absent from this source drop).
+
+## zlib
+
+CodeBase's compressed memo entries call zlib's `compress2`/`uncompress`, and the
+drop ships only zlib's headers, at version 1.1.4. `third_party/zlib/` holds
+**zlib 1.3.1**, from the `madler/zlib` v1.3.1 release tarball (SHA-256
+`9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23`, the value
+zlib.net publishes), reduced to the core library: the ten `.c` files that
+compression and decompression need, their headers, `LICENSE` and `README`. No
+`gz*.c`, `infback.c`, build files or `contrib`. zlib's licence is permissive and
+GPL-compatible.
+
+`build-lib.bat` compiles it as C (`/TC`, without `cb-config.h`) into
+`obj\zlib\` and archives it into `codebase.lib`, and puts its include path
+**ahead of** `original\source`, so the library compiles against the headers of
+the zlib it links rather than the drop's older ones.
+
+**The version is part of the corpus.** `CMPMEMO.fpt` holds what this zlib's
+deflate produced; another version may compress the same text differently. The
+dumps record memos decompressed, so they would not move — only the `.fpt` would.
+Switching compression on moved no byte of any other case (verified 2026-10-29).
 
 ## Determinism
 
@@ -159,6 +186,7 @@ and its own subdirectory.
 | `CDXEXPR.DBF` | `0x30` | the expression case: 16 records, 22 tags, and the only `H` field in the corpus. Its records supply what a literal cannot say — the field-loader-only types and a null — because the function semantics are recorded over constants instead. Beside the usual dumps it writes `CDXEXPR.expr.dump.txt` (node arrays, constant and field values, rejections) through `dump-expr.cpp`, and `FUNCTIONS.dump.txt` is written once from `main.cpp`. **Its expression lists are sized by function-table row coverage**: 144 of the 193 rows are reached by some expression and the remaining 49 are unreachable by construction, so adding a case here is how an uncovered row gets covered. Adding one changes only the expression dump — every other file regenerates byte-identical. Since step 011 it also carries **54 query filters** through `dump-query.cpp` |
 | `CDXCOLL.DBF` | `0x30` | the collation case: cp1252, one `C(20)` field indexed both machine and `GENERAL`, so `keyLen` 20 and 40 and pad bytes `0x20` and `0x00` sit in one file |
 | `IDXONE.DBF` | `0x30` | the single-tag case: a one-tag `.cdx` plus the `.IDX` derived from it, verified by walking both — see below |
+| `CMPMEMO.DBF` | `0x31` | compressed memo entries: created with `code4memoCompress` on, so `flags[1] = 1`. 8 records; payloads of 0, 1, 511, **512** (the block size, stays type 1), **513** (first compressed), 4096, 66000 (a 17-bit length prefix), and pseudo-random binary that grows when compressed and is stored as type 3 anyway. Beside the usual dump it writes `CMPMEMO.memo.dump.txt`: each entry read back with decompression off — its block, stored type and stored length |
 
 One case is not a corpus case at all:
 
@@ -172,7 +200,8 @@ deliberate and the case file says why.
 
 Verified on the generated bytes: `headerLen` = 32 + n×32 + 1 (+263 for `0x30`);
 the 263 reserved bytes all zero; `flags[8]` and `autoIncrementVal` zero, so the
-VFP files have genuine-VFP shape with no CodeBase extensions; no trailing
+VFP files have genuine-VFP shape with no CodeBase extensions (except `CMPMEMO`,
+which exists to carry one); no trailing
 `0x1A`; FPT header `blockSize` = 512 big-endian, matching the specs.
 
 Genuine dBase III memo (version `0x83` + `.DBT`) is **not** producible here — it

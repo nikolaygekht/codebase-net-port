@@ -12,12 +12,20 @@ namespace CodeBase.Net;
 /// An engine owns every table it opens, so closing the engine closes them all. A caller that keeps
 /// one in a using statement cannot leak a file handle by forgetting a table, and one that wants a
 /// table closed sooner can close it directly.
+///
+/// Tables of one engine may be opened, used and closed on different threads at the same time; the
+/// engine keeps its own bookkeeping consistent. A single table is not: no two operations may run on
+/// one table at once, and serialising them is the caller's. See ADR-41.
 /// </summary>
 public sealed class CodeBaseEngine : IDisposable
 {
     private readonly DbfOpener opener;
     private readonly CachingSourceFactory sources;
     private readonly List<Table> open = [];
+
+    // Tables of one engine may be opened and closed from different threads at once (ADR-41), so the
+    // list and the closed flag are touched only under this.
+    private readonly object gate = new();
     private bool closed;
 
     /// <summary>
@@ -111,7 +119,20 @@ public sealed class CodeBaseEngine : IDisposable
     /// <summary>
     /// Gets the tables this engine currently has open.
     /// </summary>
-    public IReadOnlyList<Table> OpenTables => open;
+    /// <value>
+    /// A snapshot, taken when the property is read: tables opened or closed afterwards, on this thread
+    /// or another, do not appear in it or vanish from it.
+    /// </value>
+    public IReadOnlyList<Table> OpenTables
+    {
+        get
+        {
+            lock (gate)
+            {
+                return [.. open];
+            }
+        }
+    }
 
     /// <summary>
     /// Opens a table, and the memo file accompanying it if its header declares one.
@@ -120,16 +141,31 @@ public sealed class CodeBaseEngine : IDisposable
     /// <returns>The open table, which this engine also owns.</returns>
     /// <exception cref="CodeBaseException">
     /// The file contradicts itself or its own length, names a field type this library cannot read,
-    /// or declares a memo file that is not beside it.
+    /// declares a memo file that is not beside it, or holds data compressed by CodeBase, which this
+    /// library does not support.
     /// </exception>
     /// <exception cref="ObjectDisposedException">The engine has been closed.</exception>
     public Table OpenTable(string path)
     {
-        ObjectDisposedException.ThrowIf(closed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref closed), this);
 
+        // Opened outside the lock: reading a header is file I/O, and one slow open must not hold up
+        // every other thread's open and close.
         Table table = new(path, opener.Open(path), DefaultEncoding, ExpressionOptions, QueryTagScope, Forget);
-        open.Add(table);
-        return table;
+
+        lock (gate)
+        {
+            if (!closed)
+            {
+                open.Add(table);
+                return table;
+            }
+        }
+
+        // The engine was closed while this table was being opened. Its Dispose has already taken its
+        // list, so this table would never be closed by it; close it here and refuse.
+        table.Dispose();
+        throw new ObjectDisposedException(GetType().FullName);
     }
 
     /// <summary>
@@ -148,7 +184,7 @@ public sealed class CodeBaseEngine : IDisposable
     /// </remarks>
     public int DropCachedBlocks()
     {
-        ObjectDisposedException.ThrowIf(closed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref closed), this);
 
         return sources.InvalidateAll();
     }
@@ -158,20 +194,31 @@ public sealed class CodeBaseEngine : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (closed)
-            return;
+        Table[] closing;
 
-        closed = true;
+        lock (gate)
+        {
+            if (closed)
+                return;
 
-        // Over a copy: closing a table asks the engine to forget it, which changes the list.
-        foreach (Table table in open.ToArray())
+            closed = true;
+            closing = [.. open];
+            open.Clear();
+        }
+
+        // Outside the lock: closing a table calls back into Forget, and a table's close is file I/O.
+        foreach (Table table in closing)
             table.Dispose();
-
-        open.Clear();
     }
 
     /// <summary>
     /// Stops tracking a table that has closed itself.
     /// </summary>
-    private void Forget(Table table) => open.Remove(table);
+    private void Forget(Table table)
+    {
+        lock (gate)
+        {
+            open.Remove(table);
+        }
+    }
 }

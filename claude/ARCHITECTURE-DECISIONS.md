@@ -511,7 +511,7 @@ bug that no test in this repository would catch, because the corpus pads with sp
 documentation gains the warning. If a `GetTrimmedString` is added later it must trim `' '` only, and
 this entry is the reason.
 
-## ADR-23 — Compressed memo entries are refused until the corpus can gate them · open
+## ADR-23 — Compressed memo entries are refused until the corpus can gate them · superseded by ADR-55
 
 **Context.** An FPT entry declares a type; type 3 means the payload is compressed. It is a CodeBase
 extension — `code4memoCompress`'s own comment says "note that those memo files are then incompatible
@@ -1256,7 +1256,7 @@ points at a **missing mechanism** — scan resistance, and read-ahead for sequen
 against faithful still needs the second implementation *and* a workload larger than a realistic pool; a
 small pool over a small file is not that.
 
-## ADR-40 — The speed-up itself is gated, at 2×, and on read counts wherever a clock cannot carry it · accepted
+## ADR-40 — The speed-up itself is gated, at 2×, and on read counts wherever a clock cannot carry it · accepted (amended by ADR-57)
 
 **Context.** Every other gate in step 009 passes on a cache that is perfectly correct and **never
 hits** — and so does a machine on which syscalls have become cheap enough that the whole optimization
@@ -1907,3 +1907,156 @@ returning fewer records than the filter names is what a caller wanted.
 constant. `QUERY-OPTIMIZER.md` §3.4 and §11.1 are corrected. `CDXCOLL` joins the equivalence gate,
 where it is the only table that can witness this, and it needs no generator run because its
 expectation is a scan.
+
+## ADR-55 — Compressed memo entries are read, decompressed, and refused when damaged · accepted
+
+**Date.** 2026-10-29. **Supersedes [ADR-23](#adr-23).**
+
+**Context.** ADR-23 refused type-3 entries because no corpus case could gate a decoder, and named
+what would close it: zlib in the generator and a case with `code4memoCompress` on. Step 012 did that.
+It also found ADR-23's premise half wrong: the wrapper did not need reconstructing. `c4compress` and
+`c4uncompress` are in the drop (`C4CODE.C:400-470`, under `#ifdef S4COMPRESS`), and `FPT-MEMO.md`
+§3.9's "bodies are not in this source drop" was a misreading.
+
+**What the reference does, read and now witnessed.** Turning compression on at create makes the
+table version `0x31` with `flags[1] = 1` (D4CREATE.C:1351-1355, 1424-1433). From then on an entry is
+compressed when its payload is **longer than one block** (`m4file.c:744`), with no "only if
+smaller": `CMPMEMO`'s 513 pseudo-random bytes are stored as 528. The payload is the uncompressed
+length as a native `long` — little-endian on every Windows build — then a `compress2` stream at level
+9 (`C4CODE.C:1560`), which is RFC 1950 zlib. Reading decompresses whatever says it is type 3, whether
+or not the table declares the extension, ignores what `uncompress()` returns, and keeps reporting the
+type as 3 (`m4file.c:207, 256, 268-282`).
+
+**Decision.**
+
+- **Read and decompress.** `MemoReader` inflates type 3 with the BCL's `ZLibStream` — no dependency,
+  ADR-17 untouched — and every accessor sees the payload the writer was given. `GetMemoType` still
+  answers `Compressed`, as the reference does.
+- **Decompress regardless of the table's flag**, as the reference does. The flag no longer changes
+  anything on the read path, so `MemoReader` stops taking it; `FeatureFlags.MayHaveCompressedMemos`
+  stays, as a header fact.
+- **Refuse every way the entry can disagree with itself**: too short for a prefix and a stream, a
+  prefix above the reference's own `0x7FFFFFF0` guard (checked before allocating), a zlib header
+  whose method or check value is wrong, a stream that ends before the declared length or runs past
+  it, and a wrong Adler-32 trailer.
+
+**Rejected — ignoring the result of the inflate, as the reference does.** It would hand back a
+buffer of whatever had been written into it, and a wrong memo that reads as a right one is the worst
+outcome a reader has. This is a divergence only on damaged files; on every entry the reference
+writes, the two answers are the same bytes.
+
+**Why the zlib header check matters.** A CodeBase built with `S4COMPRESS_QUICKLZ` (D4all.h:126)
+writes the same type and the same prefix with a different algorithm. Without the header check its
+entries would inflate to noise or to an exception from deep in the inflater; with it they are refused
+with a message that names the likely cause.
+
+**Corpus consequence.** The generator vendors **zlib 1.3.1** (`test-files-generator/third_party/zlib/`),
+whose headers precede the drop's 1.1.4 ones. `CMPMEMO.fpt`'s compressed bytes are that version's
+output; another zlib may compress differently, which would move `.fpt` bytes and never the dumps, since
+the dump records memos decompressed. Turning `S4COMPRESS` on moved **no** byte of any other case.
+
+**Not decided here — writing.** The port is read-only. When it writes, a compressed entry cannot be
+byte-identical to the reference's unless it deflates exactly as zlib does, which .NET's deflate does
+not promise; that is a question for the write path, not a reason to refuse reading.
+
+## ADR-56 — Tables with compressed data are refused at open, and not supported · accepted
+
+**Date.** 2026-10-29. Decided by the user.
+
+**Context.** A version `0x31` table with `flags[2] = 1` stores its records compressed: CodeBase's
+whole-file compression, written by `d4compress` or by creating with `compressedData` on. The header
+is followed by an offset table in one of three formats, then the records in compressed blocks
+(D4OPEN.C:2760 onward; `d4compress` output is opened read-only even by CodeBase). The port parsed the
+flag into `FeatureFlags.HasCompressedData` and then ignored it, so such a table opened as though it
+were plain and its compressed bytes would have been read as field values — found while closing
+ADR-23.
+
+**Decision.** **Not supported, and refused at open** with `NotSupported`, before the file length is
+checked, since a compressed file is shorter than its records and that refusal would blame corruption.
+The refusal applies only to `0x31`: the C library reads the flags on no other version
+(D4OPEN.C:2152-2196), so a stray byte in a plain table is not a declaration.
+
+**Why not support it.** It is a CodeBase-only extension that Visual FoxPro cannot read, switched on
+explicitly and rarely; it is a storage layer of its own rather than an encoding of a field; and
+writing it byte-identically would need zlib's exact output. Unlike compressed memo entries (ADR-55),
+which sit inside an ordinary file and decompress in a few lines, it would reshape how every byte of
+the table is located.
+
+**If it is ever wanted.** A post-v1 capability. The generator already builds with `S4COMPRESS`, so a
+corpus case is possible, and the port has the seam: a decompressing `IRandomAccessSource` beneath
+the record reader would leave everything above it unchanged.
+
+## ADR-57 — The suite is run in Release, and the timed gates skip themselves in Debug · accepted
+
+**Date.** 2026-10-29. Amends [ADR-40](#adr-40): its floor stands, its evidence did not.
+
+**Context.** `BlockCacheSpeedupTests.TheCacheMakesAWalkAtLeastTwiceAsFast` failed once in a full
+native-Windows run. Measured on this machine, 1000-record passes: a cached tag walk is **2.35×**
+faster than an uncached one in Debug and **~10×** in Release; Go+Skip 4.8× and ~17×. The same harness
+against a worktree at step 009's close gives the same figures, so nothing regressed. ADR-40's support
+for the timed walk, "7.4x Release, 11.6x Debug", was half wrong: 11.6× was the seek prediction
+carried onto the wrong line, and no Debug walk had been measured. While the suite ran under WSL
+through `/mnt/d` an uncached read cost ~170 µs, which hid the gap.
+
+**Why Debug was the default.** Nobody chose it: `dotnet test` with no `-c` builds Debug, and the
+documented command had none. Nothing depends on it — the library and tests hold no `Debug.Assert`
+and no `#if DEBUG`.
+
+**Decision.**
+
+- **The suite is run with `-c Release`**, as documented in `FOR-DEVELOPERS.md`: it tests the build
+  users get, and it is the build the timed gates were designed against.
+- **The two timed assertions skip themselves** when the library carries a `DebuggableAttribute` with
+  the JIT optimizer disabled, with a message saying to run in Release. The read-count gates are exact
+  in any build and always run. **The 2× floor is not lowered.**
+- `sonar.bat` stays on Debug, where inlining does not blur line coverage; the timed tests skip there
+  and contribute no coverage worth having.
+- **The timed tests run alone**, in an xUnit collection with parallelization disabled, which runs
+  after the parallel collections have finished. Release alone was not enough: in a full parallel run
+  Go+Skip once measured 1.91×, against ~4–17× by itself. With the collection, eight consecutive full
+  Release runs passed. (The two test assemblies still run side by side; that has not shown up.)
+
+**Rejected — making Release the default through `Directory.Build.props`.** It would make a plain
+`dotnet test` do the right thing, at the cost of an IDE debugging session that silently runs
+optimized code. Documenting the flag and making the one sensitive test refuse to mislead is enough.
+
+**Rejected — lowering the floor or adding a Debug-specific floor.** A floor tuned to fit the build
+measures the build. The timed gate exists for one signal — syscalls becoming cheap enough that the
+cache stops paying — and only optimized code can show it.
+
+**Seen, not decided.** In Release inside the xUnit host, cached Go+Skip sometimes measured 431 µs
+against 100 µs standalone: the 300 ms wall-clock warm-up does not always reach tier-1 code there.
+Alone, the ratio still clears the floor several times over; under the suite's own load it did not,
+which is why the timed tests now run alone.
+
+## ADR-58 — `Seek` takes the exact type: text is sought only in a character tag · accepted
+
+**Date.** 2026-10-29. Decided in step 009's review of the defect; recorded here because it is a public
+contract. Closes [`009-performance-audit/DEFECT-seek-string-on-a-non-character-tag.md`](dev/009-performance-audit/DEFECT-seek-string-on-a-non-character-tag.md).
+
+**Context.** The typed overloads — `Seek(double)`, `Seek(int)`, `Seek(DateOnly)` and their
+`SeekAtOrAfter`/`SeekAtOrBefore` siblings — already refused a tag of another kind. The text overloads
+did not: on any tag that was not character they handed the caller's text to the code that builds a key
+from a **record's stored bytes**. On a numeric tag unparseable text reads as zero, so the seek went to
+the key for zero and reported Ok or NoRecord — a plausible wrong answer. Double, integer, currency,
+date and datetime tags threw `ArgumentOutOfRangeException` or built garbage keys, depending on the
+text's length.
+
+**Decision.** `Seek(string)`, `SeekPrefix`, `SeekAtOrAfter(string)` and `SeekAtOrBefore(string)` take
+**character tags only**, machine or collated. Any other kind is refused with `CodeBaseException`
+(`Info`) naming the tag, its key kind and the overload that would have worked, **before** the tag's
+search buffer is written, so the cursor does not move and a typed search already running survives.
+
+**Consequence, accepted.** Currency, datetime, single-float and logical tags have no seek by value at
+all for now: they have no typed overload, and text is no longer a back door into them (it never
+worked). Adding `Seek(decimal)` and `Seek(DateTime)` is ordinary work when a caller needs it.
+
+**Rejected — parsing the text into the tag's type.** Which text means which number or date is a
+culture question (`1,5`, `01/02/03`) the library would have to answer for every caller, and the
+reference's own conversion, `c4atod`, is not in the drop to copy. A caller who wants conversion writes
+it, or uses an extension method outside the library's contract.
+
+**Witness.** `SeekTypeGoldenTests` points every text overload at every one of the corpus's 41 tags and
+takes the expected kind from the reference — the field's type in the table dump, the compiled type in
+the expression dump, or the function table's return type for the one expression neither lists.
+Restoring the old branch reddens exactly the 19 tags whose keys are not character.

@@ -1,8 +1,12 @@
 # Project state
 
-**Updated:** 2026-09-04 · **the tree is clean and pushed.** The last commit is this file saying so;
-the one before it fixes an `EXPR` gap step 011 exposed — a field may be qualified by the table's own
-name. **Before it, step 011
+**Updated:** 2026-10-29 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed
+locally and not pushed.** Development moved to native Windows; the generator builds there, now with
+zlib, and regenerated the corpus byte-identical. Done in 012 so far: compressed memo entries read
+(ADR-55), compressed-data tables refused at open (ADR-56), `Seek` by text only on character tags
+(ADR-58), a race in the engine's table list fixed, and the suite run in Release with the timed gates
+alone (ADR-57). Record: [`claude/dev/012-p1-tails/STATE.md`](claude/dev/012-p1-tails/STATE.md).
+**Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
 tests** (801 golden, 2461 unit), up from 1909 at the start of the step, and **no existing corpus file
@@ -224,8 +228,8 @@ counts, so the bit-packing is checked as an encoding and not only through the ke
 adds **206 recorded search cases, 104 seek-next runs and 3364 exact-pair assertions**, plus properties for
 the three operations the C library does not have. Navigating a table by index adds **3364 records reached
 through 18 tags, with every field of every one checked against that record's own dump** — through both
-surfaces, in both directions. The one refusal is a **compressed memo entry**, which no corpus case can gate
-yet (ADR-23, open).
+surfaces, in both directions. **Compressed memo entries** are read too, since step 012, gated by
+`CMPMEMO` (ADR-55, superseding ADR-23).
 
 **`test-files-generator/`** builds and runs end to end (Windows/MSVC):
 
@@ -288,7 +292,21 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-09-04), the ones before it, and the four before those
+## 2. This session (2026-10-29), the ones before it, and the four before those
+
+**Step 012 opened as `012-p1-tails`** — the P1 capabilities' owed tails in one folder, one generator
+trip — and the counted query comparison moved to 013. Development moved from WSL to native Windows.
+Done, each with a mutation check: the generator rebuilt with VS 2026 and zlib 1.3.1 vendored
+(regeneration byte-identical, `.gitattributes` keeps `.bat` files CRLF so `cmd.exe` parses them);
+case `CMPMEMO` and the port reading type-3 memo entries (ADR-55, superseding ADR-23); compressed-data
+tables refused at open (ADR-56); `Seek` by text refused on every non-character tag (ADR-58), with
+`FoxNumeric`'s first layer-1 tests; `CodeBaseEngine`'s table list made thread-safe (it tore under
+concurrent open/close); the suite documented as `-c Release`, the clock gates skipping in Debug and
+running in their own non-parallel collection (ADR-57 — the "11.6× Debug" behind ADR-40 was never a
+measurement). Remaining in 012: the query refusals' witnesses, null operands, the tag-context parse,
+case mapping by code page, and close. Tests: 2493 unit, 873 golden.
+
+### Before it (2026-09-04)
 
 **Step 011 closed and `QUERY` is done** — the record is
 [`SUMMARY.md`](claude/dev/011-query-optimizer/SUMMARY.md), and §1 above says what a caller can now
@@ -869,7 +887,13 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ## 3. Next
 
-### Step 012 — how much work does a query cost the reference? (tomorrow)
+### Finish step 012 — `claude/dev/012-p1-tails/`
+
+Sub-steps 3–6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `CDXCOLL`'s query dump and
+case `QRYGATE` for the query refusals; `.NOT.` over null and the double evaluation; the tag-context
+parse; `UPPER`/`LOWER` by the table's code page; then close.
+
+### Step 013 — how much work does a query cost the reference?
 
 **`QUERY`'s performance has never been compared against the C library.** Step 009 measured seek and
 walk — 1.36–1.43× slower per seek, **2.45× faster** on a walk — but it predates the optimizer, and its
@@ -929,12 +953,6 @@ retired. Owed: the **Windows ANSI upper-case mapping**, which no corpus table ca
 **second rejection pass with a real `TAG4FILE`**, without which `e4tagExpr` (−510) and the tag-only
 alias refusals stay unobservable. The alias gap that step 011 exposed is **fixed** — a field may now
 be qualified by the table's own name.
-
-### One thing that depends on nothing
-
-**Close ADR-23 if it is wanted.** Its own small step: add zlib to the generator, reconstruct the
-`c4compress` wrapper from the layout the reader pins down, add a case with `code4memoCompress` enabled
-and a payload longer than one block. The reader is then a few lines over `ZLibStream`.
 
 ### What step 009 left on the table
 

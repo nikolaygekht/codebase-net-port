@@ -1,5 +1,9 @@
 # Defect: `Seek(string)` on a tag whose keys are not character
 
+> **Fixed 2026-10-29** in step 012 (`012-p1-tails`, sub-step 2): the text overloads refuse every tag
+> whose keys are not character, and `FoxNumeric` has its layer-1 tests (items 1 and 2 below). Items 3
+> and 4 remain open. Decision: ADR-58.
+
 **Found 2026-08-21**, while writing sub-step 5's cached-vs-uncached equivalence test. Not a cache
 defect: it is present with the cache off, and the cache is what made me point a string seek at every
 tag of every corpus table for the first time.

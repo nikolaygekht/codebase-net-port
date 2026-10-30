@@ -115,7 +115,9 @@ internal sealed class TableTagCursor
     /// <param name="value">The value to look for, in its stored form.</param>
     /// <param name="prefix">Whether a short value stands for a prefix rather than a whole key.</param>
     /// <returns>The search.</returns>
-    /// <exception cref="CodeBaseException">The tag's keys cannot be built from a value.</exception>
+    /// <exception cref="CodeBaseException">
+    /// The tag's keys are not character, so text is not a value they can be searched for.
+    /// </exception>
     public KeySearch SearchFor(ReadOnlySpan<byte> value, bool prefix)
     {
         SeekConverter resolved = Converter;
@@ -158,10 +160,14 @@ internal sealed class TableTagCursor
                 break;
 
             default:
-                // Every other kind is a fixed-width number. There is no such thing as a prefix of
-                // one, so the flag does not apply and the whole key is always built.
-                length = RecordKey.WriteValue(resolved, value, into);
-                break;
+                // Text is not converted into a number, a date or a truth value. Read as a field's
+                // stored bytes it would seek a plausible wrong key — a numeric tag the key for zero —
+                // so it is refused before the buffer or the running search is touched. Seek takes
+                // the exact type (ADR-58).
+                throw new CodeBaseException(
+                    ErrorCode.Info,
+                    $"Tag '{tag.Name}' holds {resolved.Kind} keys, so it cannot be searched for text. " +
+                    TypedSeekFor(resolved.Kind));
         }
 
         active = KeySearch.Into(into, length, resolved.KeyLength, resolved.PadByte);
@@ -191,6 +197,19 @@ internal sealed class TableTagCursor
     /// <exception cref="CodeBaseException">This tag's keys are not dates.</exception>
     public KeySearch SearchForDate(DateOnly value) =>
         Numeric(KeyKind.Date, "a date", into => KeyTransform.FromDate(value, into));
+
+    /// <summary>
+    /// Names the seek a caller should have used for a tag of a kind that does not take text.
+    /// </summary>
+    /// <param name="kind">The tag's key kind.</param>
+    /// <returns>A sentence for the end of a refusal.</returns>
+    private static string TypedSeekFor(KeyKind kind) => kind switch
+    {
+        KeyKind.Double => "Seek it with a double.",
+        KeyKind.Int32 => "Seek it with an int.",
+        KeyKind.Date => "Seek it with a DateOnly.",
+        _ => "No seek by value is available for this kind of key yet.",
+    };
 
     private KeySearch Numeric(KeyKind expected, string what, Func<byte[], int> write)
     {

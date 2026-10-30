@@ -155,6 +155,38 @@ public sealed class DbfOpenerTests
         source.IsDisposed.Should().BeTrue();
     }
 
+    [Fact]
+    public void Open_AnExtendedTableDeclaringCompressedData_IsRefusedAsNotSupported()
+    {
+        // A real 0x31 header with flags[2] set: CodeBase's whole-file compression, which this library
+        // does not read. Refused before the length check, which would otherwise call it corrupt.
+        byte[] table = Corpus.ReadAllBytes("CMPMEMO.DBF");
+        table[0].Should().Be(DbfVersion.VisualFoxProExtended);
+        table[14] = 1;
+        FakeFileSystem files = new(
+            ("/data/CMPMEMO.DBF", table),
+            ("/data/CMPMEMO.fpt", Corpus.ReadAllBytes("CMPMEMO.fpt")));
+
+        CodeBaseException refusal = Rejection(files, "/data/CMPMEMO.DBF");
+
+        refusal.Code.Should().Be(ErrorCode.NotSupported);
+        refusal.Message.Should().Contain("compressed");
+        files.Sources.Should().OnlyContain(s => s.IsDisposed);
+    }
+
+    [Fact]
+    public void Open_APlainTableWithTheCompressedDataByteSet_OpensAsUsual()
+    {
+        // The C library reads the feature flags only on a 0x31 table, so the same byte in a plain
+        // Visual FoxPro table is noise rather than a declaration.
+        byte[] table = Corpus.ReadAllBytes("VFPTYPE.DBF");
+        table[0].Should().Be(DbfVersion.VisualFoxPro);
+        table[14] = 1;
+        FakeFileSystem files = new(("/data/VFPTYPE.DBF", table));
+
+        Open(files, "/data/VFPTYPE.DBF").Header.RecordCount.Should().Be(32);
+    }
+
     private static FakeFileSystem CorpusFileSystem() => new(
         (TablePath, Corpus.ReadAllBytes("VFPMEMO.DBF")),
         (MemoPath, Corpus.ReadAllBytes("VFPMEMO.fpt")));

@@ -91,10 +91,7 @@ public sealed class Table : IDisposable
 
         if (opened.Memo is not null && opened.MemoHeader is not null)
         {
-            memoReader = new MemoReader(
-                opened.Memo,
-                opened.MemoHeader.Value.BlockSize,
-                opened.Header.Flags.MayHaveCompressedMemos);
+            memoReader = new MemoReader(opened.Memo, opened.MemoHeader.Value.BlockSize);
         }
 
         // A table opens on no record at all, with a blank buffer rather than whatever the array
@@ -596,15 +593,14 @@ public sealed class Table : IDisposable
     }
 
     /// <summary>
-    /// Gives the cursor that follows a tag, refusing a tag this table cannot use.
-    /// </summary>
-    /// <summary>
     /// Moves to the record whose key is exactly a value, in the selected tag.
     /// </summary>
     /// <param name="value">The value to look for, as text.</param>
     /// <returns>Ok with the cursor on it, or NoRecord with the cursor on no record.</returns>
     /// <exception cref="CodeBaseException">
-    /// No tag is selected, or the selected tag's keys cannot be built from a value of this type.
+    /// No tag is selected, or the selected tag's keys are not character. Text is never converted: a
+    /// numeric, integer or date tag is sought through the overload of that type, and the cursor does
+    /// not move when the seek is refused.
     /// </exception>
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     /// <remarks>
@@ -1184,7 +1180,10 @@ public sealed class Table : IDisposable
     /// Gets the number of bytes in the memo a field of the current record refers to.
     /// </summary>
     /// <param name="field">The memo field to read.</param>
-    /// <returns>The payload length, or zero where the record has no memo in this field.</returns>
+    /// <returns>
+    /// The payload length, or zero where the record has no memo in this field. For a compressed entry
+    /// it is the length decompressed, not the length stored.
+    /// </returns>
     /// <exception cref="CodeBaseException">
     /// The field does not hold a memo reference, or the entry it names is unreadable.
     /// </exception>
@@ -1198,7 +1197,7 @@ public sealed class Table : IDisposable
     /// <returns>
     /// The payload, verbatim, or an empty array where the record has no memo in this field. An
     /// absent memo and an empty one are the same thing here because the format cannot tell them
-    /// apart.
+    /// apart. A compressed entry is returned decompressed.
     /// </returns>
     /// <exception cref="CodeBaseException">
     /// The field does not hold a memo reference, or the entry it names is unreadable.
@@ -1212,7 +1211,8 @@ public sealed class Table : IDisposable
     /// <param name="field">The memo field to read.</param>
     /// <returns>
     /// The declared type. A record with no memo answers text, which is what an empty memo would also
-    /// answer.
+    /// answer. A compressed entry answers compressed, although every other accessor gives its
+    /// payload decompressed.
     /// </returns>
     /// <exception cref="CodeBaseException">
     /// The field does not hold a memo reference, or the entry it names is unreadable.

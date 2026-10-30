@@ -5,8 +5,7 @@
  * --------------------
  * `original/source/` is read-only reference material and must never be
  * modified (see CLAUDE.md). But the shipped `D4all.h` is configured for a
- * Windows DLL build with WinSock and zlib compression, none of which we want
- * or can link.
+ * Windows DLL build with WinSock, neither of which we want.
  *
  * HOW THE OVERRIDE WORKS
  * ----------------------
@@ -52,8 +51,9 @@
 
 /* ---- Library reducing switches ----------------------------------------- */
 #define S4OFF_REPORT           /* report writer is out of scope */
-#define S4OFF_COMPRESS         /* [CHANGED] zlib is not shipped with the drop,
-                                * and compressed DBF/memo is out of scope */
+#define S4COMPRESS_ZLIB        /* zlib is vendored in third_party/zlib; D4all.h
+                                * picks it in the block this file bypasses, and
+                                * d4defs.h refuses to build without one */
 
 /* ---- FoxPro collating sequence support --------------------------------- */
 #define S4GENERAL              /* GENERAL collation (accents, expansions) */

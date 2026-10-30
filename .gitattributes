@@ -1,0 +1,4 @@
+# Batch files must be CRLF in the working tree: cmd.exe resolves call/goto targets by byte
+# offset assuming CRLF, and an LF-only script runs with its lines cut apart.
+*.bat text eol=crlf
+*.cmd text eol=crlf

@@ -1,0 +1,21 @@
+# CMPMEMO.fpt entries as stored: memo4fileReadPart with uncompress = 0
+# type 1 = text, 3 = compressed (4-byte length + zlib stream)
+blockSize 512
+
+[entries]
+rec 1 NOTES      block=0 type=0 stored=0
+rec 1 BINMEMO    block=0 type=0 stored=0
+rec 2 NOTES      block=1 type=1 stored=1
+rec 2 BINMEMO    block=2 type=1 stored=1
+rec 3 NOTES      block=3 type=1 stored=511
+rec 3 BINMEMO    block=5 type=1 stored=16
+rec 4 NOTES      block=6 type=1 stored=512
+rec 4 BINMEMO    block=8 type=1 stored=512
+rec 5 NOTES      block=10 type=3 stored=69
+rec 5 BINMEMO    block=11 type=3 stored=528
+rec 6 NOTES      block=13 type=3 stored=88
+rec 6 BINMEMO    block=14 type=3 stored=2015
+rec 7 NOTES      block=18 type=3 stored=274
+rec 7 BINMEMO    block=0 type=0 stored=0
+rec 8 NOTES      block=19 type=3 stored=71
+rec 8 BINMEMO    block=20 type=3 stored=288

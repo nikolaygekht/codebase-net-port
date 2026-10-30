@@ -24,7 +24,7 @@ public sealed class RecordGoldenTests
     {
         // Part of the gate rather than commentary: a data-driven suite that discovers nothing
         // reports success having proved nothing.
-        AllTables().Should().HaveCount(13);
+        AllTables().Should().HaveCount(14);
     }
 
     [Theory]
@@ -34,6 +34,7 @@ public sealed class RecordGoldenTests
         // Needs no decoder at all, and catches the failure that would otherwise look like a decoding
         // bug: reading one record too early or too late.
         CorpusDump expected = CorpusDump.Load(tableName);
+        CorpusMemoDump storedTypes = CorpusMemoDump.Load(tableName);
 
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf(expected.FileName));
@@ -93,6 +94,7 @@ public sealed class RecordGoldenTests
     public void EveryOrdinaryFieldOfEveryRecord_ReadsWhatTheCLibraryRead(string tableName)
     {
         CorpusDump expected = CorpusDump.Load(tableName);
+        CorpusMemoDump storedTypes = CorpusMemoDump.Load(tableName);
 
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf(expected.FileName));
@@ -108,7 +110,7 @@ public sealed class RecordGoldenTests
             {
                 FieldDefinition field = table.Fields[value.Name];
 
-                AssertField(table, field, value, record.Number);
+                AssertField(table, field, value, record.Number, storedTypes);
                 fieldsAsserted++;
             }
 
@@ -126,7 +128,8 @@ public sealed class RecordGoldenTests
     /// <summary>
     /// Asserts one field against everything the dump records for it.
     /// </summary>
-    private static void AssertField(Table table, FieldDefinition field, DumpValue value, int recordNumber)
+    private static void AssertField(
+        Table table, FieldDefinition field, DumpValue value, int recordNumber, CorpusMemoDump storedTypes)
     {
         string because = $"record {recordNumber} field {value.Name}";
 
@@ -142,7 +145,7 @@ public sealed class RecordGoldenTests
                  .Be(MemoReference.Read(value.Bytes), "{0} block number", because);
             table.GetMemoLength(field).Should().Be((int)value.MemoLength!.Value, "{0} length", because);
             table.GetMemoBytes(field).Should().Equal(value.MemoBytes!, "{0} payload", because);
-            table.GetMemoType(field).Should().Be(MemoType.Text, "{0} type", because);
+            table.GetMemoType(field).Should().Be(storedTypes.TypeOf(recordNumber, value.Name), "{0} type", because);
         }
 
         if (value.Number is double number)

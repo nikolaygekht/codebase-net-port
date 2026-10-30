@@ -57,9 +57,20 @@ real bytes before building on it (`PORTING-PLAN.md` §9, risk R11).
 ## Building and testing
 
 ```bash
-dotnet build   net/CodeBase.Net.sln
-dotnet test    net/CodeBase.Net.sln
+dotnet build   net/CodeBase.Net.sln -c Release
+dotnet test    net/CodeBase.Net.sln -c Release
 ```
+
+**Test in Release.** It is the build users get, and the cache's timed gates
+(`BlockCacheSpeedupTests`) only mean something against optimized code: a Debug build disables the
+JIT optimizer, and the walk the gate times drops from about 10 times faster cached to 2.35, a hair
+over its 2x floor. They also run **alone**, in a non-parallel xUnit collection (`TimingCollection`)
+that waits for the rest of the suite, because a clock read under the suite's own load measures the
+load. In Debug those two timed tests **skip themselves** with a message saying so;
+everything else, the read-count gates included, runs and passes the same in either build. Nothing
+in the code depends on Debug — there is no `Debug.Assert` or `#if DEBUG` anywhere. A plain
+`dotnet test` still builds Debug; that is the SDK's default, not a choice of this repository
+(ADR-57). `sonar.bat` keeps Debug, for line coverage that inlining does not blur.
 
 Five projects: `CodeBase.Net` (the library — **no package references**, deliberately, ADR-17),
 `CodeBase.Net.Tests` (layers 1-3), `CodeBase.Net.Golden` (layer 4, against `net/corpus/`),

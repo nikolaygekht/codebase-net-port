@@ -210,8 +210,8 @@ public sealed class CachedReadGoldenTests
             foreach (string value in values)
             {
                 // Refusals are compared too, and deliberately: a tag whose keys are not character
-                // does not take a string, so what matters is that both runs refuse the same way. See
-                // the note in the step's STATE.md about what that refusal currently looks like.
+                // does not take a string, so what matters is that both runs refuse the same way.
+                // That the refusal is right, and not merely consistent, is SeekTypeGoldenTests' job.
                 seen.Add($"{tag.Name}:{value}={Outcome(open, value)}");
             }
         }

@@ -42,8 +42,14 @@ public sealed class FileSystemTests : IDisposable
         Write("TABLE.DBF");
         Write("TABLE.FPT");
 
-        FileSystem.Instance.Resolve(Path.Combine(directory, "TABLE.DBF"), ".fpt")
-            .Should().Be(Path.Combine(directory, "TABLE.FPT"));
+        string? found = FileSystem.Instance.Resolve(Path.Combine(directory, "TABLE.DBF"), ".fpt");
+
+        // A case-insensitive filesystem answers the obvious path directly, and that path opens the
+        // file just as well, so only a case-sensitive one has to return the spelling on disk.
+        if (IsCaseSensitive())
+            found.Should().Be(Path.Combine(directory, "TABLE.FPT"));
+        else
+            found.Should().BeEquivalentTo(Path.Combine(directory, "TABLE.FPT"));
     }
 
     [Fact]

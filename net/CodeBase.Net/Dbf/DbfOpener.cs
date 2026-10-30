@@ -55,7 +55,7 @@ internal sealed class DbfOpener
     /// <returns>Everything read, ready for a table to be built from.</returns>
     /// <exception cref="CodeBaseException">
     /// The file contradicts itself, contradicts its own length, names a field this library cannot
-    /// read, or declares a memo file that is not there.
+    /// read, declares a memo file that is not there, or holds compressed data.
     /// </exception>
     public OpenedTable Open(string path)
     {
@@ -66,6 +66,7 @@ internal sealed class DbfOpener
         try
         {
             DbfHeader header = DbfHeader.Parse(ReadTableHeader(data));
+            RefuseIfCompressed(header);
             CheckAgainstFileLength(header, data.Length);
 
             IDbfFormatVariant variant = IDbfFormatVariant.Resolve(header.Version);
@@ -169,6 +170,30 @@ internal sealed class DbfOpener
                 $"{failure.Got}.",
                 failure);
         }
+    }
+
+    /// <summary>
+    /// Refuses a table whose record data is compressed.
+    ///
+    /// Checked before the file length, because a compressed file is shorter than its records and that
+    /// refusal would blame corruption for what is an unsupported extension.
+    /// </summary>
+    /// <param name="header">The table's header.</param>
+    /// <exception cref="CodeBaseException">The table declares compressed data.</exception>
+    private static void RefuseIfCompressed(DbfHeader header)
+    {
+        // The flags mean something only on a version 0x31 table; the C library ignores them on any
+        // other (D4OPEN.C:2152-2196), so a stray byte in a plain Visual FoxPro table is not a refusal.
+        if (header.Version != DbfVersion.VisualFoxProExtended || !header.Flags.HasCompressedData)
+            return;
+
+        // CodeBase's whole-file compression: an offset table after the header, then the records in
+        // compressed blocks (D4OPEN.C:2760 onward). Reading past it as records would return the
+        // compressed bytes as field values. Not supported, by decision; see ADR-56.
+        throw new CodeBaseException(
+            ErrorCode.NotSupported,
+            "The table's data is compressed, a CodeBase extension that Visual FoxPro cannot read and " +
+            "this library does not support. Copy it to an uncompressed table with CodeBase first.");
     }
 
     /// <summary>

@@ -152,9 +152,6 @@ internal sealed class IndexFileReader : IDisposable
     }
 
     /// <summary>
-    /// Closes the index file.
-    /// </summary>
-    /// <summary>
     /// Forgets every block of this index file that the cache is holding.
     /// </summary>
     /// <returns>How many were given up, which is zero when the file is not cached.</returns>

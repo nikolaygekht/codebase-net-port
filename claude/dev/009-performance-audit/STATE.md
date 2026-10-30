@@ -506,6 +506,11 @@ is a behaviour change, and this step's gate is that nothing a file decodes to ma
 equivalence test pins the current behaviour against the *cache* altering it without blessing it as
 correct.
 
+**Changed after close, 2026-10-29, by step 012.** The defect is fixed (ADR-58) and its write-up says
+so at the top. `results-block-cache.txt` §3 carries a dated correction: the "11.6x Debug" behind the
+timed walk gate was never measured — Debug measures 2.3×, and the gate now runs in Release only
+(ADR-57).
+
 ## Blockers
 
 None. One open decision that is **not** blocking, recorded in the root `STATE.md` §3: whether

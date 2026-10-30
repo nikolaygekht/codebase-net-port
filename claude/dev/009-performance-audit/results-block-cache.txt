@@ -52,6 +52,20 @@ Same benchmark as every earlier sub-step, now parameterised by cache mode.
     wall clock, walk      >= 2x   (7.4x Release, 11.6x Debug)
     wall clock, Go+Skip   >= 2x   (23x)
 
+  CORRECTION, 2026-10-29 (step 012): "11.6x Debug" was never measured. 11.6x is
+  the seek prediction from ANALYSIS.md section 5, carried into this line by
+  mistake. Measured natively on this machine, Debug, 1000-record passes, against
+  this step's own code (a worktree at 197f646) and today's alike:
+
+    wall clock, walk      2.30-2.35x   (Release: ~10x)
+    wall clock, Go+Skip   4.8x         (Release: ~17x)
+
+  So in Debug -- which is what a plain `dotnet test` builds -- the walk clears
+  the 2x floor by about 17%, and a loaded full-suite run can push it under. The
+  suite ran under WSL through /mnt/d while this step was open, where an uncached
+  read costs ~170 us, which is why the gap never showed. Detail:
+  claude/dev/012-p1-tails/STATE.md.
+
   There is deliberately NO timed assertion on a seek storm. At 2.13x a 2x floor
   would sit inside noise of its own threshold and flake. THE FLOOR IS NOT
   LOWERED TO FIT -- what is measured changes instead: a seek's win is gated by

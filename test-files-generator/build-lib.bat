@@ -7,17 +7,24 @@ REM    build-lib.bat          incremental (skips objects that already exist)
 REM    build-lib.bat clean    delete all objects and the library, then rebuild
 REM
 REM  Output:  obj\codebase\*.obj   intermediate objects and per-file logs
-REM           obj\codebase.lib     the static library
+REM           obj\zlib\*.obj       zlib, which the memo compression calls
+REM           obj\codebase.lib     the static library, zlib included
 REM
 REM  Nothing under original/source is modified. Build switches come from
 REM  src\cb-config.h, force-included ahead of the shipped D4all.h.
+REM
+REM  zlib is vendored under third_party\zlib (the drop ships only its headers,
+REM  and an older version of them). Its include path precedes original\source
+REM  so the library compiles against the headers of the zlib it links.
 REM ===========================================================================
 setlocal EnableDelayedExpansion
 
 set "ROOT=%~dp0"
 set "SRCDIR=%ROOT%..\original\source"
 set "CFGDIR=%ROOT%src"
+set "ZLIBDIR=%ROOT%third_party\zlib"
 set "OBJDIR=%ROOT%obj\codebase"
+set "ZOBJDIR=%ROOT%obj\zlib"
 set "LIBOUT=%ROOT%obj\codebase.lib"
 
 if not exist "%SRCDIR%\D4all.h" (
@@ -29,6 +36,7 @@ if not exist "%SRCDIR%\D4all.h" (
 if /i "%~1"=="clean" (
    echo [build-lib] cleaning...
    if exist "%OBJDIR%" rd /s /q "%OBJDIR%"
+   if exist "%ZOBJDIR%" rd /s /q "%ZOBJDIR%"
    if exist "%LIBOUT%" del /q "%LIBOUT%"
 )
 
@@ -38,9 +46,28 @@ call "%CB_VCVARS%" >nul 2>&1
 if errorlevel 1 ( echo [build-lib] ERROR: vcvars failed & exit /b 1 )
 
 if not exist "%OBJDIR%" mkdir "%OBJDIR%"
+if not exist "%ZOBJDIR%" mkdir "%ZOBJDIR%"
+
+set /a BUILT=0, SKIPPED=0, EXCLUDED=0, FAILED=0
+
+echo [build-lib] compiling zlib (x86, C)...
+for %%f in ("%ZLIBDIR%\*.c") do (
+   if exist "%ZOBJDIR%\%%~nf.obj" (
+      set /a SKIPPED+=1
+   ) else (
+      REM  /TC  zlib is C; it does not see cb-config.h.
+      cl /c /TC /nologo /W0 /O2 /D_CRT_SECURE_NO_WARNINGS /DWIN32 ^
+         /I"%ZLIBDIR%" "%%f" /Fo"%ZOBJDIR%\%%~nf.obj" >"%ZOBJDIR%\%%~nf.log" 2>&1
+      if errorlevel 1 (
+         set /a FAILED+=1
+         echo [build-lib]   FAILED %%~nxf  ^(see obj\zlib\%%~nf.log^)
+      ) else (
+         set /a BUILT+=1
+      )
+   )
+)
 
 echo [build-lib] compiling (x86, C++)...
-set /a BUILT=0, SKIPPED=0, EXCLUDED=0, FAILED=0
 
 for %%f in ("%SRCDIR%\*.c") do (
    set "NAME=%%~nxf"
@@ -67,7 +94,7 @@ for %%f in ("%SRCDIR%\*.c") do (
       REM       under #ifdef __cplusplus and call sites depend on them.
       REM  /FI  force-include our build configuration ahead of D4all.h.
       cl /c /TP /nologo /W0 /O2 /D_CRT_SECURE_NO_WARNINGS /DWIN32 ^
-         /FI"%CFGDIR%\cb-config.h" /I"%SRCDIR%" /I"%CFGDIR%" ^
+         /FI"%CFGDIR%\cb-config.h" /I"%ZLIBDIR%" /I"%SRCDIR%" /I"%CFGDIR%" ^
          "%%f" /Fo"%OBJDIR%\%%~nf.obj" >"%OBJDIR%\%%~nf.log" 2>&1
       if errorlevel 1 (
          set /a FAILED+=1
@@ -82,7 +109,7 @@ echo [build-lib] compiled=!BUILT!  cached=!SKIPPED!  excluded=!EXCLUDED!  failed
 if !FAILED! gtr 0 exit /b 1
 
 echo [build-lib] archiving -^> obj\codebase.lib
-lib /nologo /OUT:"%LIBOUT%" "%OBJDIR%\*.obj" >"%ROOT%obj\lib.log" 2>&1
+lib /nologo /OUT:"%LIBOUT%" "%OBJDIR%\*.obj" "%ZOBJDIR%\*.obj" >"%ROOT%obj\lib.log" 2>&1
 if errorlevel 1 (
    echo [build-lib] ERROR: lib failed, see obj\lib.log
    exit /b 1

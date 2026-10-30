@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 using AwesomeAssertions;
 using CodeBase.Net.Dbf;
@@ -29,8 +30,15 @@ namespace CodeBase.Net.Tests.Performance;
 /// would. The timed one is kept for the single thing they cannot see: the day the syscalls get cheap.
 /// If it ever flakes it gets a trait and an opt-out — **never a lower threshold**, because a floor that
 /// moves to match the code is not a gate.
+///
+/// **The timed assertions skip themselves when the library is built without optimization.** A Debug
+/// build disables the JIT optimizer, which slows the cached path's CPU several times and the uncached
+/// path's syscalls hardly at all, so the ratio measures the build rather than the cache: 2.35 times
+/// for a walk in Debug against about 10 in Release, on the same machine and code (ADR-57). The read
+/// counts are exact in either build and always run.
 /// </summary>
 [Trait("Layer", "Performance")]
+[Collection(nameof(TimingCollection))]
 public sealed class BlockCacheSpeedupTests
 {
     /// <summary>How much cheaper the cache has to make things before this test is content.</summary>
@@ -117,6 +125,11 @@ public sealed class BlockCacheSpeedupTests
     /// </remarks>
     private static void AssertTwiceAsFast(Action<Table> work, string what)
     {
+        Assert.SkipWhen(
+            LibraryIsUnoptimized,
+            "The library is built without JIT optimization (a Debug build), so a timing would measure " +
+            "the build rather than the cache. Run the suite with -c Release to time it.");
+
         double uncachedFirst = Ratio(Fastest(BlockCacheMode.Off, work), Fastest(BlockCacheMode.Always, work));
         double cachedFirst = 1.0 / Ratio(Fastest(BlockCacheMode.Always, work), Fastest(BlockCacheMode.Off, work));
 
@@ -143,6 +156,12 @@ public sealed class BlockCacheSpeedupTests
                 Passes);
         }
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the library under test was compiled with the JIT optimizer disabled.
+    /// </summary>
+    private static bool LibraryIsUnoptimized =>
+        typeof(Table).Assembly.GetCustomAttribute<DebuggableAttribute>()?.IsJITOptimizerDisabled == true;
 
     private static void SeekStorm(Table table)
     {

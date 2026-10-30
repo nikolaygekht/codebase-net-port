@@ -29,6 +29,7 @@ int caseIdxOne ( CODE4 *cb, const char *outDir );   /* IDXONE.DBF  — 0x30 + CD
 int caseCdxColl( CODE4 *cb, const char *outDir );   /* CDXCOLL.DBF — 0x30 + CDX, machine and GENERAL collation */
 int caseCdxTime( CODE4 *cb, const char *outDir );   /* CDXTIME.DBF — 0x30 + CDX, datetime keys and the fox flag bitmap */
 int caseCdxExpr( CODE4 *cb, const char *outDir );   /* CDXEXPR.DBF — 0x30 + CDX + FPT, expression tags and the expression dump */
+int caseCmpMemo( CODE4 *cb, const char *outDir );   /* CMPMEMO.DBF — 0x31 + FPT, compressed memo entries */
 
 /* The one benchmark case: a workload, not an expectation. It writes into a
  * `benchmark` subdirectory of the output and has no dump, because nothing

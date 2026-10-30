@@ -119,8 +119,8 @@ purpose, in the `exact-on` and `century-on` groups.
 The corpus's own generator stays the authority for everything CodeBase can produce. In particular
 this directory does **not** try to answer: the parse-rejection surface and its error codes, the
 compiled node arrays, `0x31` tables, `keyLen > 240`, CDX block sizes other than 512, the `'7'`
-datetime, or compressed memo (`c4compress` is a CodeBase extension with no VFP counterpart — ADR-23
-stays open regardless of this VM).
+datetime, or compressed memo (`c4compress` is a CodeBase extension with no VFP counterpart; the
+CodeBase generator's `CMPMEMO` covers it — ADR-55).
 
 The other runs ADR-44 authorises — code-page marks beyond CodeBase's five constants, a VFP 9 `0x32`
 table with a memo, `V`/`Q`/`W` fields, native auto-increment, a DBC backlink, an insert-and-split

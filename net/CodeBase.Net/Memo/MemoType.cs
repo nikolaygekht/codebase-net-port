@@ -30,8 +30,8 @@ public enum MemoType
     /// A compressed entry, which is a CodeBase extension Visual FoxPro cannot read.
     /// </summary>
     /// <value>
-    /// Reading one is not supported yet: no file this project can generate contains one, so a
-    /// decoder for it could not be checked against the reference implementation. See ADR-23.
+    /// Written only by CodeBase, and only for a table created with compressed memos switched on.
+    /// It is read decompressed: the type tells how the entry was stored, not what its payload is.
     /// </value>
     Compressed = 3,
 }

@@ -45,6 +45,7 @@
 
 #include "util.h"
 #include "dump-index.h"
+#include "dump-query.h"
 #include "cases.h"
 
 #define ROWS 34          /* records in this table */
@@ -121,6 +122,21 @@ static const TEXTBYTES TEXTS[ROWS] =
    TEXT_BYTES( C_OL_1 ),     TEXT_BYTES( C_OL_2 ),
    TEXT_BYTES( C_ZEBRA_1 ),  TEXT_BYTES( C_ZEBRA_2 ),
    TEXT_BYTES( C_TAILFULL ),  TEXT_BYTES( C_TAILFULL2 )
+};
+
+/* The query list. C_GEN sorts before C_MACH in the tag directory and both are
+ * over K_TEXT, so the optimizer meets the collated tag first on every term. The
+ * source refuses it (r4log.c:114-120), but that refusal is compiled out of every
+ * non-testing build (d4defs.h:669-673), so the reference USES C_GEN and these
+ * filters come out wrong: each disagrees with its own scan (ADR-59). Adding the
+ * list changed no index: the .DBF, the .cdx and both existing dumps regenerate
+ * byte-identical. */
+static const QUERYCASE QUERIES[] =
+{
+   { "K_TEXT = \"cafe\"",                         0,        "eq: C_GEN is met first and used, though the filter compares bytes" },
+   { "K_TEXT > \"M\"",                            "C_MACH", "the range that lost six records when a collated tag answered it (ADR-54)" },
+   { "K_TEXT >= \"a\" .AND. K_TEXT < \"d\"",       0,        "a closed range; GENERAL would fold the upper-case rows into it" },
+   { "K_TEXT > \"y\"",                            "C_GEN",  "walked in GENERAL order: the accented and ligature rows sort among the letters -- ordering by a tag is not answering with it" }
 };
 
 /* ------------------------------------------------------------------- case */
@@ -204,6 +220,9 @@ int caseCdxColl( CODE4 *cb, const char *outDir )
    rc = finish( cb, data, outDir, "CDXCOLL.DBF" );
    if ( rc == 0 )
       rc = dumpIndex( cb, outDir, "CDXCOLL.DBF", "CDXCOLL.cdx" );
+   if ( rc == 0 )
+      rc = dumpQueries( cb, outDir, "CDXCOLL.DBF",
+                        QUERIES, (int)( sizeof( QUERIES ) / sizeof( QUERIES[0] ) ) );
 
    return rc;
 }

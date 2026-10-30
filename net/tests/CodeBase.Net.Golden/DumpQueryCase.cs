@@ -56,8 +56,9 @@ internal sealed record DumpFlagSet(
 ///
 /// The two record sequences are the heart of it. [c]Optimized[/c] is what the reference's optimizer
 /// returned; [c]Scanned[/c] is what the same filter returns with the optimizer disabled, which is
-/// the reference's own scan truth. They are equal for every case in the corpus but one, and that one
-/// is the defect at m4map.c:216 demonstrating itself -- see [c]Agrees[/c].
+/// the reference's own scan truth. They are equal for every case in the corpus but seven: one is the
+/// defect at m4map.c:216 demonstrating itself, and six are the reference answering with a collated tag
+/// (ADR-59) -- see [c]Agrees[/c].
 /// </summary>
 /// <param name="Filter">The filter expression, as it was set.</param>
 /// <param name="Note">What the case is for, copied from the generator.</param>

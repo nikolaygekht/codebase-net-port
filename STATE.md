@@ -1,11 +1,14 @@
 # Project state
 
 **Updated:** 2026-10-29 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed
-locally and not pushed.** Development moved to native Windows; the generator builds there, now with
+locally in two commits and not pushed.** Development moved to native Windows; the generator builds there, now with
 zlib, and regenerated the corpus byte-identical. Done in 012 so far: compressed memo entries read
 (ADR-55), compressed-data tables refused at open (ADR-56), `Seek` by text only on character tags
-(ADR-58), a race in the engine's table list fixed, and the suite run in Release with the timed gates
-alone (ADR-57). Record: [`claude/dev/012-p1-tails/STATE.md`](claude/dev/012-p1-tails/STATE.md).
+(ADR-58), a race in the engine's table list fixed, the suite run in Release with the timed gates
+alone (ADR-57), and the query refusals each witnessed by case `QRYGATE` — which found that **the
+reference answers queries with GENERAL tags and gets them wrong**: its refusal is compiled out. The
+port keeps refusing them, a divergence by decision (ADR-59). Record: [`claude/dev/012-p1-tails/STATE.md`](claude/dev/012-p1-tails/STATE.md).
+Next session: sub-step 4, `.NOT.` over null.
 **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
@@ -108,7 +111,8 @@ the crossover is at *total* selectivity where the loss is 1.2%.
 reference would, which keeps its record sets comparable; `AllSeekable` adds the integer and currency
 tags it refuses. Filtered, unique and **collated** tags are refused in both — the first two because
 they index a subset rather than the table, the third because a filter's comparisons are in byte order
-and a collated tag's keys are not (**ADR-54**).
+and a collated tag's keys are not (**ADR-54**). The reference, as built, *uses* collated tags and
+returns the wrong records, so there the port diverges on purpose (**ADR-59**).
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -303,8 +307,13 @@ tables refused at open (ADR-56); `Seek` by text refused on every non-character t
 `FoxNumeric`'s first layer-1 tests; `CodeBaseEngine`'s table list made thread-safe (it tore under
 concurrent open/close); the suite documented as `-c Release`, the clock gates skipping in Debug and
 running in their own non-parallel collection (ADR-57 — the "11.6× Debug" behind ADR-40 was never a
-measurement). Remaining in 012: the query refusals' witnesses, null operands, the tag-context parse,
-case mapping by code page, and close. Tests: 2493 unit, 873 golden.
+measurement). Then the query refusals: `CDXCOLL` gained a query dump and case `QRYGATE` isolates
+each refused kind of tag, and the reference turned out to use GENERAL tags — the refusal at
+r4log.c:114-120 is compiled out by d4defs.h:669-673 in every non-testing build, and all six such
+filters disagree with its own scan. ADR-59; the decision gates skip those six by a rule read from the
+dumps, and `CollationDivergenceGoldenTests` holds the port to the reference's scan instead. Remaining
+in 012: null operands, the tag-context parse,
+case mapping by code page, and close. Tests: 2493 unit, 937 golden, in Release.
 
 ### Before it (2026-09-04)
 
@@ -889,8 +898,7 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ### Finish step 012 — `claude/dev/012-p1-tails/`
 
-Sub-steps 3–6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `CDXCOLL`'s query dump and
-case `QRYGATE` for the query refusals; `.NOT.` over null and the double evaluation; the tag-context
+Sub-steps 4–6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `.NOT.` over null and the double evaluation; the tag-context
 parse; `UPPER`/`LOWER` by the table's code page; then close.
 
 ### Step 013 — how much work does a query cost the reference?

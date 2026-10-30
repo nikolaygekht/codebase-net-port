@@ -400,6 +400,11 @@ an expression nothing else indexes, which means a **new tag** and therefore a re
 every index dump with it. Not worth that: the refusal is one branch of a pure predicate and sub-step
 2 tests it exhaustively at layer 1. Named so it is a decision and not an oversight.
 
+*Corrected after close, 2026-10-29, by step 012:* backwards. The tag directory is alphabetical, so
+`T_FILT` is visited **before** `T_NUM` and `K_N > 0` recording `T_NUM` shows the filtered refusal; it
+is the **unique** refusal that no dump showed. Step 012 added `QRYGATE`, which isolates the unique,
+filtered and GENERAL refusals, and found the reference does not refuse a GENERAL tag at all (ADR-59).
+
 **Two things step 010 owed the corpus are still owed.** The second rejection pass with a real
 `TAG4FILE` (so `e4tagExpr`, −510, and the alias refusals stop being unobservable) was not folded into
 this run — it is a rejection-dump change, not a query one, and mixing them would have made the

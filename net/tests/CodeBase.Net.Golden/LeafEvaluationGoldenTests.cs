@@ -21,7 +21,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class LeafEvaluationGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
 
     [Theory]
     [MemberData(nameof(Tables))]
@@ -30,7 +30,7 @@ public sealed class LeafEvaluationGoldenTests
         using QueryHarness harness = QueryHarness.For(table);
         int checkedFilters = 0;
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases)
+        foreach (DumpQueryCase filter in harness.Dump.Comparable)
         {
             QueryPlan plan = harness.Plan(filter.Filter);
 
@@ -47,9 +47,10 @@ public sealed class LeafEvaluationGoldenTests
                 "the records {0} reaches", filter.Filter);
         }
 
-        // 41 filters across the three tables qualify -- 24, 9 and 8 -- so a table contributing none
-        // would mean the plan stopped producing single-leaf trees rather than the gate passing.
-        checkedFilters.Should().BeGreaterThanOrEqualTo(8, "the gate needs filters it applies to");
+        // 47 filters across the four tables qualify -- 24, 9, 8 and QRYGATE's six controls -- so a table
+        // contributing none would mean the plan stopped producing single-leaf trees rather than the
+        // gate passing.
+        checkedFilters.Should().BeGreaterThanOrEqualTo(6, "the gate needs filters it applies to");
     }
 
     /// <summary>
@@ -62,7 +63,7 @@ public sealed class LeafEvaluationGoldenTests
     {
         using QueryHarness harness = QueryHarness.For(table);
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases)
+        foreach (DumpQueryCase filter in harness.Dump.Comparable)
         {
             QueryPlan plan = harness.Plan(filter.Filter);
 

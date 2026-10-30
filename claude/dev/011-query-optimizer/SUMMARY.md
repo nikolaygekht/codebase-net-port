@@ -93,6 +93,10 @@ in the step** — every regeneration was byte-identical outside the query dumps.
 - **Two corpus gaps named rather than papered over:** the filtered-tag refusal cannot be isolated by
   any dump (every filtered tag shares its field with a plain one), and a collated tag can only be
   reached where no machine tag shadows it.
+  *Corrected 2026-10-29 (step 012):* the first gap did not exist — tags are visited alphabetically,
+  `T_FILT` precedes `T_NUM`, so `CDXBASE` isolated the filtered refusal all along; it was the
+  **unique** refusal nothing showed (`T_DUP` precedes `T_UNIQ`). And the reference never refuses a
+  collated tag at all: that refusal is compiled out (ADR-59). `QRYGATE` now isolates all three.
 
 ## For the next step
 

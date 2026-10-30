@@ -24,13 +24,14 @@ public sealed class QueryOracleGoldenTests
     private static readonly CorpusQueryDump Base = CorpusQueryDump.Load("CDXBASE");
     private static readonly CorpusQueryDump Deep = CorpusQueryDump.Load("CDXDEEP");
 
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
 
     private static CorpusQueryDump Dump(string table) => table switch
     {
         "CDXEXPR" => Expr,
         "CDXBASE" => Base,
-        _ => Deep,
+        "CDXDEEP" => Deep,
+        _ => CorpusQueryDump.Load(table),
     };
 
     [Theory]

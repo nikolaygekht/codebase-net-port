@@ -283,11 +283,11 @@ Two of these are subtle enough to call out:
 
 ### 3.4 Which tags the optimizer will use at all
 
-Before any matching, `e4isTag` skips a tag entirely under four conditions:
+Before any matching, `e4isTag` skips a tag entirely under four conditions as written, **three as built**:
 
 | Gate | Rule | File:line |
 |---|---|---|
-| collation | unless `CODE4.useGeneralTagsInRelate` is set, a tag whose `collateName` is **neither `collate4none` nor `collate4machine`** is skipped | r4log.c:115-120 |
+| collation | **compiled out of every S4FOX build except S4TESTING** (see below). Where it is compiled in: unless `CODE4.useGeneralTagsInRelate` is set, a tag whose `collateName` is neither `collate4none` nor `collate4machine` is skipped | r4log.c:114-120, d4defs.h:669-673 |
 | type | S4FOX: a tag whose `tfile4type` is `r4currency`, `r4int`, `r4dateTime` or `r4dateTimeMilli` is skipped — **a blacklist of four, not a shortlist**, see below | r4log.c:127-139 |
 | filter | a tag with a filter (`tagFile->filter != 0`) is skipped | r4log.c:144 |
 | unique | a tag for which `t4unique(tagOn) == r4uniqueContinue` is skipped | r4log.c:144 |
@@ -312,8 +312,20 @@ r4log.c:64-108. Paraphrased:
   a deliberate refusal on the grounds that the *residual* comparison in `log4true` uses `memcmp`
   ordering and the two could disagree — a correctness refusal, not a missing feature.
 
-**Both defaults exclude.** `useGeneralTagsInRelate` is not among the fields `code4initLow` sets, so
-it is 0 by the constructor's `memset` ([`API-ERRORS.md`](API-ERRORS.md) §6, C4CODE.C:874).
+  **And it is compiled out.** The refusal sits inside `#if !defined( S4USE_GENERAL_TAGS_IN_RELATE )`
+  (r4log.c:114), and `d4defs.h:669-673` defines that macro in every S4FOX build that is not
+  S4TESTING (`S4GENERAL` is forced on two lines earlier). So every shipping build uses a GENERAL tag
+  to answer a byte-order filter, and returns the wrong records — the very thing the comment says the
+  refusal exists to prevent. **Witnessed** (2026-10-29): in `CDXCOLL.query.dump.txt` every filter is
+  matched to `C_GEN`, and in `QRYGATE.query.dump.txt` the lone GENERAL tag `Q_GEN` answers `G_TEXT >
+  "M"` with 12 records where the reference's own scan returns 18; all six such filters (four in `CDXCOLL`, two in `QRYGATE`) say `agree
+  NO`. `useGeneralTagsInRelate` (0) is never consulted. The port refuses collated tags anyway,
+  deliberately (ADR-54, ADR-59). (Corrected 2026-10-29: this section said the collation gate was in
+  force by default; it never was in a build of this drop.)
+
+**The two defaults that are in force exclude.** `useGeneralTagsInRelate` is not among the fields
+`code4initLow` sets, so it is 0 by the constructor's `memset` ([`API-ERRORS.md`](API-ERRORS.md) §6,
+C4CODE.C:874) — but as above, nothing reads it in a non-testing build.
 `errDefaultUnique` **defaults to `r4uniqueContinue` (25)** (API-ERRORS.md:361, C4CODE.C:984), and
 `tfile4unique` returns that stored action only when the tag is unique or candidate
 (`typeCode & 0x05`), else 0 (I4TAG.C:3327-3337). So:
@@ -321,18 +333,26 @@ it is 0 by the constructor's `memset` ([`API-ERRORS.md`](API-ERRORS.md) §6, C4C
 - a plain tag → `t4unique` = 0 ≠ 25 → **eligible**
 - a `unique` or `candidate` tag → `t4unique` = 25 → **skipped**, under the default
 
-**A skipped tag does not end the search.** `CDXBASE` carries both a plain tag (`T_DUP`) and a unique
-one (`T_UNIQ`) over the same field, and `K_DUP = "CHERRY"` matches `T_DUP`
-(`CDXBASE.query.dump.txt`) — so the `d4tagNext` walk continues past the refusal to the next
-candidate rather than stopping at the first tag whose expression would have matched. A table with
-one tag per field could not distinguish the two behaviours.
+**A skipped tag does not end the search.** The `d4tagNext` walk is in tag-directory order, which is
+**alphabetical** (`CDXBASE.cdx.dump.txt`'s directory), and continues past a refusal to the next
+candidate. `CDXBASE` shows it once: `T_FILT` (filtered, over `K_N`) sorts before `T_NUM`, and
+`K_N > 0` is matched to `T_NUM`. (Corrected 2026-10-29: this paragraph used to cite `K_DUP =
+"CHERRY"`, but `T_DUP` sorts before `T_UNIQ`, so that filter never reaches the unique tag and shows
+nothing about it.)
 
-The net effect is that **CodeBase's optimizer can only use plain, unfiltered,
-machine-or-none-collated tags whose key type is not integer, currency or datetime.** For this port that excludes the integer,
-currency, datetime and `GENERAL` tags that steps 004-008 built and gated. Whether the port keeps the
+**Each refusal isolated.** `QRYGATE` gives each refused kind of tag a field of its own, with a
+control field holding the same values under a plain tag. Its dump shows the **unique** and
+**filtered** refusals directly — `tag=-` and `fullyMapped 0` over `Q_UNIQ` and `Q_FILT`, the control
+tag matched on the control field — and the GENERAL tag *used*, as above. Before it, nothing in the
+corpus showed the unique refusal at all.
+
+The net effect is that **CodeBase's optimizer as built uses plain, unfiltered tags whose key type is
+not integer, currency or datetime — collated or not.** For this port that excludes the integer,
+currency and datetime tags that steps 004-008 built and gated. Whether the port keeps the
 restriction is a decision, not a fact; §11.1 states the case each way, and **ADR-52 decided it, as
-corrected by ADR-54**: replicate all four by default, and widen the **type gate only**. The filter,
-unique and collation gates are structural — see §11.1.
+corrected by ADR-54 and ADR-59**: replicate the type, filter and unique gates by default, widen the
+**type gate only**, and refuse collated tags in both scopes although the reference uses them. The
+filter, unique and collation gates are structural — see §11.1.
 
 ---
 
@@ -894,7 +914,7 @@ else is evaluated per candidate record (§7.3), which is always correct and neve
 | a term over a tag of type `I`, `Y`, `T` or `r4dateTimeMilli` | **no** | r4log.c:127-139 |
 | a term over a **date** or **logical** tag | **yes** — the type gate is a blacklist of four, whatever its comment says | r4log.c:127-139; §3.4 |
 | a term inside an `.OR.` written before an unoptimizable one | **no**, and it is never even *tested* — operands are visited backwards and the branch dies at the first failure | m4map.c:107, 127-141; §3.3 |
-| a term over a `GENERAL`-collated tag | **no** by default (`useGeneralTagsInRelate == 0`) | r4log.c:115-120 |
+| a term over a `GENERAL`-collated tag | **yes**, and wrongly — the refusal is compiled out of every non-testing build (§3.4); the port refuses it (ADR-59) | r4log.c:114-120; d4defs.h:669-673 |
 | a term over a filtered tag | **no** | r4log.c:144 |
 | a term over a `unique`/`candidate` tag | **no** by default (`errDefaultUnique == r4uniqueContinue`) | r4log.c:144; I4TAG.C:3327-3337 |
 | a term over a **slave** table's tag | **no** | r4log.c:173-186 |
@@ -963,8 +983,8 @@ is read on the S4FOX path. §1.1, §2.2.
 
 ### 11.1 Decide the tag-eligibility set explicitly
 
-§3.4 shows CodeBase optimizing only plain, unfiltered, machine-collated `r4double`/`r4charBin`/
-`r4memoBin` tags. Two defensible positions:
+§3.4 shows CodeBase optimizing only plain, unfiltered tags outside the integer, currency and
+datetime types — and, as built, collated ones too. Two defensible positions:
 
 - **Replicate.** The refusals are correctness-motivated: the integer/currency/datetime refusal is
   because the constant cannot be converted to the tag's key domain, and the collation refusal is
@@ -990,7 +1010,10 @@ source's own comment states. A comparison in a filter is defined in **byte order
 evaluating it does; a collated tag stores its keys in another order; so answering the filter by
 seeking the tag substitutes one order for the other, and a term answered by a tag is never checked
 again. Witnessed on `CDXCOLL`, where `K_TEXT > "M"` loses `alpha`, `cafe`, `café`, `Æther`, `æon` and
-`aeon` — each begins with a byte above `M`'s, and `GENERAL` sorts each below it.
+`aeon` — each begins with a byte above `M`'s, and `GENERAL` sorts each below it. **The reference
+itself loses them**: as built it uses the collated tag (§3.4), and `CDXCOLL.query.dump.txt` records its
+optimized answer disagreeing with its own scan. Here the port does not follow the reference, by
+decision (ADR-59).
 
 **And widening the type gate needs a refusal the reference has no equivalent of**: the constant must
 be expressible in the tag's key domain *exactly*. `K_INT >= 2.5` is not `K_INT >= 2`, so a fractional

@@ -24,11 +24,13 @@ namespace CodeBase.Net.Golden;
 /// </summary>
 internal sealed class CorpusQueryDump
 {
-    private CorpusQueryDump(string table, int recordCount, IReadOnlyList<DumpQueryCase> cases)
+    private CorpusQueryDump(
+        string table, int recordCount, IReadOnlyList<DumpQueryCase> cases, IReadOnlySet<string> collatedTags)
     {
         Table = table;
         RecordCount = recordCount;
         Cases = cases;
+        CollatedTags = collatedTags;
     }
 
     /// <summary>Gets the table the filters were run against.</summary>
@@ -39,6 +41,31 @@ internal sealed class CorpusQueryDump
 
     /// <summary>Gets the filters, in dump order.</summary>
     public IReadOnlyList<DumpQueryCase> Cases { get; }
+
+    /// <summary>
+    /// Gets the names of the table's tags that carry a collation, from its index dump.
+    /// </summary>
+    /// <value>
+    /// The reference uses such a tag to answer a query, though its byte-order comparison and the tag's
+    /// order disagree: the refusal at r4log.c:114-120 is compiled out of every S4FOX build that is not
+    /// S4TESTING (d4defs.h:669-673). The port refuses them (ADR-54, ADR-59), so a case that used one
+    /// is not a decision the port can be compared with.
+    /// </value>
+    public IReadOnlySet<string> CollatedTags { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the reference answered a case with a tag that carries a collation.
+    /// </summary>
+    /// <param name="filter">A case from this dump.</param>
+    /// <returns>True where any node was matched to a collated tag.</returns>
+    public bool UsesCollatedTag(DumpQueryCase filter) =>
+        filter.Nodes.Any(n => n.Tag is not null && CollatedTags.Contains(n.Tag));
+
+    /// <summary>
+    /// Gets the cases whose optimizer decisions the port is compared with: every case that did not use a
+    /// collated tag.
+    /// </summary>
+    public IEnumerable<DumpQueryCase> Comparable => Cases.Where(c => !UsesCollatedTag(c));
 
     /// <summary>
     /// Reads one table's query dump out of the corpus.
@@ -120,7 +147,11 @@ internal sealed class CorpusQueryDump
                 $"{fileName} declares {declared} cases and holds {cases.Count}.");
         }
 
-        return new CorpusQueryDump(table, recordCount, cases);
+        HashSet<string> collated = [.. CorpusIndexDump.Load(tableName + ".cdx").RealTags
+            .Where(t => t.SortSequence.Length > 0)
+            .Select(t => t.Name.TrimEnd())];
+
+        return new CorpusQueryDump(table, recordCount, cases, collated);
     }
 
     private static string Word(string line, string key)

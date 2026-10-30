@@ -34,6 +34,7 @@ turns out to be untested, add a generator case and regenerate.
 | `CDXCOLL.DBF` + `.cdx` | `0x30` | **Index, collation.** cp1252, one `C(20)` field indexed twice — machine (`keyLen` 20, pad `0x20`) and `GENERAL` (`keyLen` 40, pad `0x00`) — over accented text and the `œ`/`ß`/`þ` expansions. See below. |
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
 | `CMPMEMO.DBF` + `.fpt` | `0x31` | **Compressed memo entries**, a CodeBase extension Visual FoxPro cannot read. Created with `code4memoCompress` on, so the header carries `flags[1] = 1`; every entry longer than one block is stored as type 3 — a 4-byte length, then a zlib stream. Its `CMPMEMO.memo.dump.txt` says which. See below. |
+| `QRYGATE.DBF` + `.cdx` | `0x30` | **Query refusals, isolated.** Three tags the reference's optimizer is written to refuse — unique `Q_UNIQ`, filtered `Q_FILT`, GENERAL `Q_GEN` — each the only tag over its own field, beside a control field holding the same values under a plain tag. Its query dump shows the unique and filtered refusals as `tag=-`, and shows the GENERAL one **used**, wrongly: that refusal is compiled out of every non-testing build (ADR-59). 24 records, cp1252. |
 
 ## Benchmark data — `benchmark/`
 
@@ -100,7 +101,8 @@ swept into every data-driven golden test. The gates that want these name them.
 
 The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
-records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters.
+records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters, and
+`QRYGATE` 24.
 
 ### What `CMPMEMO` pins down
 
@@ -117,7 +119,7 @@ record with no memo shows `block=0 type=0 stored=0`. Only this table has one.
 
 `CMPMEMO.fpt`'s compressed bytes are what zlib 1.3.1 produced; see the generator README.
 
-`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME` and `IDXONE` are the tables whose header byte 28 carries the
+`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `IDXONE` and `QRYGATE` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
 (`i4create.c:1404-1418`).
 
@@ -249,8 +251,8 @@ more for the query optimizer (step `011-query-optimizer`):
   Values are the **raw result bytes**, escaped by the same rules as a key: a numeric result is a
   double, and printing it as text would hide the low bits the key transform depends on.
 
-* **`CDXEXPR.query.dump.txt` (54 filters), `CDXBASE.query.dump.txt` (15) and
-  `CDXDEEP.query.dump.txt` (12)** — what the reference's **query optimizer** decided about a filter,
+* **`CDXEXPR.query.dump.txt` (54 filters), `CDXBASE.query.dump.txt` (15),
+  `CDXDEEP.query.dump.txt` (12), `QRYGATE.query.dump.txt` (13) and `CDXCOLL.query.dump.txt` (4)** — what the reference's **query optimizer** decided about a filter,
   written by `dump-query.cpp`. The optimizer produces no bytes, so it cannot be gated the way a
   format is; what it produces is decisions, and `RELATE4`/`RELATION4` are public structs, so the
   decisions are read out directly rather than inferred from the records that come out at the end.
@@ -266,9 +268,12 @@ more for the query optimizer (step `011-query-optimizer`):
   the first usable: the reference has a defect that inverts a range bound on a reflected comparison
   nested inside a connective, so on such a filter a correct port is *expected* to disagree with the
   optimized answer. Rather than a hand-written exception list, each case carries `agree yes|no` and
-  the expectation follows from it. **Exactly one of the 81 filters disagrees** —
-  `K_INT > 0 .AND. 4 > K_NUM`, whose two readings are *disjoint* — and it is the case written to
-  provoke it.
+  the expectation follows from it. **Seven of the 98 filters disagree.** One is
+  `K_INT > 0 .AND. 4 > K_NUM`, whose two readings are *disjoint* — the case written to provoke the
+  defect. The other six are the reference answering with a **GENERAL** tag: its refusal is compiled
+  out (`d4defs.h:669-673`), so every filter over `CDXCOLL` and `QRYGATE`'s two GENERAL filters come
+  out wrong. The port refuses those tags (ADR-59), and the decision gates skip those six by a rule
+  read from the dumps.
 
   Two things to know before reading the bits. The bitset is often stored as its **complement**
   (`isFlip=1`), because the reference flags the complement whenever a range covers more than half a

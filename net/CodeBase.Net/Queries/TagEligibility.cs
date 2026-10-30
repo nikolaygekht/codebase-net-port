@@ -6,11 +6,12 @@ namespace CodeBase.Net.Queries;
 /// <summary>
 /// Whether the optimizer is allowed to answer a term with a given tag.
 ///
-/// Four refusals, and they are not the same kind of thing. Two are structural and hold whatever the
+/// Four refusals, and they are not the same kind of thing. Three are structural and hold whatever the
 /// caller asks for: a filtered tag indexes a subset of the table, so seeking it answers a different
-/// question from the one asked, and a unique tag stores one key per group of equal keys, so it cannot
-/// list a range's records at all. Two are the reference implementation's own limits, which this
-/// library does not share, and a caller can lift them.
+/// question from the one asked; a unique tag stores one key per group of equal keys, so it cannot list
+/// a range's records at all; and a collated tag orders its keys differently from the byte order a
+/// filter compares in. One, the key type, is the reference implementation's own limit, which this
+/// library does not share, and a caller can lift it.
 ///
 /// Governing specification: QUERY-OPTIMIZER.md section 3.4.
 /// </summary>
@@ -95,11 +96,11 @@ internal static class TagEligibility
     /// it and a range seek drops them. Nothing downstream puts them back, because a term answered by
     /// a tag is not checked again.
     ///
-    /// The reference refuses collated tags for exactly this reason and says so: results "could
-    /// differ depending on if a tag was available" (AS 04/26/00, r4log.c:108-120). An earlier reading
-    /// of this port held that the argument did not apply here, because the two orders never meet in
-    /// one answer. They do not have to. The filter's meaning is one order and the tag is the other,
-    /// and answering the filter from the tag silently swaps them.
+    /// The reference's source refuses collated tags for exactly this reason and says so: results
+    /// "could differ depending on if a tag was available" (AS 04/26/00, r4log.c:108-120). But the
+    /// refusal is compiled out of every build that is not a test build (d4defs.h:669-673), so the
+    /// reference as shipped uses the tag and returns the wrong records, which the corpus records. This
+    /// library refuses it anyway; that is a divergence by decision (ADR-59).
     /// </value>
     private static bool IsUsableOrder(CollationName collation) => collation == CollationName.Machine;
 }

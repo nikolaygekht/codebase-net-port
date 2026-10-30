@@ -24,7 +24,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class QueryResultGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
 
     /// <summary>
     /// The gate, in record-number order: no tag selected, so the query walks its own record set and
@@ -147,7 +147,7 @@ public sealed class QueryResultGoldenTests
         using QueryHarness harness = QueryHarness.For(table);
         int seen = 0;
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases.Where(c => c.FullyMapped))
+        foreach (DumpQueryCase filter in harness.Dump.Comparable.Where(c => c.FullyMapped))
         {
             seen++;
             harness.Residual(filter.Filter).HasWork.Should().BeFalse(

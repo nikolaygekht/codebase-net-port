@@ -25,7 +25,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class TagMatchGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
 
     /// <summary>
     /// The gate. Every node of every filter, against the reference's own answer.
@@ -40,6 +40,16 @@ public sealed class TagMatchGoldenTests
         {
             QueryTag?[] ours = harness.Match(filter.Filter);
             string[] mine = [.. ours.Select(t => t?.Name ?? "-")];
+
+            // The reference answers with a collated tag that the port refuses by decision, and what it
+            // would have matched instead is not in the dump. What can be said is that the port did not
+            // take one -- CollationDivergenceGoldenTests checks what it returned.
+            if (harness.Dump.UsesCollatedTag(filter))
+            {
+                mine.Should().NotIntersectWith(harness.Dump.CollatedTags, "the tags matched for {0}", filter.Filter);
+                continue;
+            }
+
             string[] theirs = [.. filter.Nodes.Select(n => n.Tag ?? "-")];
 
             mine.Should().Equal(theirs, "the tags matched for {0}", filter.Filter);
@@ -89,17 +99,21 @@ public sealed class TagMatchGoldenTests
     }
 
     /// <summary>
-    /// A tag the optimizer refuses does not end the search. CDXBASE carries a plain tag and a unique
-    /// tag over one field, and the plain one answers.
+    /// A tag the optimizer refuses does not end the search. Tags are visited in directory order, which
+    /// is alphabetical, so the refused tag has to sort first for this to show anything: in CDXBASE the
+    /// filtered T_FILT sorts before the plain T_NUM over the same field, and the reference's dump
+    /// records T_NUM. (Not T_DUP and T_UNIQ: T_DUP sorts first, so the unique tag is never reached.)
     /// </summary>
     [Fact]
     public void ARefusedTagDoesNotStopTheSearch()
     {
         using QueryHarness harness = QueryHarness.For("CDXBASE");
-        QueryTag?[] matched = harness.Match("K_DUP = \"CHERRY\"");
+        QueryTag?[] matched = harness.Match("K_N > 0");
 
-        matched.Should().Contain(t => t != null && t.Value.Name == "T_DUP");
-        matched.Should().NotContain(t => t != null && t.Value.Name == "T_UNIQ");
+        matched.Should().Contain(t => t != null && t.Value.Name == "T_NUM");
+        matched.Should().NotContain(t => t != null && t.Value.Name == "T_FILT");
+        harness.Dump.Cases.Single(c => c.Filter == "K_N > 0").Nodes
+            .Should().Contain(n => n.Tag == "T_NUM", "the reference walked past T_FILT too");
     }
 
     /// <summary>

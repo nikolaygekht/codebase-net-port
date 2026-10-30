@@ -34,14 +34,13 @@ public sealed class QueryEquivalenceGoldenTests
     /// whether the answer is right, which is what makes these worth writing.
     /// </value>
     /// <summary>
-    /// Filters over the one table whose tags are collated, which has no recorded answers at all.
+    /// Filters over the table whose tags are collated, beyond the four its query dump records.
     /// </summary>
     /// <value>
     /// CDXCOLL carries a collated tag and a machine one over the same field, and the collated one
-    /// comes first -- so under the default scope the machine tag answers every term and under a
-    /// widened one the collated tag does. The same filters over the same data, reached through two
-    /// different key encodings, must return the same records. Nothing else in the corpus can say
-    /// that, and no reference answer is needed to: the expectation is a scan.
+    /// comes first. The port refuses the collated tag in both scopes (ADR-54), so the machine tag
+    /// answers every term; the reference uses the collated one and gets these wrong (ADR-59), so its
+    /// answers are no expectation here. A scan is, and needs no reference.
     /// </value>
     private static readonly string[] Collated =
     [
@@ -75,7 +74,7 @@ public sealed class QueryEquivalenceGoldenTests
         {
             TheoryData<string, bool> cases = [];
 
-            foreach (string table in new[] { "CDXEXPR", "CDXBASE", "CDXDEEP", "CDXCOLL" })
+            foreach (string table in new[] { "CDXEXPR", "CDXBASE", "CDXDEEP", "CDXCOLL", "QRYGATE" })
             {
                 cases.Add(table, false);
                 cases.Add(table, true);

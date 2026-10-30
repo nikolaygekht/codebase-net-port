@@ -788,6 +788,12 @@ something different. Never use it for keys, indexes, or memos.
   already answered. The port trusts a term exactly when decomposition produced a surviving leaf for
   it, which is safe because the only leaf that could be a superset is a widened prefix bound and the
   widening is exact (`QUERY-OPTIMIZER.md` §4.4). Same record set, fewer evaluations (**ADR-53**).
+- **The optimizer refuses a collated tag the reference uses.** The reference's refusal is compiled
+  out of every non-testing build (d4defs.h:669-673), so it answers a byte-order filter from a
+  GENERAL tag and returns the wrong records — every such filter in the corpus disagrees with its own
+  scan. The port refuses the tag in both scopes and returns the scan's records (**ADR-54, ADR-59**),
+  gated by `CollationDivergenceGoldenTests`; the decision gates skip those filters by a rule read from
+  the dumps, not by a list. A divergence from a defect.
 
 ---
 

@@ -30,7 +30,19 @@
 - [x] step 2b — G, timed tests alone (2026-10-29). `TimingCollection` (parallelization disabled);
   `BlockCacheSpeedupTests` joins it. ADR-57 and `FOR-DEVELOPERS.md` amended. Eight consecutive full
   Release runs green: 2493 + 873.
-- [ ] step 3 — B, the query refusals
+- [x] step 3 — B, the query refusals (2026-10-29). `CDXCOLL` gains four query filters (no index change);
+  new case `QRYGATE` (lone unique, filtered and GENERAL tags, each beside a plain control; 13 filters).
+  Regeneration changed exactly the six declared files. **Finding: the reference uses GENERAL tags** —
+  the refusal is compiled out (`d4defs.h:669-673`); six filters disagree with its own scan. The port
+  keeps refusing them: ADR-59 (ADR-54 marked), `QUERY-OPTIMIZER.md` §3.4/§8/§11.1, `PORTING-PLAN.md`
+  §8, `QueryTagScope`/`TagEligibility`/engine docs corrected (the scope docs still said `AllSeekable`
+  adds collated tags, stale since ADR-54). Gates: `QRYGATE` in every decision gate, `CDXCOLL` in Gate A
+  only; `CorpusQueryDump.CollatedTags`/`Comparable` exclude the six by rule; new
+  `CollationDivergenceGoldenTests` (scan and stored order). `ARefusedTagDoesNotStopTheSearch` now uses
+  `T_FILT`/`T_NUM`; stale comment in `QueryEquivalenceGoldenTests` fixed; 011 records corrected.
+  **Mutations:** unique refusal off → `QRYGATE` red at every depth; filter refusal off → `CDXBASE`,
+  `CDXEXPR`, `QRYGATE` red; collation refusal off → `CollationDivergenceGoldenTests` and `QRYGATE`'s tag
+  match red. Each reddens a reference-backed gate, not only Gate A. 2493 + 937 green.
 - [ ] step 4 — C1, null operands
 - [ ] step 5 — C2, the tag-context parse
 - [ ] step 6 — C3, case mapping by code page

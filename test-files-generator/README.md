@@ -74,6 +74,7 @@ test-files-generator/
 │  ├─ case-cdxcoll.cpp
 │  ├─ case-idxone.cpp
 │  ├─ case-cmpmemo.cpp
+│  ├─ case-qrygate.cpp
 │  ├─ util.h/.cpp      shared: error reporting, byte-run assignment, frozen date
 │  │                   stamp, close+dump tail, byte escaping
 │  ├─ dump.h/.cpp      shared: the <NAME>.dump.txt writer
@@ -187,6 +188,7 @@ and its own subdirectory.
 | `CDXCOLL.DBF` | `0x30` | the collation case: cp1252, one `C(20)` field indexed both machine and `GENERAL`, so `keyLen` 20 and 40 and pad bytes `0x20` and `0x00` sit in one file |
 | `IDXONE.DBF` | `0x30` | the single-tag case: a one-tag `.cdx` plus the `.IDX` derived from it, verified by walking both — see below |
 | `CMPMEMO.DBF` | `0x31` | compressed memo entries: created with `code4memoCompress` on, so `flags[1] = 1`. 8 records; payloads of 0, 1, 511, **512** (the block size, stays type 1), **513** (first compressed), 4096, 66000 (a 17-bit length prefix), and pseudo-random binary that grows when compressed and is stored as type 3 anyway. Beside the usual dump it writes `CMPMEMO.memo.dump.txt`: each entry read back with decompression off — its block, stored type and stored length |
+| `QRYGATE.DBF` | `0x30` | the query-refusal case: three tags the reference's optimizer is written to refuse — unique, filtered, GENERAL — each alone on its own field beside a control field with a plain tag, and 13 filters through `dump-query.cpp`. The GENERAL refusal is compiled out (`d4defs.h:669-673`), so the dump records the reference using that tag and getting it wrong (ADR-59) |
 
 One case is not a corpus case at all:
 
@@ -223,9 +225,11 @@ each compiled node, `fullyMapped`, the candidate bitset **before** any residual 
 records returned in both orders. Every filter is then run a **second** time with
 `RELATION4.bitmapDisable` set, which disables the optimizer (`m4map.c:341`) and leaves the reference
 evaluating the filter per record — so the dump carries the reference's own scan truth beside its
-optimized answer, and says whether the two agree. Exactly one of the corpus's 81 filters disagrees,
-which is the reference demonstrating a known defect on itself. `CDXBASE` supplies the eligibility
-refusals (a unique tag, a filtered tag, an integer tag), `CDXDEEP` the ranges that cross leaf
+optimized answer, and says whether the two agree. Seven of the corpus's 98 filters disagree: one is the
+reference demonstrating a known defect on itself, six are it answering with a GENERAL tag whose
+refusal is compiled out (ADR-59). `QRYGATE` isolates the unique, filtered and GENERAL refusals,
+`CDXCOLL` (four filters, added with no index change) shows the GENERAL tag reached first, `CDXBASE`
+supplies the filtered and integer refusals, `CDXDEEP` the ranges that cross leaf
 boundaries, `CDXEXPR` everything about expression tags. Filters are chosen to cover every row of
 `QUERY-OPTIMIZER.md` §8, plus every shape the constraint algebra folds — which is what took `CDXEXPR`
 from 43 to 54, because until then no filter joined two terms over one tag by an `.OR.` whose union is

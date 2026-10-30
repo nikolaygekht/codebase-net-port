@@ -177,6 +177,21 @@ over-precise and sign-only text, **as a decision recorded** — the C answer (`c
 - The reference-backed gates (depths 1–4, leaf evaluation, merge) gain both tables in their table
   lists; Gate A gains `QRYGATE`; `CorpusLayoutTests` gains `QRYGATE`.
 
+**Overturned by the first regeneration (2026-10-29).** The reference does **not** refuse a GENERAL tag:
+the refusal at r4log.c:114-120 is inside `#if !defined( S4USE_GENERAL_TAGS_IN_RELATE )`, which
+`d4defs.h:669-673` defines in every non-testing S4FOX build. Both dumps show the GENERAL tag used and
+the answer wrong (`agree NO` on all six such filters). So the first bullet's premise was false and the
+gates were built differently from the third bullet:
+- `QRYGATE` joins every decision gate; `CDXCOLL` joins **none** — every one of its filters reached
+  `C_GEN` first, and what the reference would have matched with the refusal in force is not in its
+  dump. It stays in Gate A.
+- The decision gates compare only cases that used no collated tag (`CorpusQueryDump.Comparable`),
+  identified from the dumps — a matched tag whose index header names a sort sequence.
+- `CollationDivergenceGoldenTests` checks those cases against what the reference *does* say: its scan,
+  and its tag's stored key order.
+- The port's behaviour does not change; its account does: ADR-59, `QUERY-OPTIMIZER.md` §3.4, §8, §11.1,
+  `QueryTagScope` and `TagEligibility` docs, `PORTING-PLAN.md` §8.
+
 ### C. Three `EXPR` behaviours get witnesses, and one is a real defect
 
 **C1. Null operands.** The reference (`e4functi.c`, all under `S4CLIENT_OR_FOX`):

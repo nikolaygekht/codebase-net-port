@@ -25,7 +25,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class CandidateSetGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
 
     /// <summary>
     /// The gate.
@@ -54,7 +54,7 @@ public sealed class CandidateSetGoldenTests
     {
         using QueryHarness harness = QueryHarness.For(table);
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases.Where(c => !c.Agrees))
+        foreach (DumpQueryCase filter in harness.Dump.Comparable.Where(c => !c.Agrees))
         {
             // The one filter this reaches is a conjunction whose other term no tag answers, so the
             // candidate set is a superset that the residual check will narrow. What matters here is

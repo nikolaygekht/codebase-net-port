@@ -22,7 +22,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class DecompositionGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
 
     /// <summary>
     /// The gate.
@@ -33,7 +33,7 @@ public sealed class DecompositionGoldenTests
     {
         using QueryHarness harness = QueryHarness.For(table);
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases)
+        foreach (DumpQueryCase filter in harness.Dump.Comparable)
         {
             harness.Plan(filter.Filter).FullyMapped
                 .Should().Be(filter.FullyMapped, "fullyMapped for {0}", filter.Filter);
@@ -51,7 +51,7 @@ public sealed class DecompositionGoldenTests
     {
         using QueryHarness harness = QueryHarness.For(table);
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases)
+        foreach (DumpQueryCase filter in harness.Dump.Comparable)
         {
             (harness.Plan(filter.Filter).Root is not null)
                 .Should().Be(filter.Optimized_Anything, "a tree for {0}", filter.Filter);
@@ -69,7 +69,7 @@ public sealed class DecompositionGoldenTests
     {
         using QueryHarness harness = QueryHarness.For(table);
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases)
+        foreach (DumpQueryCase filter in harness.Dump.Comparable)
         {
             QueryPlan plan = harness.Plan(filter.Filter);
             if (plan.Root is null)
@@ -210,7 +210,7 @@ public sealed class DecompositionGoldenTests
         List<string> divergent = [];
         int seen = 0;
 
-        foreach (DumpQueryCase filter in harness.Dump.Cases)
+        foreach (DumpQueryCase filter in harness.Dump.Comparable)
         {
             CompiledExpression compiled = harness.Compile(filter.Filter);
             ExpressionEvaluator evaluator = new(compiled);

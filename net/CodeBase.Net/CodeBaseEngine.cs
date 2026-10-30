@@ -76,9 +76,9 @@ public sealed class CodeBaseEngine : IDisposable
     /// Gets or sets which of a table's tags a query may be answered with.
     /// </summary>
     /// <value>
-    /// The default uses only the tags the reference implementation would use, which keeps a query's
-    /// records comparable with what that library returns for the same filter. Widening it adds the
-    /// integer, currency, datetime and collated tags, which this library keys and seeks as exactly as
+    /// The default uses the tags the reference implementation would use, except a collated tag, which
+    /// keeps a query's records comparable with what that library returns for the same filter. Widening
+    /// it adds the integer, currency and datetime tags, which this library keys and seeks as exactly as
     /// any other -- see [clink=CodeBase.Net.Queries.QueryTagScope]QueryTagScope[/clink].
     /// </value>
     public QueryTagScope QueryTagScope { get; set; } = QueryTagScope.Compatible;

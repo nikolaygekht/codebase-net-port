@@ -1856,7 +1856,7 @@ which needs no reference at all. `QUERY-OPTIMIZER.md` §10.1 already recommended
 §12 item 2 are updated with the second and the resolution. `PORTING-PLAN.md` §8's benign-divergence
 list gains both.
 
-## ADR-54 — A collated tag may never answer a query, and the full-scan gate is what found it · accepted
+## ADR-54 — A collated tag may never answer a query, and the full-scan gate is what found it · accepted (its account of the reference corrected by ADR-59)
 
 **Date.** 2026-09-04. **Supersedes the collation half of [ADR-52](#adr-52); its type half stands.**
 
@@ -2060,3 +2060,44 @@ it, or uses an extension method outside the library's contract.
 takes the expected kind from the reference — the field's type in the table dump, the compiled type in
 the expression dump, or the function table's return type for the one expression neither lists.
 Restoring the old branch reddens exactly the 19 tags whose keys are not character.
+
+## ADR-59 — The reference does answer queries with collated tags; the port's refusal is a divergence by decision · accepted
+
+**Date.** 2026-10-29. Corrects the account of the reference in [ADR-54](#adr-54) and
+`QUERY-OPTIMIZER.md` §3.4; ADR-54's decision stands.
+
+**Context.** ADR-54 refused collated tags in both scopes and said the reference refuses them too, for
+a reason "better than its comment suggests". Step 012 added `CDXCOLL`'s query dump and a case,
+`QRYGATE`, with a lone GENERAL tag — expecting to watch the reference refuse it. It does not.
+
+**What the reference does.** The refusal at r4log.c:114-120 is inside
+`#if !defined( S4USE_GENERAL_TAGS_IN_RELATE )`, and `d4defs.h:669-673` defines that macro in every
+S4FOX build that is not S4TESTING. So in every shipping build the refusal is compiled out and
+`useGeneralTagsInRelate` is never read. The reference seeks the GENERAL tag for a filter it compares in
+byte order and returns the wrong records: all six such filters in the corpus — four in `CDXCOLL`, two in `QRYGATE` — record `agree NO`
+between its optimized answer and its own scan — `G_TEXT > "M"` returns 12 records of the 18 the
+filter means, and `K_TEXT > "M"` on `CDXCOLL` loses the same six ADR-54 named.
+
+**Decision.** The port keeps refusing collated tags in both scopes, as ADR-54 decided, and now says
+so as what it is: **a deliberate divergence from the reference, in the direction of the right record
+set**. `QueryTagScope.Compatible` therefore means "the reference's type, filter and unique refusals",
+not "exactly the tags the reference would use".
+
+**How the gates treat it.** A query the reference answered with a collated tag has no reference
+decision the port can be compared with — and what it *would* have matched with the refusal in force
+is not in the dump. So the decision gates (tag match, decomposition, candidate set, leaf evaluation,
+residual) compare only the cases that used no collated tag; which cases those are is read from the
+dumps (a matched tag whose index header names a sort sequence), never listed by hand. On the others,
+`CollationDivergenceGoldenTests` checks what can be checked against the reference: the port takes no
+collated tag, returns the reference's **scan**, and under a selected tag returns it in the order the
+reference stored that tag's keys. `CDXCOLL` is in Gate A and in that class, and in no decision gate,
+because every one of its filters reached `C_GEN` first.
+
+**Rejected — matching the reference.** It returns records the filter does not select and drops ones it
+does. `CLAUDE.md` ranks that above any compatibility argument, and the reference's own comment calls it
+the problem the refusal was written to prevent.
+
+**Also corrected.** `QUERY-OPTIMIZER.md` §3.4 cited `K_DUP = "CHERRY"` as the unique refusal's
+evidence, but `T_DUP` sorts before `T_UNIQ` and the unique tag is never reached; `QRYGATE` is now the
+evidence, and the first. Step 011's record said the filtered refusal could not be isolated; `T_FILT`
+sorts before `T_NUM`, so `CDXBASE` isolated it all along.

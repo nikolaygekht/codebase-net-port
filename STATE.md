@@ -1,7 +1,6 @@
 # Project state
 
-**Updated:** 2026-10-29 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed
-locally in two commits and not pushed.** Development moved to native Windows; the generator builds there, now with
+**Updated:** 2026-10-29 · **step 012 (`012-p1-tails`) is in progress; the tree is clean and pushed.** Development moved to native Windows; the generator builds there, now with
 zlib, and regenerated the corpus byte-identical. Done in 012 so far: compressed memo entries read
 (ADR-55), compressed-data tables refused at open (ADR-56), `Seek` by text only on character tags
 (ADR-58), a race in the engine's table list fixed, the suite run in Release with the timed gates

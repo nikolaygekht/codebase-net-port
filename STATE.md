@@ -3,7 +3,9 @@
 **Updated:** 2026-10-30 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed locally and not pushed.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
-run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Development moved to native Windows; the generator builds there, now with
+run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
+steps 001–011 into step 013's [`AUDIT.md`](claude/dev/013-coverage-audit/AUDIT.md) — the clean-up
+that follows 012, before anything new. Development moved to native Windows; the generator builds there, now with
 zlib, and regenerated the corpus byte-identical. Done in 012 so far: compressed memo entries read
 (ADR-55), compressed-data tables refused at open (ADR-56), `Seek` by text only on character tags
 (ADR-58), a race in the engine's table list fixed, the suite run in Release with the timed gates
@@ -308,7 +310,9 @@ commit messages (§7); where they conflict, ours stand (ADR-60). Its own tools r
 `mutate4csharp`, latest commit, gitignored. First CRAP run over the library: 93 of 663 members above
 8.0, 129 at 0% unit coverage, mostly `Queries/` and the evaluator that only the Golden layer reaches.
 §4 now runs `crap4csharp` after each sub-step and both tools before a step closes, numbers into the
-step's `STATE.md`, no threshold yet. `mutate4csharp` has only been run with `--scan`.
+step's `STATE.md`, no threshold yet. `mutate4csharp` has only been run with `--scan`. That run,
+attributed to the step that created each file, became step 013's `AUDIT.md`; 013 is the clean-up
+after 012 closes, and the counted query comparison moves to 014.
 
 ### Before it (2026-10-29)
 
@@ -919,7 +923,18 @@ They are the first sub-steps under the new §4 tool runs: `tools\fetch.bat` once
 after each, and the first full `mutate4csharp` run at close — copy-aside, since it writes into the
 file it mutates.
 
-### Step 013 — how much work does a query cost the reference?
+### Step 013 — clean up what the unit layers do not cover — `claude/dev/013-coverage-audit/`
+
+Starts once 012 closes, and before anything new. Its input is already written:
+[`AUDIT.md`](claude/dev/013-coverage-audit/AUDIT.md), the first `crap4csharp` run over steps
+001–011 — 93 of 662 members above 8.0, 129 at 0% unit coverage. The headline is F1: the query
+pipeline (decomposer, executor, plan, residual filter, `Query`) has no test below the Golden layer.
+Then F2–F4 in steps 008, 010 and 006, and a decision on the public facade (F5). `DESIGN.md` and
+`PLAN.md` from the template when it starts.
+
+### Step 014 — how much work does a query cost the reference?
+
+(Planned as 013 until 2026-10-30, when the coverage clean-up was put first.)
 
 **`QUERY`'s performance has never been compared against the C library.** Step 009 measured seek and
 walk — 1.36–1.43× slower per seek, **2.45× faster** on a walk — but it predates the optimizer, and its

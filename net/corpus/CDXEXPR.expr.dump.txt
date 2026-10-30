@@ -953,7 +953,7 @@ expr 130 "ASCEND(CTOD(\"01/15/00\"))"   ; row 178
   value len=8 "20000115"
 
 [field expressions]
-count        77
+count        82
 
 expr 0 "K_NUM"   ; r4num -- stored text, no function returns it
   compiled type='N'(78) len=12 keyLen=8 hasTrim=0 nodes=1
@@ -2594,6 +2594,144 @@ expr 76 "ASCEND(K_DBL)"   ; row 183
   rec 14 len=8 "\xC0\x04\x00\x00\x00\x00\x00\x00"
   rec 15 len=8 "\xC0\x08\x00\x00\x00\x00\x00\x00"
   rec 16 len=8 "\xC0\x0C\x00\x00\x00\x00\x00\x00"
+
+expr 77 "K_NNUM <> 0"   ; one side null: 1, and the node null (e4notEqual)
+  compiled type='L'(76) len=4 keyLen=2 hasTrim=0 nodes=3
+    node  0 row=8 len=12 numParms=0 numEntries=1 fieldNo=14 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=53 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x01\x00\x00\x00"
+  rec 2 len=4 "\x01\x00\x00\x00"
+  rec 3 len=4 "\x01\x00\x00\x00"
+  rec 4 len=4 "\x01\x00\x00\x00"
+  rec 5 len=4 "\x01\x00\x00\x00"
+  rec 6 len=4 "\x01\x00\x00\x00"
+  rec 7 len=4 "\x01\x00\x00\x00"
+  rec 8 len=4 "\x01\x00\x00\x00"
+  rec 9 len=4 "\x01\x00\x00\x00"
+  rec 10 len=4 "\x01\x00\x00\x00"
+  rec 11 len=4 "\x01\x00\x00\x00"
+  rec 12 len=4 "\x01\x00\x00\x00"
+  rec 13 len=4 "\x01\x00\x00\x00"
+  rec 14 len=4 "\x01\x00\x00\x00"
+  rec 15 len=4 "\x01\x00\x00\x00"
+  rec 16 len=4 "\x01\x00\x00\x00"
+
+expr 78 "K_NNUM # 0"   ; the same row by its other spelling
+  compiled type='L'(76) len=4 keyLen=2 hasTrim=0 nodes=3
+    node  0 row=8 len=12 numParms=0 numEntries=1 fieldNo=14 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=53 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=4 "\x01\x00\x00\x00"
+  rec 2 len=4 "\x01\x00\x00\x00"
+  rec 3 len=4 "\x01\x00\x00\x00"
+  rec 4 len=4 "\x01\x00\x00\x00"
+  rec 5 len=4 "\x01\x00\x00\x00"
+  rec 6 len=4 "\x01\x00\x00\x00"
+  rec 7 len=4 "\x01\x00\x00\x00"
+  rec 8 len=4 "\x01\x00\x00\x00"
+  rec 9 len=4 "\x01\x00\x00\x00"
+  rec 10 len=4 "\x01\x00\x00\x00"
+  rec 11 len=4 "\x01\x00\x00\x00"
+  rec 12 len=4 "\x01\x00\x00\x00"
+  rec 13 len=4 "\x01\x00\x00\x00"
+  rec 14 len=4 "\x01\x00\x00\x00"
+  rec 15 len=4 "\x01\x00\x00\x00"
+  rec 16 len=4 "\x01\x00\x00\x00"
+
+expr 79 ".NOT.(K_NNUM = 0)"   ; .NOT. of a null: 0 (e4not), not the negation
+  compiled type='L'(76) len=4 keyLen=2 hasTrim=0 nodes=4
+    node  0 row=8 len=12 numParms=0 numEntries=1 fieldNo=14 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=78 len=4 numParms=2 numEntries=3 fieldNo=0 i2=0
+    node  3 row=34 len=4 numParms=1 numEntries=4 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\x00\x00\x00\x00"
+  rec 4 len=4 "\x00\x00\x00\x00"
+  rec 5 len=4 "\x00\x00\x00\x00"
+  rec 6 len=4 "\x00\x00\x00\x00"
+  rec 7 len=4 "\x00\x00\x00\x00"
+  rec 8 len=4 "\x00\x00\x00\x00"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x00\x00\x00\x00"
+  rec 11 len=4 "\x00\x00\x00\x00"
+  rec 12 len=4 "\x00\x00\x00\x00"
+  rec 13 len=4 "\x00\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x00\x00"
+  rec 15 len=4 "\x00\x00\x00\x00"
+  rec 16 len=4 "\x00\x00\x00\x00"
+  fresh 2 len=4 "\x01\x00\x00\x00"
+  fresh 3 len=4 "\x01\x00\x00\x00"
+  fresh 4 len=4 "\x01\x00\x00\x00"
+  fresh 5 len=4 "\x01\x00\x00\x00"
+  fresh 7 len=4 "\x01\x00\x00\x00"
+  fresh 8 len=4 "\x01\x00\x00\x00"
+  fresh 9 len=4 "\x01\x00\x00\x00"
+  fresh 10 len=4 "\x01\x00\x00\x00"
+  fresh 11 len=4 "\x01\x00\x00\x00"
+  fresh 13 len=4 "\x01\x00\x00\x00"
+  fresh 14 len=4 "\x01\x00\x00\x00"
+  fresh 15 len=4 "\x01\x00\x00\x00"
+  fresh 16 len=4 "\x01\x00\x00\x00"
+
+expr 80 "K_NNUM * 2"   ; a null operand multiplies to zero
+  compiled type='n'(110) len=8 keyLen=9 hasTrim=0 nodes=3
+    node  0 row=8 len=12 numParms=0 numEntries=1 fieldNo=14 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=100 len=8 numParms=2 numEntries=3 fieldNo=0 i2=0
+  rec 1 len=8 "\x00\x00\x00\x00\x00\x00\x00\x00"
+  rec 2 len=8 "\xB2\x9D\xEF\xFF\xCF\x12c\xC1"
+  rec 3 len=8 "\xB6\xF3\xFD\xFF\x83\xD7\x97A"
+  rec 4 len=8 "\xFC\xA9\xF1\xD2Mb`\xBF"
+  rec 5 len=8 "\x00\x00\x00\x00\x00\x00\x04@"
+  rec 6 len=8 "\x00\x00\x00\x00\x00\x00\x00\x00"
+  rec 7 len=8 "T\xE3\xA5\x9B\xC4 \xC0?"
+  rec 8 len=8 "\x9C\xC4 \xB0rh\xC1?"
+  rec 9 len=8 "\x91\xED|?5Nx@"
+  rec 10 len=8 "\x00\x00\x00\x00\x00@\x7F@"
+  rec 11 len=8 "{\x14\xAEG\xE1\x18\x83@"
+  rec 12 len=8 "\x00\x00\x00\x00\x00\x00\x00\x00"
+  rec 13 len=8 "-\xB2\x9D\xEF\xA7\x0A\x8A@"
+  rec 14 len=8 "\xA8\xC6K7\x89\x83\x8D@"
+  rec 15 len=8 "\xF0\xA7\xC6K7~\x90@"
+  rec 16 len=8 "-\xB2\x9D\xEF\xA7:\x92@"
+
+expr 81 "K_NNUM + 1 > 0"   ; a comparison over a computed null -- the sticky isNull shows here
+  compiled type='L'(76) len=4 keyLen=2 hasTrim=0 nodes=5
+    node  0 row=8 len=12 numParms=0 numEntries=1 fieldNo=14 i2=0
+    node  1 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  2 row=42 len=8 numParms=2 numEntries=3 fieldNo=0 i2=0
+    node  3 row=27 len=8 numParms=0 numEntries=1 fieldNo=0 i2=0
+    node  4 row=85 len=4 numParms=2 numEntries=5 fieldNo=0 i2=0
+  rec 1 len=4 "\x00\x00\x00\x00"
+  rec 2 len=4 "\x00\x00\x00\x00"
+  rec 3 len=4 "\x00\x00\x00\x00"
+  rec 4 len=4 "\x00\x00\x00\x00"
+  rec 5 len=4 "\x00\x00\x00\x00"
+  rec 6 len=4 "\x00\x00\x00\x00"
+  rec 7 len=4 "\x00\x00\x00\x00"
+  rec 8 len=4 "\x00\x00\x00\x00"
+  rec 9 len=4 "\x00\x00\x00\x00"
+  rec 10 len=4 "\x00\x00\x00\x00"
+  rec 11 len=4 "\x00\x00\x00\x00"
+  rec 12 len=4 "\x00\x00\x00\x00"
+  rec 13 len=4 "\x00\x00\x00\x00"
+  rec 14 len=4 "\x00\x00\x00\x00"
+  rec 15 len=4 "\x00\x00\x00\x00"
+  rec 16 len=4 "\x00\x00\x00\x00"
+  fresh 3 len=4 "\x01\x00\x00\x00"
+  fresh 4 len=4 "\x01\x00\x00\x00"
+  fresh 5 len=4 "\x01\x00\x00\x00"
+  fresh 7 len=4 "\x01\x00\x00\x00"
+  fresh 8 len=4 "\x01\x00\x00\x00"
+  fresh 9 len=4 "\x01\x00\x00\x00"
+  fresh 10 len=4 "\x01\x00\x00\x00"
+  fresh 11 len=4 "\x01\x00\x00\x00"
+  fresh 13 len=4 "\x01\x00\x00\x00"
+  fresh 14 len=4 "\x01\x00\x00\x00"
+  fresh 15 len=4 "\x01\x00\x00\x00"
+  fresh 16 len=4 "\x01\x00\x00\x00"
 
 [clock-dependent expressions]
 count        4

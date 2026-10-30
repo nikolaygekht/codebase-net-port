@@ -2150,3 +2150,37 @@ threshold is a gate until the numbers have been studied, and `DEV_APPROACH.md` s
 **Not taken, for now.** A glossary of domain terms: terms are defined where they are used, in
 `specs/`, and a glossary would be one more document to keep true. "Keep a log" and "ship the
 smallest edit" are already the step `STATE.md` and `CLAUDE.md`'s ground rules.
+
+## ADR-61 — A null does not leak between records: the reference's sticky `isNull` is not replicated, and the corpus witnesses both readings · accepted
+
+**Date.** 2026-10-30. Step 012, sub-step 4; `DESIGN.md` Decision 3.
+
+**Context.** In the null-aware build every computed node sets its own `isNull` when an operand is
+null (e4functi.c:334-337 for `+`, :2325-2327 for `<>`), and no path clears it; only the field
+loaders reset theirs (`e4fieldCopy`, :608-616). One compiled `EXPR4` evaluated record after record
+therefore reports a computed node null on every record after the first null one. That is invisible
+in a value until a parent reads a computed child's flag — a comparison over `K_NNUM + 1`, or `.NOT.`
+over a comparison — and then it is a different answer: in `CDXEXPR`, record 1 is null, so the
+reference answers `K_NNUM + 1 > 0` and `.NOT.(K_NNUM = 0)` with false on all sixteen records.
+
+**Decision.** The port evaluates every record as though the expression had been parsed for it
+alone. A filter whose answer depends on which records were evaluated before it cannot be answered by
+an optimizer that evaluates a subset: replicating it would make the full-scan equivalence gate
+unsatisfiable, and would make one record's membership depend on the scan order.
+
+**How the corpus holds both.** The generator evaluates every field expression twice — through one
+`EXPR4` across the records, as before, and parsed afresh for each record — and writes a `fresh` line
+wherever the two differ, the same move as step 011's depth 0. The port's value gate reads the fresh
+value where there is one. A golden test pins **where** they differ: on `.NOT.(K_NNUM = 0)` and
+`K_NNUM + 1 > 0`, at every non-null record after the first, and on none of the other 80 field
+expressions. So the stickiness is a witnessed fact rather than a reading of the source, and an
+expression that started to differ would fail the test instead of quietly moving the gate.
+
+**And the defect it uncovered on the way.** `.NOT.` of a null operand is false and null in the
+reference (`e4not`, :2247-2261); the port negated it, so `.NOT.(K_NNUM = 0)` held on every null
+record and a filter meant to leave out the zeros returned the nulls as well — a wrong record set.
+The decomposer never optimizes a negation (m4map.c:288-291), so the evaluator is the only path, and
+it is fixed there.
+
+**Not done.** No null filter is added to the query lists: the reference's own scan answer would be
+the sticky one, so its record sets would disagree with the port by design and gate nothing.

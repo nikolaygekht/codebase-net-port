@@ -68,7 +68,7 @@ public sealed class ExpressionLexerGoldenTests
         // A reader that silently found nothing would make every test above pass, so the counts are
         // pinned against what the step's record says the generator produced.
         Oracle.ConstantExpressions.Should().HaveCount(131);
-        Oracle.FieldExpressions.Should().HaveCount(77);
+        Oracle.FieldExpressions.Should().HaveCount(82);
         Oracle.ClockDependentExpressions.Should().HaveCount(4);
         Oracle.Rejections.Should().HaveCount(18);
         Oracle.VisualFoxProOnly.Should().HaveCount(13);

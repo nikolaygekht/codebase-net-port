@@ -119,13 +119,14 @@ internal sealed class CorpusExpressionDump
         List<DumpNode> nodes = [];
         byte[]? value = null;
         Dictionary<int, byte[]> records = [];
+        Dictionary<int, byte[]> fresh = [];
 
         void Close()
         {
             if (expression is not null && target is not null)
             {
                 target.Add(new DumpExpression(
-                    expression, type, length, hasTrim, nodeCount, nodes, value, records));
+                    expression, type, length, hasTrim, nodeCount, nodes, value, records, fresh));
             }
 
             expression = null;
@@ -136,6 +137,7 @@ internal sealed class CorpusExpressionDump
             nodes = [];
             value = null;
             records = [];
+            fresh = [];
         }
 
         foreach (string raw in File.ReadLines(Path.Combine(Corpus.Root, FileName)))
@@ -187,6 +189,15 @@ internal sealed class CorpusExpressionDump
                     int quote = line.IndexOf('"', StringComparison.Ordinal);
                     if (quote >= 0)
                         records[ReadNumber(line, "rec ")] = DumpEscape.ReadQuoted(line, ref quote);
+                }
+                else if (line.StartsWith("fresh ", StringComparison.Ordinal))
+                {
+                    // A fresh parse that failed would leave the record ungated, so it is refused.
+                    int quote = line.IndexOf('"', StringComparison.Ordinal);
+                    if (quote < 0)
+                        throw new InvalidDataException($"{FileName} has a fresh reading with no value: {line}");
+
+                    fresh[ReadNumber(line, "fresh ")] = DumpEscape.ReadQuoted(line, ref quote);
                 }
                 else if (line.StartsWith("node ", StringComparison.Ordinal))
                 {

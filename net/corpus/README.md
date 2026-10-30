@@ -230,7 +230,7 @@ more for the query optimizer (step `011-query-optimizer`):
   transcription slip is a failing test rather than a parse difference discovered later.
 * **`CDXEXPR.expr.dump.txt`** — what the C library's parser and evaluator answer, in five sections:
   `[constant expressions]` (131), which reference no field and so have no record dimension;
-  `[field expressions]` (77), evaluated at every record, for the types no literal can express
+  `[field expressions]` (82), evaluated at every record, for the types no literal can express
   (`r4num`, `r4date`, `r4int`, `r4currency`, a memo, and null); `[clock-dependent expressions]` (4),
   recorded for **shape only** because a value would change on every run;
   `[rejections]` (18), which records for each malformed string whether the parser accepted it and
@@ -250,6 +250,14 @@ more for the query optimizer (step `011-query-optimizer`):
   overload row does not fail loudly, it selects the neighbouring row and returns a plausible value.
   Values are the **raw result bytes**, escaped by the same rules as a key: a numeric result is a
   double, and printing it as text would hide the low bits the key transform depends on.
+
+  **A field expression is evaluated twice** (ADR-61): through one compiled `EXPR4` across the
+  records, as the `rec` lines record, and parsed afresh for each record. A `fresh` line follows
+  wherever the second reading gives other bytes, because the reference never clears a computed
+  node's null flag and so carries a null forward from an earlier record. No `fresh` line means the
+  two agree; they differ on exactly `.NOT.(K_NNUM = 0)` and `K_NNUM + 1 > 0`, the two of the five
+  null-operand expressions added on 2026-10-30 where a parent reads a computed child's null. The
+  port is gated on the fresh reading.
 
 * **`CDXEXPR.query.dump.txt` (54 filters), `CDXBASE.query.dump.txt` (15),
   `CDXDEEP.query.dump.txt` (12), `QRYGATE.query.dump.txt` (13) and `CDXCOLL.query.dump.txt` (4)** — what the reference's **query optimizer** decided about a filter,

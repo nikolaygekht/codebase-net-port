@@ -1,7 +1,7 @@
 # 012-p1-tails — state
 
-**Status:** in progress — design and plan written, awaiting the user's review before sub-step 2
-**Current sub-step:** PLAN.md step 2
+**Status:** in progress — sub-steps 1–4, 7 and 7a done
+**Current sub-step:** PLAN.md step 5
 
 ## Done so far
 
@@ -43,7 +43,27 @@
   **Mutations:** unique refusal off → `QRYGATE` red at every depth; filter refusal off → `CDXBASE`,
   `CDXEXPR`, `QRYGATE` red; collation refusal off → `CollationDivergenceGoldenTests` and `QRYGATE`'s tag
   match red. Each reddens a reference-backed gate, not only Gate A. 2493 + 937 green.
-- [ ] step 4 — C1, null operands
+- [x] step 4 — C1, null operands (2026-10-30), the first sub-step under `DEV_APPROACH.md` §4's
+  test-first and tool rules.
+  - Generator: five `FIELDEXPRS` appended (`K_NNUM <> 0`, `# 0`, `.NOT.(K_NNUM = 0)`, `* 2`,
+    `K_NNUM + 1 > 0`), so no earlier index moved; `dump-expr.cpp` evaluates each field expression a
+    second time, parsed afresh per record, and writes a `fresh` line only where the bytes differ.
+    Regeneration changed exactly `CDXEXPR.expr.dump.txt`: 77 → 82 expressions, and **fresh lines on
+    exactly `.NOT.(K_NNUM = 0)` and `K_NNUM + 1 > 0`**, at every non-null record after record 1 —
+    the sticky `isNull` witnessed, as the design predicted from the source.
+  - Test first: the reader learnt `fresh` lines (`DumpExpression.FreshValues`, `FreshValueAt`), the
+    value gate reads the fresh value, `TheReferenceCarriesANullForwardOnlyWhereAComputedNullIsRead`
+    pins where the readings differ, plus `TheNegationOfAnAbsentAnswerIsAbsentAndFalse` (layer 1) and
+    `NegatedNullFilterTests` (layer 2, `Table.Query` over `CDXEXPR`). Before the fix all three failed
+    for the expected reason only: the gate on `.NOT.(K_NNUM = 0)` at records 1, 6, 12; the query
+    returned those three records extra.
+  - Port: `ExpressionEvaluator.Negate` — a null operand gives false and null (e4functi.c:2247-2261).
+    The decomposer never optimizes a negation, so the evaluator is the only path.
+  - **Mutation:** the old `!operands[0].Logical` restored (copy-aside, md5 checked) → exactly those
+    three tests red, one per layer. `crap4csharp` on the changed file: `Negate` CC 2, 100%; `Apply`
+    unchanged at CC 114, 87.7% (013's F3/F6).
+  - Docs: ADR-61; `EXPRESSIONS.md` §6 (the `.NOT.` rule and the stickiness, cited); both READMEs.
+    Release 2496 + 938 green.
 - [ ] step 5 — C2, the tag-context parse
 - [ ] step 6 — C3, case mapping by code page
 - [x] step 7 — D, compressed memos (2026-10-29), done out of order at the user's call.
@@ -75,6 +95,11 @@
 - [ ] step 8 — close
 
 ## Notes for the next session
+
+- Running the generator's `.bat` files from an agent shell: the environment sets
+  `NoDefaultCurrentDirectoryInExePath=1`, so `cmd` does not look in the current directory —
+  `build-gen.bat` is "not recognized" there. Call them as `.uild-gen.bat`; they call each other by
+  absolute path and work unchanged.
 
 - `.gitattributes` is new and uncommitted: `*.bat`/`*.cmd` are `eol=crlf` in the working tree. The
   batch files were LF, and `cmd.exe` resolves `call`/`goto` targets by byte offset assuming CRLF, so

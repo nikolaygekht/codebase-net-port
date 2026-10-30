@@ -448,7 +448,15 @@ static const EXPRCASE FIELDEXPRS[] =
    { "ASCEND(K_INT)",                "row 180" },
    { "ASCEND(K_TS)",                 "row 181" },
    { "ASCEND(K_CUR)",                "row 182" },
-   { "ASCEND(K_DBL)",                "row 183" }
+   { "ASCEND(K_DBL)",                "row 183" },
+
+   /* Third run, 2026-10-30 -- a null operand under the operators that read
+    * it (e4functi.c, S4CLIENT_OR_FOX). Last, so no earlier index moves. */
+   { "K_NNUM <> 0",                  "one side null: 1, and the node null (e4notEqual)" },
+   { "K_NNUM # 0",                   "the same row by its other spelling" },
+   { ".NOT.(K_NNUM = 0)",            ".NOT. of a null: 0 (e4not), not the negation" },
+   { "K_NNUM * 2",                   "a null operand multiplies to zero" },
+   { "K_NNUM + 1 > 0",               "a comparison over a computed null -- the sticky isNull shows here" }
 };
 
 /* Recorded for SHAPE only -- these read the system clock, so a recorded value

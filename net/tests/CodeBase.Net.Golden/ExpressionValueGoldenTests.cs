@@ -87,8 +87,9 @@ public sealed class ExpressionValueGoldenTests
 
             ExpressionEvaluator evaluator = new(expression);
 
-            foreach ((int number, byte[] expected) in compiled.RecordValues)
+            foreach (int number in compiled.RecordValues.Keys)
             {
+                byte[] expected = compiled.FreshValueAt(number);
                 table.Go(number);
                 EvaluationContext context = Context(table);
 
@@ -109,6 +110,19 @@ public sealed class ExpressionValueGoldenTests
         }
 
         string.Join(Environment.NewLine, failures).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TheReferenceCarriesANullForwardOnlyWhereAComputedNullIsRead()
+    {
+        // The reference never clears a computed node's null flag, so one compiled expression run
+        // record after record answers differently from the same text parsed afresh — but only where
+        // a parent reads a computed child's null, which takes a nullable field under two operators.
+        // Every other expression in the dump agrees with itself, which is what makes the fresh
+        // reading a correction and not a second oracle (ADR-61).
+        Oracle.FieldExpressions.Where(e => e.FreshValues.Count > 0)
+            .Select(e => e.Expression)
+            .Should().Equal(".NOT.(K_NNUM = 0)", "K_NNUM + 1 > 0");
     }
 
     [Fact]

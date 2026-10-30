@@ -18,6 +18,17 @@
  * exactly the low bits the FOX key transform depends on. Everything is escaped
  * by the shared dumpEscapedBytes, so a value and a key unescape the same way.
  *
+ * WHY A FIELD EXPRESSION IS EVALUATED TWICE
+ * -----------------------------------------
+ * A computed node sets its isNull on a null operand (e4functi.c:334-337,
+ * :2325-2327) and nothing clears it; only the field loaders reset theirs
+ * (e4fieldCopy, :608-616). So one EXPR4
+ * evaluated record after record carries a null forward into every record after
+ * the first null one, wherever a parent reads a computed child's isNull. The
+ * port does not replicate that (ADR-61), so each field expression is also parsed
+ * afresh for every record, and a "fresh" line records the value wherever the
+ * two readings differ. No fresh line means they agree.
+ *
  * THREE MECHANICS, none of them obvious:
  *   - expr4parseLow is the const-correct entry point and takes the tag context;
  *     expr4parse( DATA4 *, char * ) is the legacy signature (e4parse.c:2698).
@@ -31,6 +42,7 @@
 #include "d4all.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "util.h"
@@ -143,6 +155,69 @@ static void dumpValue( FILE *fp, CODE4 *cb, EXPR4 *expr, const char *lead )
    fputc( '\n', fp );
 }
 
+/* A value kept past the next evaluation: expr4vary's result lives in the
+ * CODE4's shared work buffer, which any other expression overwrites. */
+typedef struct
+{
+   int len;
+   int errorCode;
+   char *bytes;
+} KEPTVALUE;
+
+static void keepValue( CODE4 *cb, EXPR4 *expr, KEPTVALUE *kept )
+{
+   char *result = 0;
+
+   kept->len = expr4vary( expr, &result );
+   kept->errorCode = 0;
+   kept->bytes = 0;
+   if ( kept->len < 0 || result == 0 )
+   {
+      kept->errorCode = (int)error4code( cb );
+      error4set( cb, 0 );
+      return;
+   }
+
+   kept->bytes = (char *)malloc( kept->len > 0 ? kept->len : 1 );
+   memcpy( kept->bytes, result, kept->len );
+}
+
+/* The second reading: the same text parsed anew for one record, so no isNull
+ * survives from an earlier record. Written only where it differs. */
+static void dumpFreshValue( FILE *fp, CODE4 *cb, DATA4 *data, const char *text,
+                            long rec, const KEPTVALUE *sticky )
+{
+   EXPR4 *fresh;
+   char *result = 0;
+   int len;
+
+   if ( error4code( cb ) != 0 )
+      error4set( cb, 0 );
+
+   fresh = expr4parseLow( data, text, 0 );
+   if ( fresh == 0 )
+   {
+      fprintf( fp, "  fresh %ld PARSE FAILED errorCode=%d\n", rec, (int)error4code( cb ) );
+      error4set( cb, 0 );
+      return;
+   }
+
+   len = expr4vary( fresh, &result );
+   if ( len < 0 || result == 0 )
+   {
+      fprintf( fp, "  fresh %ld eval-failed rc=%d errorCode=%d\n", rec, len, (int)error4code( cb ) );
+      error4set( cb, 0 );
+   }
+   else if ( sticky->bytes == 0 || len != sticky->len || memcmp( result, sticky->bytes, len ) != 0 )
+   {
+      fprintf( fp, "  fresh %ld len=%d ", rec, len );
+      dumpEscapedBytes( fp, result, (unsigned long)len );
+      fputc( '\n', fp );
+   }
+
+   expr4free( fresh );
+}
+
 static EXPR4 *parseOne( CODE4 *cb, DATA4 *data, FILE *fp, const EXPRCASE *c )
 {
    EXPR4 *expr;
@@ -252,6 +327,7 @@ int dumpExpressions( CODE4 *cb, const char *outDir, const char *dbfName,
    for ( i = 0; i < numField; i++ )
    {
       EXPR4 *expr;
+      KEPTVALUE *sticky;
       long rec;
 
       dumpCase( fp, fieldExprs + i, i );
@@ -260,9 +336,10 @@ int dumpExpressions( CODE4 *cb, const char *outDir, const char *dbfName,
          continue;
 
       dumpNodes( fp, expr );
+      sticky = (KEPTVALUE *)calloc( records + 1, sizeof( KEPTVALUE ) );
       for ( rec = 1; rec <= records; rec++ )
       {
-         char lead[32];
+         KEPTVALUE *kept = sticky + rec;
 
          if ( d4go( data, rec ) < 0 )
          {
@@ -270,10 +347,30 @@ int dumpExpressions( CODE4 *cb, const char *outDir, const char *dbfName,
             d4close( data );
             return fail( cb, "d4go" );
          }
-         sprintf( lead, "  rec %ld", rec );
-         dumpValue( fp, cb, expr, lead );
+         keepValue( cb, expr, kept );
+         if ( kept->bytes == 0 )
+            fprintf( fp, "  rec %ld eval-failed rc=%d errorCode=%d\n", rec, kept->len, kept->errorCode );
+         else
+         {
+            fprintf( fp, "  rec %ld len=%d ", rec, kept->len );
+            dumpEscapedBytes( fp, kept->bytes, (unsigned long)kept->len );
+            fputc( '\n', fp );
+         }
       }
       expr4free( expr );
+
+      for ( rec = 1; rec <= records; rec++ )
+      {
+         if ( d4go( data, rec ) < 0 )
+         {
+            fclose( fp );
+            d4close( data );
+            return fail( cb, "d4go" );
+         }
+         dumpFreshValue( fp, cb, data, fieldExprs[i].text, rec, sticky + rec );
+         free( sticky[rec].bytes );
+      }
+      free( sticky );
    }
 
    /* Clock-dependent: shape, never a value. DATE() and TIME() read the system

@@ -566,7 +566,21 @@ restriction, e4parse.c:23-26).
 
 Null handling (S4FOX): every kernel checks operand `isNull`; for arithmetic, null in → null out
 with value 0; for comparisons, `isNull(a) != isNull(b)` forces result false (true for `<>`) and
-marks the node null (pattern e4functi.c:330-340, 966-976, 2296-2305).
+marks the node null (pattern e4functi.c:330-340, 966-976, 2296-2305). **`.NOT.` of a null operand is
+false and null** — it does not negate (`e4not`, e4functi.c:2247-2261). So `.NOT.(K = 0)` is false
+where `K` is null, as `K = 0` is: neither holds on a null record. Witnessed by `CDXEXPR`'s
+`.NOT.(K_NNUM = 0)` at records 1, 6 and 12.
+
+**`isNull` is sticky within one compiled expression.** A computed node sets its own `isNull` when an
+operand is null and no path clears it; only the field loaders reset theirs (`e4fieldCopy`, e4functi.c:608-616, and
+the other `e4field*` kernels). So an `EXPR4` evaluated record after record reports a computed node
+null on every record after the first null one — visible wherever a parent reads a computed child's
+flag: a comparison over `K + 1`, or `.NOT.` over a comparison. `CDXEXPR.expr.dump.txt` evaluates each
+field expression twice, once through one `EXPR4` and once parsed afresh per record, and records a
+`fresh` line wherever the two differ: they differ on `.NOT.(K_NNUM = 0)` and `K_NNUM + 1 > 0` at every
+non-null record after record 1, and on no other expression. A value depending on which records were
+evaluated before it is a reference defect; the port evaluates every record as if freshly parsed
+(ADR-61).
 
 ---
 

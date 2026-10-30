@@ -151,7 +151,7 @@ internal sealed class ExpressionEvaluator
         // ---- the logical vocabulary ----------------------------------------
         FunctionRows.FirstLogicalWord or FunctionRows.FirstLogicalWord + 1 => ExpressionValue.Logic(true),
         FunctionRows.FirstLogicalWord + 2 or FunctionRows.FirstLogicalWord + 3 => ExpressionValue.Logic(false),
-        FunctionRows.FirstLogicalWord + 4 or FunctionRows.LastLogicalWord => ExpressionValue.Logic(!operands[0].Logical),
+        FunctionRows.FirstLogicalWord + 4 or FunctionRows.LastLogicalWord => Negate(operands[0]),
         FunctionRows.Or => AnyOf(operands),
         FunctionRows.And => AllOf(operands),
 
@@ -353,6 +353,17 @@ internal sealed class ExpressionEvaluator
 
         return ExpressionValue.Logic(false);
     }
+
+    /// <summary>
+    /// Negates a logical value, unless it is absent.
+    /// </summary>
+    /// <value>
+    /// An absent operand makes the result absent and false, not the opposite of the operand's forced
+    /// answer (e4functi.c:2247-2261). Otherwise [c].NOT.(K = 0)[/c] would hold on every record where
+    /// [c]K[/c] is null, and a filter meant to leave out the zeros would let the nulls in.
+    /// </value>
+    private static ExpressionValue Negate(ExpressionValue operand) =>
+        operand.IsNull ? ExpressionValue.Logic(false).AsNull() : ExpressionValue.Logic(!operand.Logical);
 
     // ------------------------------------------------------------- arithmetic
 

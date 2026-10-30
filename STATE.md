@@ -11,8 +11,11 @@ zlib, and regenerated the corpus byte-identical. Done in 012 so far: compressed 
 (ADR-58), a race in the engine's table list fixed, the suite run in Release with the timed gates
 alone (ADR-57), and the query refusals each witnessed by case `QRYGATE` — which found that **the
 reference answers queries with GENERAL tags and gets them wrong**: its refusal is compiled out. The
-port keeps refusing them, a divergence by decision (ADR-59). Record: [`claude/dev/012-p1-tails/STATE.md`](claude/dev/012-p1-tails/STATE.md).
-Next session: sub-step 4, `.NOT.` over null.
+port keeps refusing them, a divergence by decision (ADR-59). Then `.NOT.` over a null, which
+returned the null records as well and now does not, and the reference's sticky `isNull` witnessed
+by a second, fresh-per-record reading of every field expression and not replicated (ADR-61).
+Record: [`claude/dev/012-p1-tails/STATE.md`](claude/dev/012-p1-tails/STATE.md).
+Next: sub-step 5, the tag-context parse.
 **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
@@ -312,7 +315,11 @@ commit messages (§7); where they conflict, ours stand (ADR-60). Its own tools r
 §4 now runs `crap4csharp` after each sub-step and both tools before a step closes, numbers into the
 step's `STATE.md`, no threshold yet. `mutate4csharp` has only been run with `--scan`. That run,
 attributed to the step that created each file, became step 013's `AUDIT.md`; 013 is the clean-up
-after 012 closes, and the counted query comparison moves to 014.
+after 012 closes, and the counted query comparison moves to 014. Then 012's sub-step 4, the first
+under the new rules: `.NOT.` of a null is false and null, as in the reference — the port negated it
+and a filter `.NOT.(K_NNUM = 0)` returned the three null records too — and `CDXEXPR`'s field
+expressions evaluated a second time, parsed afresh per record, which shows the reference's `isNull`
+carrying a null forward on exactly two of 82 expressions (ADR-61). Tests: 2496 unit, 938 golden.
 
 ### Before it (2026-10-29)
 
@@ -916,7 +923,7 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ### Finish step 012 — `claude/dev/012-p1-tails/`
 
-Sub-steps 4–6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `.NOT.` over null and the double evaluation; the tag-context
+Sub-steps 5, 6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): the tag-context
 parse; `UPPER`/`LOWER` by the table's code page; then close.
 
 They are the first sub-steps under the new §4 tool runs: `tools\fetch.bat` once, then `crap4csharp`

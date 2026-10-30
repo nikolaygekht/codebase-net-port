@@ -18,7 +18,13 @@ namespace CodeBase.Net.Golden;
 /// the corpus stop regenerating identically.
 /// </param>
 /// <param name="RecordValues">
-/// The value per record, for an expression over fields, keyed by record number.
+/// The value per record, for an expression over fields, keyed by record number, from one compiled
+/// expression evaluated record after record.
+/// </param>
+/// <param name="FreshValues">
+/// The value per record where parsing the expression afresh for that record gave other bytes. The
+/// reference never clears a computed node's null flag, so one compiled expression carries a null
+/// forward from an earlier record; a fresh parse cannot. Empty where the two readings agree.
 /// </param>
 internal sealed record DumpExpression(
     string Expression,
@@ -28,4 +34,16 @@ internal sealed record DumpExpression(
     int NodeCount,
     IReadOnlyList<DumpNode> Nodes,
     byte[]? Value,
-    IReadOnlyDictionary<int, byte[]> RecordValues);
+    IReadOnlyDictionary<int, byte[]> RecordValues,
+    IReadOnlyDictionary<int, byte[]> FreshValues)
+{
+    /// <summary>Gets the value one record has when nothing evaluated before it can leak into it.</summary>
+    /// <param name="record">The record number.</param>
+    /// <returns>The fresh reading where it differs, otherwise the recorded one.</returns>
+    /// <value>
+    /// What this port is gated on (ADR-61): an answer that depends on which records were evaluated
+    /// earlier is one an optimizer that evaluates a subset could never reproduce.
+    /// </value>
+    public byte[] FreshValueAt(int record) =>
+        FreshValues.TryGetValue(record, out byte[]? fresh) ? fresh : RecordValues[record];
+}

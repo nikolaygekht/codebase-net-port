@@ -418,6 +418,28 @@ public sealed class ExpressionEvaluatorTests
     }
 
     [Fact]
+    public void TheNegationOfAnAbsentAnswerIsAbsentAndFalse()
+    {
+        // .NOT. does not negate an absent operand: it answers false and stays absent
+        // (e4functi.c:2247-2261). Negating the comparison's forced false would put every null row
+        // into a filter that only meant to exclude the zeros.
+        ExpressionValue value = Evaluate(".NOT.(K_NNUM = 0)", Context(record: Record(nullBits: 0x01)));
+
+        value.IsNull.Should().BeTrue();
+        value.Logical.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheNegationOfAPresentAnswerIsItsOpposite()
+    {
+        ExpressionValue value = Evaluate(".NOT.(K_NNUM = 0)", Context(record: Record()));
+
+        value.IsNull.Should().BeFalse();
+        value.Logical.Should().BeFalse();
+        Evaluate(".NOT.(K_NNUM = 1)", Context(record: Record())).Logical.Should().BeTrue();
+    }
+
+    [Fact]
     public void APresentValueInANullableFieldComparesAsUsual()
     {
         ExpressionValue value = Evaluate("K_NNUM = 0", Context(record: Record()));

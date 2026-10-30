@@ -2101,3 +2101,52 @@ the problem the refusal was written to prevent.
 evidence, but `T_DUP` sorts before `T_UNIQ` and the unique tag is never reached; `QRYGATE` is now the
 evidence, and the first. Step 011's record said the filtered refusal could not be isolated; `T_FILT`
 sorts before `T_NUM`, so `CDXBASE` isolated it all along.
+
+## ADR-60 — `ub-mode`'s rules are adapted into the development approach, not installed as a skill · accepted
+
+**Date.** 2026-10-30.
+
+**Context.** Robert C. Martin's [`ub-mode`](https://github.com/unclebob/ub-mode) is an agent skill
+of engineering rules — part process, part design discipline — paired with quality-gate tools
+(`crapper`, `dryer`, `mutator`, `uml-viewer`) kept in neighbouring repositories. Many of its rules
+are ones this project already follows; several are not stated anywhere here and are worth having.
+
+**Decision.** The rules worth having are restated in `DEV_APPROACH.md`, in our words and in the
+phase they belong to, with `ub-mode` cited once as their source. Where `ub-mode` and this project
+disagree, this project's rule stands. Taken: redesign rather than bolt on, subtract before adding,
+make the illegal state unwritable, parse once at the edge, do not silence the compiler, idempotent
+operations, one writer for shared state (§3.4); test-first in execution and the "returns nothing"
+check (§4); fix the cause and attack the premise (§6); commit messages saying why, what and how it
+was proved (§7).
+
+**Rejected — installing `ub-mode` as a skill beside `DEV_APPROACH.md`.** Two documents would both
+claim to be the process, and they conflict: `ub-mode` pushes to the main line at the end of every
+change, where this project commits and pushes only when asked; it cleans up worktrees, which this
+project does not use. `ub-mode` also carries no licence, so copying its text verbatim into a GPL
+repository is unclear, where restating ideas with attribution is not.
+
+**Rejected — its tools as they stand.** `crapper`, `dryer` and `mutator` cover Clojure, Java, Go,
+TypeScript, Rust and Python; none reads C#. `uml-viewer` is a Clojure application with no licence.
+Duplication is already measured by the Sonar analysis.
+
+**Taken instead — Microsoft's C# ports.** [`crap4csharp`](https://github.com/microsoft/crap4csharp)
+and [`mutate4csharp`](https://github.com/microsoft/mutate4csharp), both CC0, port `crap4java` and
+`mutate4java` from the same lineage as `ub-mode`. They are not vendored: `tools/fetch.bat` and
+`tools/fetch.sh` clone them into `tools/`, which is gitignored for them, and build them;
+`tools/README.md` says how to run them on this repository's layout. They are not packed as dotnet
+tools — neither repository packs one, and the `crap4csharp` package on NuGet is a third party's,
+unverified and not built from Microsoft's repository. They are not pinned to a commit either: every
+fetch takes the latest, by decision, and prints the commit it built so a number can be traced.
+
+**Rejected, for now — Stryker.NET.** The established .NET mutation tool, and it leaves sources alone,
+where a clean `mutate4csharp` run writes a manifest comment into the file it mutated. Not taken
+because `mutate4csharp` is the one paired with the rules adopted here; to revisit if the footer
+proves unacceptable.
+
+**Not yet — thresholds.** `crap4csharp` fails any member above a fixed 8.0; its first run here put
+93 of 663 members above it, most of them code that only the Golden layer covers. No CRAP or mutation
+threshold is a gate until the numbers have been studied, and `DEV_APPROACH.md` states none.
+
+**Not taken, for now.** A glossary of domain terms: terms are defined where they are used, in
+`specs/`, and a glossary would be one more document to keep true. "Keep a log" and "ship the
+smallest edit" are already the step `STATE.md` and `CLAUDE.md`'s ground rules.

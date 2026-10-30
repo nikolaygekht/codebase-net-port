@@ -14,6 +14,12 @@ The rule that gives everything else its shape: **design and plan are written dow
 written.** A step that starts with an editor open on a `.cs` file has skipped the part that catches
 mistakes cheaply.
 
+Several rules here — §3.4, test-first and the "returns nothing" check in §4, the premise and
+root-cause rules in §6, the commit rule in §7 — are adapted from Robert C. Martin's
+[`ub-mode`](https://github.com/unclebob/ub-mode). Where it and this file disagree, this file wins;
+ADR-60 in [`ARCHITECTURE-DECISIONS.md`](ARCHITECTURE-DECISIONS.md) records what was taken and what
+was not.
+
 ---
 
 ## 1. The loop
@@ -120,6 +126,25 @@ The specs already settled the byte layout, the endianness islands, and the colla
 Design decides *class shape*, not format facts. If a design seems to need a format fact the specs do
 not state, that is a spec gap to fill — not a judgement call to make in code.
 
+### 3.4 Shape rules
+
+- **Redesign, do not bolt on.** When a new requirement does not fit the design, ask what would have
+  been built had it been known from the start, design that, and deliver it in steps.
+- **Subtract before you add.** Take complexity out before putting any in.
+- **Make the illegal state impossible to write.** Prefer a type that cannot hold a wrong value to a
+  check that rejects it later. Code that is already clear and local stays as it is.
+- **Parse once, where the data enters.** Outside data — file bytes, caller arguments — is checked
+  at the edge, by the entity that decodes it; inside, it is trusted. A controller does not
+  re-validate what an entity already accepted.
+- **Do not silence the compiler.** Warnings are errors in this build, and none is suppressed: no
+  `#pragma warning disable`, no null-forgiving `!`, no Sonar suppression to make one go away. Fix
+  the cause.
+- **Make operations idempotent.** Running a write twice, or again after a crash halfway through,
+  ends in the same state.
+- **Separate before serializing shared state.** If two actors do not need the same mutable thing,
+  give each its own. If they do, allow one writer, and enforce that in the structure, not by
+  convention.
+
 ---
 
 ## 4. The test pyramid
@@ -164,6 +189,9 @@ The check: **if a rewrite that keeps the promise breaks the test, the test was w
 two reads, extracting a class, replacing a loop with a lookup table, caching a decode — none of that
 changes what a caller gets, so none of it should turn a suite red.
 
+The converse check: **if the test would still pass with every method under it returning nothing —
+`default`, an empty collection, a no-op — throw it out.** It asserts nothing a caller relies on.
+
 | Assert this | Not this |
 |---|---|
 | `header.RecordLength` is 87 for these bytes | that `Parse` read offset 10 before offset 8 |
@@ -202,6 +230,21 @@ This sharpens the CLAUDE.md rule ("never hand-write expected bytes"):
   interpretation of the format, then asserts we interpreted it the way we interpreted it. If no
   corpus case covers the path, generate one.
 
+### Test first, in execution
+
+In phase 6, each sub-step starts from a test:
+
+- write the failing test before changing the code;
+- see it fail **for the reason you expect** — a compile error or a missing corpus file proves
+  nothing yet;
+- make the smallest change that makes it pass.
+
+If an honest test is impractical, do not write a bad one: record the gap in the step's `STATE.md`
+and, if the gap is a missing corpus case, add the case.
+
+Test-first proves a test *can* fail before the code exists; the break-the-code check below proves,
+once the code exists, that the gate fails *where it should*. A step needs both.
+
 ### Proving a gate: break the code and watch it fail
 
 A gate that has never failed is a gate nobody has checked. Before a step closes, break the code the
@@ -229,6 +272,32 @@ a mutation that touches a *different* file from the one being restored: step 006
 way, and step 008 lost it again in a session that had already used the copy-aside rule correctly twice
 on other files. The habit does not transfer by itself, so the rule is per-restore and not per-session:
 if a file changed, it comes back from a checksummed copy, never from `git`.
+
+### Measuring it: `tools/`
+
+Two tools put numbers on what this section asks for by hand; [`tools/README.md`](../tools/README.md)
+says how to fetch and run them. `crap4csharp` lists the members whose complexity the unit layers
+leave uncovered — code that only the Golden layer reaches shows as 0%, which is the "untestable
+design" signal above. `mutate4csharp` automates the break-the-code check, one file at a time.
+
+- **After each sub-step in phase 6 — `crap4csharp` on the files the sub-step changed.** It takes
+  seconds. A member the sub-step added or changed that shows 0% has no test at its own level: write
+  that test while the sub-step is still open, or record the gap in the step's `STATE.md`, as test
+  first above says. Read the coverage column, not the exit code: a small member at 0% scores under
+  the tool's threshold and passes.
+- **Before the step closes — `crap4csharp` on every file the step changed, and `mutate4csharp` on
+  the one or two files that carry the step's logic.** A surviving mutant is a break the tests did
+  not notice: kill it with a test, or record in `STATE.md` why it stays (an equivalent mutant; a line
+  only a Golden test reaches). `mutate4csharp` edits the file it mutates and, after a clean run,
+  appends a manifest comment to it, so the copy-aside rule above applies: copy the file aside, run,
+  restore from the copy, check `md5sum`.
+- **The numbers go into the step's `STATE.md`**: the members above 8.0 and why each stays, and
+  mutants killed and survived. `SUMMARY.md` carries only the confirmation that the final run was
+  made and its numbers are the ones `STATE.md` explains.
+
+Neither number is a gate yet (ADR-60): a member above 8.0 or a surviving mutant is a finding to
+explain, not a failure that stops the step from closing. Once a few steps have recorded their
+numbers, they decide whether either becomes one.
 
 ### Mechanics
 
@@ -305,11 +374,19 @@ It will. The rule is that the documents stay true, not that the plan was right.
 A deviation that is written down is a finding. A deviation that is not is a trap for whoever reads
 the code next.
 
+**Fix the cause, not the symptom.** Reproduce the failure with a test, then fix what produced it. A
+guard that only stops the crash is not a fix.
+
+**Attack the premise.** When two fixes that rest on the same assumption fail the same gate, stop.
+Write the assumption down in one sentence, test it directly, and find where the design holds it.
+Do not try a third fix until that is done.
+
 ---
 
 ## 7. Traceability
 
 - One step → one folder → one commit, or a short series of commits all naming that step.
+- Each commit message says why, what changed, and how it was proved.
 - The root `STATE.md` names the active step folder; the active step's `STATE.md` names the current
   sub-step.
 - `claude/dev/README.md` is the index: one line per step, newest last, with its status.

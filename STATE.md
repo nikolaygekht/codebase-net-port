@@ -1,6 +1,9 @@
 # Project state
 
-**Updated:** 2026-10-29 · **step 012 (`012-p1-tails`) is in progress; the tree is clean and pushed.** Development moved to native Windows; the generator builds there, now with
+**Updated:** 2026-10-30 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed locally and not pushed.**
+The last session changed the process, not the library: `ub-mode`'s rules adapted into
+`DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
+run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Development moved to native Windows; the generator builds there, now with
 zlib, and regenerated the corpus byte-identical. Done in 012 so far: compressed memo entries read
 (ADR-55), compressed-data tables refused at open (ADR-56), `Seek` by text only on character tags
 (ADR-58), a race in the engine's table list fixed, the suite run in Release with the timed gates
@@ -295,7 +298,19 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-10-29), the ones before it, and the four before those
+## 2. This session (2026-10-30), the ones before it, and the four before those
+
+**The process, not the library.** Robert C. Martin's `ub-mode` rules were read against
+`DEV_APPROACH.md` and the ones worth having restated in it, in the phase each belongs to — shape rules
+(§3.4), test first and the "returns nothing" check (§4), fix the cause and attack the premise (§6),
+commit messages (§7); where they conflict, ours stand (ADR-60). Its own tools read no C#, so
+`tools/fetch.bat` and `fetch.sh` clone and build Microsoft's C# ports, `crap4csharp` and
+`mutate4csharp`, latest commit, gitignored. First CRAP run over the library: 93 of 663 members above
+8.0, 129 at 0% unit coverage, mostly `Queries/` and the evaluator that only the Golden layer reaches.
+§4 now runs `crap4csharp` after each sub-step and both tools before a step closes, numbers into the
+step's `STATE.md`, no threshold yet. `mutate4csharp` has only been run with `--scan`.
+
+### Before it (2026-10-29)
 
 **Step 012 opened as `012-p1-tails`** — the P1 capabilities' owed tails in one folder, one generator
 trip — and the counted query comparison moved to 013. Development moved from WSL to native Windows.
@@ -314,7 +329,7 @@ dumps, and `CollationDivergenceGoldenTests` holds the port to the reference's sc
 in 012: null operands, the tag-context parse,
 case mapping by code page, and close. Tests: 2493 unit, 937 golden, in Release.
 
-### Before it (2026-09-04)
+### And before that (2026-09-04)
 
 **Step 011 closed and `QUERY` is done** — the record is
 [`SUMMARY.md`](claude/dev/011-query-optimizer/SUMMARY.md), and §1 above says what a caller can now
@@ -899,6 +914,10 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 Sub-steps 4–6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `.NOT.` over null and the double evaluation; the tag-context
 parse; `UPPER`/`LOWER` by the table's code page; then close.
+
+They are the first sub-steps under the new §4 tool runs: `tools\fetch.bat` once, then `crap4csharp`
+after each, and the first full `mutate4csharp` run at close — copy-aside, since it writes into the
+file it mutates.
 
 ### Step 013 — how much work does a query cost the reference?
 

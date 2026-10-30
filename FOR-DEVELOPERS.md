@@ -35,6 +35,7 @@ them. **Building or testing CodeBase.NET never compiles or runs C.** See ADR-01 
 | `claude/dev/` | The per-step record: one folder per step |
 | `.claude/skills/` | Agent skills checked into the repo — `sonar` (query an analysis), `docgen-skill` (documentation authoring), `dotnet-coverage`. Local settings (`settings.local.json`) stay untracked |
 | `sonar.bat`, `SonarQube.Analysis.xml` | Quality analysis — see [Code quality](#code-quality--sonarqube) |
+| `tools/` | Scripts that fetch and build two quality tools, `crap4csharp` and `mutate4csharp`, from Microsoft's repositories — see its [README](tools/README.md). The clones are gitignored; not part of the solution |
 | `STATE.md` | What is ready, what changed last session, what is next |
 
 ### The specifications
@@ -226,7 +227,8 @@ committed**:
 | `.sonar.config` | the `sonar` agent skill, which queries results | `url = …` and `token = …`, one per line |
 
 **Settings live in [`SonarQube.Analysis.xml`](SonarQube.Analysis.xml)**, not on the command line:
-source exclusions (`original/`, `test-files-generator/`, `net/corpus/`, docs and skills), the coverage
+source exclusions (`original/`, `test-files-generator/`, `net/corpus/`, the tools cloned under
+`tools/`, docs and skills), the coverage
 and test-report globs, and the coverage exclusion for benchmarks. Only the project key, the host URL
 and the token stay in `sonar.bat` — the first because it identifies the project, the last two because
 they are secrets. Change an exclusion in the XML and the diff shows what changed and why.

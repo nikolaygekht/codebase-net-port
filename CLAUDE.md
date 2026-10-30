@@ -24,7 +24,7 @@ Each document owns its subject; the others link rather than restate it. Put a fa
 | `STATE.md` | **Where we are**: what is ready, what changed last session, what is next. Nothing else | Decisions, rules, scope |
 | `README.md` | The library, for a human evaluating it | The development process |
 | `FOR-DEVELOPERS.md` | Building, testing, contributing | Rules that bind you specifically — those are here |
-| `net/corpus/README.md`, `test-files-generator/README.md`, `test-files-generator/vfp/README.md` | Their own component | Anything outside it |
+| `net/corpus/README.md`, `test-files-generator/README.md`, `test-files-generator/vfp/README.md`, `tools/README.md` | Their own component | Anything outside it |
 
 Code and data: the port lives in `net/` — solution `net/CodeBase.Net.sln`, the library in
 `net/CodeBase.Net/`, plus `net/tests/`, `net/corpus/`. The corpus generator is
@@ -32,7 +32,7 @@ Code and data: the port lives in `net/` — solution `net/CodeBase.Net.sln`, the
 `test-files-generator/vfp/`, the **VFP 9 oracle**: scripts run in a VM that generate what CodeBase
 cannot, into the frozen corner `net/corpus/vfp/` (ADR-44). `original/source/` is read-only
 reference. Quality analysis is `sonar.bat` + `SonarQube.Analysis.xml` at the root (Windows only;
-secrets in the gitignored `.sonar.config*`). Agent skills live in `.claude/skills/`.
+secrets in the gitignored `.sonar.config*`), and the CRAP and mutation tools fetched into `tools/`. Agent skills live in `.claude/skills/`.
 
 ## Ground rules
 

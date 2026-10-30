@@ -26,11 +26,13 @@
          original/            the read-only CodeBase C reference (~117k lines)
          test-files-generator/ Windows/MSVC developer tool, not in the solution
          net/corpus/          golden binaries and their expected dumps
+         tools/*/             quality tools cloned by tools/fetch.*, not ours
          claude/, .claude/    documentation and agent skills                  -->
   <Property Name="sonar.exclusions">
     original/**,
     test-files-generator/**,
     net/corpus/**,
+    tools/*/**,
     claude/**,
     .claude/**,
     **/skill/**,

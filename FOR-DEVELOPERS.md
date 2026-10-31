@@ -118,7 +118,8 @@ addition to the usual test SDK, xUnit and AwesomeAssertions references:
 <PackageReference Include="LiquidTestReports.Markdown" Version="1.0.9" />
 ```
 
-Test projects that decode record text also need `System.Text.Encoding.CodePages`, and must call
+Test projects that decode record text or build case maps from a code page (both test projects do)
+also need `System.Text.Encoding.CodePages`, and must call
 `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)` once per test assembly. **The
 library deliberately does not do this** — registering an encoding provider is a process-wide side
 effect and belongs to the host application (ADR-17). The package must never be added to

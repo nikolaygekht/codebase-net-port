@@ -182,7 +182,7 @@ internal sealed class ExpressionParser
 
             case ExpressionTokenKind.String:
             {
-                ExpressionConstant literal = ExpressionConstant.FromText(token.Text, encoding);
+                ExpressionConstant literal = Literal(token.Text);
                 nodes.Add(new ExpressionNode(
                     FunctionRows.StringConstant,
                     0,
@@ -635,6 +635,28 @@ internal sealed class ExpressionParser
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Encodes a string literal, refusing a character the encoding cannot hold.
+    /// </summary>
+    /// <value>
+    /// A filter's literal is the caller's text and is encoded as the table's text is read, which a
+    /// character outside the code page cannot survive. Turned into a question mark it would compare
+    /// against bytes no one wrote, so the expression is refused instead.
+    /// </value>
+    private ExpressionConstant Literal(string text)
+    {
+        try
+        {
+            return ExpressionConstant.FromText(text, encoding);
+        }
+        catch (EncoderFallbackException)
+        {
+            throw Failure(
+                ErrorCode.UnrecognizedValue,
+                $"the text \"{text}\" holds a character code page {encoding.CodePage} cannot hold");
+        }
     }
 
     private CodeBaseException Failure(ErrorCode code, string what) =>

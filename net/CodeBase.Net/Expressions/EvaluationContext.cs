@@ -72,4 +72,13 @@ internal sealed record EvaluationContext
     /// holds anyway.
     /// </value>
     public Func<FieldDefinition, ReadOnlyMemory<byte>>? Memo { get; init; }
+
+    /// <summary>
+    /// Gets how [c]UPPER[/c] and [c]LOWER[/c] change a letter's case for the table being read.
+    /// </summary>
+    /// <value>
+    /// The table's own code page decides, which is the evaluator's only route to it; ASCII letters
+    /// only, the default, is what an unmarked table gets unless the host named an encoding for it.
+    /// </value>
+    public CaseMap CaseMap { get; init; } = CaseMap.Ascii;
 }

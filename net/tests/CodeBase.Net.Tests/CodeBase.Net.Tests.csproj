@@ -23,6 +23,11 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="LiquidTestReports.Markdown" Version="1.0.9" />
+    <!--
+      The legacy code pages, for the case maps built from each one. A test-project reference by
+      design: the library never registers an encoding provider (ADR-17); the test acts as the host.
+    -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

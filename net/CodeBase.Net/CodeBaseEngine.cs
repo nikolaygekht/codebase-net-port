@@ -56,6 +56,10 @@ public sealed class CodeBaseEngine : IDisposable
     /// Null, the default, means code page 437, which is how the C library reads an unmarked table.
     /// Setting this to an encoding you already hold also avoids needing an encoding provider
     /// registered for those tables. See ADR-17.
+    ///
+    /// It also decides how [c]UPPER[/c] and [c]LOWER[/c] change case in those tables. Left null, they
+    /// change the ASCII letters only, as the C library does for an unmarked table; set, they change
+    /// case by this encoding, since setting it says what those tables hold. See ADR-65.
     /// </value>
     public Encoding? DefaultEncoding { get; set; }
 

@@ -72,6 +72,13 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 Alternatively, set `CodeBaseEngine.DefaultEncoding` to an encoding you already hold — that covers
 tables whose code-page byte is unmarked or unrecognized without any provider at all.
 
+`UPPER` and `LOWER`, in filters and in index expressions, change case by the table's own code page —
+the same answer on every machine, which neither CodeBase nor Visual FoxPro gives, since both follow
+the host's ANSI code page. An unmarked table changes `a`–`z` only, as CodeBase does, unless you set
+`DefaultEncoding`. One consequence: an index another engine built with `UPPER`/`LOWER` over non-ASCII
+letters under a different mapping holds keys this library does not compute, and seeks or queries
+through that tag can be wrong. Reindex such a tag. It cannot be detected from the file.
+
 ## Reading a table in index order
 
 ```csharp

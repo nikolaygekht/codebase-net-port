@@ -32,18 +32,6 @@ public sealed class VisualFoxProFunctionGoldenTests
 
     private const string Tags = "vfp/VFPFUNC.DBF";
 
-    /// <summary>
-    /// The one case the ASCII mapping cannot answer.
-    /// </summary>
-    /// <value>
-    /// Visual FoxPro lower cases by the table's code page, and this table is marked 1251, where
-    /// byte 0xC9 is an upper-case Cyrillic letter and 0xE9 its lower-case pair. Only the ASCII path
-    /// is implemented — the same gap `UPPER` has — so this is excluded by name rather than passed by
-    /// accident. Closing it needs a transcribed case table per code page, and the step's state file
-    /// records it as owed.
-    /// </value>
-    private const string NeedsTheAnsiMapping = "LOWER(\"AB1c\" + CHR(201))";
-
     [Fact]
     public void EveryVisualFoxProOnlyFunctionAnswersWhatVisualFoxProAnswered()
     {
@@ -72,11 +60,11 @@ public sealed class VisualFoxProFunctionGoldenTests
             if (!compiled.Nodes.Any(node => FunctionTable.IsVisualFoxPro(node.Row)))
                 continue;
 
-            if (recorded.Expression == NeedsTheAnsiMapping)
-                continue;
-
+            // Cased by the oracle's own code page, 1251, which is also its host's: LOWER("AB1c" +
+            // CHR(201)) lowers the Cyrillic capital 0xC9 to 0xE9, as Visual FoxPro did (ADR-65).
             compared++;
-            ExpressionValue value = new ExpressionEvaluator(compiled).Evaluate(new EvaluationContext());
+            ExpressionValue value = new ExpressionEvaluator(compiled).Evaluate(
+                new EvaluationContext { CaseMap = oracle.CaseMap });
             string? wrong = Disagreement(recorded, value);
 
             if (wrong is not null)
@@ -84,7 +72,7 @@ public sealed class VisualFoxProFunctionGoldenTests
         }
 
         string.Join(Environment.NewLine, failures).Should().BeEmpty();
-        compared.Should().Be(36, "every recorded case that reaches the Visual FoxPro band is compared");
+        compared.Should().Be(37, "every recorded case that reaches the Visual FoxPro band is compared");
     }
 
     [Fact]

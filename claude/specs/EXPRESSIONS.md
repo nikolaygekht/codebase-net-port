@@ -512,9 +512,8 @@ function; the operand's width for `LOWER` (20 over a `C(20)`); the count times t
 for `REPLICATE` (40 over a `C(20)` repeated twice). `REPLICATE`'s count therefore has to be a
 constant, as `SPACE`'s is in the reference, or the key cannot be sized.
 
-**`LOWER` has the same open question as `UPPER`**: Visual FoxPro maps by the table's code page, and
-the oracle's one case above 0x7F is on a code-page-1251 table where 0xC9 lowers to 0xE9. Only the
-ASCII path is implemented, and that case is excluded from the gate by name.
+**`LOWER` follows the same rule as `UPPER`** (§7.5, ADR-65). The oracle's one case above 0x7F is on
+a code-page-1251 table where 0xC9 lowers to 0xE9, and the port now answers it.
 
 ---
 
@@ -593,7 +592,7 @@ evaluated before it is a reference defect; the port evaluates every record as if
 `STR(n [,len [,dec]])`: len default **10**, dec default **0**; parse-time: `if(len<0) len=10; if
 (len <= dec+1) dec = len-2; if (dec<0) dec=0` (e4parse.c:1409-1483). Runtime calls
 `c4dtoa45(double, out, len, dec)` (e4functi.c:2675-2690): right-justified, blank-padded, fixed
-`dec` decimals. **The `c4dtoa45`/`c4ltoa45`/`c4atod`/`c4clip`/`c4upper` implementations are not in
+`dec` decimals. **The `c4dtoa45`/`c4ltoa45`/`c4atod`/`c4clip` implementations are not in
 this source drop** (declared d4declar.h:1895-1899, 224; no defining .c file present) — behavior
 [UNVERIFIED at implementation level]; observable contract from call sites: overflow fills with
 `*` (`StrZero(100,2)` → `"**"` per comment e4functi.c:2545-2547), `c4ltoa45(v,p,-n)` writes n
@@ -721,13 +720,22 @@ only through a promotion, and `EMPTY(K_NNUM)` over an `N(12,3)` field resolves r
 
 ### 7.5 UPPER
 
-Under CDX with data codepage 1252/1250, uses Windows ANSI `CharUpper` (accented letters map like
-VFP); otherwise ASCII-style `c4upper` (e4functi.c:2878-2911). Port note: for VFP-compatible keys,
-implement Win-1252 uppercase mapping.
+Under CDX with data codepage 1252/1250, uses Windows `CharUpper` — the **host's** ANSI code page, not
+the table's — and otherwise `c4upper` (e4functi.c:2878-2911). `c4upper` is in `c4.c:1193-1293`
+(correcting an earlier note here that it was missing): language builds (`S4RUSSION`, `S4GERMAN`,
+`S4FRENCH`, …) map more, but the default build calls `_strupr_s`, which in the C runtime's default
+locale changes `a`–`z` only — and a build with `S4NO_STRUPR` does exactly that in a loop. Visual
+FoxPro maps by its host's code page.
 
-**Witnessed** [`CDXEXPR.expr.dump.txt`]: on a table with **no code-page mark** the ASCII path is what runs — bytes `C9 E8` pass
-through `UPPER` unchanged. So the mapping is selected by the table's code page, and an unmarked
-table must not be uppercased with a culture-aware routine.
+**Witnessed** [`CDXEXPR.expr.dump.txt`]: on a table with **no code-page mark** bytes `C9 E8` pass
+through `UPPER` unchanged — consistent with the ASCII path, though it does not distinguish ASCII
+from cp437, where neither byte has a case pair.
+
+**This port** (ADR-65) maps by the table's own code page with Unicode's invariant case mapping,
+keeping a character's other case only when it is in that code page at the same byte length; a
+multi-byte value is walked a whole character at a time. An unmarked table maps `a`–`z` only unless
+the host set `CodeBaseEngine.DefaultEncoding`. Gated against Visual FoxPro's cp1251 keys
+(`vfp/VFPFUNC.CDX`, `T_UPPER`/`T_LOWER`), the one case where its host and its table agree.
 
 ### 7.6 VAL
 
@@ -1094,7 +1102,7 @@ Selected by exactly one of S4FOX / S4CLIPPER / S4MDX / S4NDX at build time.
 ## 14. Open questions / risks for the C# port
 
 1. **[PARTLY CLOSED — `STR` rounding and overflow are now witnessed, §7.1.]**
-   **`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4clip`, `c4upper`, `c4encode` implementations are missing
+   **`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4clip`, `c4encode` implementations are missing
    from this source drop** (declared d4declar.h:1888-1899, 224-225; no defining translation unit
    present). Their exact rounding, overflow (`*` fill) and clipping behavior must be recovered from
    the CodeBase DLL, the docs, or empirically from VFP — STR()-based index keys depend on it.

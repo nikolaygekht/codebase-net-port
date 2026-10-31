@@ -107,7 +107,8 @@ different afterwards.
 
 **C3. `UPPER`/`LOWER` by the table's code page.**
 - **Now:** only `a–z` change case. In a cp1251 table `UPPER("привет")` returns `"привет"`.
-- **After:** `"ПРИВЕТ"`. Case is mapped by the table's encoding; an unmarked table uses cp437. This
+- **After:** `"ПРИВЕТ"`. Case is mapped by the table's encoding; an unmarked table maps ASCII only, as
+  now, unless the host set `CodeBaseEngine.DefaultEncoding` (amended 2026-10-31, Decision 1). This
   affects filters, and the keys the port computes to seek an `UPPER(...)` tag.
 - **Code:** a new `CaseMap` (a 256-byte table for single-byte encodings); `EvaluationContext` carries
   it; `UPPER` and `LOWER` take it from there.
@@ -340,9 +341,16 @@ Most of this step changes existing classes rather than adding new ones.
 one byte that decodes to the mapped character**, otherwise the byte maps to itself. For a multi-byte
 encoding, decode the value, map, re-encode, and keep each character's mapping only where its encoded
 length is unchanged — so a trail byte is never touched, which `_strupr_s` over Shift-JIS would get wrong.
-Built from `Table.TextEncoding`, so an unmarked table maps under `CodeBaseEngine.DefaultEncoding` (cp437
-by default), the encoding its text is already read with; and a missing encoding provider fails at the
-first `UPPER`, as `GetString` already does (ADR-17).
+Built from `Table.TextEncoding` for a table that names a known code page, the encoding its text is
+already read with; a missing encoding provider fails at the first `UPPER`, as `GetString` already does
+(ADR-17). An unmarked table (or one whose mark this library does not know) maps ASCII only unless the
+host set `CodeBaseEngine.DefaultEncoding`, in which case that encoding is the table's (Decision 1,
+amended). Built lazily, on the first `UPPER` or `LOWER`, so a table whose encoding is unavailable still
+selects its tags. The multi-byte map is precomputed per character over the encoding's repertoire and
+applied while walking the value with a `Decoder`, so only whole characters are ever replaced and any
+byte that does not decode is copied as it stands. The query decomposer needs no map: it folds only
+literals and date conversions into constants (`ExpressionEvaluator.IsConstant`), never a case
+function, so every `UPPER` in a filter is evaluated per record with the table's context.
 
 ## Public surface
 
@@ -386,6 +394,14 @@ following it would change the key of an all-ASCII value. Consequences, all accep
   is noted as a possible later addition, not built here.)
 - **The corpus is unaffected**: the one non-ASCII value under an `UPPER` tag is `CDXEXPR` record 16,
   `C9 E8`, which in cp437 is `╔Φ` — neither has a case mapping.
+- **Amended 2026-10-31, by the user: an unmarked table maps ASCII only, unless the host set
+  `CodeBaseEngine.DefaultEncoding`.** CodeBase writes unmarked tables by default and maps them through
+  ASCII (`c4upper`), so an `UPPER` tag it built over non-ASCII lower-case letters stores them
+  unchanged; mapping them through cp437 would seek another key. An unmarked table states no language,
+  and `a`–`z` are right in every ASCII-compatible encoding. A host that sets `DefaultEncoding` has
+  stated the encoding of its unmarked tables, and then that encoding decides. (`EXPRESSIONS.md` §7.5's
+  "witness" — `C9 E8` unchanged — does not tell ASCII from cp437, since neither byte has a case pair in
+  cp437.)
 
 **2. `Seek` requires the exact type.** Already decided in the 009 defect's review; recorded as an ADR
 because it is a public contract. A conversion helper, if wanted, is an extension method outside the

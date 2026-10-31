@@ -188,7 +188,7 @@ internal sealed class ExpressionEvaluator
         FunctionRows.SubStr or FunctionRows.Left => Slice(node, operands[0]),
         FunctionRows.Right => SliceFromEnd(node, operands[0]),
         FunctionRows.Space => ExpressionValue.Text(Filled(node.Length, (byte)' ')),
-        FunctionRows.Upper => Upper(operands[0]),
+        FunctionRows.Upper => CaseMapped(operands[0], context.CaseMap, upper: true),
         FunctionRows.Trim => TrimEnd(operands[0]),
         FunctionRows.LeftTrim => TrimStart(operands[0]),
         FunctionRows.AllTrim => TrimEnd(TrimStart(operands[0])),
@@ -236,7 +236,7 @@ internal sealed class ExpressionEvaluator
         FunctionRows.PositionOf => ExpressionValue.Numeric(PositionOf(operands)),
         FunctionRows.CharacterCode => ExpressionValue.Numeric(
             operands[0].Bytes.Length == 0 ? 0 : operands[0].Bytes[0]),
-        FunctionRows.Lower => Lower(operands[0]),
+        FunctionRows.Lower => CaseMapped(operands[0], context.CaseMap, upper: false),
         FunctionRows.Repeat => Repeat(node, operands[0]),
 
         >= FunctionRows.Descend and < FunctionRows.Ascend => KeyForm(node, operands[0], complement: true),
@@ -666,23 +666,23 @@ internal sealed class ExpressionEvaluator
     }
 
     /// <summary>
-    /// Upper cases a string, byte by byte over the ASCII letters.
+    /// Changes a string's case through the table's case map, keeping its length and its trimmed length.
     /// </summary>
     /// <value>
-    /// Only the ASCII path is implemented. The reference chooses between that and the Windows ANSI
-    /// mapping by the table's code page (e4functi.c:2878-2911), and the corpus witnesses the ASCII
-    /// path on a table with no code-page mark — bytes C9 and E8 pass through unchanged. A table
-    /// marked 1252 or 1250 needs the other mapping and has no corpus case; see the step's state file.
+    /// The reference maps through the host's ANSI code page for two marks and ASCII for the rest
+    /// (e4functi.c:2878-2911), and Visual FoxPro through the host's; this library maps by the table's
+    /// own code page instead, with Unicode's invariant case mapping, so the answer does not depend on
+    /// the machine (ADR-65). A letter whose other case is not in the code page, or would take another
+    /// number of bytes, is left as it stands.
     /// </value>
-    private static ExpressionValue Upper(ExpressionValue operand)
+    private static ExpressionValue CaseMapped(ExpressionValue operand, CaseMap map, bool upper)
     {
-        byte[] result = operand.Bytes.ToArray();
+        byte[] result = new byte[operand.Bytes.Length];
 
-        for (int i = 0; i < result.Length; i++)
-        {
-            if (result[i] is >= (byte)'a' and <= (byte)'z')
-                result[i] -= 32;
-        }
+        if (upper)
+            map.ToUpper(operand.Bytes, result);
+        else
+            map.ToLower(operand.Bytes, result);
 
         return ExpressionValue.Text(result, operand.TrimmedLength);
     }
@@ -898,27 +898,6 @@ internal sealed class ExpressionEvaluator
         }
 
         return 0;
-    }
-
-    /// <summary>
-    /// Lower cases a string, byte by byte over the ASCII letters.
-    /// </summary>
-    /// <value>
-    /// The mirror of upper casing, and it has the same gap: Visual FoxPro maps by the table's code
-    /// page, and only the ASCII path is implemented here. The oracle's one case above 0x7F is
-    /// excluded by name in the gate rather than passed by accident.
-    /// </value>
-    private static ExpressionValue Lower(ExpressionValue operand)
-    {
-        byte[] result = operand.Bytes.ToArray();
-
-        for (int i = 0; i < result.Length; i++)
-        {
-            if (result[i] is >= (byte)'A' and <= (byte)'Z')
-                result[i] += 32;
-        }
-
-        return ExpressionValue.Text(result, operand.TrimmedLength);
     }
 
     /// <summary>

@@ -2267,3 +2267,75 @@ stored keys: every record's own value, transformed for the seek, must equal that
 
 **What it changes.** A caller who, following CodeBase, passes an already-complemented value no longer
 finds it; with text that was never possible here.
+
+## ADR-65 — `UPPER` and `LOWER` change case by the table's own code page; an unmarked table by ASCII unless the host names its encoding · accepted
+
+**Date.** 2026-10-29 (the rule, step 012's Decision 1), amended 2026-10-31 (unmarked tables). Decided
+by the user.
+
+**Context.** Neither reference gives a mapping worth copying. CodeBase, under CDX, uses Windows
+`CharUpper` — the **host's** ANSI code page — for a table marked 1252 or 1250, and `c4upper`
+otherwise (e4functi.c:2878-2911); in the default build `c4upper` is `_strupr_s`, which in the C
+runtime's default locale changes `a`–`z` only (c4.c:1264-1293). Visual FoxPro maps through its
+host's code page. Either way the answer depends on the machine, and in a cp1251 table
+`UPPER("привет")` stays lower-case. The port mapped ASCII only, byte by byte — which in a
+multi-byte table also changes a trail byte that happens to equal a letter, corrupting the character
+(Shift-JIS Cyrillic `а` is `84 70`, and `70` is `p`).
+
+**Decision.** Case is changed by the table's code page — the encoding its text is read with — using
+Unicode's **invariant** mapping. A character is replaced only when its other case is a character of
+that code page taking exactly as many bytes; otherwise it is left as it stands, because a value's
+width is fixed. A single-byte code page gets a 256-entry table per direction; a multi-byte one is
+walked a whole character at a time. The map is built on first use. A table that names no code page,
+or one this library does not know, maps `a`–`z` only — as CodeBase does for it — unless the host
+set `CodeBaseEngine.DefaultEncoding`, which states the encoding of its unmarked tables and then
+decides.
+
+**Why invariant and not a culture.** A code page does not name a language (cp1251 serves several),
+and the only place a culture differs from the invariant mapping is the Turkic `i`, where following
+it would change the key of an all-ASCII value.
+
+**Why ASCII for an unmarked table** (the amendment). The design first mapped it by its read
+encoding, cp437. But CodeBase writes unmarked tables by default and leaves their non-ASCII letters
+alone, so an `UPPER` tag it built stores them unchanged, and mapping by cp437 would seek another
+key. An unmarked table states no language, and `a`–`z` are right in every ASCII-compatible code page.
+
+**No full oracle.** The expectation is the rule itself, rebuilt in a layer-1 test from each
+encoding and Unicode for every code page the marks name. The Visual FoxPro oracle confirms the one
+code page where its host and its table agree, 1251: `VFPFUNC.CDX`'s `T_UPPER`/`T_LOWER` keys are
+rebuilt byte for byte, and `LOWER("AB1c" + CHR(201))` answers as Visual FoxPro did.
+
+**What it costs.** An index another engine wrote with `UPPER`/`LOWER` over non-ASCII letters, under
+a mapping other than this one, is unsupported: its stored keys disagree with what this library
+computes, so a seek or a query through such a tag can be wrong. It cannot be detected — a CDX
+carries no writer's mark — so it is documented (`Table.Query`, `Table.Seek`, `README.md`); the
+remedy is to reindex. An index agrees when its keys are ASCII, when Visual FoxPro wrote it on a host
+whose ANSI code page is the table's, when CodeBase wrote it for a 1252/1250 table on such a host, or
+when CodeBase wrote it for an unmarked table and the host names no encoding for those.
+
+**Rejected — transcribing case tables per code page by hand.** They would be typed-in bytes with no
+oracle either; the rule derived from `Encoding` is the same answer, checkable.
+
+**Rejected — following the host's ANSI code page, as both references do.** It makes the stored key
+depend on the machine that wrote it.
+
+## ADR-66 — A filter's string literals are encoded as the table's text is read · accepted
+
+**Date.** 2026-10-31. Decided by the user during step 012's sub-step 6.
+
+**Context.** The parser encodes a string literal through an encoding it is given, Latin1 by default,
+because a tag's expression comes from a header of bytes and Latin1 carries each byte to one
+character and back. `Table.CompileFilter` passed none, so a filter — text the caller wrote — had its
+literals encoded as Latin1 too. On a cp1251 table `K_TEXT = "Йи"` compared bytes nobody stored, and a
+character Latin1 cannot hold became `?` and matched nothing, silently. `Table.Seek(string)` already
+encoded its value as the table's text is read.
+
+**Decision.** A filter's literals are encoded with `Table.TextEncoding`, as `Seek` does. A filter
+whose text is plain ASCII does not ask for the encoding, since ASCII is the same in every code page a
+table can be marked with — so it still works on a table whose encoding is unavailable (620, 895, or
+no provider registered). A literal holding a character the code page cannot represent refuses the
+filter (`UnrecognizedValue`) rather than turning into `?`. A tag's expression is still read as
+Latin1: it is bytes, not text.
+
+**Rejected — leaving Latin1 and documenting it.** A filter is the main way to ask this library a
+question, and in a non-Latin table it could not name a value.

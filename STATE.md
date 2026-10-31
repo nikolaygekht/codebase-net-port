@@ -26,7 +26,11 @@ and copies, and a `DESCEND` tag is sought by its plain text, which the reference
 (ADR-64). Then the reference's open-time check, which the port lacked: a tag whose expression
 resolves to another key length than its header's is refused (E84901) — `TAGBAD` is the file
 `i4tagAdd` writes and the reference refuses, and the port refuses it too. Designing it found a memo
-under GENERAL resolved at half the cap, now applied. Next: sub-step 6, then close.
+under GENERAL resolved at half the cap, now applied. Then `UPPER`/`LOWER` by the table's own code
+page (ADR-65): the reference follows the host's, and the port changed only `a`–`z` — byte by byte,
+which in a multi-byte table also broke characters whose trail byte equals a letter. An unmarked table
+keeps ASCII unless the host names its encoding. Gated by Visual FoxPro's cp1251 keys. Next: close
+012.
 **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
@@ -332,8 +336,15 @@ GENERAL (ADR-64). Three mutations, each caught. Then 5c: a tag whose expression 
 header's key length is refused when first used, as the reference refuses the index (E84901) —
 witnessed by `TAGBAD`, the file `i4tagAdd` writes, whose `open.dump.txt` records the reference's
 −310. Designing it found a second missing rule, a memo under GENERAL resolved at half the cap (120,
-key 240), now witnessed by `TAGGEN`'s memo tags and applied. Two more mutations caught. Tests:
-2542 unit, 1122 golden.
+key 240), now witnessed by `TAGGEN`'s memo tags and applied. Two more mutations caught. Then
+sub-step 6: `UPPER`/`LOWER` change case by the table's code page through a `CaseMap` built from its
+encoding and Unicode's invariant mapping, keeping a character only where its other case is in the
+page at the same byte length (ADR-65); an unmarked table maps ASCII unless the host set
+`DefaultEncoding`, amended by the user. `VFPFUNC`'s `T_UPPER`/`T_LOWER` keys now rebuild byte for
+byte and the oracle's `LOWER` case is gated. `c4upper` turned out to be in the source after all.
+And a filter's string literals are now encoded as the table's text is read (ADR-66): they were
+Latin1, so a filter over a cp1251 table could not name a Cyrillic value and an unencodable one
+silently matched nothing. Tests: 2615 unit, 1130 golden.
 
 ### Before it (2026-10-30)
 
@@ -959,8 +970,8 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ### Finish step 012 — `claude/dev/012-p1-tails/`
 
-Sub-steps 6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `UPPER`/`LOWER` by the
-table's code page; then close.
+Sub-step 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): close — `SUMMARY.md`,
+`PORTING-PLAN.md` §5, `claude/dev/README.md`, the first full `mutate4csharp` run.
 
 They run under the new §4 rules, as sub-step 4 did: `crap4csharp` after each, and the first full
 `mutate4csharp` run at close — copy-aside, since it writes into the

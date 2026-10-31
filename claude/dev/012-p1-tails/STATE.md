@@ -1,7 +1,7 @@
 # 012-p1-tails — state
 
-**Status:** in progress — sub-steps 1–5c, 7 and 7a done
-**Current sub-step:** PLAN.md step 6
+**Status:** in progress — sub-steps 1–7a done; 8 (close) remains
+**Current sub-step:** PLAN.md step 8
 
 ## Done so far
 
@@ -173,7 +173,39 @@
     `StoredKindOf` 8.0, `For` 2.0.
   - Docs: `CDX-FORMAT.md` §3 (`keyLen` checked at open), `EXPRESSIONS.md` §9.5 (the halving row,
     the witness), both READMEs (the open dump). Release 2542 + 1122 green.
-- [ ] step 6 — C3, case mapping by code page
+- [x] step 6 — C3, case mapping by code page (2026-10-31).
+  - **Decision 1 amended by the user:** an unmarked table maps `a`–`z` only, as CodeBase does, unless
+    the host set `CodeBaseEngine.DefaultEncoding` — not by cp437 as designed. CodeBase writes
+    unmarked tables by default and leaves their non-ASCII letters alone. `DefaultEncoding` is null
+    unless set, so no new state was needed.
+  - **Spec correction:** `c4upper` is in the source (`c4.c:1193-1293`); `EXPRESSIONS.md` §7.1 and §14
+    said it was missing. The default build calls `_strupr_s`, `a`–`z` in the C locale; the language
+    builds map more. CodeBase's `CharUpper` for 1252/1250 is the **host's** ANSI page, as is Visual
+    FoxPro's — neither maps by the table's, which 010's `SUMMARY.md` and §7.5 claimed.
+  - Test first: `CaseMapTests` (layer 1; every byte of the 20 single-byte pages against the rule
+    rebuilt from `Encoding`, idempotence, ASCII below 0x80, the ASCII map, a Shift-JIS trail byte
+    `70` left alone, GBK `à` and cp949 `đ` with no capital kept, a lone lead byte, built on first
+    use); `CaseMapGoldenTests` (`VFPFUNC` `T_UPPER`/`T_LOWER` keys rebuilt byte for byte, a query
+    over cp1251, an unmarked table ASCII by default and cp437 when the host names it);
+    `VisualFoxProFunctionGoldenTests` with the `LOWER` exclusion lifted (36 → 37). Red against an
+    ASCII stub: 20 single-byte pages, the multi-byte and lazy cases, the VFP keys, the oracle case,
+    the host-encoding case.
+  - Port: `CaseMap` (new); `EvaluationContext.CaseMap` (ASCII by default); the evaluator's `UPPER`
+    and `LOWER` through it; `Table.CaseMap` into both of the table's contexts. Encoding and decoding
+    go through a clone of the encoding with replacement fallbacks — `Encoder.Fallback` does not
+    override the provider's exception fallback.
+  - **.NET's own counts** for the multi-byte pages (mapped / no capital / length change): 932
+    119/0/0, 936 119/30/0, 949 130/27/0, 950 76/0/0. A Python count had found one length change
+    (cp949 `ı`); .NET's invariant mapping gives `ı` no pair, so the length half of the rule guards a
+    host's encoding, not these.
+  - **Mutations**, copy-aside, md5 checked: ASCII map for every table → the VFP keys, the oracle
+    case, the query and the host-encoding case; unmarked mapped by its read encoding → the ASCII
+    case; the multi-byte walk replaced by ASCII bytes → the Shift-JIS case.
+  - `crap4csharp`: every `CaseMap` member ≤ 7.0, `Table.CaseMap` 4.0, `CaseMapped` 2.0.
+  - Docs: ADR-65; `Table.Query`, `Table.Seek(string)` and `CodeBaseEngine.DefaultEncoding` docs;
+    `README.md`; `EXPRESSIONS.md` §7.1, §7.5, §14 and the `LOWER` note; 010's `SUMMARY.md`;
+    `FOR-DEVELOPERS.md` (both test projects take the code-page package). Release 2613 + 1127 green
+    (2615 + 1130 with the filter-literal fix below).
 - [x] step 7 — D, compressed memos (2026-10-29), done out of order at the user's call.
   - zlib 1.3.1 vendored in `test-files-generator/third_party/zlib/` (core library only; `madler/zlib`
     v1.3.1 release tarball, SHA-256 `9a93b2b7…df23`, matching zlib.net); `build-lib.bat` compiles it
@@ -228,6 +260,21 @@
   (`PORTING-PLAN.md` §2.2 and the `DBF-READ` row, root `STATE.md` §1 and §3, `vfp/README.md`).
   Past-tense records — 003's documents, `dev/README.md`'s 003 row, `STATE.md` §2, ADR-44/46 —
   stay as written.
+
+- Sub-step 6: the design passed the case map to the query decomposer too. Dropped: it folds only
+  literals and date conversions into constants, never `UPPER`, so the map there was dead code (a
+  mutation removing it survived, which is how it was found). The unit test project gained
+  `System.Text.Encoding.CodePages` and a module initializer, as the golden one has.
+- Found in sub-step 6 and fixed in it, at the user's call: a filter's string literal was encoded as
+  Latin1 (`Table.CompileFilter` passed no encoding), so a filter over a cp1251 table could not spell
+  Cyrillic — `K_TEXT = "Йи"` compared other bytes, and a character Latin1 cannot hold became `?`
+  and matched nothing, silently. Now encoded with `TextEncoding`, as `Seek` does, only when the
+  filter's text is not plain ASCII; a character the code page cannot hold refuses the filter
+  (`UnrecognizedValue`). ADR-66. Tests first: two golden filters over `VFPFUNC` (one answered by
+  `T_UPPER`), the refusal, and a component test on a table marked 620 — an ASCII filter still
+  answers, a non-ASCII one is refused as `NotSupported`. Mutations: always asking for the encoding
+  reddens the 620 test; no refusal reddens the refusal test. `CompileFilter` 2.0,
+  `ExpressionParser.Literal` 2.7. Release 2615 + 1130 green.
 
 - Sub-steps 5a, 5b and 5c were not in the plan; the user added them after 5 (DESIGN §C2a, §C2b,
   PLAN rows).

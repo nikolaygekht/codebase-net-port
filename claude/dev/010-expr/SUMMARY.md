@@ -88,6 +88,10 @@ variadic and have a string form. All five witnessed in the oracle's stored bits,
   only ASCII; Visual FoxPro's oracle has exactly one case above 0x7F, and it is excluded from the gate
   by name. Closing it needs a transcribed case table per code page, because `CLAUDE.md` forbids a
   culture-aware routine for keys.
+  *Corrected 2026-10-31 (step 012):* neither engine maps by the table's code page — both follow the
+  host's ANSI code page (CodeBase only for 1252/1250, ASCII otherwise). Closed by ADR-65 without
+  transcribed tables: case is changed by the table's own code page through `Encoding` and Unicode's
+  invariant mapping, which is not a culture; the excluded case is gated now.
 - **`MOD` by zero and `SQRT` of a negative**, both answering zero where Visual FoxPro raises. The
   oracle wrapped `SQRT` in `ABS` precisely to avoid the second, so there is no witness for either.
 - **A second rejection pass with a real `TAG4FILE`**, for the tag-only refusals (`e4tagExpr`), which

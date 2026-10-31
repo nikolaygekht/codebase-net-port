@@ -30,9 +30,17 @@ internal static class TableImage
     /// flag.
     /// </param>
     /// <returns>The open table, and the engine that owns it.</returns>
-    public static (CodeBaseEngine Engine, Table Table) Open(params string[] records)
+    public static (CodeBaseEngine Engine, Table Table) Open(params string[] records) => OpenMarked(0x00, records);
+
+    /// <summary>
+    /// Opens a table holding the given records, with a code-page mark in its header.
+    /// </summary>
+    /// <param name="codePage">The language-driver byte, header offset 29.</param>
+    /// <param name="records">The records, as for [c]Open[/c].</param>
+    /// <returns>The open table, and the engine that owns it.</returns>
+    public static (CodeBaseEngine Engine, Table Table) OpenMarked(byte codePage, params string[] records)
     {
-        byte[] image = Build(records);
+        byte[] image = Build(codePage, records);
         CodeBaseEngine engine = new(new StubFactory(new InMemorySource(image)), new NoCompanions());
 
         return (engine, engine.OpenTable("memory.dbf"));
@@ -43,12 +51,15 @@ internal static class TableImage
     /// </summary>
     /// <param name="records">The records, deletion flag included.</param>
     /// <returns>The whole file.</returns>
-    public static byte[] Build(params string[] records)
+    public static byte[] Build(params string[] records) => Build(0x00, records);
+
+    private static byte[] Build(byte codePage, string[] records)
     {
         byte[] header = HeaderBytes.Build(
             recordCount: records.Length,
             headerLength: HeaderLength,
-            recordLength: RecordLength);
+            recordLength: RecordLength,
+            codePage: codePage);
 
         byte[] descriptor = DescriptorBytes.Build("TEXT", 'C', storedOffset: 1, length: 6);
 

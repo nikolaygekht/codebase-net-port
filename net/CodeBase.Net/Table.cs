@@ -62,6 +62,7 @@ public sealed class Table : IDisposable
     private int owner;
     private int depth;
     private Encoding? textEncoding;
+    private CaseMap? caseMap;
     private TableTagCursor? selected;
     private bool closed;
 
@@ -195,6 +196,20 @@ public sealed class Table : IDisposable
     /// The encoding is unavailable because no provider for the legacy code pages is registered.
     /// </exception>
     public Encoding TextEncoding => textEncoding ??= CodePageMap.EncodingFor(CodePage, defaultEncoding);
+
+    /// <summary>
+    /// Gets how [c]UPPER[/c] and [c]LOWER[/c] change case in this table's expressions.
+    /// </summary>
+    /// <value>
+    /// By the table's own code page when it names one this library knows. An unmarked table maps the
+    /// ASCII letters only, as CodeBase does for one, unless the host set
+    /// [c]CodeBaseEngine.DefaultEncoding[/c] and so said what its unmarked tables hold (ADR-65). The
+    /// map is built on its first use, so a table whose encoding is unavailable still opens and
+    /// selects its tags.
+    /// </value>
+    internal CaseMap CaseMap => caseMap ??= CodePageNumber is null && defaultEncoding is null
+        ? CaseMap.Ascii
+        : CaseMap.For(() => TextEncoding);
 
     /// <summary>
     /// Gets a value indicating whether a memo file accompanies the table.
@@ -611,6 +626,10 @@ public sealed class Table : IDisposable
     /// string itself: the value goes through the same conversion the keys did, so seeking SMITH in a
     /// [c]DESCEND(NAME)[/c] tag finds SMITH. The same holds for every overload that takes text.
     ///
+    /// The value is sought as given, so a tag over [c]UPPER(NAME)[/c] is sought in capitals. Such a
+    /// tag built by another engine over non-ASCII letters, under a case mapping other than the
+    /// table's code page, holds keys this library does not compute; reindex it (ADR-65).
+    ///
     /// A miss leaves the cursor on no record rather than on a neighbour, which is what
     /// [clink=CodeBase.Net.Table.Go]Go[/clink] already does past the end of the table. A caller that
     /// wants the neighbour asks for it by name, with
@@ -919,6 +938,16 @@ public sealed class Table : IDisposable
     ///
     /// Records come out in the table's selected tag's order, or in record-number order when no tag is
     /// selected, and which one a caller wants is said by selecting a tag before moving the query.
+    ///
+    /// [c]UPPER[/c] and [c]LOWER[/c] change case by the table's own code page, and an unmarked
+    /// table's by the ASCII letters alone unless [c]CodeBaseEngine.DefaultEncoding[/c] is set. A tag
+    /// another engine built with either over non-ASCII letters, under another mapping, holds keys
+    /// this library does not compute, and a query answered through it can be wrong; reindex such a
+    /// tag. See ADR-65.
+    ///
+    /// The filter's string literals are encoded as the table's text is read, as a sought value is,
+    /// so a filter can name any text the table's code page holds; a character it cannot hold
+    /// refuses the filter rather than matching nothing (ADR-66).
     /// </value>
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public Query Query(string filter)
@@ -938,13 +967,19 @@ public sealed class Table : IDisposable
     /// that is where the reference reads it (e4parse.c:2357-2417) and without it the qualified form
     /// never resolves. A filter naming any other alias still fails, which is what refuses a field of
     /// a table this query does not have.
+    ///
+    /// Its string literals are the caller's text, so they are encoded as the table's text is read —
+    /// the encoding [c]Seek[/c] uses for a value, too. A filter of plain ASCII is the same in every
+    /// code page a table can be marked with, so it does not ask for the encoding at all, and still
+    /// works on a table whose encoding is unavailable.
     /// </value>
     internal CompiledExpression CompileFilter(string filter)
     {
         string alias = System.IO.Path.GetFileNameWithoutExtension(Path);
+        Encoding literals = filter.Any(c => c > (char)0x7F) ? TextEncoding : Encoding.Latin1;
 
         return TypeResolver.Resolve(ExpressionParser.Parse(
-            filter, new TableFieldMetadata([.. Fields], alias), [alias]));
+            filter, new TableFieldMetadata([.. Fields], alias), [alias], encoding: literals));
     }
 
     /// <summary>
@@ -960,6 +995,7 @@ public sealed class Table : IDisposable
         RecordCount = opened.Header.RecordCount,
         Options = ExpressionOptions,
         Memo = opened.Memo is null ? null : field => GetMemoBytes(field),
+        CaseMap = CaseMap,
     };
 
     /// <summary>
@@ -1009,6 +1045,7 @@ public sealed class Table : IDisposable
                     RecordCount = opened.Header.RecordCount,
                     Options = ExpressionOptions,
                     Memo = memoReader is null ? null : field => GetMemoBytes(field),
+                    CaseMap = CaseMap,
                 },
                 System.IO.Path.GetFileNameWithoutExtension(Path));
             tagCursors[tag] = cursor;

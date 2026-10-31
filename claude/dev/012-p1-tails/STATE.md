@@ -1,7 +1,7 @@
 # 012-p1-tails — state
 
-**Status:** in progress — sub-steps 1–7a done; 8 (close) remains
-**Current sub-step:** PLAN.md step 8
+**Status:** done — closed 2026-10-31
+**Current sub-step:** none
 
 ## Done so far
 
@@ -143,7 +143,7 @@
     layer-1; no complement in `ConversionSearch` → six golden over both tables, two layer-1.
   - `crap4csharp` (unit coverage): `KeyForm` 30.0 → 7.0 (0% → 93%); `SeekConverter.For` 4.3 → 2.0,
     its new `StoredKindOf` 8.0 at 100%; `ConversionSearch` all ≤ 4; `SearchFor` 23.9 → 35.2 (CC 8 →
-    10, coverage 37%) — 013's F5, `TableTagCursor` has no unit layer.
+    10, coverage 37%) — 013's F4, `TableTagCursor` has no unit layer.
   - Release 2534 + 1085 green.
 - [x] step 5c — C2b, the key-length check at open (2026-10-31), added at the user's call.
   - **Finding while designing it:** a memo under GENERAL is resolved at half the cap — `info[0].len`
@@ -232,7 +232,43 @@
   layer-2 tests in `DbfOpenerTests` over real corpus headers with byte 14 set (`CMPMEMO` refused,
   `VFPTYPE` opens). **Mutations:** drop the version condition → the `0x30` test reddens; drop the
   call → the `0x31` test reddens. ADR-56; `PORTING-PLAN.md` §2.2; `CodeBaseEngine.OpenTable` docs.
-- [ ] step 8 — close
+- [x] step 8 — close (2026-10-31).
+  - **`mutate4csharp`, the first full run here**, on a committed tree, each file copied aside and
+    restored with `md5sum` checked (no manifest footer left behind), four workers, unit tests only:
+    - `ConversionSearch.cs` 3 killed, 2 survived → both real (the machine/collated branch swapped;
+      `includeTails` false), killed by two new layer-1 tests (the machine search is the padded
+      text; the GENERAL one is `CollatedKey`'s output with tails).
+    - `SeekConverter.cs` 15 killed, 3 survived → two real, in the weights condition, killed by two
+      new rows (`VAL(DESCEND(K_TEXT))` under GENERAL on cp1251 is refused, `VAL(K_TEXT)` is not);
+      one stays: `RefuseIfNotTheSameTwice`'s function names, older code that only a golden test
+      reaches.
+    - `CaseMap.cs` 67 killed, 7 survived, all equivalent: loops starting at 1 or ending one short
+      skip only U+0000, byte 0 and U+FFFF, which have no case; `flush: false` on one whole
+      character; `||`/`&&` swaps that change only how a no-case character is skipped.
+    - Re-run on the four real survivors' lines: all killed. Totals: 85 + 6 killed, 12 survived
+      first time, 8 left, all explained.
+  - **`crap4csharp` over the 18 library files the step changed**, against 013's baseline: better —
+    `ExpressionEvaluator.Apply` 138.1 → 129.2, `SeekConverter.KindOf` 68.1 → 19.3,
+    `TypeResolver.AssignKeyConversionLength` 132.0 → 19.3, `KeyForm` 30.0 → 7.0; worse —
+    `TableTagCursor.SearchFor` 23.9 → 39.2 (CC 8 → 11 for the conversion branch and the null
+    byte; 38% unit coverage — 013's F4, the cursor has no unit layer); `MemoReader.Decompress` 10.0
+    at 100% (complexity, sub-step 7). Every other member above 8.0 in these files is unchanged from
+    the baseline and is 013's.
+  - **Found while closing, and fixed:** `Table.Seek` found **no value at all** in a tag over a
+    nullable field — text, number, integer or date. The tag's keys begin with `0x80` and the search
+    did not; the query path (`TagProbe`) had it right. `KEY-COLLATION.md` §4 states the rule
+    (D4SEEK.C:44-63, 153-190); `TableTagCursor` now puts the byte in front of every search.
+    `NullableTagSeekGoldenTests` over the corpus's three nullable tags (`CDXEXPR.T_NULL`,
+    `TAGCTX.T_NMEMO`, `TAGGEN.G_NMEMO`), red first on all three; mutation: no byte → all three red.
+  - **And the candidate exception beside it** (E4EXPR.C:894-900): a candidate tag reserves no null
+    byte, which `ExpressionKey.CanBeAbsent` left to its caller and no caller applied — so 5c's
+    length check would have refused such a tag and its keys would have been built with the byte.
+    `SeekConverter.HasNullIndicator` and the length check now honour it; no corpus tag is a
+    candidate over a nullable field, so it is pinned in layer 1 over hand-built headers; mutation:
+    the exception removed → red.
+  - Docs: `SUMMARY.md`, `PORTING-PLAN.md` §5 (`CORPUS`, `EXPR`), `claude/dev/README.md`,
+    `FOR-DEVELOPERS.md` (the `.gitattributes` note owed since sub-step 1), root `STATE.md`.
+    Release 2622 + 1133 green.
 
 ## Notes for the next session
 

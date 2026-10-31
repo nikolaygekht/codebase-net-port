@@ -22,6 +22,7 @@ public sealed class SeekConverterTagContextTests
     [
         new("K_TEXT", 'C', 'C', 20, 0, 1, false, false, false, false, null),
         new("K_MEMO", 'M', 'M', 4, 0, 21, false, false, false, false, null),
+        new("K_NTEXT", 'C', 'C', 20, 0, 25, false, false, false, false, 0),
     ];
 
     [Fact]
@@ -98,6 +99,10 @@ public sealed class SeekConverterTagContextTests
     [InlineData("DESCEND(K_TEXT)", "GENERAL", 40, true)]
     [InlineData("K_TEXT", "GENERAL", 40, true)]
     [InlineData("DESCEND(K_TEXT)", "", 20, false)]
+    // A number computed from a conversion still weighs the conversion's operand; a number computed
+    // from the plain field weighs nothing, whatever the header names.
+    [InlineData("VAL(DESCEND(K_TEXT))", "GENERAL", 8, true)]
+    [InlineData("VAL(K_TEXT)", "GENERAL", 8, false)]
     public void ACollationWithNoWeightsForTheCodePageIsRefused(string expression, string collation, int keyLength, bool refused)
     {
         Action open = () => Converter(expression, keyLength, collation, codePage: 1251);
@@ -108,9 +113,30 @@ public sealed class SeekConverterTagContextTests
             open.Should().NotThrow();
     }
 
-    private static SeekConverter Converter(string expression, int keyLength, string collation, int codePage = 1252)
+    [Theory]
+    // A nullable field's key spends a leading byte on whether the value is there, except in a
+    // candidate tag, which disallows the null and so makes no room for it (E4EXPR.C:894-900).
+    [InlineData(0x22, 21, false, true)]
+    [InlineData(0x24, 20, false, false)]
+    [InlineData(0x24, 21, true, false)]
+    public void ACandidateTagMakesNoRoomForTheNullByte(int typeCode, int keyLength, bool refused, bool indicator)
     {
-        byte[] image = IndexImage.SingleTag(keyLength, root: 1024, expression: expression, collation: collation).Build();
+        Func<SeekConverter> open = () => Converter("K_NTEXT", keyLength, "", typeCode: (byte)typeCode);
+
+        if (refused)
+        {
+            open.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Index);
+            return;
+        }
+
+        open().HasNullIndicator.Should().Be(indicator);
+    }
+
+    private static SeekConverter Converter(
+        string expression, int keyLength, string collation, int codePage = 1252, byte typeCode = 0x20)
+    {
+        byte[] image = IndexImage.SingleTag(
+            keyLength, root: 1024, typeCode: typeCode, expression: expression, collation: collation).Build();
 
         return SeekConverter.For(
             IndexHeader.Parse(image, "an image"), Fields, codePage, ExpressionOptions.Invariant, alias: "T");

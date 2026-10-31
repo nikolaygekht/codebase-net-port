@@ -59,6 +59,38 @@ public sealed class ConversionSearchTests
     }
 
     [Fact]
+    public void InMachineOrderAnAscendingSearchIsTheTextPaddedWithBlanks()
+    {
+        // Machine order converts nothing: the search is the text at the operand's width.
+        byte[] search = new byte[20];
+
+        ConversionSearch.Write(Converter("ASCEND(K_TEXT)", 20, ""), "zebra"u8, prefix: false, search);
+
+        search.Should().Equal([.. "zebra"u8.ToArray(), .. Enumerable.Repeat((byte)' ', 15)]);
+    }
+
+    [Fact]
+    public void UnderGeneralAnAscendingSearchIsTheCollatedKeyWithItsTails()
+    {
+        // The whole search weighs the padded text with its tails, as the stored key was weighed;
+        // "café" has a tail, so leaving the tails out would be a different key.
+        byte[] text = [(byte)'c', (byte)'a', (byte)'f', 0xE9];
+        byte[] padded = [.. text, .. Enumerable.Repeat((byte)' ', 16)];
+        byte[] expected = new byte[40];
+        CollatedKey.Write(
+            padded,
+            CollationWeights.TableFor(CollationName.General, 1252),
+            CollationWeights.ExpansionsFor(CollationName.General, 1252),
+            includeTails: true,
+            expected);
+
+        byte[] search = new byte[40];
+        ConversionSearch.Write(Converter("ASCEND(K_TEXT)", 40, "GENERAL"), text, prefix: false, search);
+
+        search.Should().Equal(expected);
+    }
+
+    [Fact]
     public void AValueWiderThanTheOperandIsCutToIt()
     {
         SeekConverter converter = Converter("DESCEND(K_TEXT)", 20, "");

@@ -286,6 +286,12 @@ copy-corpus.bat      :: publish            -> ..\net\corpus\
 Then review `git status` and commit what changed. Output is byte-stable: regenerating without
 changing a case produces identical files (ADR-07).
 
+The batch files must have CRLF line endings, which `.gitattributes` enforces in the working tree:
+`cmd.exe` resolves `call` and `goto` targets by byte offset assuming CRLF, and with LF endings
+`build-gen.bat` runs with its lines cut apart and silently leaves the old `testgen.exe` in place. From
+a shell that sets `NoDefaultCurrentDirectoryInExePath` (some agent shells do), call them as
+`.uild-gen.bat`.
+
 To add a case, write `test-files-generator/src/case-<name>.cpp`, declare it in `cases.h`, and call it
 from `main.cpp`. Utilities are shared; **test data is per-case on purpose**, so tuning one case
 cannot move another case's bytes.

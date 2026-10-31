@@ -78,6 +78,8 @@ internal enum KeyConversion
 /// </summary>
 internal sealed class SeekConverter
 {
+    private readonly bool candidate;
+
     private SeekConverter(
         KeyKind kind,
         FieldDefinition? field,
@@ -86,7 +88,8 @@ internal sealed class SeekConverter
         byte padByte,
         CollationName collation,
         int codePage,
-        KeyConversion conversion)
+        KeyConversion conversion,
+        bool candidate)
     {
         Kind = kind;
         Field = field;
@@ -96,6 +99,7 @@ internal sealed class SeekConverter
         Collation = collation;
         CodePage = codePage;
         Conversion = conversion;
+        this.candidate = candidate;
     }
 
     /// <summary>Gets the kind of key the tag stores.</summary>
@@ -125,7 +129,11 @@ internal sealed class SeekConverter
     /// <summary>
     /// Gets a value indicating whether the key carries a leading byte saying the value is there.
     /// </summary>
-    public bool HasNullIndicator => ExpressionKey.CanBeAbsent(Compiled);
+    /// <value>
+    /// When the expression reads a field that can be null — except in a candidate tag, which
+    /// disallows the null and so makes no room for it (E4EXPR.C:894-900).
+    /// </value>
+    public bool HasNullIndicator => !candidate && ExpressionKey.CanBeAbsent(Compiled);
 
     /// <summary>
     /// Resolves the converter for a tag.
@@ -170,13 +178,14 @@ internal sealed class SeekConverter
 
         KeyKind kind = StoredKindOf(compiled, collation, codePage, expression);
 
-        RefuseIfTheKeyLengthDisagrees(compiled, kind, header, expression);
+        bool candidate = header.Options.HasFlag(TagOptions.Candidate);
+        RefuseIfTheKeyLengthDisagrees(compiled, kind, candidate, header, expression);
 
         FieldDefinition? field = fields.FirstOrDefault(
             f => string.Equals(f.Name, expression, StringComparison.OrdinalIgnoreCase));
 
         return new SeekConverter(
-            kind, field, compiled, header.KeyLength, padByte, collation, codePage, ConversionOf(compiled));
+            kind, field, compiled, header.KeyLength, padByte, collation, codePage, ConversionOf(compiled), candidate);
     }
 
     /// <summary>
@@ -186,15 +195,16 @@ internal sealed class SeekConverter
     /// The reference makes the same check at open and refuses the index (E84901, i4init.c:485-490),
     /// with the length worked out as [c]expr4keyLen[/c] does (E4EXPR.C:1049-1100): a collated string
     /// adds the collation's bytes per character, a string whose conversion already collated it adds
-    /// none. Keys built by one expression and sought by another would be a wrong answer, not a slow
+    /// none, and a candidate tag reserves no null byte. Keys built by one expression and sought by another would be a wrong answer, not a slow
     /// one, so the tag is refused when it is first used, by name; the reference's own i4tagAdd writes
     /// such a file (CDX-FORMAT.md section 8.6).
     /// </value>
     private static void RefuseIfTheKeyLengthDisagrees(
-        CompiledExpression compiled, KeyKind kind, IndexHeader header, string expression)
+        CompiledExpression compiled, KeyKind kind, bool candidate, IndexHeader header, string expression)
     {
         int perCharacterAdd = kind == KeyKind.CollatedCharacter ? compiled.Tag!.Value.PerCharacterAdd : 0;
-        int computed = ExpressionKey.Length(compiled, perCharacterAdd);
+        int unreserved = candidate && ExpressionKey.CanBeAbsent(compiled) ? 1 : 0;
+        int computed = ExpressionKey.Length(compiled, perCharacterAdd) - unreserved;
 
         if (computed != header.KeyLength)
         {

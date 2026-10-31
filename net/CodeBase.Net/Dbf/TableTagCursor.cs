@@ -121,7 +121,8 @@ internal sealed class TableTagCursor
     public KeySearch SearchFor(ReadOnlySpan<byte> value, bool prefix)
     {
         SeekConverter resolved = Converter;
-        byte[] into = Buffer;
+        int indicator = resolved.HasNullIndicator ? 1 : 0;
+        Span<byte> into = Buffer.AsSpan(indicator);
         int length;
 
         switch (resolved.Kind)
@@ -136,7 +137,7 @@ internal sealed class TableTagCursor
                 length = prefix ? Math.Min(value.Length, into.Length) : into.Length;
                 value[..Math.Min(value.Length, into.Length)].CopyTo(into);
                 if (!prefix)
-                    into.AsSpan(Math.Min(value.Length, into.Length)).Fill(resolved.PadByte);
+                    into[Math.Min(value.Length, into.Length)..].Fill(resolved.PadByte);
                 break;
 
             case KeyKind.CollatedCharacter when prefix:
@@ -176,7 +177,7 @@ internal sealed class TableTagCursor
                     TypedSeekFor(resolved.Kind));
         }
 
-        active = KeySearch.Into(into, length, resolved.KeyLength, resolved.PadByte);
+        active = KeySearch.Into(Buffer, Indicated(indicator, length), resolved.KeyLength, resolved.PadByte);
         searching = true;
 
         return active;
@@ -217,7 +218,7 @@ internal sealed class TableTagCursor
         _ => "No seek by value is available for this kind of key yet.",
     };
 
-    private KeySearch Numeric(KeyKind expected, string what, Func<byte[], int> write)
+    private KeySearch Numeric(KeyKind expected, string what, KeyWriter write)
     {
         SeekConverter resolved = Converter;
 
@@ -228,10 +229,39 @@ internal sealed class TableTagCursor
                 $"Tag '{tag.Name}' holds {resolved.Kind} keys, so it cannot be searched for {what}.");
         }
 
-        active = KeySearch.Into(Buffer, write(Buffer), resolved.KeyLength, resolved.PadByte);
+        int indicator = resolved.HasNullIndicator ? 1 : 0;
+        int length = write(Buffer.AsSpan(indicator));
+
+        active = KeySearch.Into(Buffer, Indicated(indicator, length), resolved.KeyLength, resolved.PadByte);
         searching = true;
 
         return active;
+    }
+
+    /// <summary>
+    /// Writes a key's value bytes, returning how many were written.
+    /// </summary>
+    private delegate int KeyWriter(Span<byte> destination);
+
+    /// <summary>
+    /// Puts the leading byte of a key whose value can be absent in front of a search already written after it.
+    /// </summary>
+    /// <param name="indicator">One for a tag whose keys carry the byte, zero otherwise.</param>
+    /// <param name="length">How many value bytes the search covers.</param>
+    /// <returns>How many bytes the whole search covers.</returns>
+    /// <value>
+    /// Such a tag's keys begin with 0x80 for a value and are all zeros for an absent one, so a
+    /// value is sought behind 0x80, as the reference seeks it (tfile4stok, D4SEEK.C:47-57, and the
+    /// numeric forms at 154-156 and 177-179). Without it a value's first byte is compared against the
+    /// indicator and nothing is found.
+    /// </value>
+    private int Indicated(int indicator, int length)
+    {
+        if (indicator == 0)
+            return length;
+
+        Buffer[0] = 0x80;
+        return length + 1;
     }
 
     /// <summary>

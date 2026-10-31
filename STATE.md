@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-10-31 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed locally and not pushed.**
+**Updated:** 2026-10-31 · **step 012 (`012-p1-tails`) is closed; the tree is clean and pushed.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -29,8 +29,10 @@ resolves to another key length than its header's is refused (E84901) — `TAGBAD
 under GENERAL resolved at half the cap, now applied. Then `UPPER`/`LOWER` by the table's own code
 page (ADR-65): the reference follows the host's, and the port changed only `a`–`z` — byte by byte,
 which in a multi-byte table also broke characters whose trail byte equals a letter. An unmarked table
-keeps ASCII unless the host names its encoding. Gated by Visual FoxPro's cp1251 keys. Next: close
-012.
+keeps ASCII unless the host names its encoding. Gated by Visual FoxPro's cp1251 keys. Closing it
+found that `Seek` found **nothing** in a tag over a nullable field — the search lacked the `0x80`
+byte the keys begin with — now fixed and gated, along with the candidate tag's exception. The first
+full `mutate4csharp` run: 91 mutants killed, 8 left, all explained. Next: step 013.
 **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
@@ -344,7 +346,13 @@ page at the same byte length (ADR-65); an unmarked table maps ASCII unless the h
 byte and the oracle's `LOWER` case is gated. `c4upper` turned out to be in the source after all.
 And a filter's string literals are now encoded as the table's text is read (ADR-66): they were
 Latin1, so a filter over a cp1251 table could not name a Cyrillic value and an unencodable one
-silently matched nothing. Tests: 2615 unit, 1130 golden.
+silently matched nothing. Then the close: `SUMMARY.md`, the capability table, the index, and the
+first full `mutate4csharp` run over `CaseMap`, `ConversionSearch` and `SeekConverter` — four real
+survivors killed by new layer-1 tests, eight equivalent or out of scope and recorded. And a defect
+found on the way: `Seek` on a tag over a nullable field never found anything, since step 010 — the
+query path put the `0x80` byte in front of the value and the seek path did not. Fixed, with a gate
+over the corpus's three nullable tags; a candidate tag now reserves no null byte, as in the
+reference. Tests: 2622 unit, 1133 golden.
 
 ### Before it (2026-10-30)
 
@@ -968,15 +976,6 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ## 3. Next
 
-### Finish step 012 — `claude/dev/012-p1-tails/`
-
-Sub-step 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): close — `SUMMARY.md`,
-`PORTING-PLAN.md` §5, `claude/dev/README.md`, the first full `mutate4csharp` run.
-
-They run under the new §4 rules, as sub-step 4 did: `crap4csharp` after each, and the first full
-`mutate4csharp` run at close — copy-aside, since it writes into the
-file it mutates.
-
 ### Step 013 — clean up what the unit layers do not cover — `claude/dev/013-coverage-audit/`
 
 Starts once 012 closes, and before anything new. Its input is already written:
@@ -984,7 +983,9 @@ Starts once 012 closes, and before anything new. Its input is already written:
 001–011 — 93 of 662 members above 8.0, 129 at 0% unit coverage. The headline is F1: the query
 pipeline (decomposer, executor, plan, residual filter, `Query`) has no test below the Golden layer.
 Then F2–F4 in steps 008, 010 and 006, and a decision on the public facade (F5). `DESIGN.md` and
-`PLAN.md` from the template when it starts.
+`PLAN.md` from the template when it starts. 012's close adds weight to F4: `TableTagCursor.SearchFor`
+rose to CRAP 39.2, and the defect it hid — no seek ever finding a value in a nullable tag — lived
+there unseen since step 010 because no unit test reaches the cursor.
 
 ### Step 014 — expressions over several open tables (`EXPR-ALIAS`)
 

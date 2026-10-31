@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-10-31 · **step 012 (`012-p1-tails`) is closed; the tree is clean and pushed.**
+**Updated:** 2026-10-31 · **step 012 (`012-p1-tails`) is closed and pushed; step 013 is planned, committed locally and not pushed.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -982,8 +982,11 @@ Starts once 012 closes, and before anything new. Its input is already written:
 [`AUDIT.md`](claude/dev/013-coverage-audit/AUDIT.md), the first `crap4csharp` run over steps
 001–011 — 93 of 662 members above 8.0, 129 at 0% unit coverage. The headline is F1: the query
 pipeline (decomposer, executor, plan, residual filter, `Query`) has no test below the Golden layer.
-Then F2–F4 in steps 008, 010 and 006, and a decision on the public facade (F5). `DESIGN.md` and
-`PLAN.md` from the template when it starts. 012's close adds weight to F4: `TableTagCursor.SearchFor`
+Then F2–F4 in steps 008, 010 and 006, and the public API (F5). **Planned 2026-10-31:**
+[`DESIGN.md`](claude/dev/013-coverage-audit/DESIGN.md) and
+[`PLAN.md`](claude/dev/013-coverage-audit/PLAN.md), eight sub-steps starting with a fresh baseline,
+no new production seam needed. F5 decided by the user (ADR-67): nothing is made public for a test,
+and every public forwarding member gets at least one test that it reaches its target. 012's close adds weight to F4: `TableTagCursor.SearchFor`
 rose to CRAP 39.2, and the defect it hid — no seek ever finding a value in a nullable tag — lived
 there unseen since step 010 because no unit test reaches the cursor.
 

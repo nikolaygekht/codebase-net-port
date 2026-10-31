@@ -2339,3 +2339,29 @@ Latin1: it is bytes, not text.
 
 **Rejected — leaving Latin1 and documenting it.** A filter is the main way to ask this library a
 question, and in a non-Latin table it could not name a value.
+
+## ADR-67 — Nothing is made public for tests; every public forwarding member gets a test that it forwards, and the target gets the rest · accepted
+
+**Date.** 2026-10-31. Decided by the user while step 013 was being planned.
+
+**Context.** Step 013's audit (finding F5) counted about forty members of the public API — `Table`,
+`Tag`, `CodeBaseEngine` — at 0% unit coverage, nearly all one-line forwards to internal classes
+that are tested at their own level. Only the golden suite calls the forwarding itself, so a forward
+to the wrong place (the wrong field, the wrong overload, the wrong cursor) would be caught only if
+some corpus gate happened to read through it.
+
+**Decision.**
+
+1. **Nothing becomes public for a test's sake.** A public member is found and used. Tests reach
+   internal classes through `InternalsVisibleTo`, and a seam a test needs is `internal`.
+2. **Every public member that forwards gets at least one test** proving it reaches the right place:
+   a call through the public member whose observable result only the intended target produces. Not
+   a `Verify` on a mock — the forwarding is proved by what comes back.
+3. **Exhaustive coverage of what the target does belongs to the target's own tests**, not to the
+   forwarding member's.
+
+**Rejected — no test for a one-line forward.** Cheap, but a forward to the wrong target is a real
+defect, and the golden suite proves it only by accident of what it reads.
+
+**Rejected — repeating the target's tests through the public member.** It doubles the suite and
+couples the public tests to every rule the target holds.

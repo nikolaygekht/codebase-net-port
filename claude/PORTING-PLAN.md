@@ -104,6 +104,15 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself.
 - Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs).
+- **Collated tags in the query optimizer, for equality.** ADR-54/59 refuse a collated tag in both
+  scopes because a filter compares in byte order and the tag is in weight order — a range seek
+  substitutes one for the other and loses records. For **equality and prefix equality** the relation
+  is one-way: byte-equal texts have equal collated keys, so the tag returns a **superset** of the
+  records, and a leaf marked untrusted, re-checked per record by the residual filter, would answer
+  exactly and faster than a scan. Needs a trust mark on a plan leaf, a refinement of ADR-54, and the
+  equivalence gate over `CDXCOLL`/`QRYGATE`. Recorded 2026-10-31 at the user's call, during step 013.
+  `TagProbe.KeyFor`'s collated branch, dead until then, builds a full-width value's key from raw bytes
+  rather than weights and must be fixed when this is taken up.
 - Full VFP9 varchar/varbinary null-bit semantics. (`V`/`Q`/`W` were parked on there being no live
   VFP; ADR-44 removes that obstacle — a table with those fields is item 4 of its run order. Still
   LATER: the obstacle was never the only reason.)

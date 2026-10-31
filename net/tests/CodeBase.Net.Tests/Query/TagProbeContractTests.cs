@@ -77,3 +77,50 @@ public sealed class SortedKeyProbeContractTests : TagProbeContract
     private protected override ITagProbe CreateProbe() =>
         SortedKeyProbe.OfText(10, [.. KeysHeld]);
 }
+
+/// <summary>
+/// The contract over a descending tag, where the probe walks the tree against its traversal.
+/// </summary>
+/// <value>
+/// CDXBASE's descending character tag. The contract is stated in stored order, which a descending
+/// tag reaches by stepping backwards; this is what holds the probe's reversal to it.
+/// </value>
+[Trait("Layer", "Component")]
+public sealed class DescendingTagProbeContractTests : TagProbeContract
+{
+    private static readonly Lazy<IReadOnlyList<string>> LazyKeys = new(ReadKeys);
+
+    private protected override IReadOnlyList<string> KeysHeld => LazyKeys.Value;
+
+    private protected override ITagProbe CreateProbe() => Open().Probe;
+
+    private static (Table Table, ITagProbe Probe) Open()
+    {
+        var engine = new CodeBaseEngine();
+        Table table = engine.OpenTable(Corpus.PathOf("CDXBASE.DBF"));
+        Tag tag = table.Tags["T_TEXTD"];
+
+        return (table, new TagProbe(
+            tag.Inner,
+            SeekConverter.For(
+                tag.Inner.Header,
+                [.. table.Fields],
+                table.CodePageNumber ?? CodePageMap.UnmarkedCodePage,
+                ExpressionOptions.Invariant,
+                "CDXBASE")));
+    }
+
+    private static IReadOnlyList<string> ReadKeys()
+    {
+        (Table table, ITagProbe probe) = Open();
+        using (table)
+        {
+            List<string> keys = [];
+
+            for (bool on = probe.First(); on; on = probe.Step())
+                keys.Add(System.Text.Encoding.Latin1.GetString(probe.Current.Key).TrimEnd());
+
+            return keys;
+        }
+    }
+}

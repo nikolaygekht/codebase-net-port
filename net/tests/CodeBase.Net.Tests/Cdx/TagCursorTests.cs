@@ -123,6 +123,29 @@ public sealed class TagCursorTests
         cursor.Eof.Should().BeFalse();
     }
 
+    [Theory]
+    // Stepping back in from either end lands on the end's own key, in the tag's order whichever way
+    // that runs physically -- and stepping further out stays out.
+    [InlineData(false, "ALPHA   ", "DELTA   ")]
+    [InlineData(true, "DELTA   ", "ALPHA   ")]
+    public void Walk_SteppingBackInFromAnEndLandsOnThatEndsKey(bool descending, string first, string last)
+    {
+        using IndexFileReader index = TwoLeaves(descending);
+        TagCursor cursor = index.Tags[0].OpenCursor();
+
+        cursor.Top().Should().BeTrue();
+        cursor.Previous().Should().BeFalse();
+        cursor.Previous().Should().BeFalse("stepping further out of the start stays out");
+        cursor.Next().Should().BeTrue();
+        System.Text.Encoding.ASCII.GetString(cursor.Current.Key).Should().Be(first);
+
+        cursor.Bottom().Should().BeTrue();
+        cursor.Next().Should().BeFalse();
+        cursor.Next().Should().BeFalse("stepping further out of the end stays out");
+        cursor.Previous().Should().BeTrue();
+        System.Text.Encoding.ASCII.GetString(cursor.Current.Key).Should().Be(last);
+    }
+
     [Fact]
     public void Skip_MovesAsFarAsItCanAndSaysHowFarThatWas()
     {

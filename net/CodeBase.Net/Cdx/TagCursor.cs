@@ -465,15 +465,19 @@ internal sealed class TagCursor
         // it: the index still remembers where the walk ran out, so stepping back from the end must
         // return to the last entry and not to the one before it. This is the same rule the record
         // cursor follows for a table (d4skip.c:1197-1202), and the reason it needs saying is that a
-        // walk which merely stops at the end never notices the difference.
-        if (Eof && direction < 0 && index < block.Leaf.Count)
+        // walk which merely stops at the end never notices the difference. The two flags name the
+        // tag's own ends, so the step is read in the tag's order too: on a descending tag the end is
+        // the physical start, and stepping back in from it moves physically forwards.
+        long inTagOrder = tag.Descending ? -direction : direction;
+
+        if (Eof && inTagOrder < 0 && index < block.Leaf.Count)
         {
             Eof = false;
             Bof = false;
             return true;
         }
 
-        if (Bof && direction > 0 && index < block.Leaf.Count)
+        if (Bof && inTagOrder > 0 && index < block.Leaf.Count)
         {
             Eof = false;
             Bof = false;

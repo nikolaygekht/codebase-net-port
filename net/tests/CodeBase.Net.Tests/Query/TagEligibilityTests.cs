@@ -117,6 +117,34 @@ public sealed class TagEligibilityTests
         TagEligibility.Allows(Plain(KeyKind.Int32, filtered: true), QueryTagScope.AllSeekable)
             .Should().BeFalse();
 
+    [Theory]
+    // An integer tag holds whole numbers within an int; a currency tag ten-thousandths within a
+    // long; a single-precision tag only what a float holds exactly.
+    [InlineData("Int32", 3.0, true)]
+    [InlineData("Int32", 2.5, false)]
+    [InlineData("Int32", 3e10, false)]
+    [InlineData("Int32", double.PositiveInfinity, false)]
+    [InlineData("Currency", 1.2345, true)]
+    [InlineData("Currency", 1.23456, false)]
+    [InlineData("Currency", 1e16, false)]
+    [InlineData("Single", 0.5, true)]
+    [InlineData("Single", 0.1, false)]
+    [InlineData("Double", 0.1, true)]
+    [InlineData("Character", 0.1, true)]
+    public void ATagCanExpressOnlyAValueItsKeysHoldExactly(string kind, double value, bool expressible) =>
+        TagEligibility.CanExpress(Plain(Enum.Parse<KeyKind>(kind)), ConstraintValue.From(ExpressionValue.Numeric(value), 8))
+            .Should().Be(expressible);
+
+    [Fact]
+    public void ADatetimeTagCanExpressOnlyATimestamp()
+    {
+        // No literal names a moment, so only a timestamp value can be sought in one.
+        TagEligibility.CanExpress(Plain(KeyKind.DateTime), ConstraintValue.From(ExpressionValue.Timestamp(2451545, 0), 8))
+            .Should().BeTrue();
+        TagEligibility.CanExpress(Plain(KeyKind.DateTime), ConstraintValue.From(ExpressionValue.Numeric(2451545), 8))
+            .Should().BeFalse();
+    }
+
     /// <summary>
     /// One field, which is all these cases need: what is being tested is the tag's own properties,
     /// and its key expression only has to compile.

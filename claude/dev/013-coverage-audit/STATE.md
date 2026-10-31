@@ -4,8 +4,8 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — sub-step 1 done
-**Current sub-step:** PLAN.md step 2
+**Status:** in progress — sub-steps 1–2 done
+**Current sub-step:** PLAN.md step 3
 
 ## Done so far
 
@@ -45,7 +45,31 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     `Bottom`, `Previous`; `Tag.ToString`, `Filter`, `Collation`; `FieldCollection.Count`,
     `TryGet`; `CodeBaseEngine.BlockCache`, `BlockCacheBlocks`. The full list is the TSV's rows with
     `0.0%` in those classes.
-- [ ] step 2 — F1a, decomposition
+- [x] step 2 — F1a, decomposition (2026-10-31). No library change; no defect found.
+  - `QueryDecomposerTests` (layer 1, 46 cases) over hand-built fields and `QueryTag`s compiled from
+    their expressions, each stating a rule of `QUERY-OPTIMIZER.md` §3–4 as a plan — the tag and
+    constraint of each leaf under its connectives, children sorted since the walk's order is not a
+    promise: every operator and its reflection; the prefix widening, lower bounds only; terms no tag
+    answers (bare field, negation, two fields, an untagged expression); an and keeping what it can,
+    an or abandoned from either side, an and with nothing left; two tags under an or; folding under
+    an and, and under an or only into one range; nothing folded across a connective; a refused tag
+    not ending the search; the widened scope; constants a tag cannot hold exactly; a constant read
+    under the decomposer's date policy; `MatchTags` showing the or's untried operand; the constraint
+    and value descriptions; text comparison by common bytes, then width.
+  - `TagEligibilityTests` gained `CanExpress` per key kind (whole, out of range, infinite, currency
+    precision, float exactness, a timestamp only for a datetime tag).
+  - Coverage (unit), against `baseline.txt`: `Walk.Constrain` 0% → 96% (the `_ => null` arm is
+    unreachable: only comparison rows reach it), `VisitComparison` 55% → 95% (`left < 0` is
+    unreachable on a well-formed tree), `VisitConnective` 0% → 100%, `TryMatch` 38% → 100%,
+    `Fold`, `Merged`, `Widens`, `MatchTags`, `QueryPlan.For`/`LeafCount`, `CanExpress`/`IsWhole`,
+    `ConstraintNode.Walk`/`IsLeaf`/`Leaf`/`Branch`, both `ToString`s 100%; `ConstraintValue.CompareTo`
+    57% → 100% with the text cases. Left: `ConstraintValue.AsCurrency`, sub-step 3's (`TagProbe`).
+  - **`mutate4csharp`**, copy-aside, md5 checked: `TagEligibility.cs` 17 of 17 killed;
+    `QueryDecomposer.cs` 57 of 59, the two survivors equivalent — `:207` `FullyMapped = false` set
+    true for a non-comparison term (a whole-filter one has no root, and a connective sets it false
+    again at once), `:242` a one-child connective returned as a branch (`Merged` folds it back to
+    the leaf).
+  - Release 2680 + 1133 green.
 - [ ] step 3 — F1b, execution
 - [ ] step 4 — F1c, the result cursor
 - [ ] step 5 — F2, keys from values

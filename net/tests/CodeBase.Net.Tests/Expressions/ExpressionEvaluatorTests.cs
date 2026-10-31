@@ -1,5 +1,6 @@
 using System.Text;
 using AwesomeAssertions;
+using CodeBase.Net.Cdx;
 using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
 using Xunit;
@@ -523,6 +524,38 @@ public sealed class ExpressionEvaluatorTests
 
     private static readonly IFieldMetadata WithFloat = new TableFieldMetadata(
         [Field("K_FLT", 'H', 4)], "T");
+
+    // ------------------------------------------------- conversions under a tag
+
+    [Fact]
+    public void UnderACollatedTagAStringsAscendingConversionIsItsCollatedKey()
+    {
+        // The operand is weighed with the tag's collation at evaluation time (e4functi.c:3042-3062),
+        // into the same heads-and-tails form a collated tag stores for the plain string.
+        byte[] text = Encoding.Latin1.GetBytes("cafe");
+        byte[] expected = new byte[2 * text.Length];
+        CollatedKey.Write(
+            text,
+            CollationWeights.TableFor(CollationName.General, 1252),
+            CollationWeights.ExpansionsFor(CollationName.General, 1252),
+            includeTails: true,
+            expected);
+
+        UnderTag("ASCEND(\"cafe\")", CollationName.General).Should().Equal(expected);
+        UnderTag("DESCEND(\"cafe\")", CollationName.General).Should().Equal(expected.Select(b => (byte)~b));
+    }
+
+    [Fact]
+    public void UnderAMachineTagAStringsConversionIsAsWithoutATag()
+    {
+        UnderTag("ASCEND(\"cafe\")", CollationName.Machine).Should().Equal(Bytes("ASCEND(\"cafe\")"));
+        UnderTag("DESCEND(\"cafe\")", CollationName.Machine).Should().Equal(Bytes("DESCEND(\"cafe\")"));
+    }
+
+    private static byte[] UnderTag(string expression, CollationName collation) =>
+        new ExpressionEvaluator(TypeResolver.Resolve(
+                ExpressionParser.Parse(expression, Fields), TagContext.For(collation, 1252)))
+            .Evaluate(Context()).Bytes.ToArray();
 
     private static CompiledExpression Compile(string expression) =>
         TypeResolver.Resolve(ExpressionParser.Parse(

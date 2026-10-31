@@ -468,11 +468,14 @@ static int dumpSeeks( FILE *out, TAG4FILE *t4, long count )
  * identity (t4noChangeStr, i4init.c:583-592), so the value bytes *are* the key
  * bytes and the length-taking d4seekN/d4seekNextN can be driven with raw bytes.
  * The length-taking forms matter: T_BIN's keys hold 0x00, which would stop the
- * string forms dead.
+ * string forms dead. A nullable tag is not the identity even in machine order:
+ * the value gets the 0x80 indicator byte put in front of it (tfile4stok,
+ * D4SEEK.C:47-57), so a key's raw bytes would be sought as a different key.
  */
 static int identityTransform( TAG4FILE *t4 )
 {
-   return tfile4type( t4 ) == r4str && t4->collateName == collate4machine;
+   return tfile4type( t4 ) == r4str && t4->collateName == collate4machine
+       && !expr4nullLow( t4->expr, 0 );
 }
 
 static int dumpSeekNext( FILE *out, DATA4 *data, TAG4 *tag, long count )

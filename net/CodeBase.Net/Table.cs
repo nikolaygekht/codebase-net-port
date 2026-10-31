@@ -607,6 +607,10 @@ public sealed class Table : IDisposable
     /// A whole-key match: the value is padded to the tag's key width, so seeking SMITH finds SMITH
     /// and not SMITHSON. Use [clink=CodeBase.Net.Table.SeekPrefix]SeekPrefix[/clink] for that.
     ///
+    /// A tag whose whole expression is [c]ASCEND[/c] or [c]DESCEND[/c] of a string is sought by the
+    /// string itself: the value goes through the same conversion the keys did, so seeking SMITH in a
+    /// [c]DESCEND(NAME)[/c] tag finds SMITH. The same holds for every overload that takes text.
+    ///
     /// A miss leaves the cursor on no record rather than on a neighbour, which is what
     /// [clink=CodeBase.Net.Table.Go]Go[/clink] already does past the end of the table. A caller that
     /// wants the neighbour asks for it by name, with

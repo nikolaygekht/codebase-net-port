@@ -24,7 +24,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class QueryResultGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX", "TAGGEN"];
 
     /// <summary>
     /// The gate, in record-number order: no tag selected, so the query walks its own record set and
@@ -154,7 +154,10 @@ public sealed class QueryResultGoldenTests
                 "{0} is answered entirely by its tags", filter.Filter);
         }
 
-        seen.Should().BeGreaterThan(0);
+        // TAGGEN's filters are over ID, which no tag covers: they are there to walk its GENERAL tags
+        // in order, and no plan of theirs maps.
+        if (table != "TAGGEN")
+            seen.Should().BeGreaterThan(0);
     }
 
     /// <summary>

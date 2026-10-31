@@ -59,6 +59,32 @@ different afterwards.
 - **Code:** whichever of those lengths the port gets wrong; the dump says how many — possibly none.
 - **Docs:** `EXPRESSIONS.md` records that error −510 is unreachable here.
 
+**C2a. The tag-context tags themselves, and `ASCEND`/`DESCEND` under a tag's collation.** *(Added
+2026-10-31, at the user's call, after sub-step 5.)*
+- **Why:** sub-step 5 witnessed the lengths through the resolver alone; no corpus tag was a bare memo
+  or a GENERAL tag over `ASCEND`/`DESCEND`. Two new cases hold such tags, so the rules are witnessed in
+  stored keys, seeks and query answers.
+- **Found on the way:** the reference's `i4tagAdd` skips the re-parse `i4create` makes once the
+  collation is set, writes `DESCEND(K_TEXT)` under GENERAL with key length 20, and refuses its own file
+  at open (−310). Both cases are built by `i4create` alone; the omissions are recorded so the writer
+  does not port them (Decision 6).
+- **Now:** a GENERAL tag over `ASCEND`/`DESCEND` of a string cannot be keyed here. The evaluator
+  converts without the collation and the key builder then collates the result a second time — the
+  reference does the opposite on both counts (`EXPRESSIONS.md` §9.5) — and both throw on the width.
+  A string seek on any `DESCEND` tag never finds, here as in the reference.
+- **After:** inside a non-machine tag, `ASCEND`/`DESCEND` of a string collates its operand (heads,
+  tails, zeros) and `DESCEND` complements it; a non-machine tag with any `ASCEND`/`DESCEND` stores
+  those bytes without collating again. A tag whose whole expression is `ASCEND`/`DESCEND` of a string
+  is sought through that transform (Decision 7).
+- **Generator:** `TAGCTX` (machine, `i4create`): `T_MEMO`, `T_NMEMO` (nullable memo), `T_TEXT`,
+  `T_ASC`, `T_DESC`. `TAGGEN` (cp1252, GENERAL, `i4create`): `G_TEXT`, `G_ASC`, `G_DESC` over the
+  same kind of text, with accents and an expansion. `dump-index.cpp`: a nullable tag is not an
+  identity transform for `[seeknext]` (`tfile4stok` puts the indicator in front, D4SEEK.C:47-57).
+- **Code:** `TagContext` carries the collation and code page; `CompiledExpression` keeps the tag it
+  was resolved for; `ExpressionEvaluator.KeyForm` collates under it; `SeekConverter` chooses the
+  uncollated kind for such a tag and records a whole-expression conversion; `TableTagCursor.SearchFor`
+  seeks through it.
+
 **C3. `UPPER`/`LOWER` by the table's code page.**
 - **Now:** only `a–z` change case. In a cp1251 table `UPPER("привет")` returns `"привет"`.
 - **After:** `"ПРИВЕТ"`. Case is mapped by the table's encoding; an unmarked table uses cp437. This
@@ -262,6 +288,8 @@ The gate's declared list. Anything else that moves in `git status` after a regen
 | `CDXCOLL.query.dump.txt` | **new** |
 | `QRYGATE.DBF`, `.cdx`, `.dump.txt`, `.cdx.dump.txt`, `.query.dump.txt` | **new** |
 | `CMPMEMO.DBF`, `.fpt`, `.dump.txt`, `.memo.dump.txt` | **new** |
+| `TAGCTX.DBF`, `.cdx`, `.fpt`, `.dump.txt`, `.cdx.dump.txt`, `.query.dump.txt` | **new** (C2a) |
+| `TAGGEN.DBF`, `.cdx`, `.dump.txt`, `.cdx.dump.txt`, `.query.dump.txt` | **new** (C2a) |
 | `vfp/*` | untouched — the VFP oracle is not rerun |
 
 `CDXEXPR.query.dump.txt` changes **only** if a null filter is added to its query list (Decision 3 says
@@ -279,6 +307,12 @@ Most of this step changes existing classes rather than adding new ones.
 | `EvaluationContext` | Entity | carries the table's `CaseMap` | the evaluator's only route to a code page |
 | `TypeResolver` | Controller | the tag-context lengths C2 shows it gets wrong | only if C2 finds a divergence |
 | `MemoReader` | Controller | inflates a type-3 entry | `ZLibStream`, BCL — no dependency (ADR-17) |
+| `TagContext` | Entity | carries the tag's collation and code page; the per-character add is derived | C2a |
+| `CompiledExpression` | Entity | keeps the `TagContext` it was resolved for, null for a filter | the evaluator's route to the tag's weights |
+| `ExpressionEvaluator` | Controller | `KeyForm` collates a string operand under a non-machine tag | e4functi.c:3042-3062 |
+| `SeekConverter` | Entity | a non-machine tag with `ASCEND`/`DESCEND` keys as `Character` (already collated); records whether the whole expression is a string's `ASCEND` or `DESCEND`; refuses missing weights for it too | E4EXPR.C:671-684 |
+| `ConversionSearch` *(new)* | Controller | writes the search for a value through a whole-expression `ASCEND`/`DESCEND`: pad to the operand, collate (heads only for a prefix), complement | pure; Decision 7 |
+| `TableTagCursor` | Controller | `SearchFor` goes through `ConversionSearch` for such a tag | |
 
 **`CaseMap`'s rule.** For a single-byte encoding, a 256-entry table built by decoding each byte, applying
 `char.ToUpperInvariant`/`ToLowerInvariant`, and encoding back — kept only when the result is **exactly
@@ -293,7 +327,8 @@ first `UPPER`, as `GetString` already does (ADR-17).
 
 **No new public API.** Changed behaviour: `Table.Seek(string)` and its three siblings throw on a tag
 whose keys are not character; `Table.GetMemo*` return a compressed entry's payload; a filter or a tag
-using `UPPER`/`LOWER` maps non-ASCII characters by the table's code page.
+using `UPPER`/`LOWER` maps non-ASCII characters by the table's code page; a string seek on a tag whose
+whole expression is `ASCEND(x)`/`DESCEND(x)` takes the value of `x`, not key bytes (C2a).
 
 ## Seams
 
@@ -349,6 +384,15 @@ reference's own scan truth would be sticky too.
 
 **5. The foreign-alias refusal is a spec fact, not an ADR.** The port has no multi-table expressions;
 −510 is unreachable and −210 is the answer. `EXPRESSIONS.md` says so, with the citation.
+
+**6. A tag is created the way `i4create` creates it; `i4tagAdd`'s omissions are not ported (ADR-63).**
+Decided by the user, 2026-10-31. Nothing is written in this step; the decision binds `WRITE`, and the
+facts are in `CDX-FORMAT.md` §8.6. `original/source/` is not patched — the generator uses `i4create`,
+the reference's own correct path, so the corpus still witnesses the reference.
+
+**7. A whole-expression `ASCEND`/`DESCEND` tag is sought through its transform (ADR-64).** Decided by
+the user, 2026-10-31, for machine and GENERAL tags alike. The reference never finds a `DESCEND` tag's
+key by a plain value; the expectation is the stored keys of `TAGCTX` and `TAGGEN`.
 
 ## Open questions
 

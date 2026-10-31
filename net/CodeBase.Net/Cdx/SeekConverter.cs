@@ -41,6 +41,25 @@ internal enum KeyKind
 }
 
 /// <summary>
+/// Whether a tag's whole expression converts a string into key form, and which way.
+/// </summary>
+/// <value>
+/// Such a tag stores the conversion's bytes, not the string's, so a string sought in it has to go
+/// through the same conversion to be found (ADR-64).
+/// </value>
+internal enum KeyConversion
+{
+    /// <summary>The expression is not, as a whole, an ascending or descending conversion of a string.</summary>
+    None,
+
+    /// <summary>The expression is [c]ASCEND[/c] of a string.</summary>
+    Ascending,
+
+    /// <summary>The expression is [c]DESCEND[/c] of a string: the ascending form, every byte complemented.</summary>
+    Descending,
+}
+
+/// <summary>
 /// Everything a tag needs in order to turn a value into a key, resolved once when the tag is opened.
 ///
 /// The C library does this at open too, picking a pair of conversion functions from the key's type
@@ -66,7 +85,8 @@ internal sealed class SeekConverter
         int keyLength,
         byte padByte,
         CollationName collation,
-        int codePage)
+        int codePage,
+        KeyConversion conversion)
     {
         Kind = kind;
         Field = field;
@@ -75,6 +95,7 @@ internal sealed class SeekConverter
         PadByte = padByte;
         Collation = collation;
         CodePage = codePage;
+        Conversion = conversion;
     }
 
     /// <summary>Gets the kind of key the tag stores.</summary>
@@ -97,6 +118,9 @@ internal sealed class SeekConverter
 
     /// <summary>Gets the code page of the table, which decides which weight table the collation means.</summary>
     public int CodePage { get; }
+
+    /// <summary>Gets whether the tag's whole expression is an ascending or descending conversion of a string.</summary>
+    public KeyConversion Conversion { get; }
 
     /// <summary>
     /// Gets a value indicating whether the key carries a leading byte saying the value is there.
@@ -135,7 +159,7 @@ internal sealed class SeekConverter
         // memo change lengths -- and lengths are what the optimizer matches a filter's terms on.
         CompiledExpression compiled = TypeResolver.Resolve(
             ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias), [alias]),
-            TagContext.For(collation));
+            TagContext.For(collation, codePage));
 
         RefuseIfNotTheSameTwice(compiled, expression);
 
@@ -144,15 +168,34 @@ internal sealed class SeekConverter
         // compiling it a second time.
         byte padByte = header.PadByte ?? KeyTypeResolver.PadByteOf(compiled.ResultType, header, expression);
 
-        KeyKind kind = KindOf(compiled.ResultType, collation, expression);
+        KeyKind kind = StoredKindOf(compiled, collation, codePage, expression);
 
         FieldDefinition? field = fields.FirstOrDefault(
             f => string.Equals(f.Name, expression, StringComparison.OrdinalIgnoreCase));
 
-        // A collated tag names a sort order; which weight table that means depends on the table's
-        // code page, and the index does not record it. Settled here, at the one point that knows
-        // both, so a mismatch is refused before any key is built from the wrong table.
-        if (kind == KeyKind.CollatedCharacter && !CollationWeights.Supports(collation, codePage))
+        return new SeekConverter(
+            kind, field, compiled, header.KeyLength, padByte, collation, codePage, ConversionOf(compiled));
+    }
+
+    /// <summary>
+    /// Works out the kind of key a tag stores, and refuses a collation this library has no weights for.
+    /// </summary>
+    /// <value>
+    /// A collated string tag over an ascending or descending conversion stores bytes the conversion
+    /// has already weighed, so its keys are copied rather than collated a second time
+    /// (E4EXPR.C:671-684). The conversion still needs the weights, so they are required all the same.
+    /// Which weight table a collation means depends on the table's code page, and the index does not
+    /// record it; this is the one point that knows both, so a mismatch is refused before any key is
+    /// built from the wrong table.
+    /// </value>
+    private static KeyKind StoredKindOf(
+        CompiledExpression compiled, CollationName collation, int codePage, string expression)
+    {
+        KeyKind kind = KindOf(compiled.ResultType, collation, expression);
+        bool converts = compiled.Nodes.Any(n => n.Row is >= FunctionRows.Descend and <= FunctionRows.LastAscend);
+
+        if ((kind == KeyKind.CollatedCharacter || (converts && collation != CollationName.Machine))
+            && !CollationWeights.Supports(collation, codePage))
         {
             throw new CodeBaseException(
                 ErrorCode.NotSupported,
@@ -160,8 +203,27 @@ internal sealed class SeekConverter
                 $"weights for the table's code page {codePage}.");
         }
 
-        return new SeekConverter(
-            kind, field, compiled, header.KeyLength, padByte, collation, codePage);
+        return kind == KeyKind.CollatedCharacter && converts ? KeyKind.Character : kind;
+    }
+
+    /// <summary>
+    /// Works out whether an expression is, as a whole, an ascending or descending conversion of a string.
+    /// </summary>
+    /// <value>
+    /// Only the root counts. Where a conversion is part of a larger expression, a value sought in the
+    /// tag does not map onto a key, and it is sought as it stands.
+    /// </value>
+    private static KeyConversion ConversionOf(CompiledExpression compiled)
+    {
+        int row = compiled.Nodes[^1].Row;
+
+        if (row is < FunctionRows.Descend or > FunctionRows.LastAscend
+            || FunctionTable.Row(row).Parameter1 != ExpressionType.Character)
+        {
+            return KeyConversion.None;
+        }
+
+        return row < FunctionRows.Ascend ? KeyConversion.Descending : KeyConversion.Ascending;
     }
 
     /// <summary>

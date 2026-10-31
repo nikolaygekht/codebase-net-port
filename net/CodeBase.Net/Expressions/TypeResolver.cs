@@ -108,7 +108,7 @@ internal sealed class TypeResolver
         for (int index = 0; index < nodes.Length; index++)
             Visit(index);
 
-        return new CompiledExpression(source, nodes, hasTrim);
+        return new CompiledExpression(source, nodes, hasTrim, tag);
     }
 
     private void Visit(int index)

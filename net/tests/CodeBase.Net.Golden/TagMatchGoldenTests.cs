@@ -25,7 +25,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class TagMatchGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX"];
 
     /// <summary>
     /// The gate. Every node of every filter, against the reference's own answer.

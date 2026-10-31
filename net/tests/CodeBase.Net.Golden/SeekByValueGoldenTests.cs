@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using CodeBase.Net.Cdx;
 using CodeBase.Net.Dbf;
 using CodeBase.Net.TestUtils;
 using Xunit;
@@ -27,13 +28,20 @@ public sealed class SeekByValueGoldenTests
         { "CDXCOLL", "C_GEN", "K_TEXT" },
         { "CDXDEEP", "D_WIDE", "K_WIDE" },
         { "IDXONE", "X_WIDE", "K_WIDE" },
+        { "TAGCTX", "T_TEXT", "K_TEXT" },
+        { "TAGCTX", "T_ASC", "K_TEXT" },
+        { "TAGCTX", "T_DESC", "K_TEXT" },
+        { "TAGGEN", "G_TEXT", "K_TEXT" },
+        { "TAGGEN", "G_ASC", "K_TEXT" },
+        { "TAGGEN", "G_DESC", "K_TEXT" },
     };
 
     [Fact]
     public void TheGateCoversEveryCharacterTagInTheCorpus()
     {
         // A data-driven suite that discovered nothing would report success having proved nothing.
-        CharacterTags().Should().HaveCount(6);
+        // The last four are sought through their tag's ASCEND or DESCEND, by the plain value (ADR-64).
+        CharacterTags().Should().HaveCount(12);
     }
 
     [Theory]
@@ -64,7 +72,7 @@ public sealed class SeekByValueGoldenTests
             // string comparison can express that, and the keys themselves are already gated by
             // KeyTransformGoldenTests, which rebuilds all 68 of this file's. What is left to prove
             // here is that every value in the tag is findable, which is the assertion above.
-            if (tagName != "C_GEN")
+            if (!IsCollated(table, tagName))
                 table.GetString(field).Should().Be(wanted);
 
             sought++;
@@ -98,7 +106,7 @@ public sealed class SeekByValueGoldenTests
             // A collated tag matches case- and accent-insensitively, so the record it lands on need
             // not begin with these characters as *text* -- only as weights. Asserting the string
             // prefix there would be asserting that GENERAL does not do its job.
-            if (tagName != "C_GEN")
+            if (!IsCollated(table, tagName))
                 table.GetString(field).TrimEnd().Should().StartWith(opening);
         }
     }
@@ -211,4 +219,7 @@ public sealed class SeekByValueGoldenTests
         table.Seek(new DateOnly(2000, 2, 29)).Should().Be(GoResult.Ok);
         table.GetDate(date).Should().Be(new DateOnly(2000, 2, 29));
     }
+
+    private static bool IsCollated(Table table, string tagName) =>
+        table.Tags[tagName].Inner.Header.Collation != CollationName.Machine;
 }

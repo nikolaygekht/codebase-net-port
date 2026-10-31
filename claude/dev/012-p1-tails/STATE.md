@@ -1,6 +1,6 @@
 # 012-p1-tails — state
 
-**Status:** in progress — sub-steps 1–5, 7 and 7a done
+**Status:** in progress — sub-steps 1–5b, 7 and 7a done
 **Current sub-step:** PLAN.md step 6
 
 ## Done so far
@@ -95,6 +95,56 @@
     (2a's) failed once in a full run — its `Thread.Sleep(5)` could pass before any thread opened a
     table, failing the precondition. It now closes the engine once the first table is open.
   - Release 2509 + 940 green.
+- [x] step 5a — C2a, the corpus (2026-10-31), added at the user's call.
+  - **Finding: the reference's `i4tagAdd` cannot write a GENERAL tag over `DESCEND`/`ASCEND` of a
+    string.** The first try added `G_DESC` to `TAGCTX` with `i4tagAdd` under GENERAL; the generator
+    failed reopening it (−310, E84901). `i4create` parses such an expression again once the collation
+    is set (i4create.c:1010-1025); `i4tagAdd` does not (i4add.c:746-760), writes key length 20, and
+    the open, which reads the collation before parsing, resolves 40. The comparison of the two paths
+    also found a candidate stored as plain unique, `signature` 0, and two size/type checks skipped.
+    `CDX-FORMAT.md` §8.6; ADR-63 (the writer follows `i4create` on every path, resolving the key
+    length with the open path's own call); `PORTING-PLAN.md` `WRITE`. `original/source/` not patched,
+    by decision — the corpus would witness our fix.
+  - Two tables, every tag by `i4create`: `TAGCTX` (machine; `T_MEMO`, `T_NMEMO`, `T_TEXT`, `T_ASC`,
+    `T_DESC`, six filters) and `TAGGEN` (GENERAL, cp1252, an accent and two expansions; `G_TEXT`,
+    `G_ASC`, `G_DESC`, three filters over `ID` walked in each tag's order). Regeneration changed
+    exactly the eleven declared files.
+  - Generator fix: `dump-index.cpp` treated a nullable machine string tag as an identity transform
+    for `[seeknext]`, but `d4seekN` puts `0x80` in front of the value (D4SEEK.C:47-57) — the recorded
+    runs answered another question. Only `TAGCTX.T_NMEMO` was affected; no other dump moved.
+  - Harness: `SeekTypeGoldenTests` took a memo tag's type from the field (`M`); the reference compiles
+    it as `C` for its tag. Both tables in `CorpusLayoutTests`, the index, seek, seek-by-value and
+    query-result/oracle/equivalence gates; `TAGCTX` in the optimizer gates too (its control maps;
+    `LeafEvaluation`'s floor is 1 for it), `TAGGEN` not (no plan of its maps; `AFullyMapped`'s floor
+    is 0 for it). Corpus-size pins moved.
+  - Memo tags, against the port as it stood: all 24 keys of `T_MEMO`/`T_NMEMO`/`T_TEXT` rebuilt byte
+    for byte (240 cut, `0x80` + 239, zero padding), and every query answer and tag-order walk agreed.
+- [x] step 5b — C2a, `ASCEND`/`DESCEND` under a tag's collation (2026-10-31).
+  - The port keyed a GENERAL tag over a conversion the reference's opposite way on both counts —
+    converted without the collation, then collated the result again — and threw on the width; a
+    string seek on any `DESCEND` tag never found, here as in the reference.
+  - Test first: the key gate over both tables (40 + 24 keys), every record's text sought through
+    `ConversionSearch` equal to its stored key, `SeekByValueGoldenTests` over the four conversion tags
+    and both controls. Red: exactly 12 golden tests, all 5b's.
+  - Port: `TagContext` carries collation and code page; `CompiledExpression.Tag`;
+    `ExpressionEvaluator.KeyForm` collates a string under a collated tag (e4functi.c:3042-3062);
+    `SeekConverter` keys a collated string tag with a conversion as `Character` (E4EXPR.C:671-684),
+    requires the weights for it, and records `Conversion` for a whole-expression one;
+    `ConversionSearch` (new); `TableTagCursor.SearchFor` uses it. ADR-64 (sought through the
+    transform, machine and GENERAL alike); `EXPRESSIONS.md` §9.5 (evaluation, key build, seek,
+    stored-key witness; the "no nullable memo under an index" line removed); `Table.Seek` docs.
+  - Layer 1: `ConversionSearchTests` (prefix of whole; `DESCEND` = `ASCEND` complemented; cut to the
+    operand), `SeekConverterTagContextTests` (kind, conversion, weights refusal on cp1251, and
+    `VAL(DESCEND(K_TEXT))` stays numeric — a bug of mine caught before it landed),
+    `ExpressionEvaluatorTests` (a conversion under GENERAL is `CollatedKey`'s output, under machine
+    as without a tag).
+  - **Mutations**, copy-aside, md5 checked: no collation in `KeyForm` → the `TAGGEN` key gate and the
+    layer-1 evaluator test; collating again → the key gate, four seek-by-value, two seek-type, three
+    layer-1; no complement in `ConversionSearch` → six golden over both tables, two layer-1.
+  - `crap4csharp` (unit coverage): `KeyForm` 30.0 → 7.0 (0% → 93%); `SeekConverter.For` 4.3 → 2.0,
+    its new `StoredKindOf` 8.0 at 100%; `ConversionSearch` all ≤ 4; `SearchFor` 23.9 → 35.2 (CC 8 →
+    10, coverage 37%) — 013's F5, `TableTagCursor` has no unit layer.
+  - Release 2534 + 1085 green.
 - [ ] step 6 — C3, case mapping by code page
 - [x] step 7 — D, compressed memos (2026-10-29), done out of order at the user's call.
   - zlib 1.3.1 vendored in `test-files-generator/third_party/zlib/` (core library only; `madler/zlib`
@@ -150,6 +200,10 @@
   (`PORTING-PLAN.md` §2.2 and the `DBF-READ` row, root `STATE.md` §1 and §3, `vfp/README.md`).
   Past-tense records — 003's documents, `dev/README.md`'s 003 row, `STATE.md` §2, ADR-44/46 —
   stay as written.
+
+- Sub-steps 5a and 5b were not in the plan; the user added them after 5 (DESIGN §C2a, PLAN rows).
+  5a's first shape — one table with `G_DESC` added by `i4tagAdd` — is what found the `i4tagAdd`
+  defect, and became two tables built by `i4create`.
 
 - Sub-step 5: the plan named the section `[tag rejections]` with a second table for a −510 witness.
   It is `[tag context]`, and −510 is not witnessed: the port cannot reach it until expressions can

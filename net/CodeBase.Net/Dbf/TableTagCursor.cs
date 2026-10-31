@@ -126,6 +126,12 @@ internal sealed class TableTagCursor
 
         switch (resolved.Kind)
         {
+            case KeyKind.Character when resolved.Conversion != KeyConversion.None:
+                // The tag stores ASCEND or DESCEND of the text, so the text is converted the same way
+                // before it is sought (ADR-64).
+                length = ConversionSearch.Write(resolved, value, prefix, into);
+                break;
+
             case KeyKind.Character:
                 length = prefix ? Math.Min(value.Length, into.Length) : into.Length;
                 value[..Math.Min(value.Length, into.Length)].CopyTo(into);

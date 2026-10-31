@@ -549,6 +549,10 @@ which is why it is P1 and write support is P2.
   step a developer may run the generator's `validate` mode over C#-written files; that is a manual
   confirmation, not part of the suite.
 - **Needs:** `CDX-READ`, `COLLATION`, `EXPR` (you cannot write a key you cannot compute or verify).
+- **Creating a tag follows `i4create` on every path (ADR-63).** The reference's `i4tagAdd` leaves out
+  steps `i4create` has (`CDX-FORMAT.md` §8.6), and one of them writes a key length the reference then
+  refuses at open. One creation routine serves "create the index" and "add a tag", and takes the key
+  length from the same tag-context resolution the open path uses.
 - **Owes the block cache** — write-through or retire, the separate write-optimization switch, and a
   record count that is never read stale. See §5's *cross-capability obligation* below; a write that
   leaves a stale block resident is a wrong record set.

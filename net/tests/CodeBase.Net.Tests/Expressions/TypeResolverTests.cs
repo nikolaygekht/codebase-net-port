@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using CodeBase.Net.Cdx;
 using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
 using Xunit;
@@ -267,7 +268,7 @@ public sealed class TypeResolverTests
         string expression, int perCharacterAdd, int memoLength)
     {
         CompiledExpression compiled = TypeResolver.Resolve(
-            ExpressionParser.Parse(expression, Fields), new TagContext(perCharacterAdd));
+            ExpressionParser.Parse(expression, Fields), Tag(perCharacterAdd));
 
         compiled.Nodes[0].Length.Should().Be(memoLength);
         Compile(expression).Nodes[0].Length.Should().Be(1024);
@@ -280,7 +281,7 @@ public sealed class TypeResolverTests
         IFieldMetadata nullable = new TableFieldMetadata(
             [new FieldDefinition("K_MEMO", 'M', 'M', 10, 0, 1, false, false, false, false, 0)], "T");
 
-        TypeResolver.Resolve(ExpressionParser.Parse("K_MEMO", nullable), new TagContext(0))
+        TypeResolver.Resolve(ExpressionParser.Parse("K_MEMO", nullable), Tag(0))
             .Length.Should().Be(239);
     }
 
@@ -294,7 +295,7 @@ public sealed class TypeResolverTests
     public void AStringsKeyConversionIsWidenedByTheTagsCollation(
         string expression, int perCharacterAdd, int length)
     {
-        TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields), new TagContext(perCharacterAdd))
+        TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields), Tag(perCharacterAdd))
             .Length.Should().Be(length);
     }
 
@@ -304,12 +305,15 @@ public sealed class TypeResolverTests
     [InlineData("ASCEND(K_DATE)")]
     public void ANonStringsKeyConversionIsTheSameWidthForAnyTag(string expression)
     {
-        TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields), new TagContext(1))
+        TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields), Tag(1))
             .Length.Should().Be(Compile(expression).Length);
     }
 
     private static CompiledExpression Compile(string expression) =>
         TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields));
+
+    private static TagContext Tag(int perCharacterAdd) =>
+        TagContext.For(perCharacterAdd == 0 ? CollationName.Machine : CollationName.General, 1252);
 
     private static FieldDefinition Field(string name, char type, int length, int decimals = 0) =>
         new(name, type, type, length, decimals, 1, false, false, false, false, null);

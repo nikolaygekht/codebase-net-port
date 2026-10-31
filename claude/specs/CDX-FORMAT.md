@@ -668,6 +668,34 @@ Keys are produced sorted (`sort4get`), then appended into an in-memory chain of
   `e4candidate`), returns `r4unique` (`r4unique`/`r4candidate`) or is skipped
   (`r4uniqueContinue`) (r4reinde.c:2083-2107).
 
+### 8.6 Two ways to create a tag, and what the second one skips
+
+A tag is created either **with** its index (`i4create` → `i4createTag`, i4create.c:917-1080) or
+**added** to an existing one (`i4tagAdd` → `i4addOneTag`, i4add.c:694-830, under S4FOX). Both run the
+same sequence — parse the expression, choose the collation, take the key length — but the second
+leaves out steps the first has:
+
+| Step in `i4create` | In `i4tagAdd` | Effect of the omission |
+|---|---|---|
+| `signature = 0x01` (i4create.c:922) | not set; the tag is zero-allocated | `signature` 0x00 on disk (§3, witnessed in `CDXCOLL.cdx`) — harmless, the byte is unused |
+| candidate ⇒ `typeCode += 0x04` (i4create.c:924-928) | every unique kind ⇒ `+= 0x01` (i4add.c:698-701) | a candidate tag is stored as a plain unique one |
+| parse again once the collation is set, when the expression has `ASCEND`/`DESCEND` and the collation is not machine (i4create.c:1010-1025, "AS May 12/06") | not done (i4add.c:746-760) | key length taken from the first parse, without the widening of `EXPRESSIONS.md` §9.5 |
+| expression and filter at most `I4MAX_EXPR_SIZE` (E85304, i4create.c:971-973, 1072-1074) | not checked | — |
+| filter must be logical (E80905, i4create.c:1060-1065) | not checked | — |
+| `isUnicode` from the expression's type; a collation not yet loaded read from disk (i4create.c:980-1004) | not done | no effect on the character collations this library reads |
+
+**Why the re-parse matters.** The collation is chosen from the parsed expression (a non-character
+expression gets machine order, `tfile4setCollationSeqCollatable`, I4TAG.C), so the first parse runs
+with no collation, and `ASCEND`/`DESCEND` of a string is not widened then (`EXPRESSIONS.md` §9.5).
+`i4create` parses again; `i4tagAdd` does not, writes the narrow length into `keyLen`, and at open —
+where the collation is read from the header **before** the parse — the expression resolves wider and
+the length check refuses the file (E84901, `e4index`, i4init.c:485-490). Observed with the generator:
+`DESCEND(K_TEXT)` over a C(20) field added under GENERAL is written with `keyLen` 20 and reopened at
+40. The same expression created by `i4create` is written at 40 and opens (`TAGGEN.cdx`).
+
+**For this port's writer**: one creation routine serves both paths and follows `i4create`, and the key
+length is computed by the same resolution the open path uses (ADR-63).
+
 ---
 
 ## 9. Free list and file extension

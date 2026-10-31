@@ -75,6 +75,8 @@ test-files-generator/
 │  ├─ case-idxone.cpp
 │  ├─ case-cmpmemo.cpp
 │  ├─ case-qrygate.cpp
+│  ├─ case-tagctx.cpp
+│  ├─ case-taggen.cpp
 │  ├─ util.h/.cpp      shared: error reporting, byte-run assignment, frozen date
 │  │                   stamp, close+dump tail, byte escaping
 │  ├─ dump.h/.cpp      shared: the <NAME>.dump.txt writer
@@ -189,6 +191,8 @@ and its own subdirectory.
 | `IDXONE.DBF` | `0x30` | the single-tag case: a one-tag `.cdx` plus the `.IDX` derived from it, verified by walking both — see below |
 | `CMPMEMO.DBF` | `0x31` | compressed memo entries: created with `code4memoCompress` on, so `flags[1] = 1`. 8 records; payloads of 0, 1, 511, **512** (the block size, stays type 1), **513** (first compressed), 4096, 66000 (a 17-bit length prefix), and pseudo-random binary that grows when compressed and is stored as type 3 anyway. Beside the usual dump it writes `CMPMEMO.memo.dump.txt`: each entry read back with decompression off — its block, stored type and stored length |
 | `QRYGATE.DBF` | `0x30` | the query-refusal case: three tags the reference's optimizer is written to refuse — unique, filtered, GENERAL — each alone on its own field beside a control field with a plain tag, and 13 filters through `dump-query.cpp`. The GENERAL refusal is compiled out (`d4defs.h:669-673`), so the dump records the reference using that tag and getting it wrong (ADR-59) |
+| `TAGCTX.DBF` | `0x30` | tags parsed in a tag's context, machine order: `T_MEMO` (a bare memo, resolved at 240), `T_NMEMO` (a nullable memo, 239 behind the null byte; rows 5 and 6 share their first 240 bytes), `T_TEXT`, `T_ASC` and `T_DESC` over `ASCEND`/`DESCEND(K_TEXT)`. Every tag by `i4create`. Six filters, three walked in a tag's order |
+| `TAGGEN.DBF` | `0x30` | `ASCEND`/`DESCEND` of a string under GENERAL, cp1252: `G_TEXT`, `G_ASC`, `G_DESC`. **Built by `i4create`, not `i4tagAdd`**: `i4tagAdd` takes the key length before the collation is set (no re-parse, `i4add.c:746-760` against `i4create.c:1010-1025`), writes 20 for `DESCEND(K_TEXT)`, and the reference refuses its own file at open with −310. Three filters over `ID`, each walked in one tag's order |
 
 One case is not a corpus case at all:
 
@@ -240,8 +244,9 @@ that changes with the year.
 **The dumps carry seek cases too.** `dump-index.cpp` derives ten to twelve search values per tag from
 that tag's own keys — the first, last and a middle key, the first key of a run of duplicates, a prefix, a
 value between two keys, one below and one above everything, an empty one and an all-pad one — then records
-what `tfile4seek` returned and where it left the cursor. For the eleven tags whose key transform is the
-identity (a machine-collated character tag, where value bytes *are* key bytes) it also records
+what `tfile4seek` returned and where it left the cursor. For every tag whose key transform is the
+identity (a machine-collated character tag that cannot be null, where value bytes *are* key bytes — a
+nullable tag's seek puts the `0x80` indicator in front, `D4SEEK.C:47-57`) it also records
 `d4seekN`-then-`d4seekNextN` runs as record sequences. Two traps: `tfile4seek` **writes through the key
 pointer it is given** on a descending tag, so every case is seeked from a fresh copy; and the
 **length-taking** forms of the seek calls are required, because `T_BIN`'s keys hold `0x00` and the string

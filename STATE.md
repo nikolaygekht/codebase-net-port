@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-10-30 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed locally and not pushed.**
+**Updated:** 2026-10-31 · **step 012 (`012-p1-tails`) is in progress; the tree is clean, committed locally and not pushed.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -17,7 +17,13 @@ by a second, fresh-per-record reading of every field expression and not replicat
 Record: [`claude/dev/012-p1-tails/STATE.md`](claude/dev/012-p1-tails/STATE.md).
 Then the tag-context parse: the port resolved a tag's expression as a filter, so a bare memo tag
 could match a memo term the reference never lets it answer; both length rules now apply, witnessed
-by parsing with real tags. Next: sub-step 5a, a corpus case holding such tags, then 6.
+by parsing with real tags. Then the tags themselves, in cases `TAGCTX` (machine) and `TAGGEN`
+(GENERAL): **the reference's `i4tagAdd` writes a GENERAL tag over `DESCEND` with a key length it
+then refuses to open** — `i4create` re-parses once the collation is set and `i4tagAdd` does not — so
+both cases are built by `i4create`, and the writer will follow it on every path (ADR-63). The port
+keyed such a tag the opposite way to the reference and threw; now it collates inside the conversion
+and copies, and a `DESCEND` tag is sought by its plain text, which the reference never manages
+(ADR-64). Next: sub-step 6, then close.
 **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
@@ -305,7 +311,23 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-10-30), the ones before it, and the four before those
+## 2. This session (2026-10-31), the ones before it, and the four before those
+
+**012's sub-steps 5a and 5b, added at the user's call.** A corpus case to hold the tag-context tags
+began as one table with `G_DESC` added by `i4tagAdd` under GENERAL, and the generator could not
+reopen it: `i4tagAdd` skips the re-parse `i4create` makes once the collation is set, so it writes
+key length 20 where the open resolves 40 (−310). Comparing the two paths found three more omissions
+(`CDX-FORMAT.md` §8.6). Decided: the writer creates every tag the way `i4create` does and takes the
+length from the open path's own resolution (ADR-63, `PORTING-PLAN.md` `WRITE`); `original/source/`
+stays unpatched. Cases `TAGCTX` (machine: bare memo, nullable memo, `ASCEND`, `DESCEND`, plain) and
+`TAGGEN` (GENERAL, cp1252: plain, `ASCEND`, `DESCEND`), every tag by `i4create`; the generator also
+stopped treating a nullable tag's seek as an identity. The memo tags matched the port as it stood.
+The GENERAL conversions did not: the port converted without the collation, collated the result
+again, and threw. Now the conversion collates under the tag and the key is copied, and a tag whose
+whole expression is `ASCEND`/`DESCEND` of a string is sought through that transform, machine and
+GENERAL (ADR-64). Three mutations, each caught. Tests: 2534 unit, 1085 golden.
+
+### Before it (2026-10-30)
 
 **The process, not the library.** Robert C. Martin's `ub-mode` rules were read against
 `DEV_APPROACH.md` and the ones worth having restated in it, in the phase each belongs to — shape rules
@@ -327,7 +349,7 @@ under GENERAL — witnessed by a `[tag context]` section parsed with real tags; 
 several open tables scheduled as their own capability, `EXPR-ALIAS`, step 014 (ADR-62). Tests:
 2509 unit, 940 golden.
 
-### Before it (2026-10-29)
+### Before that (2026-10-29)
 
 **Step 012 opened as `012-p1-tails`** — the P1 capabilities' owed tails in one folder, one generator
 trip — and the counted query comparison moved to 013. Development moved from WSL to native Windows.
@@ -929,10 +951,10 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ### Finish step 012 — `claude/dev/012-p1-tails/`
 
-Sub-step 5a — a corpus case with a bare memo tag, a nullable one and a GENERAL tag over `DESCEND`,
-so the tag-context rules are witnessed in stored keys and query answers, not only in lengths — then
-sub-steps 6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `UPPER`/`LOWER` by the
-table's code page; then close.
+Sub-steps 6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `UPPER`/`LOWER` by the
+table's code page; then close. Proposed and not yet decided: refusing a tag at open whose expression
+resolves to a key length other than its header's, as the reference does (E84901, i4init.c:485-490) —
+the port has no such check.
 
 They run under the new §4 rules, as sub-step 4 did: `crap4csharp` after each, and the first full
 `mutate4csharp` run at close — copy-aside, since it writes into the

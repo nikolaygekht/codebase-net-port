@@ -977,9 +977,34 @@ an expression is **resolved** with when it is parsed for a tag. Two rules, and o
 | the same under machine order, or another function under GENERAL | unchanged — `DESCEND(K_TEXT)` → 20, `UPPER(K_TEXT)` → 20 | — |
 
 The widened conversion's **key** length is its own length (40), not doubled again: its bytes are
-already collated (§9.5 above). The null-byte half of the memo rule has no witness — no corpus table
-has a nullable memo under an index. Since `e4isTag` compares node lengths (QUERY-OPTIMIZER.md §3.3),
-a bare memo tag never matches a memo term of a filter (1024 against 240), in the reference or here.
+already collated (§9.5 above). Since `e4isTag` compares node lengths (QUERY-OPTIMIZER.md §3.3), a bare
+memo tag never matches a memo term of a filter (1024 against 240), in the reference or here.
+
+**Witnessed in stored keys** [`TAGCTX.cdx`, `TAGGEN.cdx`]: `T_MEMO` keys are the memo's first 240
+bytes, a shorter memo **padded with zeros**, not blanks, and two memos equal in their first 240 bytes
+share a key; `T_NMEMO`, over a nullable memo, has key length 240 — the `0x80` byte and 239 of memo —
+and an all-zero key where the memo is null (which for a memo is empty). `G_ASC` and `G_DESC` (GENERAL,
+cp1252) have key length 40 and hold the collated key of the text, and its complement; `G_ASC`'s keys
+are `G_TEXT`'s, byte for byte.
+
+**Under a collation, a string's `ASCEND`/`DESCEND` collates its own operand**, at evaluation time.
+When the expression belongs to a tag whose collation is not machine, `ASCEND` of a string runs the
+operand through the collation into the full key — heads, then tails, then zeros, at the widened
+length (e4functi.c:3042-3062) — and `DESCEND` complements that (e4functi.c:3081-3085). Building the key
+then **copies** those bytes: a non-machine tag with `hasAscendOrDescend` set skips the collation step
+it would otherwise apply (E4EXPR.C:671-684, "AS May 12/06"). The flag is set by any `ASCEND`/`DESCEND`
+in the expression, of any type (e4parse.c:617-620; I4TAG.C, `tfile4setCollationSeqCollatable`), so a
+GENERAL tag over `DESCEND(K_NUM)` stores its bytes uncollated too.
+
+**Seeking such a tag collates the caller's value** — the tag's seek conversion is chosen from the
+collation alone (i4init.c:582-614) — which matches an `ASCEND` tag's keys and never a `DESCEND` tag's:
+the caller's own `DESCEND()` runs outside the tag, without the collation. In machine order the
+conversion is the identity (i4init.c:586-591), and a `DESCEND` tag is sought by passing
+`DESCEND(value)`. This port seeks both through the tag's own transform instead (ADR-64).
+
+The tag-context rules apply only when the tag was **created** by `i4create`: `i4tagAdd` takes the key
+length before the collation is set and writes a file the reference then refuses to open (CDX-FORMAT.md
+§8.6).
 
 ---
 

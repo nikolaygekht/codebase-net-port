@@ -43,7 +43,7 @@ public sealed class SeekTypeGoldenTests
     {
         List<(string Table, string Tag)> tags = [.. EveryTag().Select(row => row.Data)];
 
-        tags.Should().HaveCount(47);
+        tags.Should().HaveCount(55);
         tags.Count(t => ReferenceType(t.Table, t.Tag) == 'C').Should().BeGreaterThan(0);
         tags.Count(t => ReferenceType(t.Table, t.Tag) != 'C').Should().BeGreaterThan(0);
     }
@@ -127,8 +127,11 @@ public sealed class SeekTypeGoldenTests
 
         DumpField? field = CorpusDump.Load(tableName).Fields
             .SingleOrDefault(f => f.Name.Equals(expression, StringComparison.OrdinalIgnoreCase));
+        // A memo that is the whole expression is compiled for its tag as a string at the key size,
+        // which the corpus's tag-context section records as type 'C' (e4parse.c:433-457). It is the
+        // one field whose tag type is not its own.
         if (field is not null)
-            return field.Type;
+            return field.Type == 'M' ? 'C' : field.Type;
 
         DumpExpression? compiled = Expressions.ConstantExpressions
             .Concat(Expressions.FieldExpressions)

@@ -2207,3 +2207,63 @@ need to come first.
 **What it must not get wrong.** To a query over one table, a field of another is neither a constant
 nor that table's field. A term reading one goes to the per-record check, never to a tag — or the
 optimizer answers from an index for a value it never looked up (R12).
+
+## ADR-63 — A tag is created the way `i4create` creates it, on every path; what `i4tagAdd` leaves out is not ported · accepted
+
+**Date.** 2026-10-31. Decided by the user during step 012's sub-step 5a.
+
+**Context.** The reference creates a tag in two places: with its index (`i4create`) and added to an
+existing one (`i4tagAdd`). The second leaves out steps the first has (CDX-FORMAT.md §8.6). One of them
+breaks files: when the expression holds `ASCEND`/`DESCEND` of a string and the collation is not
+machine, `i4create` parses the expression again once the collation is set, and `i4tagAdd` does not. It
+writes the length from the first parse, the expression resolves wider at open, and the reference
+refuses its own file (E84901). The generator hit it with `DESCEND(K_TEXT)` under GENERAL. The others
+lose a candidate tag's flag and skip the expression-size and logical-filter checks.
+
+**Decision.** When this port writes indexes (`WRITE`, `PORTING-PLAN.md` §5), one routine creates a
+tag for both paths, and it follows `i4create`: parse, choose the collation (machine for an expression
+that is not collatable), then resolve **for the tag** — `TypeResolver.Resolve(parsed,
+TagContext.For(collation))`, the call the open path makes — and take the key length from that.
+Because create and open compute the length through one function, they cannot disagree; the
+reference's defect needs two parses at two times, and this has one. A candidate tag gets 0x04; the
+two size checks and the logical-filter check are made.
+
+**What it costs.** A tag this port adds where the reference would have used `i4tagAdd` differs from
+the reference's bytes where the reference is wrong: the key length of such a tag (and so every key),
+and a candidate's `typeCode`. There is no reference file to match for the first — the reference's
+own is unreadable — and the second is the value `i4create` writes for the same tag.
+
+**Rejected — porting `i4tagAdd` as it stands.** It reproduces a file nothing can open.
+
+**Rejected — patching `original/source/` so the generator's `i4tagAdd` is correct.** The corpus would
+then witness our fix, not the reference, and every `FILE.C:line` citation below the edit would move.
+The generator builds such tags through `i4create` instead (case `TAGGEN`), which is the reference's
+own correct path. If a later step needs the file layout only an added tag has, a patch applied to a
+copy in `test-files-generator/`, with its own ADR, is the route.
+
+## ADR-64 — A tag whose whole expression is `ASCEND` or `DESCEND` of a string is sought through that transform · accepted
+
+**Date.** 2026-10-31. Decided by the user during step 012's sub-step 5a.
+
+**Context.** The reference seeks a character tag by converting the caller's value with the tag's
+collation alone (i4init.c:582-614): the identity in machine order, the collation otherwise. A
+`DESCEND` tag's keys are complemented, so in machine order the caller must pass `DESCEND(value)`, and
+under GENERAL nothing finds them at all — the caller's `DESCEND()` runs outside the tag, without the
+collation, and the result is then collated again (EXPRESSIONS.md §9.5). This port's `Table.Seek`
+takes text, through which complemented bytes cannot be passed, so a `DESCEND` tag could not be
+sought here either.
+
+**Decision.** When a tag's expression is, as a whole, `ASCEND(x)` or `DESCEND(x)` with `x` a string,
+the value sought goes through the same transform the key went through: padded to the operand's
+width, collated when the tag's collation is not machine, complemented for `DESCEND`. A prefix seek
+keeps the heads only, as a collated prefix seek does, then complements them. Seeking `"zebra"` finds
+the record holding `zebra` in a `DESCEND(K_TEXT)` tag, in machine order and under GENERAL alike.
+Where `ASCEND`/`DESCEND` is only part of the expression, the value does not map onto a key, and the
+seek converts as it does today.
+
+**No oracle, and what stands in.** The reference never answers this seek. The expectation is the
+stored keys: every record's own value, transformed for the seek, must equal that record's key in
+`TAGCTX.cdx` (machine) and `TAGGEN.cdx` (GENERAL), and the seek must land on it.
+
+**What it changes.** A caller who, following CodeBase, passes an already-complemented value no longer
+finds it; with text that was never possible here.

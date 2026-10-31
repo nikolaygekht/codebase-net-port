@@ -31,6 +31,8 @@ int caseCdxTime( CODE4 *cb, const char *outDir );   /* CDXTIME.DBF — 0x30 + CD
 int caseCdxExpr( CODE4 *cb, const char *outDir );   /* CDXEXPR.DBF — 0x30 + CDX + FPT, expression tags and the expression dump */
 int caseCmpMemo( CODE4 *cb, const char *outDir );   /* CMPMEMO.DBF — 0x31 + FPT, compressed memo entries */
 int caseQryGate( CODE4 *cb, const char *outDir );   /* QRYGATE.DBF — 0x30 + CDX, the query refusals isolated */
+int caseTagCtx ( CODE4 *cb, const char *outDir );   /* TAGCTX.DBF  — 0x30 + CDX + FPT, tags parsed in a tag's context */
+int caseTagGen ( CODE4 *cb, const char *outDir );   /* TAGGEN.DBF  — 0x30 + CDX, ASCEND and DESCEND under GENERAL */
 
 /* The one benchmark case: a workload, not an expectation. It writes into a
  * `benchmark` subdirectory of the output and has no dump, because nothing

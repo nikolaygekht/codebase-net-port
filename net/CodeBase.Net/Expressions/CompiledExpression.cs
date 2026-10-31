@@ -25,11 +25,13 @@ internal sealed class CompiledExpression
     /// <param name="source">The text it was compiled from.</param>
     /// <param name="nodes">The nodes, in postfix order with the root last.</param>
     /// <param name="hasTrim">Whether a trim appears anywhere in it.</param>
-    internal CompiledExpression(string source, ExpressionNode[] nodes, bool hasTrim)
+    /// <param name="tag">The tag it was resolved for, or null for a filter.</param>
+    internal CompiledExpression(string source, ExpressionNode[] nodes, bool hasTrim, TagContext? tag = null)
     {
         Source = source;
         this.nodes = nodes;
         HasTrim = hasTrim;
+        Tag = tag;
     }
 
     /// <summary>
@@ -61,4 +63,14 @@ internal sealed class CompiledExpression
     /// key time rewrites them. One trim anywhere sets it.
     /// </value>
     public bool HasTrim { get; }
+
+    /// <summary>
+    /// Gets the tag the expression was resolved for, or null when it was resolved as a filter.
+    /// </summary>
+    /// <value>
+    /// Kept because it changes evaluation as well as lengths: under a collated tag an ascending or
+    /// descending conversion of a string weighs its operand with the tag's collation
+    /// (e4functi.c:3042-3062), and the evaluator has no other way to know which.
+    /// </value>
+    public TagContext? Tag { get; }
 }

@@ -35,6 +35,8 @@ turns out to be untested, add a generator case and regenerate.
 | `IDXONE.DBF` + `.cdx` + `.IDX` | `0x30` | **Index, single-tag file.** The same 300-record tree in both shapes: a compound `.cdx` holding one tag, and the `.IDX` derived from it. See below. |
 | `CMPMEMO.DBF` + `.fpt` | `0x31` | **Compressed memo entries**, a CodeBase extension Visual FoxPro cannot read. Created with `code4memoCompress` on, so the header carries `flags[1] = 1`; every entry longer than one block is stored as type 3 — a 4-byte length, then a zlib stream. Its `CMPMEMO.memo.dump.txt` says which. See below. |
 | `QRYGATE.DBF` + `.cdx` | `0x30` | **Query refusals, isolated.** Three tags the reference's optimizer is written to refuse — unique `Q_UNIQ`, filtered `Q_FILT`, GENERAL `Q_GEN` — each the only tag over its own field, beside a control field holding the same values under a plain tag. Its query dump shows the unique and filtered refusals as `tag=-`, and shows the GENERAL one **used**, wrongly: that refusal is compiled out of every non-testing build (ADR-59). 24 records, cp1252. |
+| `TAGCTX.DBF` + `.cdx` + `.fpt` | `0x30` | **Tags parsed in a tag's context, machine order.** `T_MEMO` over a memo that is the whole expression (resolved at 240, not 1024), `T_NMEMO` over a nullable memo (239 behind the null byte), `T_ASC`/`T_DESC` over `ASCEND`/`DESCEND(K_TEXT)`, and the plain `T_TEXT`. Every tag by `i4create`. Its query dump shows the reference never answering a memo term from a memo tag (1024 against 240). 8 records, cp1252. |
+| `TAGGEN.DBF` + `.cdx` | `0x30` | **`ASCEND`/`DESCEND` under GENERAL.** `G_ASC` and `G_DESC` hold the collated key of the text and its complement, at key length 40; `G_TEXT` is the plain GENERAL control. Built by `i4create` because `i4tagAdd` writes such a tag with a key length the reference then refuses to open (`claude/specs/CDX-FORMAT.md` §8.6). Text with an accent and two expansions. Its queries are over `ID`, which no tag covers, and walk each tag in order. 8 records, cp1252. |
 
 ## Benchmark data — `benchmark/`
 
@@ -101,8 +103,8 @@ swept into every data-driven golden test. The gates that want these name them.
 
 The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
-records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters, and
-`QRYGATE` 24.
+records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters,
+`QRYGATE` 24, and `TAGCTX` and `TAGGEN` 8 each.
 
 ### What `CMPMEMO` pins down
 
@@ -119,7 +121,7 @@ record with no memo shows `block=0 type=0 stored=0`. Only this table has one.
 
 `CMPMEMO.fpt`'s compressed bytes are what zlib 1.3.1 produced; see the generator README.
 
-`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `IDXONE` and `QRYGATE` are the tables whose header byte 28 carries the
+`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `IDXONE`, `QRYGATE`, `TAGCTX` and `TAGGEN` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
 (`i4create.c:1404-1418`).
 
@@ -264,7 +266,8 @@ more for the query optimizer (step `011-query-optimizer`):
   port is gated on the fresh reading.
 
 * **`CDXEXPR.query.dump.txt` (54 filters), `CDXBASE.query.dump.txt` (15),
-  `CDXDEEP.query.dump.txt` (12), `QRYGATE.query.dump.txt` (13) and `CDXCOLL.query.dump.txt` (4)** — what the reference's **query optimizer** decided about a filter,
+  `CDXDEEP.query.dump.txt` (12), `QRYGATE.query.dump.txt` (13), `CDXCOLL.query.dump.txt` (4),
+  `TAGCTX.query.dump.txt` (6) and `TAGGEN.query.dump.txt` (3)** — what the reference's **query optimizer** decided about a filter,
   written by `dump-query.cpp`. The optimizer produces no bytes, so it cannot be gated the way a
   format is; what it produces is decisions, and `RELATE4`/`RELATION4` are public structs, so the
   decisions are read out directly rather than inferred from the records that come out at the end.

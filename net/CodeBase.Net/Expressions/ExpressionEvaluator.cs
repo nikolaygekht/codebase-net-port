@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Globalization;
+using CodeBase.Net.Cdx;
 using CodeBase.Net.Dbf;
 using T = CodeBase.Net.Expressions.ExpressionType;
 
@@ -747,16 +748,20 @@ internal sealed class ExpressionEvaluator
     /// <value>
     /// Ascending conversion produces exactly the byte form an index stores, so over machine-collated
     /// character data it is the identity; descending conversion is that form with every byte
-    /// complemented, which is why it maps a blank to 0xDF. A tag whose expression uses either is
-    /// marked as already collated, so nothing collates the result a second time. The one departure
-    /// from the key form is a truth value, which ascends to a digit rather than to a letter.
+    /// complemented, which is why it maps a blank to 0xDF. Under a tag with a collation, a string is
+    /// weighed with that collation here, into heads, tails and zeros at the widened length
+    /// (e4functi.c:3042-3062), and the tag stores those bytes without collating them again
+    /// (E4EXPR.C:671-684). The one departure from the key form is a truth value, which ascends to a
+    /// digit rather than to a letter.
     /// </value>
-    private static ExpressionValue KeyForm(ExpressionNode node, ExpressionValue operand, bool complement)
+    private ExpressionValue KeyForm(ExpressionNode node, ExpressionValue operand, bool complement)
     {
         byte[] result = new byte[node.Length];
 
         if (operand.Type == T.Logical)
             result[0] = operand.Logical ? (byte)'1' : (byte)'0';
+        else if (operand.Type == T.Character && expression.Tag is { IsCollated: true } tag)
+            Collate(operand.Bytes, tag, result);
         else
             ExpressionKey.Write(operand, hasTrim: false, withIndicator: false, result);
 
@@ -767,6 +772,28 @@ internal sealed class ExpressionEvaluator
         }
 
         return ExpressionValue.Text(result);
+    }
+
+    /// <summary>
+    /// Weighs a string with a tag's collation, at the width the conversion was resolved to.
+    /// </summary>
+    /// <value>
+    /// The operand is taken at the conversion's width divided by what the collation adds per
+    /// character, which is the operand's own width, and padded with blanks if it is shorter
+    /// (e4functi.c:3053).
+    /// </value>
+    private static void Collate(ReadOnlySpan<byte> operand, TagContext tag, Span<byte> result)
+    {
+        Span<byte> value = stackalloc byte[result.Length / (1 + tag.PerCharacterAdd)];
+        value.Fill((byte)' ');
+        operand[..Math.Min(operand.Length, value.Length)].CopyTo(value);
+
+        CollatedKey.Write(
+            value,
+            CollationWeights.TableFor(tag.Collation, tag.CodePage),
+            CollationWeights.ExpansionsFor(tag.Collation, tag.CodePage),
+            includeTails: true,
+            result);
     }
 
     /// <summary>

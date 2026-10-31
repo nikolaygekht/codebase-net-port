@@ -2797,3 +2797,46 @@ count        13
   "ASC(\"A\")" codebase-refuses errorCode=-470   ; r4numDoub
   "LOWER(\"AB\")" codebase-refuses errorCode=-470   ; r4str -- result length is the operand's
   "REPLICATE(\"A\",3)" codebase-refuses errorCode=-470   ; r4str -- result length is n x operand, and 9 chars besides
+
+[tag context]
+count        7
+
+expr 0 "K_MEMO"   ; the whole expression is a memo: capped at the key size
+  tag CDXEXPR.T_NUM collation=1
+  compiled type='C'(67) len=240 keyLen=240 hasTrim=0 nodes=1
+    node  0 row=26 len=240 numParms=0 numEntries=1 fieldNo=13 i2=0
+
+expr 1 "EMPTY(K_MEMO)"   ; a memo inside an expression: not capped
+  tag CDXEXPR.T_NUM collation=1
+  compiled type='L'(76) len=4 keyLen=1 hasTrim=0 nodes=2
+    node  0 row=26 len=1024 numParms=0 numEntries=1 fieldNo=13 i2=0
+    node  1 row=151 len=4 numParms=1 numEntries=2 fieldNo=0 i2=0
+
+expr 2 "DESCEND(K_TEXT)"   ; machine order: not widened
+  tag CDXEXPR.T_NUM collation=1
+  compiled type='C'(67) len=20 keyLen=20 hasTrim=0 nodes=2
+    node  0 row=0 len=20 numParms=0 numEntries=1 fieldNo=2 i2=0
+    node  1 row=156 len=20 numParms=1 numEntries=2 fieldNo=0 i2=0
+
+expr 3 "K_TEXT"   ; a bare field under GENERAL: not widened
+  tag CDXCOLL.C_GEN collation=2
+  compiled type='C'(67) len=20 keyLen=40 hasTrim=0 nodes=1
+    node  0 row=0 len=20 numParms=0 numEntries=1 fieldNo=2 i2=0
+
+expr 4 "DESCEND(K_TEXT)"   ; GENERAL: widened
+  tag CDXCOLL.C_GEN collation=2
+  compiled type='C'(67) len=40 keyLen=40 hasTrim=0 nodes=2
+    node  0 row=0 len=20 numParms=0 numEntries=1 fieldNo=2 i2=0
+    node  1 row=156 len=40 numParms=1 numEntries=2 fieldNo=0 i2=0
+
+expr 5 "ASCEND(K_TEXT)"   ; GENERAL: widened
+  tag CDXCOLL.C_GEN collation=2
+  compiled type='C'(67) len=40 keyLen=40 hasTrim=0 nodes=2
+    node  0 row=0 len=20 numParms=0 numEntries=1 fieldNo=2 i2=0
+    node  1 row=173 len=40 numParms=1 numEntries=2 fieldNo=0 i2=0
+
+expr 6 "UPPER(K_TEXT)"   ; GENERAL, but not DESCEND/ASCEND: not widened
+  tag CDXCOLL.C_GEN collation=2
+  compiled type='C'(67) len=20 keyLen=40 hasTrim=0 nodes=2
+    node  0 row=3 len=20 numParms=0 numEntries=1 fieldNo=2 i2=0
+    node  1 row=112 len=20 numParms=1 numEntries=2 fieldNo=0 i2=0

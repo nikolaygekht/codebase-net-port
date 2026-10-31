@@ -176,7 +176,9 @@ is the one site where that is false.)*
   `ALIAS.FIELD` (e4parse.c:2357-2369). Alias is resolved via `tran4dataName` among open DATA4s
   (e4parse.c:2252-2272). Field names > 10 chars are an error — `e4unrecValue`, not a
   name-specific code — unless the DBF supports long field names (e4parse.c:2404-2417). In a *tag* expression an alias other than the indexed table itself
-  is an error `e4tagExpr` (e4parse.c:2385-2387).
+  is an error `e4tagExpr` (e4parse.c:2385-2387). **Unreachable in this port for now**: it resolves
+  only the table's own name, so another table's alias is an unknown field (`e4fieldName`, −210) in a
+  tag and a filter alike. It becomes reachable, and is gated, with `EXPR-ALIAS` (ADR-62).
 
 ---
 
@@ -962,7 +964,22 @@ simple tag expression are limited to `I4MAX_KEY_SIZE_COMPATIBLE (240) − nullBy
 **Witnessed** [`CDXEXPR.expr.dump.txt`]: `DESCEND` over machine-collated character data is a plain byte complement —
 `DESCEND(K_TEXT)` maps `'S'` (0x53) to 0xAC, i.e. `0xFF − c`, and a blank (0x20) to 0xDF. `ASCEND`
 over the same field is the identity. **A memo operand's expression length is 1024**, NUL-padded,
-whatever the payload — so the 240 cap above is a tag-time refusal and not an expression-time one.
+whatever the payload.
+
+**Witnessed** [`CDXEXPR.expr.dump.txt` `[tag context]`]: the 240 cap is not a refusal but the length
+an expression is **resolved** with when it is parsed for a tag. Two rules, and only these change:
+
+| Parsed for a tag | Length | Source |
+|---|---|---|
+| a memo field that is the whole expression (`infoN == 1`) | `min(240 − null byte, memSizeMemoExpr)` — `K_MEMO` → 240 | e4parse.c:433-457 |
+| a memo inside a larger expression | `memSizeMemoExpr`, as without a tag — `EMPTY(K_MEMO)`'s memo node → 1024 | e4parse.c:452-453 |
+| `DESCEND`/`ASCEND` of a string, collation not machine | operand length × (1 + `keySizeCharPerCharAdd`) — under GENERAL `DESCEND(K_TEXT)` → 40 | e4parse.c:655-672 |
+| the same under machine order, or another function under GENERAL | unchanged — `DESCEND(K_TEXT)` → 20, `UPPER(K_TEXT)` → 20 | — |
+
+The widened conversion's **key** length is its own length (40), not doubled again: its bytes are
+already collated (§9.5 above). The null-byte half of the memo rule has no witness — no corpus table
+has a nullable memo under an index. Since `e4isTag` compares node lengths (QUERY-OPTIMIZER.md §3.3),
+a bare memo tag never matches a memo term of a filter (1024 against 240), in the reference or here.
 
 ---
 

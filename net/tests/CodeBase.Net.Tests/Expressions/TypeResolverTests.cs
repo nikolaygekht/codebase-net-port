@@ -255,6 +255,59 @@ public sealed class TypeResolverTests
         Compile(wide).Nodes.Should().HaveCount(119);
     }
 
+    // ----------------------------------------------------------- for a tag
+
+    [Theory]
+    // A memo that is the whole key expression is capped at the key size; inside an expression it is
+    // the ordinary memo operand, and without a tag it always is.
+    [InlineData("K_MEMO", 0, 240)]
+    [InlineData("K_MEMO", 1, 240)]
+    [InlineData("EMPTY(K_MEMO)", 0, 1024)]
+    public void AMemoIsCappedAtTheKeySizeOnlyWhenItIsTheWholeTagExpression(
+        string expression, int perCharacterAdd, int memoLength)
+    {
+        CompiledExpression compiled = TypeResolver.Resolve(
+            ExpressionParser.Parse(expression, Fields), new TagContext(perCharacterAdd));
+
+        compiled.Nodes[0].Length.Should().Be(memoLength);
+        Compile(expression).Nodes[0].Length.Should().Be(1024);
+    }
+
+    [Fact]
+    public void ANullableMemoLeavesTheNullByteRoomInTheKey()
+    {
+        // The key spends one leading byte on whether the value is there (e4parse.c:445-448).
+        IFieldMetadata nullable = new TableFieldMetadata(
+            [new FieldDefinition("K_MEMO", 'M', 'M', 10, 0, 1, false, false, false, false, 0)], "T");
+
+        TypeResolver.Resolve(ExpressionParser.Parse("K_MEMO", nullable), new TagContext(0))
+            .Length.Should().Be(239);
+    }
+
+    [Theory]
+    // Only a string's conversion is widened, and only by a collation that adds bytes: a number's
+    // conversion has a fixed width, and machine order adds nothing.
+    [InlineData("DESCEND(K_TEXT)", 1, 40)]
+    [InlineData("ASCEND(K_TEXT)", 1, 40)]
+    [InlineData("DESCEND(K_TEXT)", 0, 20)]
+    [InlineData("UPPER(K_TEXT)", 1, 20)]
+    public void AStringsKeyConversionIsWidenedByTheTagsCollation(
+        string expression, int perCharacterAdd, int length)
+    {
+        TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields), new TagContext(perCharacterAdd))
+            .Length.Should().Be(length);
+    }
+
+    [Theory]
+    [InlineData("DESCEND(K_NUM)")]
+    [InlineData("DESCEND(K_INT)")]
+    [InlineData("ASCEND(K_DATE)")]
+    public void ANonStringsKeyConversionIsTheSameWidthForAnyTag(string expression)
+    {
+        TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields), new TagContext(1))
+            .Length.Should().Be(Compile(expression).Length);
+    }
+
     private static CompiledExpression Compile(string expression) =>
         TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields));
 

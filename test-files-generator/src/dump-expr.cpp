@@ -246,12 +246,70 @@ static void dumpCase( FILE *fp, const EXPRCASE *c, int index )
    fputc( '\n', fp );
 }
 
+/* An expression parsed for a tag is resolved with that tag's context: a bare
+ * memo field is capped at the key size (e4parse.c:433-457), and DESCEND/ASCEND
+ * of a string is widened by a non-machine collation (:655-672). The dump's own
+ * table is used as it is open; another is opened beside it, so that its index
+ * -- and a tag of another collation -- can be borrowed, and closed after. */
+static int dumpTagCase( FILE *fp, CODE4 *cb, const char *outDir, DATA4 *own,
+                        const char *ownName, const TAGCASE *c, int index )
+{
+   char path[520];
+   DATA4 *data = own;
+   TAG4 *tag;
+   EXPR4 *expr;
+
+   fprintf( fp, "\nexpr %d ", index );
+   dumpEscapedBytes( fp, c->text, (unsigned long)strlen( c->text ) );
+   if ( c->note != 0 )
+      fprintf( fp, "   ; %s", c->note );
+   fputc( '\n', fp );
+
+   if ( strcmp( c->table, ownName ) != 0 )
+   {
+      sprintf( path, "%s\\%s.DBF", outDir, c->table );
+      data = d4open( cb, path );
+      if ( data == 0 )
+         return fail( cb, "d4open for a tag-context parse" );
+   }
+
+   tag = d4tag( data, c->tag );
+   if ( tag == 0 )
+   {
+      if ( data != own )
+         d4close( data );
+      return fail( cb, "d4tag for a tag-context parse" );
+   }
+   fprintf( fp, "  tag %s.%s collation=%d\n", c->table, c->tag, (int)tag->tagFile->collateName );
+
+   if ( error4code( cb ) != 0 )
+      error4set( cb, 0 );
+
+   expr = expr4parseLow( data, c->text, tag->tagFile );
+   if ( expr == 0 )
+   {
+      fprintf( fp, "  PARSE FAILED errorCode=%d\n", (int)error4code( cb ) );
+      error4set( cb, 0 );
+   }
+   else
+   {
+      dumpNodes( fp, expr );
+      expr4free( expr );
+   }
+
+   if ( data != own && d4close( data ) < 0 )
+      return fail( cb, "d4close after a tag-context parse" );
+
+   return 0;
+}
+
 int dumpExpressions( CODE4 *cb, const char *outDir, const char *dbfName,
                      const EXPRCASE *constExprs, int numConst,
                      const EXPRCASE *fieldExprs, int numField,
                      const EXPRCASE *clockExprs, int numClock,
                      const EXPRCASE *rejects,    int numReject,
-                     const EXPRCASE *vfpOnly,    int numVfpOnly )
+                     const EXPRCASE *vfpOnly,    int numVfpOnly,
+                     const TAGCASE  *tagExprs,   int numTag )
 {
    char path[520];
    char stem[260];
@@ -459,6 +517,19 @@ int dumpExpressions( CODE4 *cb, const char *outDir, const char *dbfName,
       if ( vfpOnly[i].note != 0 )
          fprintf( fp, "   ; %s", vfpOnly[i].note );
       fputc( '\n', fp );
+   }
+
+   /* Shape only, as the clock section: what changes is lengths, and a value
+    * would be the same as the unlinked parse's. */
+   fprintf( fp, "\n[tag context]\ncount        %d\n", numTag );
+   for ( i = 0; i < numTag; i++ )
+   {
+      if ( dumpTagCase( fp, cb, outDir, data, stem, tagExprs + i, i ) != 0 )
+      {
+         fclose( fp );
+         d4close( data );
+         return 1;
+      }
    }
 
    fclose( fp );

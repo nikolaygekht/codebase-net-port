@@ -2184,3 +2184,26 @@ it is fixed there.
 
 **Not done.** No null filter is added to the query lists: the reference's own scan answer would be
 the sticky one, so its record sets would disagree with the port by design and gate nothing.
+
+## ADR-62 — Expressions over several open tables come into v1, ahead of relations and apart from them · accepted
+
+**Date.** 2026-10-30. Decided by the user while step 012's tag-context parse was being planned.
+
+**Context.** The reference resolves `ALIAS->FIELD` and `ALIAS.FIELD` against every table open in the
+`CODE4` (`getData4fromName`, e4parse.c:2357-2380), and reads the field from that table's current
+record. Relations depend on it — a relation's filter and sort are parsed against the master and name
+the slaves' fields (r4relate.c:5130, :6036) — but the expression engine does not depend on
+relations: whoever positions the other table decides the record. This port resolves only the
+table's own name, so another table's alias is an unknown field (−210), and −510, the refusal of a
+tag expression that names another open table (e4parse.c:2383-2387), is unreachable.
+
+**Decision.** Expressions over several open tables become a capability of their own, `EXPR-ALIAS`
+(`PORTING-PLAN.md` §5, P1), planned as step 014. Multi-table relations stay out of v1 (§2.3).
+
+**Rejected — doing it only with relations, after v1.** It would keep −510 untestable until then,
+and tie a parser-and-evaluator change to the join machinery, which is far larger and does not
+need to come first.
+
+**What it must not get wrong.** To a query over one table, a field of another is neither a constant
+nor that table's field. A term reading one goes to the per-record check, never to a tag — or the
+optimizer answers from an index for a value it never looked up (R12).

@@ -15,7 +15,9 @@ port keeps refusing them, a divergence by decision (ADR-59). Then `.NOT.` over a
 returned the null records as well and now does not, and the reference's sticky `isNull` witnessed
 by a second, fresh-per-record reading of every field expression and not replicated (ADR-61).
 Record: [`claude/dev/012-p1-tails/STATE.md`](claude/dev/012-p1-tails/STATE.md).
-Next: sub-step 5, the tag-context parse.
+Then the tag-context parse: the port resolved a tag's expression as a filter, so a bare memo tag
+could match a memo term the reference never lets it answer; both length rules now apply, witnessed
+by parsing with real tags. Next: sub-step 5a, a corpus case holding such tags, then 6.
 **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
@@ -315,11 +317,15 @@ commit messages (§7); where they conflict, ours stand (ADR-60). Its own tools r
 §4 now runs `crap4csharp` after each sub-step and both tools before a step closes, numbers into the
 step's `STATE.md`, no threshold yet. `mutate4csharp` has only been run with `--scan`. That run,
 attributed to the step that created each file, became step 013's `AUDIT.md`; 013 is the clean-up
-after 012 closes, and the counted query comparison moves to 014. Then 012's sub-step 4, the first
+after 012 closes, and the counted query comparison moves to 014 — and then, with `EXPR-ALIAS` put at 014 (ADR-62), to 015. Then 012's sub-step 4, the first
 under the new rules: `.NOT.` of a null is false and null, as in the reference — the port negated it
 and a filter `.NOT.(K_NNUM = 0)` returned the three null records too — and `CDXEXPR`'s field
 expressions evaluated a second time, parsed afresh per record, which shows the reference's `isNull`
-carrying a null forward on exactly two of 82 expressions (ADR-61). Tests: 2496 unit, 938 golden.
+carrying a null forward on exactly two of 82 expressions (ADR-61). Then sub-step 5: a tag's
+expression resolved for that tag — a bare memo capped at 240, `DESCEND`/`ASCEND` of a string widened
+under GENERAL — witnessed by a `[tag context]` section parsed with real tags; and expressions over
+several open tables scheduled as their own capability, `EXPR-ALIAS`, step 014 (ADR-62). Tests:
+2509 unit, 940 golden.
 
 ### Before it (2026-10-29)
 
@@ -923,11 +929,13 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ### Finish step 012 — `claude/dev/012-p1-tails/`
 
-Sub-steps 5, 6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): the tag-context
-parse; `UPPER`/`LOWER` by the table's code page; then close.
+Sub-step 5a — a corpus case with a bare memo tag, a nullable one and a GENERAL tag over `DESCEND`,
+so the tag-context rules are witnessed in stored keys and query answers, not only in lengths — then
+sub-steps 6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `UPPER`/`LOWER` by the
+table's code page; then close.
 
-They are the first sub-steps under the new §4 tool runs: `tools\fetch.bat` once, then `crap4csharp`
-after each, and the first full `mutate4csharp` run at close — copy-aside, since it writes into the
+They run under the new §4 rules, as sub-step 4 did: `crap4csharp` after each, and the first full
+`mutate4csharp` run at close — copy-aside, since it writes into the
 file it mutates.
 
 ### Step 013 — clean up what the unit layers do not cover — `claude/dev/013-coverage-audit/`
@@ -939,9 +947,17 @@ pipeline (decomposer, executor, plan, residual filter, `Query`) has no test belo
 Then F2–F4 in steps 008, 010 and 006, and a decision on the public facade (F5). `DESIGN.md` and
 `PLAN.md` from the template when it starts.
 
-### Step 014 — how much work does a query cost the reference?
+### Step 014 — expressions over several open tables (`EXPR-ALIAS`)
 
-(Planned as 013 until 2026-10-30, when the coverage clean-up was put first.)
+An expression names a field of another open table and reads that table's current record; no
+relation is needed, so it comes ahead of them (ADR-62, `PORTING-PLAN.md` §5). It makes −510 — a tag
+expression naming another open table — reachable and gated. The risk is the optimizer: a field of
+another table must go to the per-record check, never to a tag.
+
+### Step 015 — how much work does a query cost the reference?
+
+(Planned as 013, then 014; moved twice on 2026-10-30, behind the coverage clean-up and
+`EXPR-ALIAS`.)
 
 **`QUERY`'s performance has never been compared against the C library.** Step 009 measured seek and
 walk — 1.36–1.43× slower per seek, **2.45× faster** on a walk — but it predates the optimizer, and its

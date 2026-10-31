@@ -315,6 +315,7 @@ capability it advanced (`DEV_APPROACH.md` §6). This table is the project's answ
 | `COLLATION` | Collation tables & key transforms | **P1** | **done** — `COLL4ARR` tables for cp1252/cp437/cp850 copied verbatim, every numeric transform, `GENERAL` head-and-tail keys, the `flags4dateTime` bitmap, and the partial-seek rules (008 sub-steps 1-5). Gated by **3559 keys** rebuilt from the values that produced them | **R2 retired**, R7 |
 | `EXPR` | Expression engine (read subset) | **P1** | **done** 2026-09-03 ([`010-expr`](dev/010-expr/)) — table, scanner, parser, overload resolution, evaluator, key conversion, and wired into the tag path. **Every key of every expression tag in `CDXEXPR.cdx` is rebuilt byte for byte** (22 tags, 338 keys), each tag walks the records the reference stored in its order, and ADR-28's refusal is gone. Also **the thirteen functions Visual FoxPro has and CodeBase refuses** (ADR-43), gated by Visual FoxPro's own answers in a VM (ADR-44) — 36 values on stored bits and 16 tag key lengths against its own headers. Outstanding and named: the Windows ANSI case mapping for `UPPER` and `LOWER`, which no corpus table can witness | **R5** retired |
 | `QUERY` | **Bitmap query optimizer** | **P1** | **done** 2026-09-04 ([`dev/011-query-optimizer/`](dev/011-query-optimizer/)) — three gates, all green: full-scan equivalence in both tag scopes, the reference's own answers at five depths over 81 filters, and counted work. **ADR-52**, **ADR-53**, **ADR-54** | ~~R12~~, ~~R13~~ |
+| `EXPR-ALIAS` | Expressions over several open tables | **P1** | not started — planned as step 014 (ADR-62) | R12 |
 | `WRITE` | Single-user write & round-trip | **P2** | not started — **owes the block cache, see §5's cross-capability obligation** | R4, R9, **R6** |
 | `LOCKING` | Locking & multi-user | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | R3, R10, **R6** |
 | `TRANS` | Transactions & recovery | **P3** | not started — **owes the block cache, see §5's cross-capability obligation** | **R6** |
@@ -462,6 +463,21 @@ VFP reserved area, the `t4dblToFox` sign rule.
   from its expression matches the on-disk key (ties into the `COLLATION` transforms and
   `EXPRESSIONS.md` §7 text formats).
 - **Needs:** `DBF-READ` (field values to evaluate over), `COLLATION` (for the key half of the gate).
+
+### `EXPR-ALIAS` — expressions over several open tables · P1
+
+- **Deliverable:** an expression may name a field of another table open in the same engine,
+  `ALIAS->FIELD` or `ALIAS.FIELD`, and reads it from that table's current record — as the reference
+  resolves an alias among all open tables (e4parse.c:2357-2380). No relation is needed: whoever
+  positions the other table decides which record is read. Multi-table relations stay out of v1
+  (§2.3); this is the part of them the expression engine owns, done first (ADR-62).
+- **Gate:** the reference's values for expressions over two open tables, at chosen positions of
+  each; a tag expression naming another open table refused with −510 (e4parse.c:2383-2387), which
+  this makes reachable; an expression over a closed table refused; and full-scan equivalence for a
+  query whose filter reads another table.
+- **Chief risk — R12, a wrong record set.** To a query over table A, a field of table B is neither
+  a constant nor a field of A. Such a term must go to the per-record check, never to a tag.
+- **Needs:** `EXPR`, `QUERY`.
 
 ### `QUERY` — bitmap query optimizer · P1 — **THE HEADLINE FEATURE**
 

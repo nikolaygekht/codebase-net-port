@@ -1,7 +1,7 @@
 # 012-p1-tails — state
 
-**Status:** in progress — sub-steps 1–4, 7 and 7a done
-**Current sub-step:** PLAN.md step 5
+**Status:** in progress — sub-steps 1–5, 7 and 7a done
+**Current sub-step:** PLAN.md step 6
 
 ## Done so far
 
@@ -64,7 +64,37 @@
     unchanged at CC 114, 87.7% (013's F3/F6).
   - Docs: ADR-61; `EXPRESSIONS.md` §6 (the `.NOT.` rule and the stickiness, cited); both READMEs.
     Release 2496 + 938 green.
-- [ ] step 5 — C2, the tag-context parse
+- [x] step 5 — C2, the tag-context parse (2026-10-30).
+  - Generator: `CDXEXPR.expr.dump.txt` gains `[tag context]`, seven expressions parsed with a real
+    `TAG4FILE` — `CDXEXPR.T_NUM` (machine) and `CDXCOLL.C_GEN` (GENERAL, its table opened beside) —
+    each rule beside a case it must leave alone. Regeneration changed exactly that file. The
+    reference: bare `K_MEMO` → 240, `EMPTY(K_MEMO)`'s memo → 1024; under GENERAL `DESCEND`/`ASCEND
+    (K_TEXT)` → 40 (key length 40 too, not 80), `K_TEXT` and `UPPER(K_TEXT)` → 20.
+  - The design's "possibly none" did not hold: the port had no tag context at all and got **both**
+    wrong. Where it shows: the resolved length is the width a collated search pads to
+    (`TableTagCursor`, `TagProbe`), and the optimizer's tag match compares node lengths
+    (QUERY-OPTIMIZER.md §3.3) — so a bare memo tag matched a memo term here, at 1024 against 1024,
+    and could have answered from keys truncated to 240 bytes. The reference never matches it (1024
+    against 240), and now neither does the port.
+  - Port: `TagContext` (the collation's per-character add), `TypeResolver.Resolve(parsed, tag)`
+    applying both rules, and `SeekConverter.For` passing `TagContext.For(collation)`.
+  - Test first, against a stub that ignored the context: `TagContextGoldenTests` red on exactly the
+    three rule cases, the four controls green; layer-1 `TypeResolverTests` (both rules, the nullable
+    memo's 239 by rule — no corpus witness — and conversions of non-strings unchanged); component
+    `SeekConverterTagContextTests` over hand-built headers for the wiring, which no corpus tag
+    reaches. One layer-1 expectation of mine was wrong (`DESCEND(K_NUM)` is 12, not 8 — stored
+    numeric text keeps its width); replaced by "the same as without a tag", nothing hand-typed.
+  - **Mutations**, copy-aside, md5 checked: no context passed in `SeekConverter` → the two wiring
+    tests only; memo not capped → golden + wiring + three layer-1; not widened → golden + wiring +
+    two layer-1. `crap4csharp`: `AssignKeyConversionLength` 0% → 66.7% (013's F3), `TagContext.For`
+    100%, `AssignStringLength` CC 38 at 100% (F6).
+  - Docs: `EXPRESSIONS.md` §9.5 corrected (the 240 cap was described as a tag-time refusal; it is a
+    resolution length) with the witnessed table, and §3 marks −510 unreachable until `EXPR-ALIAS`;
+    both READMEs; the stale `MemoOperandLength` comment.
+  - Also fixed: `EngineTableListConcurrencyTests.ClosingTheEngineWhileOthersOpen_LeavesNoTableOpen`
+    (2a's) failed once in a full run — its `Thread.Sleep(5)` could pass before any thread opened a
+    table, failing the precondition. It now closes the engine once the first table is open.
+  - Release 2509 + 940 green.
 - [ ] step 6 — C3, case mapping by code page
 - [x] step 7 — D, compressed memos (2026-10-29), done out of order at the user's call.
   - zlib 1.3.1 vendored in `test-files-generator/third_party/zlib/` (core library only; `madler/zlib`
@@ -120,6 +150,12 @@
   (`PORTING-PLAN.md` §2.2 and the `DBF-READ` row, root `STATE.md` §1 and §3, `vfp/README.md`).
   Past-tense records — 003's documents, `dev/README.md`'s 003 row, `STATE.md` §2, ADR-44/46 —
   stay as written.
+
+- Sub-step 5: the plan named the section `[tag rejections]` with a second table for a −510 witness.
+  It is `[tag context]`, and −510 is not witnessed: the port cannot reach it until expressions can
+  name another table, which the user scheduled as its own capability, `EXPR-ALIAS`, step 014
+  (ADR-62). The second table is opened anyway, for its GENERAL tag. The counted query comparison
+  moved to 015.
 
 - Seen and not acted on: `FeatureFlags.UsesLongFieldNames` drives the long-name refusal
   (`FieldDescriptorTable.Parse`) on **any** version, though the C library reads the flags only on

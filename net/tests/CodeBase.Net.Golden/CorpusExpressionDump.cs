@@ -31,6 +31,7 @@ internal sealed class CorpusExpressionDump
         "[clock-dependent expressions]",
         "[rejections]",
         "[vfp-only]",
+        "[tag context]",
     ];
 
     private CorpusExpressionDump(
@@ -40,7 +41,8 @@ internal sealed class CorpusExpressionDump
         IReadOnlyList<DumpExpression> fieldExpressions,
         IReadOnlyList<DumpExpression> clockDependentExpressions,
         IReadOnlyList<DumpRejection> rejections,
-        IReadOnlyList<DumpRejection> visualFoxProOnly)
+        IReadOnlyList<DumpRejection> visualFoxProOnly,
+        IReadOnlyList<DumpTagExpression> tagContext)
     {
         DatePicture = datePicture;
         Century = century;
@@ -49,6 +51,7 @@ internal sealed class CorpusExpressionDump
         ClockDependentExpressions = clockDependentExpressions;
         Rejections = rejections;
         VisualFoxProOnly = visualFoxProOnly;
+        TagContextExpressions = tagContext;
     }
 
     /// <summary>Gets the date picture the reference was built with, from the dump's header.</summary>
@@ -87,6 +90,13 @@ internal sealed class CorpusExpressionDump
     /// </value>
     public IReadOnlyList<DumpRejection> VisualFoxProOnly { get; }
 
+    /// <summary>Gets the expressions the reference resolved for a tag, recorded for shape only.</summary>
+    /// <value>
+    /// A tag changes two lengths, so each of these names the tag it was parsed for and carries the
+    /// compiled shape that tag gave it. No value is recorded: a tag changes no value.
+    /// </value>
+    public IReadOnlyList<DumpTagExpression> TagContextExpressions { get; }
+
     /// <summary>
     /// Gets every expression the reference implementation compiled, across the three value sections.
     /// </summary>
@@ -104,6 +114,8 @@ internal sealed class CorpusExpressionDump
         List<DumpExpression> clock = [];
         List<DumpRejection> rejections = [];
         List<DumpRejection> visualFoxPro = [];
+        List<DumpExpression> tagged = [];
+        List<(string Table, string Tag)> taggedFor = [];
         string section = string.Empty;
         string picture = string.Empty;
         int century = 0;
@@ -158,6 +170,7 @@ internal sealed class CorpusExpressionDump
                     "[constant expressions]" => constants,
                     "[field expressions]" => fields,
                     "[clock-dependent expressions]" => clock,
+                    "[tag context]" => tagged,
                     _ => null,
                 };
 
@@ -199,6 +212,11 @@ internal sealed class CorpusExpressionDump
 
                     fresh[ReadNumber(line, "fresh ")] = DumpEscape.ReadQuoted(line, ref quote);
                 }
+                else if (line.StartsWith("tag ", StringComparison.Ordinal))
+                {
+                    string[] named = line["tag ".Length..].Split(' ')[0].Split('.');
+                    taggedFor.Add((named[0], named[1]));
+                }
                 else if (line.StartsWith("node ", StringComparison.Ordinal))
                 {
                     nodes.Add(new DumpNode(
@@ -235,8 +253,12 @@ internal sealed class CorpusExpressionDump
         }
 
         Close();
+        if (tagged.Count != taggedFor.Count)
+            throw new InvalidDataException($"{FileName} names a tag for {taggedFor.Count} of {tagged.Count} tag-context expressions.");
+
         return new CorpusExpressionDump(
-            picture, century, constants, fields, clock, rejections, visualFoxPro);
+            picture, century, constants, fields, clock, rejections, visualFoxPro,
+            [.. tagged.Zip(taggedFor, (e, t) => new DumpTagExpression(e, t.Table, t.Tag))]);
     }
 
     /// <summary>

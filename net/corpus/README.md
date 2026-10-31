@@ -228,14 +228,18 @@ more for the query optimizer (step `011-query-optimizer`):
   per row, its name, code, name length, priority, parameter count, return type and parameter types.
   It depends on no table. The port's own function table is compared against it row for row, so a
   transcription slip is a failing test rather than a parse difference discovered later.
-* **`CDXEXPR.expr.dump.txt`** — what the C library's parser and evaluator answer, in five sections:
+* **`CDXEXPR.expr.dump.txt`** — what the C library's parser and evaluator answer, in six sections:
   `[constant expressions]` (131), which reference no field and so have no record dimension;
   `[field expressions]` (82), evaluated at every record, for the types no literal can express
   (`r4num`, `r4date`, `r4int`, `r4currency`, a memo, and null); `[clock-dependent expressions]` (4),
   recorded for **shape only** because a value would change on every run;
   `[rejections]` (18), which records for each malformed string whether the parser accepted it and
   with which `error4code`; and `[vfp-only]` (13), the names Visual FoxPro has that the reference
-  refuses, which this port accepts (ADR-43) and which are therefore **not** an expectation.
+  refuses, which this port accepts (ADR-43) and which are therefore **not** an expectation; and
+  `[tag context]` (7), expressions parsed **for a tag** — `CDXEXPR`'s machine-order `T_NUM`, and
+  `CDXCOLL`'s GENERAL `C_GEN`, borrowed by opening that table beside this one — recorded for shape
+  only, because a tag changes lengths and no value: a bare memo is capped at the key size, and
+  `DESCEND`/`ASCEND` of a string is widened by a GENERAL collation (`EXPRESSIONS.md` §9.5).
 
   **The expression lists are sized by row coverage, not by taste.** Of the 193 rows of
   `v4functions`, 144 are reached by some expression here and the other 49 cannot be reached at all —

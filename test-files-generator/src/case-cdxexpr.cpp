@@ -459,6 +459,23 @@ static const EXPRCASE FIELDEXPRS[] =
    { "K_NNUM + 1 > 0",               "a comparison over a computed null -- the sticky isNull shows here" }
 };
 
+/* Parsed in a tag's context (e4parse.c, the tagPtr branches), which changes
+ * two lengths: a memo field that is the whole expression is capped at the key
+ * size (:433-457), and DESCEND/ASCEND of a string is widened by a collation
+ * that is not machine order (:655-672). Each rule beside a case it must leave
+ * alone. CDXCOLL is written before this case, so its GENERAL tag is there to
+ * borrow. Added 2026-10-30, step 012 sub-step 5. */
+static const TAGCASE TAGEXPRS[] =
+{
+   { "K_MEMO",          "CDXEXPR", "T_NUM",  "the whole expression is a memo: capped at the key size" },
+   { "EMPTY(K_MEMO)",   "CDXEXPR", "T_NUM",  "a memo inside an expression: not capped" },
+   { "DESCEND(K_TEXT)", "CDXEXPR", "T_NUM",  "machine order: not widened" },
+   { "K_TEXT",          "CDXCOLL", "C_GEN",  "a bare field under GENERAL: not widened" },
+   { "DESCEND(K_TEXT)", "CDXCOLL", "C_GEN",  "GENERAL: widened" },
+   { "ASCEND(K_TEXT)",  "CDXCOLL", "C_GEN",  "GENERAL: widened" },
+   { "UPPER(K_TEXT)",   "CDXCOLL", "C_GEN",  "GENERAL, but not DESCEND/ASCEND: not widened" }
+};
+
 /* Recorded for SHAPE only -- these read the system clock, so a recorded value
  * would change on every run and break byte-identical regeneration. Their type,
  * length, key length and node array are stable, which is what the resolution
@@ -801,7 +818,8 @@ int caseCdxExpr( CODE4 *cb, const char *outDir )
                             FIELDEXPRS, (int)( sizeof( FIELDEXPRS ) / sizeof( FIELDEXPRS[0] ) ),
                             CLOCKEXPRS, (int)( sizeof( CLOCKEXPRS ) / sizeof( CLOCKEXPRS[0] ) ),
                             REJECTIONS, (int)( sizeof( REJECTIONS ) / sizeof( REJECTIONS[0] ) ),
-                            VFPONLY,    (int)( sizeof( VFPONLY    ) / sizeof( VFPONLY[0]    ) ) );
+                            VFPONLY,    (int)( sizeof( VFPONLY    ) / sizeof( VFPONLY[0]    ) ),
+                            TAGEXPRS,   (int)( sizeof( TAGEXPRS   ) / sizeof( TAGEXPRS[0]   ) ) );
    if ( rc == 0 )
       rc = dumpQueries( cb, outDir, "CDXEXPR.DBF",
                         QUERIES, (int)( sizeof( QUERIES ) / sizeof( QUERIES[0] ) ) );

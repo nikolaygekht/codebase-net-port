@@ -54,13 +54,14 @@ internal sealed class TypeResolver
     /// </summary>
     /// <value>
     /// The reference reads it from a setting whose default is not in this source drop; the corpus is
-    /// the witness that the default is this, and EXPRESSIONS.md section 11 records it. A tag over a
-    /// memo is capped further, which needs the tag context this pass does not yet have.
+    /// the witness that the default is this, and EXPRESSIONS.md section 11 records it. A memo that is
+    /// the whole of a tag's expression is capped further, at the key size.
     /// </value>
     private const int MemoOperandLength = 1024;
 
     private readonly string source;
     private readonly ExpressionNode[] nodes;
+    private readonly TagContext? tag;
     private readonly T[] types = new T[StackDepth + 1];
     private readonly int[] lengths = new int[StackDepth + 1];
     private readonly int[] producers = new int[StackDepth + 1];
@@ -78,25 +79,27 @@ internal sealed class TypeResolver
     /// </value>
     private bool trimmedOrMemoSeen;
 
-    private TypeResolver(ParsedExpression parsed)
+    private TypeResolver(ParsedExpression parsed, TagContext? tag)
     {
         source = parsed.Source;
         nodes = [.. parsed.Nodes];
+        this.tag = tag;
     }
 
     /// <summary>
     /// Types a parsed expression.
     /// </summary>
     /// <param name="parsed">What the parser produced.</param>
+    /// <param name="tag">The tag the expression is resolved for, or null for a filter.</param>
     /// <returns>The compiled expression.</returns>
     /// <exception cref="CodeBaseException">
     /// No overload of an operation accepts the types its operands have, a call's parameter count
     /// disagrees with the row it resolved to, or the expression needs more operand slots than the
     /// engine has.
     /// </exception>
-    public static CompiledExpression Resolve(ParsedExpression parsed)
+    public static CompiledExpression Resolve(ParsedExpression parsed, TagContext? tag = null)
     {
-        TypeResolver resolver = new(parsed);
+        TypeResolver resolver = new(parsed, tag);
         return resolver.Run();
     }
 
@@ -328,7 +331,11 @@ internal sealed class TypeResolver
                 return;
 
             case FunctionRows.FieldMemo:
-                lengths[top] = MemoOperandLength;
+                // A memo that is the whole of a tag's expression is capped at the key size, less the
+                // byte a nullable field's key spends on whether it is there (e4parse.c:433-457).
+                lengths[top] = tag is not null && nodes.Length == 1
+                    ? Math.Min(ExpressionKey.MaximumLength - (node.Field!.Value.Definition.IsNullable ? 1 : 0), MemoOperandLength)
+                    : MemoOperandLength;
                 trimmedOrMemoSeen = true;
                 return;
 
@@ -433,12 +440,16 @@ internal sealed class TypeResolver
     /// <value>
     /// Every one of these rows returns a string, so the length has to come from what it was handed
     /// rather than from what it returns. A character operand keeps its own width, except under a tag
-    /// with a collation that widens keys, which needs the tag context this pass does not yet have.
+    /// whose collation adds bytes per character, which widens it by that much (e4parse.c:655-672).
     /// </value>
     private void AssignKeyConversionLength(int row)
     {
         switch (FunctionTable.Row(row).Parameter1)
         {
+            case T.Character:
+                lengths[top] *= 1 + (tag?.PerCharacterAdd ?? 0);
+                return;
+
             case T.DateAsDouble:
             case T.NumericAsDouble:
             case T.Timestamp:

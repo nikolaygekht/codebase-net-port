@@ -27,6 +27,16 @@ typedef struct
    const char *note;
 } EXPRCASE;
 
+/* An expression parsed for a tag: the table whose fields it names and the tag
+ * whose context it is parsed in, both already written to outDir. */
+typedef struct
+{
+   const char *text;
+   const char *table;
+   const char *tag;
+   const char *note;
+} TAGCASE;
+
 /* Write FUNCTIONS.dump.txt: every row of v4functions with everything but the
  * function pointer. Needs no table. Returns 0 on success. */
 int dumpFunctionTable( const char *outDir );
@@ -40,12 +50,15 @@ int dumpFunctionTable( const char *outDir );
  * record dimension. `clockExprs` are recorded for SHAPE ONLY -- type, length,
  * key length and node array, but never a value: DATE() and TIME() read the
  * system clock, and a recorded value for one would change on every run and
- * break the corpus's byte-identical regeneration. Returns 0 on success. */
+ * break the corpus's byte-identical regeneration. `tagExprs` are parsed in a
+ * tag's context, which changes some lengths, and recorded for shape only.
+ * Returns 0 on success. */
 int dumpExpressions( CODE4 *cb, const char *outDir, const char *dbfName,
                      const EXPRCASE *constExprs, int numConst,
                      const EXPRCASE *fieldExprs, int numField,
                      const EXPRCASE *clockExprs, int numClock,
                      const EXPRCASE *rejects,    int numReject,
-                     const EXPRCASE *vfpOnly,    int numVfpOnly );
+                     const EXPRCASE *vfpOnly,    int numVfpOnly,
+                     const TAGCASE  *tagExprs,   int numTag );
 
 #endif /* GEN_DUMP_EXPR_H */

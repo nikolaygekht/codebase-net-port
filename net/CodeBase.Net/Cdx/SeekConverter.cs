@@ -130,9 +130,12 @@ internal sealed class SeekConverter
         // The table's name goes to the scanner as well as to the resolver: a tag expression may
         // qualify a field with it, and the scanner is where the reference reads the aliases a name
         // may carry (e4parse.c:2357-2417). Without it the qualified form is refused as an unknown
-        // field, which is what this port did until the query path made the omission visible.
+        // field, which is what this port did until the query path made the omission visible. It is
+        // resolved for this tag, as the reference parses it, because the tag's collation and a bare
+        // memo change lengths -- and lengths are what the optimizer matches a filter's terms on.
         CompiledExpression compiled = TypeResolver.Resolve(
-            ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias), [alias]));
+            ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias), [alias]),
+            TagContext.For(collation));
 
         RefuseIfNotTheSameTwice(compiled, expression);
 

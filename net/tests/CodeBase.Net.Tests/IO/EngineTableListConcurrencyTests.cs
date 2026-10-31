@@ -64,6 +64,7 @@ public sealed class EngineTableListConcurrencyTests
         List<Table> received = [];
         List<Exception> failures = [];
         using Barrier start = new(Threads + 1);
+        using ManualResetEventSlim firstOpen = new();
 
         Thread[] threads = [.. Enumerable.Range(0, Threads).Select(_ => new Thread(() =>
         {
@@ -77,6 +78,8 @@ public sealed class EngineTableListConcurrencyTests
                     {
                         received.Add(table);
                     }
+
+                    firstOpen.Set();
                 }
             }
             catch (ObjectDisposedException)
@@ -94,7 +97,10 @@ public sealed class EngineTableListConcurrencyTests
 
         Array.ForEach(threads, t => t.Start());
         start.SignalAndWait(TestContext.Current.CancellationToken);
-        Thread.Sleep(5);
+
+        // Closed once some table is open rather than after a fixed pause: under a loaded full run a
+        // pause can pass before any thread is scheduled, and then nothing races the close at all.
+        firstOpen.Wait(TestContext.Current.CancellationToken);
         engine.Dispose();
         Array.ForEach(threads, t => t.Join());
 

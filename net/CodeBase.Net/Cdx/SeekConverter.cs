@@ -170,11 +170,39 @@ internal sealed class SeekConverter
 
         KeyKind kind = StoredKindOf(compiled, collation, codePage, expression);
 
+        RefuseIfTheKeyLengthDisagrees(compiled, kind, header, expression);
+
         FieldDefinition? field = fields.FirstOrDefault(
             f => string.Equals(f.Name, expression, StringComparison.OrdinalIgnoreCase));
 
         return new SeekConverter(
             kind, field, compiled, header.KeyLength, padByte, collation, codePage, ConversionOf(compiled));
+    }
+
+    /// <summary>
+    /// Refuses a tag whose expression resolves to a key length other than the one its header records.
+    /// </summary>
+    /// <value>
+    /// The reference makes the same check at open and refuses the index (E84901, i4init.c:485-490),
+    /// with the length worked out as [c]expr4keyLen[/c] does (E4EXPR.C:1049-1100): a collated string
+    /// adds the collation's bytes per character, a string whose conversion already collated it adds
+    /// none. Keys built by one expression and sought by another would be a wrong answer, not a slow
+    /// one, so the tag is refused when it is first used, by name; the reference's own i4tagAdd writes
+    /// such a file (CDX-FORMAT.md section 8.6).
+    /// </value>
+    private static void RefuseIfTheKeyLengthDisagrees(
+        CompiledExpression compiled, KeyKind kind, IndexHeader header, string expression)
+    {
+        int perCharacterAdd = kind == KeyKind.CollatedCharacter ? compiled.Tag!.Value.PerCharacterAdd : 0;
+        int computed = ExpressionKey.Length(compiled, perCharacterAdd);
+
+        if (computed != header.KeyLength)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Index,
+                $"Tag '{expression}' records keys of {header.KeyLength} bytes, and its expression makes " +
+                $"keys of {computed}. The index was not written by this expression as it is read here.");
+        }
     }
 
     /// <summary>

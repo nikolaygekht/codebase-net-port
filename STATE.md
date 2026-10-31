@@ -23,7 +23,10 @@ then refuses to open** — `i4create` re-parses once the collation is set and `i
 both cases are built by `i4create`, and the writer will follow it on every path (ADR-63). The port
 keyed such a tag the opposite way to the reference and threw; now it collates inside the conversion
 and copies, and a `DESCEND` tag is sought by its plain text, which the reference never manages
-(ADR-64). Next: sub-step 6, then close.
+(ADR-64). Then the reference's open-time check, which the port lacked: a tag whose expression
+resolves to another key length than its header's is refused (E84901) — `TAGBAD` is the file
+`i4tagAdd` writes and the reference refuses, and the port refuses it too. Designing it found a memo
+under GENERAL resolved at half the cap, now applied. Next: sub-step 6, then close.
 **Before it, step 011
 closed: `QUERY` is done, and it is the library's headline feature.** A filter over one table becomes
 a record set produced by seeking indexes instead of reading them. `dotnet test` green on **3262
@@ -325,7 +328,12 @@ stopped treating a nullable tag's seek as an identity. The memo tags matched the
 The GENERAL conversions did not: the port converted without the collation, collated the result
 again, and threw. Now the conversion collates under the tag and the key is copied, and a tag whose
 whole expression is `ASCEND`/`DESCEND` of a string is sought through that transform, machine and
-GENERAL (ADR-64). Three mutations, each caught. Tests: 2534 unit, 1085 golden.
+GENERAL (ADR-64). Three mutations, each caught. Then 5c: a tag whose expression disagrees with its
+header's key length is refused when first used, as the reference refuses the index (E84901) —
+witnessed by `TAGBAD`, the file `i4tagAdd` writes, whose `open.dump.txt` records the reference's
+−310. Designing it found a second missing rule, a memo under GENERAL resolved at half the cap (120,
+key 240), now witnessed by `TAGGEN`'s memo tags and applied. Two more mutations caught. Tests:
+2542 unit, 1122 golden.
 
 ### Before it (2026-10-30)
 
@@ -952,9 +960,7 @@ because it planned to measure before `COLLATION` and the reverse happened.
 ### Finish step 012 — `claude/dev/012-p1-tails/`
 
 Sub-steps 6 and 8 of its [`PLAN.md`](claude/dev/012-p1-tails/PLAN.md): `UPPER`/`LOWER` by the
-table's code page; then close. Proposed and not yet decided: refusing a tag at open whose expression
-resolves to a key length other than its header's, as the reference does (E84901, i4init.c:485-490) —
-the port has no such check.
+table's code page; then close.
 
 They run under the new §4 rules, as sub-step 4 did: `crap4csharp` after each, and the first full
 `mutate4csharp` run at close — copy-aside, since it writes into the

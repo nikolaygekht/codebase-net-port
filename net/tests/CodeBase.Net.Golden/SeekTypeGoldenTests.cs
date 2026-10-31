@@ -29,7 +29,9 @@ public sealed class SeekTypeGoldenTests
     public static TheoryData<string, string> EveryTag()
     {
         TheoryData<string, string> data = [];
-        foreach (string table in Corpus.TableNames.Where(t => File.Exists(Path.Combine(Corpus.Root, t + ".cdx"))))
+        // By the index dump and not the index: TAGBAD.cdx is a file the reference cannot open, so it
+        // has no dump to take the tags from (KeyLengthGoldenTests covers it).
+        foreach (string table in Corpus.TableNames.Where(t => File.Exists(Path.Combine(Corpus.Root, t + ".cdx.dump.txt"))))
         {
             foreach (DumpIndexTag tag in CorpusIndexDump.Load(table + ".cdx").RealTags)
                 data.Add(table, tag.Name.TrimEnd());
@@ -43,7 +45,7 @@ public sealed class SeekTypeGoldenTests
     {
         List<(string Table, string Tag)> tags = [.. EveryTag().Select(row => row.Data)];
 
-        tags.Should().HaveCount(55);
+        tags.Should().HaveCount(57);
         tags.Count(t => ReferenceType(t.Table, t.Tag) == 'C').Should().BeGreaterThan(0);
         tags.Count(t => ReferenceType(t.Table, t.Tag) != 'C').Should().BeGreaterThan(0);
     }

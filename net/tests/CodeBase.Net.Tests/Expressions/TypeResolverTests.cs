@@ -259,10 +259,11 @@ public sealed class TypeResolverTests
     // ----------------------------------------------------------- for a tag
 
     [Theory]
-    // A memo that is the whole key expression is capped at the key size; inside an expression it is
-    // the ordinary memo operand, and without a tag it always is.
+    // A memo that is the whole key expression is capped at the key size, and under a collation that
+    // adds a byte per character at half of it (i4init.c:466-481); inside an expression it is the
+    // ordinary memo operand, and without a tag it always is.
     [InlineData("K_MEMO", 0, 240)]
-    [InlineData("K_MEMO", 1, 240)]
+    [InlineData("K_MEMO", 1, 120)]
     [InlineData("EMPTY(K_MEMO)", 0, 1024)]
     public void AMemoIsCappedAtTheKeySizeOnlyWhenItIsTheWholeTagExpression(
         string expression, int perCharacterAdd, int memoLength)
@@ -283,6 +284,10 @@ public sealed class TypeResolverTests
 
         TypeResolver.Resolve(ExpressionParser.Parse("K_MEMO", nullable), Tag(0))
             .Length.Should().Be(239);
+
+        // Under GENERAL the halving takes the byte's room first: 239 halved, the key 1 + 119 + 119.
+        TypeResolver.Resolve(ExpressionParser.Parse("K_MEMO", nullable), Tag(1))
+            .Length.Should().Be(119);
     }
 
     [Theory]

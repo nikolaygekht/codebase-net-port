@@ -69,6 +69,7 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseQryGate( &cb, outDir );
    if ( rc == 0 ) rc = caseTagCtx ( &cb, outDir );
    if ( rc == 0 ) rc = caseTagGen ( &cb, outDir );
+   if ( rc == 0 ) rc = caseTagBad ( &cb, outDir );
 
    /* Last, and not part of the corpus proper: the benchmark table, into
     * <outDir>\benchmark, with no dump. */

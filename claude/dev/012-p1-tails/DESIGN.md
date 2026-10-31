@@ -85,6 +85,26 @@ different afterwards.
   uncollated kind for such a tag and records a whole-expression conversion; `TableTagCursor.SearchFor`
   seeks through it.
 
+**C2b. A tag whose expression disagrees with its key length is refused at open.** *(Added
+2026-10-31, at the user's call.)*
+- **Now:** the reference resolves a tag's expression at open and refuses the index when the key
+  length it computes differs from the header's (E84901, `e4index`, i4init.c:162-166 and :485-490).
+  The port has no such check: it opens the tag and builds seek keys from an expression the keys were
+  not built by.
+- **Found while designing it:** a memo under GENERAL is resolved at half the cap — `info[0].len` and
+  the expression's length divided by (1 + the collation's add) when at least 239 (i4init.c:466-481,
+  i4create.c:1029-1045) — so its expression is 120 and its key 240, or 119 and 239 when nullable.
+  The port has no such rule; with the check it would refuse a valid file.
+- **After:** `SeekConverter.For` computes the key length the reference computes — `ExpressionKey.Length`
+  with the collation's add for a collated string, none for a conversion — and refuses a mismatch with
+  `CodeBaseException(Index)` naming the tag. The refusal is per tag at first use, like every other
+  refusal of a tag here, so the table still opens and a query leaves the tag out; the reference fails
+  the whole index open. `TypeResolver` applies the memo halving under a collated tag.
+- **Generator:** `TAGGEN` gains `K_MEMO` and a nullable `K_NMEMO` with `G_MEMO`/`G_NMEMO`. New case
+  `TAGBAD`: `T_TEXT` by `i4create`, then `G_DESC` over `DESCEND(K_TEXT)` added by `i4tagAdd` under
+  GENERAL — the file the reference refuses to open. Its table dump is taken without the production
+  index, and `TAGBAD.open.dump.txt` records the refusal (`i4open` → −310).
+
 **C3. `UPPER`/`LOWER` by the table's code page.**
 - **Now:** only `a–z` change case. In a cp1251 table `UPPER("привет")` returns `"привет"`.
 - **After:** `"ПРИВЕТ"`. Case is mapped by the table's encoding; an unmarked table uses cp437. This
@@ -289,7 +309,8 @@ The gate's declared list. Anything else that moves in `git status` after a regen
 | `QRYGATE.DBF`, `.cdx`, `.dump.txt`, `.cdx.dump.txt`, `.query.dump.txt` | **new** |
 | `CMPMEMO.DBF`, `.fpt`, `.dump.txt`, `.memo.dump.txt` | **new** |
 | `TAGCTX.DBF`, `.cdx`, `.fpt`, `.dump.txt`, `.cdx.dump.txt`, `.query.dump.txt` | **new** (C2a) |
-| `TAGGEN.DBF`, `.cdx`, `.dump.txt`, `.cdx.dump.txt`, `.query.dump.txt` | **new** (C2a) |
+| `TAGGEN.DBF`, `.cdx`, `.fpt`, `.dump.txt`, `.cdx.dump.txt`, `.query.dump.txt` | **new** (C2a); two memo fields and tags added (C2b) |
+| `TAGBAD.DBF`, `.cdx`, `.dump.txt`, `.open.dump.txt` | **new** (C2b) |
 | `vfp/*` | untouched — the VFP oracle is not rerun |
 
 `CDXEXPR.query.dump.txt` changes **only** if a null filter is added to its query list (Decision 3 says

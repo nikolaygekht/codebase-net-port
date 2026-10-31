@@ -32,7 +32,8 @@ int caseCdxExpr( CODE4 *cb, const char *outDir );   /* CDXEXPR.DBF — 0x30 + CD
 int caseCmpMemo( CODE4 *cb, const char *outDir );   /* CMPMEMO.DBF — 0x31 + FPT, compressed memo entries */
 int caseQryGate( CODE4 *cb, const char *outDir );   /* QRYGATE.DBF — 0x30 + CDX, the query refusals isolated */
 int caseTagCtx ( CODE4 *cb, const char *outDir );   /* TAGCTX.DBF  — 0x30 + CDX + FPT, tags parsed in a tag's context */
-int caseTagGen ( CODE4 *cb, const char *outDir );   /* TAGGEN.DBF  — 0x30 + CDX, ASCEND and DESCEND under GENERAL */
+int caseTagGen ( CODE4 *cb, const char *outDir );   /* TAGGEN.DBF  — 0x30 + CDX + FPT, ASCEND, DESCEND and memo under GENERAL */
+int caseTagBad ( CODE4 *cb, const char *outDir );   /* TAGBAD.DBF  — 0x30 + CDX, the GENERAL DESCEND tag i4tagAdd writes and the reference refuses */
 
 /* The one benchmark case: a workload, not an expectation. It writes into a
  * `benchmark` subdirectory of the output and has no dump, because nothing

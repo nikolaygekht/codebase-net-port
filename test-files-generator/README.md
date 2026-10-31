@@ -75,6 +75,7 @@ test-files-generator/
 │  ├─ case-idxone.cpp
 │  ├─ case-cmpmemo.cpp
 │  ├─ case-qrygate.cpp
+│  ├─ case-tagbad.cpp
 │  ├─ case-tagctx.cpp
 │  ├─ case-taggen.cpp
 │  ├─ util.h/.cpp      shared: error reporting, byte-run assignment, frozen date
@@ -192,7 +193,8 @@ and its own subdirectory.
 | `CMPMEMO.DBF` | `0x31` | compressed memo entries: created with `code4memoCompress` on, so `flags[1] = 1`. 8 records; payloads of 0, 1, 511, **512** (the block size, stays type 1), **513** (first compressed), 4096, 66000 (a 17-bit length prefix), and pseudo-random binary that grows when compressed and is stored as type 3 anyway. Beside the usual dump it writes `CMPMEMO.memo.dump.txt`: each entry read back with decompression off — its block, stored type and stored length |
 | `QRYGATE.DBF` | `0x30` | the query-refusal case: three tags the reference's optimizer is written to refuse — unique, filtered, GENERAL — each alone on its own field beside a control field with a plain tag, and 13 filters through `dump-query.cpp`. The GENERAL refusal is compiled out (`d4defs.h:669-673`), so the dump records the reference using that tag and getting it wrong (ADR-59) |
 | `TAGCTX.DBF` | `0x30` | tags parsed in a tag's context, machine order: `T_MEMO` (a bare memo, resolved at 240), `T_NMEMO` (a nullable memo, 239 behind the null byte; rows 5 and 6 share their first 240 bytes), `T_TEXT`, `T_ASC` and `T_DESC` over `ASCEND`/`DESCEND(K_TEXT)`. Every tag by `i4create`. Six filters, three walked in a tag's order |
-| `TAGGEN.DBF` | `0x30` | `ASCEND`/`DESCEND` of a string under GENERAL, cp1252: `G_TEXT`, `G_ASC`, `G_DESC`. **Built by `i4create`, not `i4tagAdd`**: `i4tagAdd` takes the key length before the collation is set (no re-parse, `i4add.c:746-760` against `i4create.c:1010-1025`), writes 20 for `DESCEND(K_TEXT)`, and the reference refuses its own file at open with −310. Three filters over `ID`, each walked in one tag's order |
+| `TAGGEN.DBF` | `0x30` | `ASCEND`/`DESCEND` of a string and memo under GENERAL, cp1252: `G_TEXT`, `G_ASC`, `G_DESC`, `G_MEMO`, `G_NMEMO` (a memo resolved at half the cap, 120, or 119 when nullable). **Built by `i4create`, not `i4tagAdd`**: `i4tagAdd` takes the key length before the collation is set (no re-parse, `i4add.c:746-760` against `i4create.c:1010-1025`), writes 20 for `DESCEND(K_TEXT)`, and the reference refuses its own file at open with −310. Three filters over `ID`, each walked in one tag's order |
+| `TAGBAD.DBF` | `0x30` | that refused file, kept: `T_TEXT` by `i4create`, `G_DESC` over `DESCEND(K_TEXT)` added by `i4tagAdd` under GENERAL. The table is dumped with `autoOpen` off; `TAGBAD.open.dump.txt` records what `i4open` answered (`refused errorCode=-310`), and the case fails if the index ever opens |
 
 One case is not a corpus case at all:
 

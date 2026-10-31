@@ -972,6 +972,7 @@ an expression is **resolved** with when it is parsed for a tag. Two rules, and o
 | Parsed for a tag | Length | Source |
 |---|---|---|
 | a memo field that is the whole expression (`infoN == 1`) | `min(240 − null byte, memSizeMemoExpr)` — `K_MEMO` → 240 | e4parse.c:433-457 |
+| then, under a collation that adds bytes per character, when the expression reads a memo and `info[0].len` ≥ 239 | `info[0].len` and the expression's length each divided by (1 + add) — under GENERAL `K_MEMO` → 120 (key 240), nullable → 119 (key 239) | i4init.c:466-481, i4create.c:1029-1045 |
 | a memo inside a larger expression | `memSizeMemoExpr`, as without a tag — `EMPTY(K_MEMO)`'s memo node → 1024 | e4parse.c:452-453 |
 | `DESCEND`/`ASCEND` of a string, collation not machine | operand length × (1 + `keySizeCharPerCharAdd`) — under GENERAL `DESCEND(K_TEXT)` → 40 | e4parse.c:655-672 |
 | the same under machine order, or another function under GENERAL | unchanged — `DESCEND(K_TEXT)` → 20, `UPPER(K_TEXT)` → 20 | — |
@@ -983,7 +984,9 @@ memo tag never matches a memo term of a filter (1024 against 240), in the refere
 **Witnessed in stored keys** [`TAGCTX.cdx`, `TAGGEN.cdx`]: `T_MEMO` keys are the memo's first 240
 bytes, a shorter memo **padded with zeros**, not blanks, and two memos equal in their first 240 bytes
 share a key; `T_NMEMO`, over a nullable memo, has key length 240 — the `0x80` byte and 239 of memo —
-and an all-zero key where the memo is null (which for a memo is empty). `G_ASC` and `G_DESC` (GENERAL,
+and an all-zero key where the memo is null (which for a memo is empty). Under GENERAL, `G_MEMO` has key
+length 240 — 120 characters weighed, two bytes each, the zero padding weighed as `0x10` — and
+`G_NMEMO` 239. `G_ASC` and `G_DESC` (GENERAL,
 cp1252) have key length 40 and hold the collated key of the text, and its complement; `G_ASC`'s keys
 are `G_TEXT`'s, byte for byte.
 

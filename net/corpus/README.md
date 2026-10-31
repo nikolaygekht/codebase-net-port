@@ -36,7 +36,8 @@ turns out to be untested, add a generator case and regenerate.
 | `CMPMEMO.DBF` + `.fpt` | `0x31` | **Compressed memo entries**, a CodeBase extension Visual FoxPro cannot read. Created with `code4memoCompress` on, so the header carries `flags[1] = 1`; every entry longer than one block is stored as type 3 — a 4-byte length, then a zlib stream. Its `CMPMEMO.memo.dump.txt` says which. See below. |
 | `QRYGATE.DBF` + `.cdx` | `0x30` | **Query refusals, isolated.** Three tags the reference's optimizer is written to refuse — unique `Q_UNIQ`, filtered `Q_FILT`, GENERAL `Q_GEN` — each the only tag over its own field, beside a control field holding the same values under a plain tag. Its query dump shows the unique and filtered refusals as `tag=-`, and shows the GENERAL one **used**, wrongly: that refusal is compiled out of every non-testing build (ADR-59). 24 records, cp1252. |
 | `TAGCTX.DBF` + `.cdx` + `.fpt` | `0x30` | **Tags parsed in a tag's context, machine order.** `T_MEMO` over a memo that is the whole expression (resolved at 240, not 1024), `T_NMEMO` over a nullable memo (239 behind the null byte), `T_ASC`/`T_DESC` over `ASCEND`/`DESCEND(K_TEXT)`, and the plain `T_TEXT`. Every tag by `i4create`. Its query dump shows the reference never answering a memo term from a memo tag (1024 against 240). 8 records, cp1252. |
-| `TAGGEN.DBF` + `.cdx` | `0x30` | **`ASCEND`/`DESCEND` under GENERAL.** `G_ASC` and `G_DESC` hold the collated key of the text and its complement, at key length 40; `G_TEXT` is the plain GENERAL control. Built by `i4create` because `i4tagAdd` writes such a tag with a key length the reference then refuses to open (`claude/specs/CDX-FORMAT.md` §8.6). Text with an accent and two expansions. Its queries are over `ID`, which no tag covers, and walk each tag in order. 8 records, cp1252. |
+| `TAGGEN.DBF` + `.cdx` + `.fpt` | `0x30` | **`ASCEND`/`DESCEND` and memo under GENERAL.** `G_ASC` and `G_DESC` hold the collated key of the text and its complement, at key length 40; `G_TEXT` is the plain GENERAL control. `G_MEMO` and `G_NMEMO`: a memo under GENERAL is resolved at half the cap, 120 (key 240), or 119 behind the null byte (key 239). Built by `i4create` because `i4tagAdd` writes the conversion tags with a key length the reference then refuses to open (`claude/specs/CDX-FORMAT.md` §8.6). Text with an accent and two expansions. Its queries are over `ID`, which no tag covers, and walk each tag in order. 8 records, cp1252. |
+| `TAGBAD.DBF` + `.cdx` | `0x30` | **The index the reference writes and refuses to open.** `T_TEXT` by `i4create`, then `G_DESC` over `DESCEND(K_TEXT)` added by `i4tagAdd` under GENERAL, which records key length 20 where the open resolves 40. No `.cdx.dump.txt` — the reference cannot open the index — but `TAGBAD.open.dump.txt` records its answer, `refused errorCode=-310`, and the table dump is taken without the index. 4 records, cp1252. |
 
 ## Benchmark data — `benchmark/`
 
@@ -104,7 +105,7 @@ swept into every data-driven golden test. The gates that want these name them.
 The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
 records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters,
-`QRYGATE` 24, and `TAGCTX` and `TAGGEN` 8 each.
+`QRYGATE` 24, `TAGCTX` and `TAGGEN` 8 each, and `TAGBAD` 4.
 
 ### What `CMPMEMO` pins down
 
@@ -121,7 +122,7 @@ record with no memo shows `block=0 type=0 stored=0`. Only this table has one.
 
 `CMPMEMO.fpt`'s compressed bytes are what zlib 1.3.1 produced; see the generator README.
 
-`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `IDXONE`, `QRYGATE`, `TAGCTX` and `TAGGEN` are the tables whose header byte 28 carries the
+`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `IDXONE`, `QRYGATE`, `TAGBAD`, `TAGCTX` and `TAGGEN` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
 (`i4create.c:1404-1418`).
 
@@ -220,6 +221,13 @@ the two files differ in 1025 bytes. The C library **cannot write** a single-tag 
 directory's header and then every tag's header, which in such a file is the same block
 (`i4check.c:889-914`). So this case is witnessed differently: the generator walks both files and
 requires the same 300 keys and record numbers from each. See ADR-25.
+
+## The open dump
+
+`TAGBAD.open.dump.txt` records a refusal rather than a structure. Its last line is what `i4open`
+answered for `TAGBAD.cdx`, `open refused errorCode=-310`: the tag `G_DESC` resolves to keys of 40
+bytes and its header records 20 (E84901, `i4init.c:485-490`). The port refuses the same tag with the
+same code when it is selected; the table and its other tag still serve.
 
 ## The expression dumps
 

@@ -1,6 +1,6 @@
 # 012-p1-tails — state
 
-**Status:** in progress — sub-steps 1–5b, 7 and 7a done
+**Status:** in progress — sub-steps 1–5c, 7 and 7a done
 **Current sub-step:** PLAN.md step 6
 
 ## Done so far
@@ -145,6 +145,34 @@
     its new `StoredKindOf` 8.0 at 100%; `ConversionSearch` all ≤ 4; `SearchFor` 23.9 → 35.2 (CC 8 →
     10, coverage 37%) — 013's F5, `TableTagCursor` has no unit layer.
   - Release 2534 + 1085 green.
+- [x] step 5c — C2b, the key-length check at open (2026-10-31), added at the user's call.
+  - **Finding while designing it:** a memo under GENERAL is resolved at half the cap — `info[0].len`
+    and the expression's length divided by (1 + add) when at least 239, at create and at open
+    (i4create.c:1029-1045, i4init.c:466-481). The port had no such rule, and with the check it would
+    have refused a valid file. Witnessed: `TAGGEN.G_MEMO` key length 240 (expression 120),
+    `G_NMEMO` 239.
+  - Generator: `TAGGEN` gains `K_MEMO`, nullable `K_NMEMO`, `G_MEMO`, `G_NMEMO`. New case `TAGBAD`:
+    `T_TEXT` by `i4create`, `G_DESC` over `DESCEND(K_TEXT)` added by `i4tagAdd` under GENERAL; the
+    table is dumped with `autoOpen` off, and `TAGBAD.open.dump.txt` records `i4open`'s answer,
+    `refused errorCode=-310` (the case fails if it ever opens). Regeneration changed exactly the
+    declared files; `TAGGEN.query.dump.txt` did not move.
+  - Test first: `KeyLengthGoldenTests` (every tag of the nine indexed tables resolves to its header's
+    length; `TAGBAD.G_DESC` refused with the dump's code; `T_TEXT` and a query still serve), the key
+    gate over `TAGGEN`'s 40 keys, layer 1 for the halving and for headers whose length disagrees.
+    Red: exactly 5c's tests.
+  - Port: `SeekConverter.RefuseIfTheKeyLengthDisagrees` — `ExpressionKey.Length` with the
+    collation's add for a collated string, none for a conversion — `CodeBaseException(Index)` naming
+    the expression; per tag at first use, so the table opens and a query leaves the tag out (the
+    reference fails the whole index). `TypeResolver.HalveAMemoForTheCollation`.
+  - Harness: `SeekTypeGoldenTests` finds tags by `.cdx.dump.txt`, not `.cdx`; `CachedReadGoldenTests`
+    records a refused selection in both runs; unit headers in `SeekConverterTagContextTests` now
+    carry their true key lengths.
+  - **Mutations**, copy-aside, md5 checked: no check → the `TAGBAD` refusal and four layer-1; no
+    halving → the `TAGGEN` key, key-length, two seek-type and query-equivalence gates, three layer-1.
+  - `crap4csharp`: `RefuseIfTheKeyLengthDisagrees` 3.0, `HalveAMemoForTheCollation` 6.0 (91%),
+    `StoredKindOf` 8.0, `For` 2.0.
+  - Docs: `CDX-FORMAT.md` §3 (`keyLen` checked at open), `EXPRESSIONS.md` §9.5 (the halving row,
+    the witness), both READMEs (the open dump). Release 2542 + 1122 green.
 - [ ] step 6 — C3, case mapping by code page
 - [x] step 7 — D, compressed memos (2026-10-29), done out of order at the user's call.
   - zlib 1.3.1 vendored in `test-files-generator/third_party/zlib/` (core library only; `madler/zlib`
@@ -201,7 +229,8 @@
   Past-tense records — 003's documents, `dev/README.md`'s 003 row, `STATE.md` §2, ADR-44/46 —
   stay as written.
 
-- Sub-steps 5a and 5b were not in the plan; the user added them after 5 (DESIGN §C2a, PLAN rows).
+- Sub-steps 5a, 5b and 5c were not in the plan; the user added them after 5 (DESIGN §C2a, §C2b,
+  PLAN rows).
   5a's first shape — one table with `G_DESC` added by `i4tagAdd` — is what found the `i4tagAdd`
   defect, and became two tables built by `i4create`.
 

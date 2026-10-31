@@ -45,7 +45,7 @@ public sealed class SeekGoldenTests
 
         // Part of the gate rather than commentary: a data-driven suite that discovers nothing reports
         // success having proved nothing.
-        cases.Should().Be(301);
+        cases.Should().Be(321);
         runs.Should().Be(141);
     }
 

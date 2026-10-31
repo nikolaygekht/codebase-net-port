@@ -150,7 +150,9 @@ public sealed class CachedReadGoldenTests
 
         foreach (Tag tag in open.Tags)
         {
-            open.SelectTag(tag);
+            if (!Selected(open, tag, seen))
+                continue;
+
             seen.Add($"--- {tag.Name}");
             seen.AddRange(Walk(open));
         }
@@ -171,6 +173,27 @@ public sealed class CachedReadGoldenTests
         }
 
         return seen;
+    }
+
+    /// <summary>
+    /// Selects a tag, or records that it was refused, so both runs are compared on that too.
+    /// </summary>
+    /// <value>
+    /// TAGBAD's G_DESC is refused when it is selected, because its expression and its key length
+    /// disagree; a cache must not change that answer any more than any other.
+    /// </value>
+    private static bool Selected(Table table, Tag tag, List<string> seen)
+    {
+        try
+        {
+            table.SelectTag(tag);
+            return true;
+        }
+        catch (CodeBaseException refused)
+        {
+            seen.Add($"--- {tag.Name} refused {refused.Code}");
+            return false;
+        }
     }
 
     private static string Outcome(Table table, string value)
@@ -197,7 +220,9 @@ public sealed class CachedReadGoldenTests
         {
             // Every value the tag holds, sought by its own text, which is the case a caller writes
             // and the one that exercises the padded comparison as well.
-            open.SelectTag(tag);
+            if (!Selected(open, tag, seen))
+                continue;
+
             List<string> values = [];
 
             for (GoResult go = open.Top(); go == GoResult.Ok;)

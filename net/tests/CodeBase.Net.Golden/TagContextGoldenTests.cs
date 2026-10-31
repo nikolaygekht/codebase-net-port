@@ -73,7 +73,7 @@ public sealed class TagContextGoldenTests
     public static TheoryData<string, int> TagTables() => new()
     {
         { "TAGCTX", 40 },
-        { "TAGGEN", 24 },
+        { "TAGGEN", 40 },
     };
 
     /// <summary>The tags whose whole expression is ASCEND or DESCEND of the text field.</summary>

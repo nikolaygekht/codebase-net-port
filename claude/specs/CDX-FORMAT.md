@@ -142,7 +142,7 @@ the file for the tag directory):
 | 0x000 | 4 | u32 LE | `root` | node # of root block. 0xFFFFFFFF = unknown (d4data.h:3895) |
 | 0x004 | 4 | u32 LE | `freeList` | head of free-block list; 0 = none (d4data.h:3897). Only meaningful in the tag-directory header (see §9) |
 | 0x008 | 4 | u32 **BE** | `version` | multi-user change counter, stored byte-reversed (i4init.c:365; r4reinde.c:1811-1813; i4index.c:2139-2152) |
-| 0x00C | 2 | u16 LE | `keyLen` | key length in bytes (d4data.h:3899) |
+| 0x00C | 2 | u16 LE | `keyLen` | key length in bytes (d4data.h:3899). **Checked at open**: the reference resolves the tag's expression and refuses the index (E84901, `e4index`) when `expr4keyLen` differs from this field (i4init.c:162-166, 485-490). `TAGBAD.cdx` is a file it wrote and refuses this way (§8.6) |
 | 0x00E | 1 | u8 | `typeCode` | option bits, see §3.1 (d4data.h:3901) |
 | 0x00F | 1 | u8 | `signature` | in-memory value set to 0x01 by CodeBase; declared "unused" (d4data.h:3902; i4create.c:853,922). **On disk this byte varies, and the corpus shows why**: it is 0x01 for a tag created *with* the index (`i4create`) and **0x00** for a tag *added* to an existing one (`i4tagAdd`) — both shapes occur in `CDXCOLL.cdx`, whose `C_MACH` carries 0x01 and whose `C_GEN` carries 0x00. Treat as unused; do not rely on the value when reading. |
 | 0x010 | 4 | u32 LE | `codeBaseNote` | 0xABCD ⇒ blockSize/multiplier fields valid (d4data.h:3908-3910) |

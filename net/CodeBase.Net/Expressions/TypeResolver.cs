@@ -108,8 +108,41 @@ internal sealed class TypeResolver
         for (int index = 0; index < nodes.Length; index++)
             Visit(index);
 
+        HalveAMemoForTheCollation();
+
         return new CompiledExpression(source, nodes, hasTrim, tag);
     }
+
+    /// <summary>
+    /// Brings a memo under a collation that adds bytes per character back within the key size.
+    /// </summary>
+    /// <value>
+    /// The reference's own fix-up after the parse, made at create and at open alike
+    /// (i4create.c:1029-1045, i4init.c:466-481): when the expression reads a memo, the tag's
+    /// collation adds bytes, and the first node is at least 239 long, that node's length and the
+    /// expression's are divided by one plus the add. A bare memo under GENERAL is so resolved at 120,
+    /// and its key, two bytes a character, is 240 again; a nullable one at 119, behind its null byte.
+    /// The two lengths are the reference's two fields, so for a single node it is one division.
+    /// </value>
+    private void HalveAMemoForTheCollation()
+    {
+        if (tag is not { PerCharacterAdd: > 0 } context
+            || nodes[0].Length < ExpressionKey.MaximumLength - 1
+            || !nodes.Any(n => n.Row == FunctionRows.FieldMemo))
+        {
+            return;
+        }
+
+        int divisor = 1 + context.PerCharacterAdd;
+        nodes[0] = WithLength(nodes[0], nodes[0].Length / divisor);
+
+        if (nodes.Length > 1)
+            nodes[^1] = WithLength(nodes[^1], nodes[^1].Length / divisor);
+    }
+
+    private static ExpressionNode WithLength(ExpressionNode node, int length) =>
+        new(node.Row, node.ParameterCount, node.SubtreeSize, length, node.Immediate,
+            node.Field, node.Constant, node.Type, node.Immediate2);
 
     private void Visit(int index)
     {

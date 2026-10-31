@@ -4,13 +4,47 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** not started — `DESIGN.md` and `PLAN.md` written 2026-10-31; Decision 4 (F5) decided by
-the user, ADR-67
-**Current sub-step:** PLAN.md step 1
+**Status:** in progress — sub-step 1 done
+**Current sub-step:** PLAN.md step 2
 
 ## Done so far
 
-- [ ] step 1 — fresh baseline
+- [x] step 1 — fresh baseline (2026-10-31). `crap4csharp` at `9e155ec`, the same build as the audit,
+  over all 119 library files at `997adeb`; 2620 unit tests passed, 3 skipped. Filed as
+  `baseline.txt` and `baseline-by-step.tsv` (members attributed by `crap-by-step.py` as before;
+  012 now has a row, for `CaseMap`, `ConversionSearch` and `TagContext`).
+  - **690 members, 79 above CRAP 8.0, 96 at 0%** — against the audit's 662, 93 and 129. The drop is
+    012's: its component tests reach part of `Query` and the decomposer, and its layer-1 tests
+    `KeyForm`, `KindOf` and `AssignKeyConversionLength`.
+  - **F1 as it stands** — 42 members below 100%. At 0%: `Walk.Constrain` (CC 18, CRAP 342),
+    `VisitConnective`, `Widens`, `Fold`, `Merged`, `MatchTags`; `QueryExecutor.Reach`, `ProbeFor`;
+    `QueryPlan.LeafCount`; `Query.StepByTag`, `Skip`, `Bottom`, `Previous`;
+    `TagEligibility.CanExpress`, `IsWhole`; `ConstraintNode.Walk`, `IsLeaf`, `Leaf`, `Branch`;
+    `LeafConstraint.ToString`, `ConstraintValue.ToString`, `AsCurrency`; `TagProbe.KeyLength`.
+    Partly: `VisitComparison` 55%, `TryMatch` 38%, `QueryPlan.For` 42%, `TagProbe.InTheTagsDomain`
+    44% and `KeyFor` 58%, `SubtreeMatch.Same` 73%, `Query.StepByRecord` 62%, `Prepare` 69%,
+    `ResidualFilter.Terms` 72%, `ConstraintValue.CompareTo` 57%, `ConstraintSeeker.IsExcluded` 50%.
+  - **F2** — 9 below 100%. At 0%: `RecordKey.WriteValue` (the expression overload, CC 8),
+    `RecordKey.DoubleOf`, `KeyTransform.FromDateTime`, `DecrementLowByte`. Partly: the other
+    `WriteValue` 35%, `SeekConverter.KindOf` 77%, `RefuseIfNotTheSameTwice` 53%,
+    `CollationWeights.Refuse` 36%, `TableFor` 78%.
+  - **F3** — at 0%: `ExpressionEvaluator.PictureDateText` (CC 10), `FormatNumber`, `Rounded`,
+    `TimestampText`, `MemoBytes`, `Count`, `MakeTimestamp`; `ExpressionKey.FoxNumericOf`;
+    `ExpressionValue.Scaled`, `Float`, `Whole`, `Currency`, `NumericText`, `DateText`;
+    `ExpressionOptions.WithDatePicture`; `FunctionTable.Rows`, `VisualFoxProRows`, `Count`,
+    `FirstVisualFoxProRow`. Partly, the ones that matter: `ExpressionKey.WriteValue` 38% (CC 13),
+    `Write` 36%, `WriteText` 58%; `ExpressionValue.ToRaw` 50%; `LoadField` 71%; `Equal` 73%;
+    `TypeResolver.AssignKeyConversionLength` 67%. Fifty-two members below 100% in all; the rest are
+    above 85% and are taken only if the tests above reach them.
+  - **F4** — `TableTagCursor.SearchFor` 38% (CC 11, CRAP 39.2), `TypedSeekFor` 0%, `SearchForInt32`,
+    `SearchForDate`, `SeekNext`, `SeekPrevious` 0%, `Indicated` 67%, `Land` 87%; `Tag.ToString`,
+    `Filter`, `Collation` 0%.
+  - **F5** — 41 public members at 0%: `Table`'s `Seek` overloads (six), `SeekPrefix`,
+    `SeekPrevious`, `GoPreviousIndexed`, the `Get*` and `GetMemo*` readers (eleven), the header
+    properties (six), `ReadMemo` (CC 3), `OpenProbe`, `CompiledFor`; `Query.StepByTag`, `Skip`,
+    `Bottom`, `Previous`; `Tag.ToString`, `Filter`, `Collation`; `FieldCollection.Count`,
+    `TryGet`; `CodeBaseEngine.BlockCache`, `BlockCacheBlocks`. The full list is the TSV's rows with
+    `0.0%` in those classes.
 - [ ] step 2 — F1a, decomposition
 - [ ] step 3 — F1b, execution
 - [ ] step 4 — F1c, the result cursor
@@ -21,9 +55,10 @@ the user, ADR-67
 
 ## Notes for the next session
 
-`AUDIT.md` was measured before step 012, which changed code under F1, F3 and F4 (`Query` gained
-component tests; `TableTagCursor.SearchFor` rose to CRAP 39.2 with the conversion and null-byte
-branches). Sub-step 1 re-measures before anything else.
+The gate compares against `baseline.txt`, not `AUDIT.md`. To list a finding's members again:
+`awk -F'	' '$4 ~ /Queries/ && $6 != "100.0%"' baseline-by-step.tsv` (class in column 4, coverage
+in 6). `crap-by-step.py` writes its TSV beside the report it is given, so run it on a copy elsewhere
+or it overwrites the audit's.
 
 ## Deviations from the plan
 

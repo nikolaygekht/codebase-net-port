@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-10-31 · **step 012 (`012-p1-tails`) is closed and pushed; step 013 is planned, committed locally and not pushed.**
+**Updated:** 2026-10-31 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-step 1 are committed locally and not pushed.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited

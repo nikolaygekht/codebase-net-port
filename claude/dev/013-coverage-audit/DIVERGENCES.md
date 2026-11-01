@@ -39,6 +39,8 @@ The answer is right, only slower.
 - **ADR-53** — two reference defects not replicated: a range bound inverted on a reflected
   comparison, and the residual check reading the wrong positions.
 - **ADR-61** — the null that sticks between records is not replicated.
+- **ADR-69** (**user's call**) — a `Bottom` that finds nothing sets `Eof` in every path; the
+  reference returns `r4eof` in all three but leaves `relate4eof` false in two.
 - **ADR-58** — `Seek(string)` only on a character tag; the reference silently converts text to a
   number.
 - **ADR-64** (**user's call**) — a `DESCEND` tag is sought through the tag's transform.

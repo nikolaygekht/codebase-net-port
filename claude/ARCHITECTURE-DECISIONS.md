@@ -1986,7 +1986,7 @@ the table is located.
 corpus case is possible, and the port has the seam: a decompressing `IRandomAccessSource` beneath
 the record reader would leave everything above it unchanged.
 
-## ADR-57 — The suite is run in Release, and the timed gates skip themselves in Debug · accepted
+## ADR-57 — The suite is run in Release, and the timed gates skip themselves in Debug · accepted (amended by ADR-68)
 
 **Date.** 2026-10-29. Amends [ADR-40](#adr-40): its floor stands, its evidence did not.
 
@@ -2365,3 +2365,119 @@ defect, and the golden suite proves it only by accident of what it reads.
 
 **Rejected — repeating the target's tests through the public member.** It doubles the suite and
 couples the public tests to every rule the target holds.
+
+## ADR-68 — The unit-test project runs without tiered compilation, so the timed gates time optimized code · accepted
+
+**Date.** 2026-10-31. Decided by the user during step 013. Amends [ADR-57](#adr-57): settles what it
+recorded as *seen, not decided*.
+
+**Context.** `BlockCacheSpeedupTests` kept failing now and then in Release, after ADR-57's
+measures. ADR-57's remaining suspect was the second test assembly running beside the unit one. A
+probe running the gate's own harness, five runs each way on an idle machine, 1000-record tag walk,
+µs per pass, uncached timed first:
+
+| | uncached | cached | ratio |
+|---|---|---|---|
+| tiered (the default) | ~1230 | ~460–475, once 644 | 2.6–2.7×, once **1.91×** |
+| tiered compilation off | ~960 | ~110 | 8.5–8.8× |
+
+Timed cached first, the tiered cached pass ranged from 92 to 199 µs (4.7–10×) and the untiered one
+stayed at 110–111, once 174. A first series, taken while a mutation run's four workers were busy
+beside it, gave the same picture, as did one with the golden suite running beside: tiered 2.3–2.9×,
+untiered 6.8–9.0×. The neighbouring assembly costs little. The JIT tier costs everything: the uncached pass is mostly
+file I/O, which code quality barely touches (1230 → 960), while the cached pass is managed code
+alone, four times faster fully optimized (470 → 110). After the 300 ms wall-clock warm-up the cached
+path is often still tier-0 code, so the ratio measures how far tier one has got, and sits at the 2×
+floor. Whether a longer warm-up would converge to ~113 under tiering was not measured.
+
+**Decision.** `CodeBase.Net.Tests` sets `<TieredCompilation>false</TieredCompilation>`: every method
+is compiled fully optimized on first call, and the timed gates compare finished code. **The 2× floor
+is not lowered**, and the timed tests keep their own non-parallel collection and their Release-only
+skip (ADR-57). The golden project keeps the default: it times nothing.
+
+**Cost.** The unit suite runs code without dynamic PGO, which tier one would add, and starts a little
+slower. Neither affects what any test checks. A host application with tiering on reaches the same
+optimized code later, and possibly better; the gate asks only whether the cache pays, which shows
+the same either way.
+
+**Rejected — a longer warm-up, or warming until the timing settles.** It is the heuristic that
+already failed: how long tier one takes depends on the JIT's background queue and the rest of the
+process, and a settle-detector adds its own threshold to tune.
+
+**Rejected — a separate project for the timed tests.** Same isolation of the setting, at the price of
+a sixth project, its Sonar entry and its packages, for two tests.
+
+## ADR-69 — A query's top or bottom that finds nothing leaves it past the end, as the reference means to, in every path · accepted
+
+**Date.** 2026-10-31. Decided by the user during step 013 ("check how the reference behaves, close
+the holes and fix it").
+
+**Context.** Step 013's mutation run over `Query.cs` left `Top`'s and `Bottom`'s flag resets
+untested. Checking what they should be against the reference (`QUERY-OPTIMIZER.md` §7.5): a
+`relate4top` that finds nothing returns `r4eof` with end of file set, and beginning of file only
+when the table is empty; a `relate4bottom` that finds nothing returns `r4eof` too — not `r4bof` —
+and the 01/28/00 fix moves the table to end of file so that `relate4eof` agrees, its beginning
+flag left set by the backward skip. In two of its three paths the reference returns `r4eof` without
+moving, so `relate4eof` reads false. The port set `Bof` alone after a failed `Bottom`, the mirror
+image of `Top`, which nothing in the reference does.
+
+**Decision.** A `Top` or `Bottom` that finds nothing sets `Eof`. `Bottom` sets `Bof` as well; `Top`
+sets it only when the table holds no record, and clears it otherwise. Both return `NoRecord` and
+leave `RecordNumber` at zero. This is the reference's intended behaviour, applied in every path —
+the two where it returns `r4eof` with end of file unset are a defect, not replicated, as
+ADR-53 and ADR-61 treat the reference's other defects.
+
+**Compatibility cost.** None for a caller testing `Eof` after a top or a bottom, which is the
+idiom the reference's comment protects. A caller of the reference who read `relate4eof` after a
+failed record-order or tag-order bottom saw false; the port says true.
+
+**Rejected — keeping the mirror (`Bottom` sets `Bof` only).** Symmetric, and what the port had,
+but the reference says the opposite on purpose, and an `Eof` test after a bottom over an empty
+result would report a record that is not there.
+
+**Rejected — both flags on every empty result.** Simpler to state, but a `Top` over a non-empty
+table with no match leaves the reference's beginning flag clear, and nothing argues for differing.
+
+## ADR-70 — A unit test that runs past its time limit ends the test process · accepted
+
+**Date.** 2026-11-01. Decided by the user during step 013: one watchdog over the whole unit-test
+assembly, a per-test attribute that allows longer, and one second for every test without one.
+
+**Context.** Re-running `mutate4csharp` over `Query.cs` left `CodeBase.Net.Tests.exe` processes
+behind, their parents dead, each spinning cores until killed by hand — one per mutant that turned a
+cursor step into an infinite loop. The tool times a run out and kills `dotnet test` with its process
+tree, but the chain is `dotnet test`, `vstest.console`, `testhost`, the test executable, and the
+last one escapes. Why exactly was not established. An xUnit `Timeout` does not help: it reports the
+test and leaves the looping thread, and so the process, running. The same orphans most likely
+explain the loaded machine behind the timing measurements of the session before.
+
+**Decision.** `CodeBase.Net.Tests` carries an assembly-level `BeforeAfterTestAttribute`,
+`RunTimeWatchdog`, which arms a timer before each test method and disarms it after. A timer that
+fires writes the test's name to standard error and kills the process. The limit is one second;
+`[MaxRunTime(seconds)]` on a test method raises it. Only the two timed `BlockCacheSpeedupTests`
+carry it, at ten seconds (they run about 1.2 s). The watchdog stands down while a debugger is
+attached. `TagCursorTests`' one `Timeout` is removed: it has the same hazard and the watchdog
+covers it.
+
+Measured on 2026-11-01, the slowest test without the attribute: 315 ms in Release, 277 ms in Debug,
+540 ms in Debug under coverlet (`sonar.bat`'s run). Four Debug suites at once, twice, on 32 cores:
+all green.
+
+**Cost.** A test that is slow by design needs the attribute, and one that slows past a second on a
+slow or loaded machine ends the run rather than merely passing late — the run then names it. Under
+`dotnet test` the xUnit VSTest adapter waits 60 seconds after the process dies before reporting the
+crash (`CrashDetectionSinkTimeout`, not configurable through run settings in 3.1.5), so a looping
+mutant still costs the mutation tool its own timeout; it no longer leaves a process behind. The
+test class's constructor is not timed.
+
+**Rejected — `Environment.FailFast`.** The same exit with a stack trace, but each one goes through
+Windows Error Reporting and leaves a report behind; a mutation run makes dozens. The stack of the
+watchdog's own timer says nothing the message does not.
+
+**Rejected — `[Fact(Timeout = …)]` per test.** Reports the loop and leaves it running.
+
+**Rejected — a watcher in the mutation script that kills orphans.** Works only where it is
+remembered, and leaves a developer's own hung run hung.
+
+**Rejected — fixing `mutate4csharp`** (a Windows job object around the run). Not this repository's
+code; the watchdog fixes the symptom for every runner.

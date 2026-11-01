@@ -67,11 +67,24 @@ dotnet test    net/CodeBase.Net.sln -c Release
 JIT optimizer, and the walk the gate times drops from about 10 times faster cached to 2.35, a hair
 over its 2x floor. They also run **alone**, in a non-parallel xUnit collection (`TimingCollection`)
 that waits for the rest of the suite, because a clock read under the suite's own load measures the
-load. In Debug those two timed tests **skip themselves** with a message saying so;
+load. And the unit-test project turns **tiered compilation off** (`<TieredCompilation>false` in
+its `.csproj`), so that every method is fully optimized from its first call: under tiering a
+300 ms warm-up often leaves the cached path at tier 0, and the gate then measures the JIT rather
+than the cache (ADR-68). In Debug those two timed tests **skip themselves** with a message saying so;
 everything else, the read-count gates included, runs and passes the same in either build. Nothing
 in the code depends on Debug — there is no `Debug.Assert` or `#if DEBUG` anywhere. A plain
 `dotnet test` still builds Debug; that is the SDK's default, not a choice of this repository
 (ADR-57). `sonar.bat` keeps Debug, for line coverage that inlining does not blur.
+
+**Every unit test has a time limit — one second unless it says otherwise.** A watchdog over the
+whole of `CodeBase.Net.Tests` (`RunTimeWatchdog.cs`) kills the test process, naming the test on
+standard error, when a test method runs past its limit; a test that is slow by design raises it with
+`[MaxRunTime(seconds)]`, as the two timed cache gates do. It exists because a test looping forever
+cannot otherwise be stopped: an xUnit `Timeout` leaves the loop running, and a mutation run left one
+orphaned, spinning test process per looping mutant (ADR-70). Run directly, the executable ends at
+once; under `dotnet test` the xUnit adapter takes a further 60 seconds to report the crash. With a
+debugger attached the watchdog stands down. If a test trips it on a slow machine, make the test
+quicker before reaching for the attribute.
 
 Five projects: `CodeBase.Net` (the library — **no package references**, deliberately, ADR-17),
 `CodeBase.Net.Tests` (layers 1-3), `CodeBase.Net.Golden` (layer 4, against `net/corpus/`),

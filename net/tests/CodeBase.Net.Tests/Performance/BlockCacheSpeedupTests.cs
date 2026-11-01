@@ -84,13 +84,16 @@ public sealed class BlockCacheSpeedupTests
             cached);
     }
 
+    // Warm-up and five timed passes each way take about 1.2 s, past the watchdog's default second.
     [Fact]
+    [MaxRunTime(10)]
     public void TheCacheMakesAWalkAtLeastTwiceAsFast()
     {
         AssertTwiceAsFast(TagWalk, "tag walk");
     }
 
     [Fact]
+    [MaxRunTime(10)]
     public void TheCacheMakesPositioningByRecordNumberAtLeastTwiceAsFast()
     {
         AssertTwiceAsFast(GoThenSkip, "Go(n) then Skip(1)");

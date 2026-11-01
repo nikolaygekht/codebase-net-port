@@ -890,6 +890,30 @@ Its one consumer is `relate4count`, which when `fullyMapped == 1` returns `f4fla
 — **the answer without reading a single record** (r4relate.c:6780-6781). The count starts at 1
 because flags are indexed by record number and there is no record 0.
 
+### 7.5 The ends — where `relate4top` and `relate4bottom` leave the query when nothing matches
+
+There is no `relate4bof`; `relate4eof` is `d4eof` of the master table, or the sort's own flag
+(r4relate.c:1712-1735). The flags are therefore `DATA4.eofFlag` and `bofFlag`, set by the moves
+below. `d4goEof` sets `eofFlag`, and `bofFlag` only when the table is empty; it never clears
+`bofFlag` (d4go.c:472-478). `d4go` to a record clears both (d4go.c:93, 326).
+
+| Move, finding nothing | Returns | `eof` | `bof` | File:line |
+|---|---|---|---|---|
+| `relate4top`, table empty | `r4eof` | 1 | 1 | `d4top` sets `bofFlag` before `d4goEof`, D4TOP.C:252-253 |
+| `relate4top`, records but no match | `r4eof` | 1 | 0 | `d4top` lands on a record, then `d4goEof` (r4relate.c:6276-6278 with a tag, 6292-6294 without); or the residual filter fails and the forward skip ends in `relate4blankSet(+1)` → `d4goEof` (r4relate.c:501-505) |
+| `relate4bottom`, table empty | `r4eof` | 1 | 1 | `d4bottom` sets `bofFlag` before `d4goEof`, D4BOTTOM.C:268-269 |
+| `relate4bottom`, residual filter fails back to the start | `r4eof` | 1 | 1 | the backward skip ends in `relate4blankSet(-1)`: `d4top`, `d4skip(-1)` sets `bofFlag` (r4relate.c:506-513); then `r4bof` is turned into `r4eof` and `d4goEof` called, "not sufficient to just change 'rc', since then calling relate4eof() returns false" (r4relate.c:1001-1007) |
+| `relate4bottom`, no bit set at or before the last record, record order | `r4eof` | **0** | 0 | `rc = r4eof` with the table left on the last record, `d4bottom`'s (r4relate.c:955-962) |
+| `relate4bottom`, the tag stepped back off its first key | `r4eof` | **0** | 0 | `rc = r4eof` with the table left where `d4bottom` put it (r4relate.c:940-949) |
+
+The 01/28/00 comment states the intent: a bottom that finds nothing is at end of file, and
+`relate4eof` says so. The last two rows return the same code without moving the table, so there
+`relate4eof` reads false and the record buffer holds a record the filter rejects — **a defect**,
+the case the comment was written to fix, left in two of the three paths.
+
+Stepping back in from the end calls `relate4bottom` (r4relate.c:3929-3937): `relate4skip(-1)` at
+end of file lands on the last match.
+
 ---
 
 ## 8. Which expression forms are optimizable

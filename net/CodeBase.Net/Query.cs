@@ -101,10 +101,10 @@ public sealed class Query
     public GoResult Top()
     {
         Prepare();
-        Bof = false;
-        Eof = false;
 
-        return Settle(SelectedTag is null ? StepByRecord(0, forwards: true) : StepByTag(null, forwards: true), forwards: true);
+        return Arrive(
+            SelectedTag is null ? StepByRecord(0, forwards: true) : StepByTag(null, forwards: true),
+            bofWhenNone: table.RecordCount == 0);
     }
 
     /// <summary>
@@ -115,12 +115,10 @@ public sealed class Query
     public GoResult Bottom()
     {
         Prepare();
-        Bof = false;
-        Eof = false;
 
-        return Settle(
+        return Arrive(
             SelectedTag is null ? StepByRecord(table.RecordCount + 1, forwards: false) : StepByTag(null, forwards: false),
-            forwards: false);
+            bofWhenNone: true);
     }
 
     /// <summary>
@@ -186,6 +184,13 @@ public sealed class Query
     /// <summary>
     /// Moves one matching record in either direction, from wherever the query is.
     /// </summary>
+    /// <value>
+    /// From past either end, a step back in starts over from that end: the first match moving
+    /// forwards out of the start, the last moving backwards out of the end. In record order that is
+    /// a step from record zero or one past the last; in a tag's order it is the tag's first or last
+    /// key, because the table's own cursor is left past the end by the move that ran off the start
+    /// and would find nothing stepping forwards from there.
+    /// </value>
     private GoResult Move(bool forwards)
     {
         Prepare();
@@ -193,10 +198,11 @@ public sealed class Query
         if (forwards ? Eof : Bof)
             return GoResult.NoRecord;
 
-        int from = Bof || Eof ? (forwards ? 0 : table.RecordCount + 1) : table.RecordNumber;
+        bool outside = Bof || Eof;
+        int from = outside ? (forwards ? 0 : table.RecordCount + 1) : table.RecordNumber;
 
         return Settle(
-            SelectedTag is null ? StepByRecord(from, forwards) : StepByTag(table.RecordNumber, forwards),
+            SelectedTag is null ? StepByRecord(from, forwards) : StepByTag(outside ? null : table.RecordNumber, forwards),
             forwards);
     }
 
@@ -257,12 +263,32 @@ public sealed class Query
     }
 
     /// <summary>
-    /// Records which end the query stopped at, when it stopped.
+    /// Sets both ends after a move to the top or the bottom, which is past the end when nothing matched.
+    /// </summary>
+    /// <value>
+    /// The reference's rule (QUERY-OPTIMIZER.md section 7.5): a top or a bottom that finds nothing
+    /// leaves the query past its end, from either direction. The beginning is set as well after a
+    /// bottom, which ran off the start looking, and after a top only when the table holds no record.
+    /// </value>
+    private GoResult Arrive(bool found, bool bofWhenNone)
+    {
+        Eof = !found;
+        Bof = !found && bofWhenNone;
+
+        return found ? GoResult.Ok : GoResult.NoRecord;
+    }
+
+    /// <summary>
+    /// Records which end the query stopped at, when it stopped, and that it is on a record when it did not.
     /// </summary>
     private GoResult Settle(bool found, bool forwards)
     {
         if (found)
+        {
+            Eof = false;
+            Bof = false;
             return GoResult.Ok;
+        }
 
         if (forwards)
             Eof = true;

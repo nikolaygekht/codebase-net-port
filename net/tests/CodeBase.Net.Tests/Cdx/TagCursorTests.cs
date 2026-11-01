@@ -194,7 +194,7 @@ public sealed class TagCursorTests
     }
 
     [Trait("Layer", "Fault")]
-    [Fact(Timeout = 10000)]
+    [Fact]
     public void Walk_ALeafChainThatCyclesThroughEmptyBlocksIsRefusedRatherThanFollowedForever()
     {
         // Empty blocks are stepped over, so a cycle made of them is a loop with no exit condition.

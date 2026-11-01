@@ -8,6 +8,12 @@
     <!-- xUnit v3 test projects are stand-alone executables, not runner-loaded libraries. -->
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
+    <!--
+      Every method JIT-compiled fully optimized at once, so the cache's timed gates
+      (BlockCacheSpeedupTests) time finished code rather than a tier-0 version still waiting for
+      tier one (ADR-68).
+    -->
+    <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
 
   <ItemGroup>

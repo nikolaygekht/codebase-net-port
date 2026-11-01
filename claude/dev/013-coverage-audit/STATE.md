@@ -4,8 +4,8 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — sub-steps 1–3 done
-**Current sub-step:** PLAN.md step 4
+**Status:** in progress — sub-steps 1–4 done
+**Current sub-step:** PLAN.md step 5
 
 ## Done so far
 
@@ -102,7 +102,24 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     optimizer refuses collated tags — with equality on one as a safe untrusted candidate set — is
     future work, recorded in `PORTING-PLAN.md` §2.3 with the full-width defect.
   - Release 2711 + 1133 green.
-- [ ] step 4 — F1c, the result cursor
+- [x] step 4 — F1c, the result cursor (2026-11-01).
+  - Tests: `QueryCursorTests` (component, a table and tag built in memory): record order and tag
+    order, forwards and back, off either end and in again, `Skip` by one and by many, record 1
+    reached from either direction, a top and a bottom that find nothing, an empty table, the count
+    with and without a residual term. Every walk is bounded by the table's size, so a cursor that
+    never reaches an end fails rather than hangs.
+  - **Defects found and fixed in `Query`**, each red first: `Eof`/`Bof` were not cleared after a
+    successful step; `Skip(-N)` from past the end stopped short of the start; in tag order a step
+    forwards from before the start found nothing (the table's cursor was left past the end, so the
+    step now starts from the tag's first key); and a `Top` or `Bottom` that found nothing set the
+    mirror-image flags — now as the reference means them (`QUERY-OPTIMIZER.md` §7.5, ADR-69,
+    decided by the user; `DIVERGENCES.md` §3).
+  - **`mutate4csharp`**: 68 mutants, 64 killed, 4 survivors all equivalent — `:86` `NextFrom(1)` to
+    `(0)` (`RecordSet.NextFrom` clamps to 1), `:148`/`:149` `count > 0` to `>=` (zero has returned
+    already), `:230` `record >= 1` to `>= 0` (`Contains(0)` is false). The first run, before the new
+    tests, left 14, eight of them real holes. Eight mutants loop; the watchdog ended each test
+    process (ADR-70, below), and none was left behind.
+  - Release 2731 (1 skipped) + 1133 green.
 - [ ] step 5 — F2, keys from values
 - [ ] step 6 — F3, the expression engine
 - [ ] step 7 — F4 + F5, the tag cursor and the public API
@@ -122,6 +139,15 @@ or it overwrites the audit's.
   answers differently from the reference, with where each was decided. Not in the plan; prompted by
   sub-step 3's finding that the optimizer never uses collated tags. Sub-step 7a added the same day,
   at the user's call, to resolve or document each entry; `PLAN.md` and `DESIGN.md` updated.
+- `BlockCacheSpeedupTests` failing now and then in Release, met during sub-step 4: measured to be the
+  JIT tier, not the neighbouring assembly — cached walk ~470 µs tiered against ~110 µs fully
+  optimized, a 2.7× ratio against 8.8×. The unit-test project now runs with tiered compilation off
+  (ADR-68, decided by the user); four full Release runs in a row green.
+- Orphaned test processes, met re-running `mutate4csharp` over `Query.cs` in sub-step 4: a mutant
+  that loops a cursor survives the tool's timeout as a `CodeBase.Net.Tests.exe` whose parents are
+  gone, spinning until killed by hand; an xUnit `Timeout` does not stop it either. Every unit test
+  now runs under a watchdog that kills the process past one second, or past a test's own
+  `[MaxRunTime]` (ADR-70, decided by the user); the timed cache gates carry ten.
 
 ## Blockers
 

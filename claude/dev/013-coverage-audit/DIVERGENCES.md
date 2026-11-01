@@ -47,6 +47,8 @@ The answer is right, only slower.
 - **ADR-65** (**user's call**) — `UPPER`/`LOWER` by the table's code page; the reference uses the
   host's.
 - **ADR-66** (**user's call**) — filter literals in the table's encoding.
+- **ADR-71** (**user's call**) — a date picture with four `Y` and no `C` (the Swedish and Finnish
+  builds' `YYYY-MM-DD`) writes the whole year; the reference writes two digits and the letters `YY`.
 - **ADR-63** (**user's call**) — the future index writer without `i4tagAdd`'s omissions.
 - **ADR-45, ADR-50** — for prefix `=` and division by zero, CodeBase was chosen over VFP.
 - **Owed from 010** — `MOD` by zero and `SQRT` of a negative answer 0 where VFP raises; VFP's

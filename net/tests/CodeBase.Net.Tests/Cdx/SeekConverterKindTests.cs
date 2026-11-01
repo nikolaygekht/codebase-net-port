@@ -69,6 +69,26 @@ public sealed class SeekConverterKindTests
             .Where(e => e.Code == ErrorCode.NotSupported && e.Message.Contains(function + "()"));
     }
 
+    [Fact]
+    public void ATagOverAFormattedDateKeysAtThePicturesLength()
+    {
+        // The key length the header records is checked against the expression's (i4init.c:485-490),
+        // and a formatted date's is the picture's: a ten-character picture makes ten-byte keys.
+        ExpressionOptions options = ExpressionOptions.CodeBase.WithDatePicture("CCYY.MM.DD");
+
+        SeekConverter converter = SeekConverter.For(
+            IndexHeader.Parse(
+                IndexImage.SingleTag(10, IndexImage.NodeOf(0), expression: "DTOC(K_DATE)").WithLeaf(10, []).Build(),
+                "an image"),
+            Fields,
+            1252,
+            options,
+            "T");
+
+        converter.KeyLength.Should().Be(10);
+        converter.Kind.Should().Be(KeyKind.Character);
+    }
+
     private static SeekConverter Converter(string expression, int keyLength, string collation) =>
         SeekConverter.For(
             IndexHeader.Parse(

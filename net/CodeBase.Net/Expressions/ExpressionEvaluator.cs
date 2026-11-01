@@ -997,6 +997,7 @@ internal sealed class ExpressionEvaluator
         string picture = context.Options.DatePicture;
         byte[] result = new byte[node.Length];
         int century = 0;
+        int yearStart = YearStart(picture);
 
         for (int i = 0; i < result.Length; i++)
         {
@@ -1005,7 +1006,9 @@ internal sealed class ExpressionEvaluator
             result[i] = at switch
             {
                 'C' => stored[century++],
-                'Y' => stored[picture.Contains('C', StringComparison.Ordinal) ? century++ : 2 + century++],
+                'Y' => picture.Contains('C', StringComparison.Ordinal)
+                    ? stored[century++]
+                    : YearDigit(stored, yearStart + century++),
                 'M' => stored[4 + Count(picture, 'M', i)],
                 'D' => stored[6 + Count(picture, 'D', i)],
                 _ => (byte)at,
@@ -1014,6 +1017,28 @@ internal sealed class ExpressionEvaluator
 
         return ExpressionValue.Text(result);
     }
+
+    /// <summary>
+    /// Works out which digit of the stored four-digit year a picture with no century letters starts at.
+    /// </summary>
+    /// <value>
+    /// One or two year letters are the year within its century, as the reference writes them. Three
+    /// or four are the year's last three or four digits -- [c]YYYY[/c] is the whole year, as
+    /// [c]CCYY[/c] is, which is how a date is read back through the same picture. The reference
+    /// writes its digits two letters in and leaves the other two letters as they are (c4.c:934-971);
+    /// ADR-71 records why this does not.
+    /// </value>
+    private static int YearStart(string picture)
+    {
+        int letters = Count(picture, 'Y', picture.Length);
+        return letters <= 2 ? 2 : 4 - letters;
+    }
+
+    /// <summary>
+    /// Reads one digit of the stored year, a zero where a picture asks for more digits than four.
+    /// </summary>
+    private static byte YearDigit(ReadOnlySpan<byte> stored, int index) =>
+        index >= 0 ? stored[index] : stored[0] == (byte)' ' ? (byte)' ' : (byte)'0';
 
     /// <summary>
     /// Counts how many of one picture letter appear before a position, which is that letter's index

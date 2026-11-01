@@ -978,8 +978,9 @@ public sealed class Table : IDisposable
         string alias = System.IO.Path.GetFileNameWithoutExtension(Path);
         Encoding literals = filter.Any(c => c > (char)0x7F) ? TextEncoding : Encoding.Latin1;
 
-        return TypeResolver.Resolve(ExpressionParser.Parse(
-            filter, new TableFieldMetadata([.. Fields], alias), [alias], encoding: literals));
+        return TypeResolver.Resolve(
+            ExpressionParser.Parse(filter, new TableFieldMetadata([.. Fields], alias), [alias], encoding: literals),
+            options: ExpressionOptions);
     }
 
     /// <summary>

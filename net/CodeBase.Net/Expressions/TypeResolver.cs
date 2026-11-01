@@ -39,17 +39,6 @@ internal sealed class TypeResolver
     private const int StackDepth = 65;
 
     /// <summary>
-    /// The picture a date takes when it is formatted as text.
-    /// </summary>
-    /// <value>
-    /// Only its length is needed here, and it is what the result length of a formatted date is. The
-    /// reference sets this picture at startup and lets a caller replace it (c4code.c:1126,
-    /// [c]code4dateFormatSet[/c]); this port has no such setting yet, and gains one when the
-    /// formatting family is ported.
-    /// </value>
-    private const string DateFormat = "MM/DD/YY";
-
-    /// <summary>
     /// How long a memo operand's value is taken to be.
     /// </summary>
     /// <value>
@@ -79,11 +68,17 @@ internal sealed class TypeResolver
     /// </value>
     private bool trimmedOrMemoSeen;
 
-    private TypeResolver(ParsedExpression parsed, TagContext? tag)
+    /// <summary>
+    /// How long a formatted date is: the length of the picture it is formatted with (e4parse.c:500-509).
+    /// </summary>
+    private readonly int datePictureLength;
+
+    private TypeResolver(ParsedExpression parsed, TagContext? tag, ExpressionOptions options)
     {
         source = parsed.Source;
         nodes = [.. parsed.Nodes];
         this.tag = tag;
+        datePictureLength = options.DatePicture.Length;
     }
 
     /// <summary>
@@ -91,15 +86,20 @@ internal sealed class TypeResolver
     /// </summary>
     /// <param name="parsed">What the parser produced.</param>
     /// <param name="tag">The tag the expression is resolved for, or null for a filter.</param>
+    /// <param name="options">
+    /// The settings the expression will be evaluated under, whose date picture is how long a
+    /// formatted date is; the engine's default settings when null.
+    /// </param>
     /// <returns>The compiled expression.</returns>
     /// <exception cref="CodeBaseException">
     /// No overload of an operation accepts the types its operands have, a call's parameter count
     /// disagrees with the row it resolved to, or the expression needs more operand slots than the
     /// engine has.
     /// </exception>
-    public static CompiledExpression Resolve(ParsedExpression parsed, TagContext? tag = null)
+    public static CompiledExpression Resolve(
+        ParsedExpression parsed, TagContext? tag = null, ExpressionOptions? options = null)
     {
-        TypeResolver resolver = new(parsed, tag);
+        TypeResolver resolver = new(parsed, tag, options ?? ExpressionOptions.Invariant);
         return resolver.Run();
     }
 
@@ -399,7 +399,7 @@ internal sealed class TypeResolver
 
             case FunctionRows.DateToText:
             case FunctionRows.DateToText + 1:
-                lengths[top] = DateFormat.Length;
+                lengths[top] = datePictureLength;
                 return;
 
             case FunctionRows.Chr:

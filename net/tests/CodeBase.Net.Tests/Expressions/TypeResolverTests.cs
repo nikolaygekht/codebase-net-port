@@ -314,6 +314,59 @@ public sealed class TypeResolverTests
             .Length.Should().Be(Compile(expression).Length);
     }
 
+    [Theory]
+    // A conversion's width is its operand type's key width (e4parse.c:622-640): a double, a date
+    // read as one and a timestamp are eight, an integer four, a logical one; any other type keeps
+    // its operand's width.
+    [InlineData("ASCEND(K_NUM + 0)", 8)]
+    [InlineData("ASCEND(K_DATE + 1)", 8)]
+    [InlineData("ASCEND(K_TS)", 8)]
+    [InlineData("ASCEND(K_INT)", 4)]
+    [InlineData("DESCEND(K_LOG)", 1)]
+    [InlineData("ASCEND(K_LOG)", 1)]
+    [InlineData("ASCEND(K_CUR)", 8)]
+    public void ANonStringsKeyConversionIsItsTypesKeyWidth(string expression, int length) =>
+        Compile(expression).Length.Should().Be(length);
+
+    [Fact]
+    public void AMemoInsideAnExpressionUnderACollationHalvesTheMemoAndTheWhole()
+    {
+        // i4init.c:466-481 divides info[0] and the expression's own length alike once the first
+        // node reaches 239, whatever else the expression holds: UPPER over a 1024-wide memo operand
+        // is resolved at 512, the memo at 512 too.
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("UPPER(K_MEMO)", Fields), Tag(1));
+
+        compiled.Nodes[0].Length.Should().Be(512);
+        compiled.Length.Should().Be(512);
+        Compile("UPPER(K_MEMO)").Length.Should().Be(1024);
+    }
+
+    [Theory]
+    // A formatted date is as long as the picture it is formatted with (e4parse.c:500-509), and the
+    // engine's own default picture is eight characters.
+    [InlineData("MM/DD/YY", 8)]
+    [InlineData("CCYY.MM.DD", 10)]
+    [InlineData("YYYY-MM-DD", 10)]
+    [InlineData("YY/MM", 5)]
+    public void AFormattedDateIsAsLongAsItsPicture(string picture, int length)
+    {
+        ExpressionOptions options = ExpressionOptions.CodeBase.WithDatePicture(picture);
+
+        TypeResolver.Resolve(ExpressionParser.Parse("DTOC(K_DATE)", Fields), options: options)
+            .Length.Should().Be(length);
+        Compile("DTOC(K_DATE)").Length.Should().Be(ExpressionOptions.Invariant.DatePicture.Length);
+    }
+
+    [Fact]
+    public void AMemoBehindANarrowFirstNodeIsNotHalved()
+    {
+        // The test is on info[0], the expression's first node, and here that is the text field.
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("K_TEXT + K_MEMO", Fields), Tag(1));
+
+        compiled.Nodes[0].Length.Should().Be(20);
+        compiled.Length.Should().Be(Compile("K_TEXT + K_MEMO").Length);
+    }
+
     private static CompiledExpression Compile(string expression) =>
         TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields));
 

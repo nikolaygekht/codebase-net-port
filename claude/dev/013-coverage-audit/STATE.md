@@ -4,8 +4,8 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — sub-steps 1–5 done
-**Current sub-step:** PLAN.md step 6
+**Status:** in progress — sub-steps 1–6 done
+**Current sub-step:** PLAN.md step 7
 
 ## Done so far
 
@@ -141,7 +141,33 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     `(…, 1)` before a truncating cast are equivalent; `RecordKey` 6/7 then the tails killed. Every
     `DecrementLowByte` mutant killed.
   - Release 2776 (1 skipped) + 1133 green.
-- [ ] step 6 — F3, the expression engine
+- [x] step 6 — F3, the expression engine (2026-11-01). Tests:
+  `ExpressionEvaluatorTests` (STR and STRZERO as EXPRESSIONS.md §7.1 witnesses them, DTOC by
+  picture and of a blank date, TTOC of a timestamp and a date), `ExpressionFieldLoaderTests` (every
+  field type read from a record laid down in memory, memo cases, the null bitmap past its first
+  byte), `ExpressionKeyTests` (the null byte, numbers and dates held as text, a trimmed tail),
+  `TypeResolverTests` (each conversion's key width; the memo halving inside an expression and not
+  behind a narrow first node). Every member the plan names is off 0% except `FunctionTable`'s four
+  band getters, read only by the golden gates that check the table against the reference.
+  **`mutate4csharp`** over the lines the tests reach: `ExpressionKey` 23/23, `TypeResolver` 21/22 then
+  the memo condition killed, `ExpressionEvaluator` 64/71 then six killed — `:1047` milliseconds
+  starting at 1 rather than 0 is equivalent (under a second); `ExpressionValue` 2/8 then the null
+  flags killed — four `0` to `1` in `NumericText`/`DateText`'s number slots are equivalent, as every
+  row taking a text-held number or date reads its bytes.
+  - **Defects found and fixed**, each red first:
+    - DTOC's result length was fixed at 8 whatever picture was configured, against e4parse.c:500-509
+      and `ExpressionOptions.DatePicture`'s own doc. A ten-character picture was cut, and a filter
+      comparing the cut text admitted every day sharing its first eight characters — a wrong record
+      set (`FilterOptionsTests`). `TypeResolver.Resolve` now takes the options and the picture's
+      length, and `Table.CompileFilter` and `SeekConverter.For` pass theirs; a DTOC tag under a
+      ten-character picture now opens.
+    - A `YYYY` picture with no `C` wrote the wrong digits (`8706-06-15` for 15 June 1987). It now
+      writes the whole year, as `CCYY` does, and reads back through the same picture as the same
+      day (ADR-71, decided by the user; the reference writes `87YY-06-15`; `DIVERGENCES.md` §3).
+  - Their mutants: three survivors, all equivalent — the guard for a result longer than its picture
+    (no longer reachable), `<= 2` against `< 2` at two letters, and the blank test reading the
+    second digit rather than the first.
+  - Release 2867 (1 skipped) + 1133 green.
 - [ ] step 7 — F4 + F5, the tag cursor and the public API
 - [ ] step 7a — the divergences, each resolved or documented (added at the user's call)
 - [ ] step 8 — close

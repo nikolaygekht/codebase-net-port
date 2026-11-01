@@ -160,7 +160,8 @@ internal sealed class SeekConverter
         // memo change lengths -- and lengths are what the optimizer matches a filter's terms on.
         CompiledExpression compiled = TypeResolver.Resolve(
             ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias), [alias]),
-            TagContext.For(collation, codePage));
+            TagContext.For(collation, codePage),
+            options);
 
         RefuseIfNotTheSameTwice(compiled, expression);
 

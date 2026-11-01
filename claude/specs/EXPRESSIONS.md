@@ -647,6 +647,12 @@ shift = max(0, trimmedLen − n) at runtime (e4functi.c:2832-2843; e4parse.c:156
   `GetDateFormat`. Confirmed by the corpus: `T_DTOC` has `keyLen=8`, and a DTOC key length *is* the
   picture length (e4parse.c:500-509). §14 risk 2 is closed.
 
+  `c4encode` (c4.c:934-971) maps the picture onto `CCYYMMDD` letter by letter: each run of a letter
+  in `CCYYMMDD` is copied to that letter's first run in the picture, as many characters as both runs
+  share, and a letter the picture lacks is skipped. So with no `C` a `YYYY` picture receives only the
+  two year digits and keeps its last two letters: 15 June 1987 under `YYYY-MM-DD` is `87YY-06-15`.
+  This port writes the whole year there instead (ADR-71).
+
   **Two pictures of equal length are indistinguishable from the file.** `MM/DD/YY` and `DD.MM.YY` are
   both 8, and produce different bytes for the same date, so a stored `DTOC` tag does not record which
   one built it and the computed-versus-stored key-length check of §9.1 cannot detect a wrong choice.

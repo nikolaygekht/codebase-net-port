@@ -394,6 +394,91 @@ public sealed class ExpressionEvaluatorTests
         Encoding.Latin1.GetString(Evaluate("TIME()", context).Bytes).Should().Be("13:05:09");
     }
 
+    // ------------------------------------------------------------- formatting
+
+    [Theory]
+    // EXPRESSIONS.md section 7.1, the values witnessed in CDXEXPR.expr.dump.txt: right-justified at
+    // the width, rounded half away from zero on the decimal digits, and a field of asterisks where
+    // the number does not fit. The width defaults to ten.
+    [InlineData("STR(2.5,10,0)", "         3")]
+    [InlineData("STR(-2.5,10,0)", "        -3")]
+    [InlineData("STR(0.125,10,2)", "      0.13")]
+    [InlineData("STR(0.135,10,2)", "      0.14")]
+    [InlineData("STR(123456,3,0)", "***")]
+    [InlineData("STR(42)", "        42")]
+    [InlineData("STR(12345,5,0)", "12345")]
+    // A number past what any width could hold is still asterisks, and not an overflow.
+    [InlineData("STR(10^30,10,0)", "**********")]
+    // Nor is a value that is no number at all: unwitnessed in the reference, and asterisks here
+    // rather than a failure, as for any number with no decimal form.
+    [InlineData("STR(10^400 - 10^400,10,0)", "**********")]
+    public void ANumberIsWrittenRightJustifiedAtItsWidth(string expression, string expected) =>
+        Text(expression).Should().Be(expected);
+
+    [Theory]
+    // STRZERO is STR with its leading blanks made zeros (e4functi.c:2569-2575), so a sign stays where
+    // the digits start, and an overflow is asterisks as STR's is (e4functi.c:2545-2547).
+    [InlineData("STRZERO(42,5)", "00042")]
+    [InlineData("STRZERO(-42,5)", "00-42")]
+    [InlineData("STRZERO(100,2)", "**")]
+    public void ZeroFillingReplacesOnlyTheLeadingBlanks(string expression, string expected) =>
+        Text(expression).Should().Be(expected);
+
+    [Theory]
+    // DTOC follows the configured picture (EXPRESSIONS.md section 7.3): the reference's default, the
+    // German build's, and ones carrying the century as c4encode's own example does (c4.c:938-940).
+    [InlineData("MM/DD/YY", "06/15/87")]
+    [InlineData("DD.MM.YY", "15.06.87")]
+    [InlineData("CCYYMMDD", "19870615")]
+    [InlineData("CCYY.MM.DD", "1987.06.15")]
+    // Four year letters and no century letter are the whole year, as CCYY is -- the Swedish and
+    // Finnish builds' picture. The reference writes 00YY-06-15 here (c4.c:934-971); ADR-71.
+    [InlineData("YYYY-MM-DD", "1987-06-15")]
+    [InlineData("YYY", "987")]
+    [InlineData("YYYYY", "01987")]
+    public void ADateIsWrittenThroughTheConfiguredPicture(string picture, string expected)
+    {
+        ExpressionOptions options = ExpressionOptions.CodeBase.WithCentury(20).WithDatePicture(picture);
+
+        Encoding.Latin1.GetString(Evaluate("DTOC(STOD(\"19870615\"))", options).Bytes)
+            .Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("MM/DD/YY")]
+    [InlineData("CCYY.MM.DD")]
+    [InlineData("YYYY-MM-DD")]
+    [InlineData("YYYYY.MM.DD")]
+    public void ADateWrittenThroughAPictureIsReadBackThroughItAsTheSameDay(string picture)
+    {
+        // CTOD reads a picture's year letters as the year's last digits (ReadDateByPicture), so what
+        // DTOC writes through a picture has to be what CTOD reads through it.
+        ExpressionOptions options = ExpressionOptions.CodeBase.WithCentury(19).WithDatePicture(picture);
+
+        Evaluate("CTOD(DTOC(STOD(\"19870615\"))) = STOD(\"19870615\")", options).Logical.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ABlankDateIsWrittenAsThePictureWithBlanksForItsDigits()
+    {
+        // Witnessed (EXPRESSIONS.md section 7.3): not eight blanks, which is what DTOS gives.
+        Text("DTOC(STOD(\"        \"))").Should().Be("  /  /  ");
+
+        Encoding.Latin1.GetString(
+                Evaluate("DTOC(STOD(\"        \"))", ExpressionOptions.CodeBase.WithDatePicture("YYYYY-MM-DD")).Bytes)
+            .Should().Be("     -  -  ");
+    }
+
+    [Theory]
+    // TTOC(x,1) is the date's eight characters and the time of day as six digits; a date has no
+    // time, so its six are zeros (EXPRESSIONS.md section 7.3, e4functi.c:821-876).
+    [InlineData("TTOC(DATETIME(2000,1,15,12,34,56))", "20000115123456")]
+    [InlineData("TTOC(DATETIME(2000,1,15,23,59,59))", "20000115235959")]
+    [InlineData("TTOC(DATETIME(2000,1,15))", "20000115000000")]
+    [InlineData("TTOC(STOD(\"20000115\"))", "20000115000000")]
+    public void ATimestampIsWrittenAsFourteenDigits(string expression, string expected) =>
+        Text(expression).Should().Be(expected);
+
     // ------------------------------------------------------------------ null
 
     [Fact]
@@ -564,6 +649,13 @@ public sealed class ExpressionEvaluatorTests
 
     private static ExpressionValue Evaluate(string expression, EvaluationContext context) =>
         new ExpressionEvaluator(Compile(expression)).Evaluate(context);
+
+    /// <summary>
+    /// Compiles and evaluates under one set of settings, as a table does with its own.
+    /// </summary>
+    private static ExpressionValue Evaluate(string expression, ExpressionOptions options) =>
+        new ExpressionEvaluator(TypeResolver.Resolve(ExpressionParser.Parse(expression, Fields), options: options))
+            .Evaluate(Context(options));
 
     private static ExpressionValue Value(string expression) => Evaluate(expression, Context());
 

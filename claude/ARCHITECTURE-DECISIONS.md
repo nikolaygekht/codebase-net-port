@@ -2481,3 +2481,32 @@ remembered, and leaves a developer's own hung run hung.
 
 **Rejected — fixing `mutate4csharp`** (a Windows job object around the run). Not this repository's
 code; the watchdog fixes the symptom for every runner.
+
+## ADR-71 — A picture's four year letters are the whole year, with or without the century letters · accepted
+
+**Date.** 2026-11-01. Decided by the user during step 013, sub-step 6.
+
+**Context.** A date is written as text through the configured picture (`DTOC`, EXPRESSIONS.md §7.3).
+The reference's Swedish and Finnish builds set the picture `YYYY-MM-DD` (C4CODE.C:1126-1140), and its
+`c4encode` (c4.c:934-971) maps a picture onto the stored `CCYYMMDD` by letter: with no `C` in the
+picture it skips the century digits, writes the two year digits into the first two `Y` positions,
+and leaves the other two as the letters themselves — 15 June 1987 is `87YY-06-15`. The port wrote
+the wrong digits instead: `8706-06-15`, the year's last two digits and then the month's. The port's own
+reading of a date through a picture (`CTOD`) already takes `YYYY` as the whole year, so neither
+wrote what it reads back.
+
+**Decision.** With no century letter in the picture, one or two `Y` are the year within its century,
+as in the reference; three or four are the year's last three or four digits, so `YYYY` is the whole
+year exactly as `CCYY` is; more than four pad the year with leading zeros. A date written through a
+picture reads back through it as the same day.
+
+**Cost.** A `DTOC` key under such a picture is not the reference's bytes. Only the Swedish and
+Finnish builds of the reference use one, and their output there is not a date anyone could read
+back, so a file holding it is not one this library expects to meet; `DIVERGENCES.md` of step 013
+lists it.
+
+**Rejected — the reference's bytes.** Literal `YY` in a date is a defect, and replicating it would
+make `DTOC` and `CTOD` disagree on the same picture.
+
+**Rejected — refusing such a picture.** It is the picture two of the reference's own builds ship
+with; the meaning is not in doubt.

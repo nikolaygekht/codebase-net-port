@@ -41,10 +41,11 @@ public sealed class KeyTransformGoldenTests
     {
         // The gate for the selection table as a whole. Each tag resolves its own converter from the
         // table's fields and code page, and then every key it holds must come back byte for byte
-        // from the value in the record it points at -- character, collated, numeric, double, date,
-        // integer and datetime keys, ascending and descending, across every indexed case.
+        // from the record it points at -- character, collated, numeric, double, date, integer and
+        // datetime keys, ascending and descending, across every indexed case. The key is built the
+        // way the library builds it to find a record in its tag: the tag's expression evaluated over
+        // the record, then weighed (TableTagCursor).
         CorpusIndexDump index = CorpusIndexDump.Load(indexFile);
-        CorpusDump table = CorpusDump.Load(tableName);
 
         using CodeBaseEngine engine = new();
         using Table open = engine.OpenTable(Corpus.PathOf(tableName + ".DBF"));
@@ -63,14 +64,14 @@ public sealed class KeyTransformGoldenTests
             DumpIndexTag expected = index.RealTags.Single(t => t.Name.TrimEnd() == tag.Name.TrimEnd());
             SeekConverter converter = SeekConverter.For(
                 tag.Header, fields, codePage, ExpressionOptions.Invariant, tableName);
-            string field = converter.Field!.Name;
+            ExpressionValueSource source = new(converter.Compiled, open.EvaluationContext());
 
             foreach (DumpIndexKey stored in expected.Keys)
             {
-                byte[] value = table.Records[(int)stored.Record - 1][field].Bytes;
+                open.Go((int)stored.Record);
                 byte[] built = new byte[converter.KeyLength];
 
-                RecordKey.WriteValue(converter, value, built).Should().Be(converter.KeyLength);
+                RecordKey.Write(converter, source, open.CurrentRecord, built).Should().Be(converter.KeyLength);
 
                 built.Should().Equal(
                     stored.Key,

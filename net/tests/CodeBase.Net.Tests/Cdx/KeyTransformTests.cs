@@ -34,6 +34,16 @@ public sealed class KeyTransformTests
 
     private static int Compare(byte[] a, byte[] b) => a.AsSpan().SequenceCompareTo(b);
 
+    /// <summary>The Julian day of 2000-01-01.</summary>
+    private const int Day2000 = 2451545;
+
+    private static byte[] DateTime(int julianDay, int milliseconds)
+    {
+        byte[] key = new byte[8];
+        KeyTransform.FromDateTime(julianDay, milliseconds, key).Should().Be(8);
+        return key;
+    }
+
     [Fact]
     public void Double_KeysSortInTheSameOrderAsTheValues()
     {
@@ -154,6 +164,98 @@ public sealed class KeyTransformTests
         Action act = () => KeyTransform.FromCurrency(decimal.MaxValue, key);
 
         act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Data);
+    }
+
+    [Fact]
+    public void Currency_AValueTooFarBelowZeroForTheField_IsRefused()
+    {
+        byte[] key = new byte[8];
+
+        Action act = () => KeyTransform.FromCurrency(decimal.MinValue, key);
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Data);
+    }
+
+    [Fact]
+    public void Currency_TheFieldsExtremesAreAccepted_AndKeyAsTheExtremeIntegers()
+    {
+        // A currency field is a 64-bit integer of ten-thousandths, so its range ends exactly at the
+        // integer's: the largest and smallest values fit and must not be refused.
+        decimal highest = long.MaxValue / 10000m;
+        decimal lowest = long.MinValue / 10000m;
+        byte[] key = new byte[8];
+        byte[] expected = new byte[8];
+
+        KeyTransform.FromCurrency(highest, key);
+        KeyTransform.FromInt64(long.MaxValue, expected);
+        key.Should().Equal(expected);
+
+        KeyTransform.FromCurrency(lowest, key);
+        KeyTransform.FromInt64(long.MinValue, expected);
+        key.Should().Equal(expected);
+    }
+
+    [Theory]
+    // KEY-COLLATION.md section 2.8: the milliseconds round to the nearest second, half up.
+    [InlineData(12_000, 12_499, 12_000)]
+    [InlineData(12_000, 12_500, 13_000)]
+    [InlineData(12_000, 12_999, 13_000)]
+    public void DateTime_TheMillisecondsRoundToTheNearestSecond(int second, int milliseconds, int roundsTo)
+    {
+        byte[] key = DateTime(Day2000, milliseconds);
+
+        key.Should().Equal(DateTime(Day2000, roundsTo), $"{milliseconds} ms rounds to {roundsTo}");
+        if (roundsTo != second)
+            key.Should().NotEqual(DateTime(Day2000, second));
+    }
+
+    [Theory]
+    [InlineData(1721426)] // 0001-01-01
+    [InlineData(2415021)] // 1900-01-01
+    [InlineData(Day2000)]
+    [InlineData(2488070)] // 2100-01-01
+    public void DateTime_AFlaggedSecondIsTheDoubleOneStepDown_AndEveryOtherIsTheDoubleItself(int day)
+    {
+        // KEY-COLLATION.md section 2.8: the day and the second become one double, and a second the
+        // empirical bitmap flags is nudged down by one in its lowest byte before the double
+        // transform. Across a real day's seconds that is exactly the next double down, which is the
+        // expectation here; every second of the day is checked, so both arms are met many times.
+        int flagged = 0;
+        List<int> wrong = [];
+
+        for (int second = 0; second < 86400; second++)
+        {
+            double value = day + (second * 1000 / 86400000.0);
+            bool nudged = DateTimeKeyFlags.NeedsDecrement(second);
+            if (nudged)
+                flagged++;
+
+            if (!DateTime(day, second * 1000).AsSpan().SequenceEqual(Double(nudged ? Math.BitDecrement(value) : value)))
+                wrong.Add(second);
+        }
+
+        wrong.Should().BeEmpty($"every second of day {day} keys as its double, one step down where flagged");
+        flagged.Should().BePositive("a day with no flagged second would not reach the decrement");
+    }
+
+    [Fact]
+    public void DateTime_KeysSortChronologically_AcrossFlaggedSecondsAndMidnight()
+    {
+        // The nudge is one step of a double whose step is far finer than a second, so it must never
+        // reorder two seconds; and the last second of a day sorts below the first of the next.
+        byte[] previous = DateTime(Day2000, 0);
+        List<int> unordered = [];
+
+        for (int second = 1; second < 86400; second++)
+        {
+            byte[] current = DateTime(Day2000, second * 1000);
+            if (Compare(previous, current) >= 0)
+                unordered.Add(second);
+            previous = current;
+        }
+
+        unordered.Should().BeEmpty("each second must sort above the one before it");
+        Compare(previous, DateTime(Day2000 + 1, 0)).Should().BeNegative();
     }
 
     [Fact]

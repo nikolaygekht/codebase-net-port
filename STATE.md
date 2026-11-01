@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-01 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-steps 1–4 are committed locally and not pushed; sub-step 4 tested the query's result cursor and fixed four defects in it (ADR-68–70).**
+**Updated:** 2026-11-01 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-steps 1–5 are committed locally and not pushed; sub-step 5 tested keys from values, found no defect, and removed a key-building path the library no longer used, its golden gate moved onto the library's own.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited

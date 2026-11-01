@@ -67,9 +67,7 @@ internal enum KeyConversion
 /// as data rather than function pointers, and it is the only place the mapping lives.
 ///
 /// The kind now comes from the [b]compiled expression's result type[/b] rather than from a field's
-/// declared type, which is what lets a tag be keyed on anything the engine can compute. A tag over a
-/// bare field still records the field, because the seek path takes a caller's value in its stored
-/// form and needs to know what that form is.
+/// declared type, which is what lets a tag be keyed on anything the engine can compute.
 ///
 /// The compiled expression is [b]kept[/b] and not discarded once the kind, the length and the pad
 /// byte have been read off it. The query optimizer decides whether a tag can stand in for a
@@ -82,7 +80,6 @@ internal sealed class SeekConverter
 
     private SeekConverter(
         KeyKind kind,
-        FieldDefinition? field,
         CompiledExpression compiled,
         int keyLength,
         byte padByte,
@@ -92,7 +89,6 @@ internal sealed class SeekConverter
         bool candidate)
     {
         Kind = kind;
-        Field = field;
         Compiled = compiled;
         KeyLength = keyLength;
         PadByte = padByte;
@@ -104,9 +100,6 @@ internal sealed class SeekConverter
 
     /// <summary>Gets the kind of key the tag stores.</summary>
     public KeyKind Kind { get; }
-
-    /// <summary>Gets the field the tag is built on, or null when its expression is not a bare name.</summary>
-    public FieldDefinition? Field { get; }
 
     /// <summary>Gets the tag's compiled key expression.</summary>
     public CompiledExpression Compiled { get; }
@@ -181,11 +174,8 @@ internal sealed class SeekConverter
         bool candidate = header.Options.HasFlag(TagOptions.Candidate);
         RefuseIfTheKeyLengthDisagrees(compiled, kind, candidate, header, expression);
 
-        FieldDefinition? field = fields.FirstOrDefault(
-            f => string.Equals(f.Name, expression, StringComparison.OrdinalIgnoreCase));
-
         return new SeekConverter(
-            kind, field, compiled, header.KeyLength, padByte, collation, codePage, ConversionOf(compiled), candidate);
+            kind, compiled, header.KeyLength, padByte, collation, codePage, ConversionOf(compiled), candidate);
     }
 
     /// <summary>

@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
 
@@ -94,11 +93,9 @@ internal static class RecordKey
     /// <param name="destination">Where to write, at least the tag's key length.</param>
     /// <returns>How many bytes were written.</returns>
     /// <value>
-    /// The build form, and the one an expression tag needs. It differs from the byte form below in
-    /// three ways, and each is something a bare field never had: the value can be absent, which
-    /// spends a leading byte; a trimmed result carries zero bytes where its trailing characters were,
-    /// which become blanks here; and what transform to use comes from the value's own type rather
-    /// than from a field's declared one.
+    /// The build form, for every tag. The value can be absent, which spends a leading byte; a trimmed
+    /// result carries zero bytes where its trailing characters were, which become blanks here; and
+    /// what transform to use comes from the value's own type rather than from a field's declared one.
     /// </value>
     public static int WriteValue(
         SeekConverter converter, ExpressionValue value, Span<byte> destination)
@@ -131,70 +128,4 @@ internal static class RecordKey
             value, converter.Compiled.HasTrim, withIndicator: false, key)
             + (converter.HasNullIndicator ? 1 : 0);
     }
-
-    /// <summary>
-    /// Writes the key a tag holds for a value already in its stored form.
-    /// </summary>
-    /// <param name="converter">The tag's resolved converter.</param>
-    /// <param name="value">The value's stored bytes.</param>
-    /// <param name="destination">Where to write, at least the tag's key length.</param>
-    /// <returns>How many bytes were written.</returns>
-    /// <exception cref="CodeBaseException">The value cannot be read as the key's declared type.</exception>
-    /// <remarks>
-    /// Split out from the record form because it is where the key actually gets built, and because
-    /// it can be compared against a stored key without a table open around it.
-    /// </remarks>
-    public static int WriteValue(
-        SeekConverter converter, ReadOnlySpan<byte> value, Span<byte> destination)
-    {
-        Span<byte> key = destination[..converter.KeyLength];
-
-        switch (converter.Kind)
-        {
-            case KeyKind.Character:
-                // Machine order keeps the bytes, cut or padded to the tag's width.
-                int copied = Math.Min(value.Length, key.Length);
-                value[..copied].CopyTo(key);
-                key[copied..].Fill(converter.PadByte);
-                return key.Length;
-
-            case KeyKind.CollatedCharacter:
-                return CollatedKey.Write(
-                    value,
-                    CollationWeights.TableFor(converter.Collation, converter.CodePage),
-                    CollationWeights.ExpansionsFor(converter.Collation, converter.CodePage),
-                    includeTails: true,
-                    key);
-
-            case KeyKind.Double:
-                return KeyTransform.FromDouble(DoubleOf(converter, value), key);
-
-            case KeyKind.Int32:
-                return KeyTransform.FromInt32(BinaryPrimitives.ReadInt32LittleEndian(value), key);
-
-            case KeyKind.Currency:
-                return KeyTransform.FromInt64(BinaryPrimitives.ReadInt64LittleEndian(value), key);
-
-            case KeyKind.Date:
-                return KeyTransform.FromDouble(FoxDate.ToJulian(value), key);
-
-            default:
-                return KeyTransform.FromDateTime(
-                    BinaryPrimitives.ReadInt32LittleEndian(value),
-                    BinaryPrimitives.ReadInt32LittleEndian(value[4..]),
-                    key);
-        }
-    }
-
-    /// <summary>
-    /// Reads the double behind a numeric, float or true-double field.
-    /// </summary>
-    /// <remarks>
-    /// A numeric or float field holds its value as text and a double field holds it as bytes, and
-    /// both key through the same transform (KEY-COLLATION.md section 2.11).
-    /// </remarks>
-    private static double DoubleOf(SeekConverter converter, ReadOnlySpan<byte> value) =>
-        converter.Field!.Type == 'B'
-            ? BitConverter.ToDouble(value)
-            : FoxNumeric.ToDouble(value);
 }

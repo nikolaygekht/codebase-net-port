@@ -4,8 +4,8 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — sub-steps 1–4 done
-**Current sub-step:** PLAN.md step 5
+**Status:** in progress — sub-steps 1–5 done
+**Current sub-step:** PLAN.md step 6
 
 ## Done so far
 
@@ -120,7 +120,27 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     tests, left 14, eight of them real holes. Eight mutants loop; the watchdog ended each test
     process (ADR-70, below), and none was left behind.
   - Release 2731 (1 skipped) + 1133 green.
-- [ ] step 5 — F2, keys from values
+- [x] step 5 — F2, keys from values (2026-11-01).
+  - Tests: `RecordKeyTests` (a nullable tag's null and value keys per KEY-COLLATION.md §5.3; a
+    collated key found by seeking its value, case-blind under GENERAL; an accent kept in the tails),
+    `KeyTransformTests` (datetime rounding, every second of four days against the double one step
+    down where flagged, ordering across midnight; currency's extremes accepted and refused past
+    them), `SeekConverterKindTests` (kind per result type, the not-same-twice refusals),
+    `CollationWeightsTests`. No defect in the library; two of the tests' first expectations were
+    wrong (GENERAL is case-blind in heads and tails alike) and were corrected against the spec.
+  - **Dead code removed, decided by the user:** the byte overload of `RecordKey.WriteValue` (CRAP 72),
+    `DoubleOf`, and with them `SeekConverter.Field`, had had no library caller since 012 (`33ca4fe`,
+    ADR-58). `KeyTransformGoldenTests`' every-key gate, their one caller, now builds each key as the
+    library does — the tag's expression evaluated over the record through `ExpressionValueSource`,
+    then `RecordKey.Write` — with the same 3563 keys and the same expected bytes (deviation, below).
+  - Coverage: every F2 member at 100% but `SeekConverter.KindOf` (76.5%), whose throw is
+    unreachable: the field loaders beyond DBF-READ's types are transcribed but no expression
+    produces one.
+  - **`mutate4csharp`**: `CollationWeights` 6/6, `SeekConverter` 24/24, `KeyTransform` 25/30 then
+    the currency bounds killed — `:38`/`:57` `+ 0x80` to `- 0x80` and `:236` `Round(…, 0)` to
+    `(…, 1)` before a truncating cast are equivalent; `RecordKey` 6/7 then the tails killed. Every
+    `DecrementLowByte` mutant killed.
+  - Release 2776 (1 skipped) + 1133 green.
 - [ ] step 6 — F3, the expression engine
 - [ ] step 7 — F4 + F5, the tag cursor and the public API
 - [ ] step 7a — the divergences, each resolved or documented (added at the user's call)
@@ -148,6 +168,11 @@ or it overwrites the audit's.
   gone, spinning until killed by hand; an xUnit `Timeout` does not stop it either. Every unit test
   now runs under a watchdog that kills the process past one second, or past a test's own
   `[MaxRunTime]` (ADR-70, decided by the user); the timed cache gates carry ten.
+- `tests/CodeBase.Net.Golden` changed in sub-step 5, against the plan's gate that it stay as it is:
+  `KeyTransformGoldenTests.EveryKeyOfEveryTagIsRebuiltFromTheRecordItNames` rebuilt the corpus's
+  keys through a `RecordKey.WriteValue` overload the library no longer called, so it gated code
+  nothing ran. It now builds them through the library's own path, with the same keys and the same
+  expectations; the overload is deleted (decided by the user).
 
 ## Blockers
 

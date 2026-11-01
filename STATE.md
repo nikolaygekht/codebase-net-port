@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-01 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-steps 1–6 are committed locally and not pushed; sub-step 6 tested the expression engine and fixed two date-formatting defects — DTOC's length now follows the configured picture, and a `YYYY` picture writes the whole year (ADR-71).**
+**Updated:** 2026-11-01 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-steps 1–7 are committed locally and not pushed; sub-step 7 tested seeking every kind of tag and the public API's forwarding, found no defect, and removed two members the library no longer called.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited

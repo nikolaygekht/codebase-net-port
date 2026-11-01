@@ -4,8 +4,8 @@ Live during phase 6 only. Short, current, and deleted-by-replacement rather than
 forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) and decisions to
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
-**Status:** in progress — sub-steps 1–6 done
-**Current sub-step:** PLAN.md step 7
+**Status:** in progress — sub-steps 1–7 done
+**Current sub-step:** PLAN.md step 7a
 
 ## Done so far
 
@@ -168,7 +168,30 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     (no longer reachable), `<= 2` against `< 2` at two letters, and the blank test reading the
     second digit rather than the first.
   - Release 2867 (1 skipped) + 1133 green.
-- [ ] step 7 — F4 + F5, the tag cursor and the public API
+- [x] step 7 — F4 + F5, the tag cursor and the public API (2026-11-01). No defect in the library.
+  - Tests: `TableTypedSeekTests` (component, a typed table and tag built in memory: a tag sought by
+    an int, a double and a date, exactly and to either side; by text through `DESCEND` (ADR-64),
+    under GENERAL whole and as a prefix, accents told apart only by a whole seek; behind a nullable
+    tag's null byte, text and integer; a whole seek against a prefix; text refused on every
+    non-character kind, naming the seek to use). `TablePublicSurfaceTests` (ADR-67, a table with a
+    memo file built in memory: the header properties, the typed readers, every memo reader, a memo
+    pointer with no memo file refused and an empty one read without it, `FieldCollection`, `Tag`'s
+    descriptions, stepping a tag that is not selected from past the end, from no record and from a
+    record the tag lacks, the engine's cache settings). `IndexedTableImage` gained a typed table of
+    any one field, nullable or not, and `MemoTableImage` is new.
+  - **Dead code removed, decided by the user:** `Table.EnsureOpen` (no caller) and
+    `Table.CompiledFor` (only two golden tests; the optimizer reads tags through `QueryTags`, which
+    those tests now use). Kept, with the reason: `Table.CurrentRecord` and `FunctionTable`'s four
+    band getters, read only by golden tests, which have no other way in to evaluate over a record or
+    to check the transcribed table against the reference.
+  - Coverage: no F4 or F5 member at 0% but `CurrentRecord`, kept as above.
+  - **`mutate4csharp`**: `TableTagCursor`'s search members 14/16, then both killed (a whole collated
+    seek without tails, a text seek left with no search to continue) — `Indicated`, the nullable-seek
+    fix, is killed by the component tests. `Table`'s own logic 11/19, then five killed (a whole seek
+    taken as a prefix, three times; an empty memo with no memo file). Equivalent: `:583` `< 1` to
+    `< 0` (a position is never zero, `Invalid` is minus one), `:594` and `:600` the record of a move
+    that did not move, and `count < 0` to `< 1` for a count of one.
+  - Release 2895 (1 skipped) + 1133 green.
 - [ ] step 7a — the divergences, each resolved or documented (added at the user's call)
 - [ ] step 8 — close
 
@@ -199,6 +222,10 @@ or it overwrites the audit's.
   keys through a `RecordKey.WriteValue` overload the library no longer called, so it gated code
   nothing ran. It now builds them through the library's own path, with the same keys and the same
   expectations; the overload is deleted (decided by the user).
+- `tests/CodeBase.Net.Golden` changed again in sub-step 7: `OptimizerContractGoldenTests`' two
+  tests of a tag keeping its compiled expression read it through `Table.CompiledFor`, which nothing
+  in the library called; they now read it through `QueryTags`, the optimizer's own path, with the
+  same expectations (decided by the user).
 
 ## Blockers
 

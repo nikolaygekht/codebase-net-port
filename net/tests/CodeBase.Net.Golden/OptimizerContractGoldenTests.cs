@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using CodeBase.Net.Expressions;
+using CodeBase.Net.Queries;
 using CodeBase.Net.TestUtils;
 using Xunit;
 
@@ -268,11 +269,16 @@ public sealed class OptimizerContractGoldenTests
             tag.Compiled.Should().BeNull($"{tag.Name} has not been used yet");
         }
 
+        // What the optimizer asks the table for: every usable tag, with its compiled expression.
+        IReadOnlyList<QueryTag> projected = table.QueryTags();
+        projected.Should().HaveCount(table.Tags.Count, "every tag of CDXEXPR is usable");
+
         List<string> failures = [];
 
-        foreach (Tag tag in table.Tags)
+        foreach (QueryTag queried in projected)
         {
-            CompiledExpression compiled = table.CompiledFor(tag);
+            Tag tag = table.Tags[queried.Ordinal];
+            CompiledExpression compiled = queried.Key;
 
             if (tag.Compiled is null)
                 failures.Add($"{tag.Name} discarded its compiled expression");
@@ -297,11 +303,11 @@ public sealed class OptimizerContractGoldenTests
 
         Tag tag = table.Tags[Index.RealTags.First().Name.TrimEnd()];
 
-        CompiledExpression first = table.CompiledFor(tag);
+        CompiledExpression first = table.QueryTags().Single(t => t.Name == tag.Name).Key;
         table.SelectTag(tag);
         table.Top().Should().Be(GoResult.Ok);
 
-        table.CompiledFor(tag).Should().BeSameAs(first);
+        table.QueryTags().Single(t => t.Name == tag.Name).Key.Should().BeSameAs(first);
         tag.Compiled.Should().BeSameAs(first);
     }
 

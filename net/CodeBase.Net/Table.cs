@@ -863,23 +863,6 @@ public sealed class Table : IDisposable
     }
 
     /// <summary>
-    /// Gets a tag's compiled key expression, compiling it if nothing has needed it yet.
-    /// </summary>
-    /// <param name="tag">The tag.</param>
-    /// <returns>The compiled expression.</returns>
-    /// <exception cref="CodeBaseException">The tag is not usable on this table.</exception>
-    /// <value>
-    /// What the query optimizer asks a table for: it walks every tag looking for one whose
-    /// expression matches a subexpression of the filter, and it compares compiled node arrays rather
-    /// than text.
-    /// </value>
-    internal CompiledExpression CompiledFor(Tag tag)
-    {
-        using Hold hold = Enter();
-        return CursorFor(tag).Compiled;
-    }
-
-    /// <summary>
     /// Projects the table's tags into what the query optimizer needs to know about them.
     /// </summary>
     /// <returns>One entry per tag, in the table's own tag order.</returns>
@@ -1497,11 +1480,6 @@ public sealed class Table : IDisposable
         return new Hold(this);
     }
 
-    /// <summary>
-    /// Refuses to work on a table whose files have been closed.
-    /// </summary>
-    /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
-    private void EnsureOpen() => ObjectDisposedException.ThrowIf(closed, this);
 
     /// <summary>
     /// Releases the claim <see cref="Enter"/> took.

@@ -1,4 +1,5 @@
 using System.Text;
+using CodeBase.Net.Dbf;
 using CodeBase.Net.IO;
 using CodeBase.Net.TestUtils;
 using CodeBase.Net.Tests.Dbf;
@@ -51,6 +52,106 @@ internal static class IndexedTableImage
         };
 
         return (engine, engine.OpenTable("memory.dbf"));
+    }
+
+    /// <summary>
+    /// Opens a table of one field of any type, with a single tag over it holding the given keys.
+    /// </summary>
+    /// <param name="field">The field, which a nullable one follows with its null-flags field.</param>
+    /// <param name="values">Each record's stored bytes for the field, or null where it is absent.</param>
+    /// <param name="keys">The tag's keys, in key order, as stored bytes and record number.</param>
+    /// <param name="expression">The tag's key expression. Defaults to the field's own name.</param>
+    /// <param name="collation">The tag's collation, empty for machine order.</param>
+    /// <param name="encoding">The encoding to read text with.</param>
+    /// <returns>The open table and the engine that owns it.</returns>
+    /// <value>
+    /// The keys are the test's input, not its expectation, so a test may build them with the key
+    /// transforms, which the golden suite holds to stored keys on their own. What the test expects is
+    /// which record a seek reaches.
+    /// </value>
+    public static (CodeBaseEngine Engine, Table Table) Open(
+        KeyField field,
+        byte[]?[] values,
+        (byte[] Key, uint Record)[] keys,
+        string? expression = null,
+        string collation = "",
+        System.Text.Encoding? encoding = null)
+    {
+        int keyLength = keys.Length > 0 ? keys[0].Key.Length : field.Length + (field.Nullable ? 1 : 0);
+        byte padByte = field.Type == 'C' && collation.Length == 0 ? (byte)' ' : (byte)0;
+
+        byte[] index = IndexImage.SingleTag(
+                keyLength,
+                IndexImage.NodeOf(0),
+                typeCode: (byte)(field.Nullable ? 0x22 : 0x20),
+                expression: expression ?? field.Name,
+                collation: collation)
+            .WithLeaf(keyLength, [.. keys.Select(k => (Encoding.Latin1.GetString(k.Key), k.Record))], padByte)
+            .Build();
+
+        CodeBaseEngine engine = new(new PairFactory(Table(field, values), index), new AlwaysCompanion())
+        {
+            DefaultEncoding = encoding,
+        };
+
+        return (engine, engine.OpenTable("memory.dbf"));
+    }
+
+    /// <summary>
+    /// The one field a typed table holds.
+    /// </summary>
+    /// <param name="Name">The field's name.</param>
+    /// <param name="Type">Its type letter.</param>
+    /// <param name="Length">Its stored width.</param>
+    /// <param name="Decimals">Its decimal places.</param>
+    /// <param name="Nullable">Whether it may be absent.</param>
+    public sealed record KeyField(string Name, char Type, int Length, int Decimals = 0, bool Nullable = false);
+
+    /// <summary>
+    /// Builds a typed table's bytes: the field, then a null-flags field when it may be absent.
+    /// </summary>
+    private static byte[] Table(KeyField field, byte[]?[] values)
+    {
+        int fieldCount = field.Nullable ? 2 : 1;
+        int headerLength = 32 + (32 * fieldCount) + 1;
+        int recordLength = 1 + field.Length + (field.Nullable ? 1 : 0);
+
+        byte[] header = HeaderBytes.Build(
+            recordCount: values.Length,
+            headerLength: headerLength,
+            recordLength: recordLength,
+            tableFlags: 0x01);
+
+        byte[] image = new byte[headerLength + (values.Length * recordLength)];
+        header.CopyTo(image.AsSpan());
+        DescriptorBytes.Build(
+                field.Name,
+                field.Type,
+                storedOffset: 1,
+                length: (byte)field.Length,
+                decimals: (byte)field.Decimals,
+                flags: field.Nullable ? FieldFlags.Nullable : FieldFlags.None)
+            .CopyTo(image.AsSpan(32));
+
+        if (field.Nullable)
+        {
+            DescriptorBytes.Build("_NullFlags", '0', storedOffset: 1 + field.Length, length: 1, flags: FieldFlags.System)
+                .CopyTo(image.AsSpan(64));
+        }
+
+        image[headerLength - 1] = 0x0D;
+
+        for (int i = 0; i < values.Length; i++)
+        {
+            Span<byte> record = image.AsSpan(headerLength + (i * recordLength), recordLength);
+            record.Fill((byte)' ');
+            values[i]?.CopyTo(record[1..]);
+
+            if (field.Nullable)
+                record[^1] = values[i] is null ? (byte)0x01 : (byte)0x00;
+        }
+
+        return image;
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-01 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-steps 1–7 are committed locally and not pushed; sub-step 7 tested seeking every kind of tag and the public API's forwarding, found no defect, and removed two members the library no longer called.**
+**Updated:** 2026-11-01 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-steps 1–7 are committed locally and not pushed, and the tree is clean. Left in 013: sub-step 7a, the divergences gone through with the user, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -108,8 +108,8 @@ its indexes rather than reading them, which is what the whole port exists for �
 can be read whole, its records read in an index tag's order, and the read path is cached.
 `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test` is green on **3262 tests**,
-801 of them golden.
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4028 tests**,
+1133 of them golden.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -320,7 +320,37 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-10-31), the ones before it, and the four before those
+## 2. This session (2026-11-01), the ones before it, and the four before those
+
+**Step 013, sub-steps 4 to 7: the code only the Golden layer reached now has tests of its own, and
+the tests found defects.** Planned on 2026-10-31 with sub-steps 1–3 (a fresh `crap4csharp`
+baseline, the decomposition and the execution tested at their own levels); this session did the rest
+but 7a and 8.
+
+- **4, the query's result cursor** — four defects in `Query`, each red first: `Eof`/`Bof` not
+  cleared after a step, `Skip(-N)` from past the end stopping short, a step forward from before the
+  start in tag order finding nothing, and a top or bottom that found nothing setting the mirror-image
+  flags (ADR-69). And a watchdog on every unit test: past one second, or a test's own
+  `[MaxRunTime]`, the test process ends, so a looping mutant can no longer leave a process spinning
+  (ADR-70). Tiered compilation is off in the unit-test project, which was what made the timed cache
+  gates flaky (ADR-68).
+- **5, keys from values** — no defect. A `RecordKey.WriteValue` overload, `DoubleOf` and
+  `SeekConverter.Field` had no library caller since 012; removed, and the golden every-key gate now
+  builds its 3563 keys the way the library does.
+- **6, the expression engine** — two defects in `DTOC`: its length was fixed at eight whatever date
+  picture was configured, so a longer picture was cut and a filter comparing the cut text admitted
+  every day sharing its first eight characters; and a `YYYY` picture wrote the wrong year digits.
+  The resolver now takes the engine's options, and `YYYY` is the whole year as `CCYY` is (ADR-71,
+  the user's call; the reference writes `87YY`).
+- **7, the tag cursor and the public API** — no defect. Every kind of tag sought through the table,
+  and one test per public forwarding member (ADR-67). `Table.EnsureOpen` and `Table.CompiledFor`
+  had no library caller; removed.
+
+Every sub-step ran `crap4csharp` and `mutate4csharp` over what it touched; each surviving mutant is
+either killed by a new test or recorded as equivalent in the step's `STATE.md`. Tests: 2895 unit
+(1 skipped), 1133 golden, in Release.
+
+### Before it (2026-10-31)
 
 **012's sub-steps 5a and 5b, added at the user's call.** A corpus case to hold the tag-context tags
 began as one table with `G_DESC` added by `i4tagAdd` under GENERAL, and the generator could not
@@ -354,7 +384,7 @@ query path put the `0x80` byte in front of the value and the seek path did not. 
 over the corpus's three nullable tags; a candidate tag now reserves no null byte, as in the
 reference. Tests: 2622 unit, 1133 golden.
 
-### Before it (2026-10-30)
+### Before that (2026-10-30)
 
 **The process, not the library.** Robert C. Martin's `ub-mode` rules were read against
 `DEV_APPROACH.md` and the ones worth having restated in it, in the phase each belongs to — shape rules
@@ -376,7 +406,7 @@ under GENERAL — witnessed by a `[tag context]` section parsed with real tags; 
 several open tables scheduled as their own capability, `EXPR-ALIAS`, step 014 (ADR-62). Tests:
 2509 unit, 940 golden.
 
-### Before that (2026-10-29)
+### And before that (2026-10-29)
 
 **Step 012 opened as `012-p1-tails`** — the P1 capabilities' owed tails in one folder, one generator
 trip — and the counted query comparison moved to 013. Development moved from WSL to native Windows.
@@ -395,7 +425,7 @@ dumps, and `CollationDivergenceGoldenTests` holds the port to the reference's sc
 in 012: null operands, the tag-context parse,
 case mapping by code page, and close. Tests: 2493 unit, 937 golden, in Release.
 
-### And before that (2026-09-04)
+### Earlier still (2026-09-04)
 
 **Step 011 closed and `QUERY` is done** — the record is
 [`SUMMARY.md`](claude/dev/011-query-optimizer/SUMMARY.md), and §1 above says what a caller can now
@@ -976,19 +1006,20 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ## 3. Next
 
-### Step 013 — clean up what the unit layers do not cover — `claude/dev/013-coverage-audit/`
+### Step 013 — finish it: sub-steps 7a and 8 — `claude/dev/013-coverage-audit/`
 
-Starts once 012 closes, and before anything new. Its input is already written:
-[`AUDIT.md`](claude/dev/013-coverage-audit/AUDIT.md), the first `crap4csharp` run over steps
-001–011 — 93 of 662 members above 8.0, 129 at 0% unit coverage. The headline is F1: the query
-pipeline (decomposer, executor, plan, residual filter, `Query`) has no test below the Golden layer.
-Then F2–F4 in steps 008, 010 and 006, and the public API (F5). **Planned 2026-10-31:**
-[`DESIGN.md`](claude/dev/013-coverage-audit/DESIGN.md) and
-[`PLAN.md`](claude/dev/013-coverage-audit/PLAN.md), eight sub-steps starting with a fresh baseline,
-no new production seam needed. F5 decided by the user (ADR-67): nothing is made public for a test,
-and every public forwarding member gets at least one test that it reaches its target. 012's close adds weight to F4: `TableTagCursor.SearchFor`
-rose to CRAP 39.2, and the defect it hid — no seek ever finding a value in a nullable tag — lived
-there unseen since step 010 because no unit test reaches the cursor.
+Sub-steps 1–7 are done; the record is the step's [`STATE.md`](claude/dev/013-coverage-audit/STATE.md).
+
+- **7a, with the user.** Go through [`DIVERGENCES.md`](claude/dev/013-coverage-audit/DIVERGENCES.md)
+  entry by entry and decide for each: fix it (test first), keep it by decision, or defer it to a
+  named step. A kept one gets an ADR where it has none and the user-facing documentation it lacks —
+  the XML docs of the API that meets it and a "Differences from CodeBase" section in `README.md`; a
+  deferred one gets its row in `PORTING-PLAN.md`. Start with its "worth looking at first": **long
+  field names are refused with no ADR**, and the flag is checked on any version where the reference
+  reads it only on `0x31`; then ADR-49 and ADR-42, which refuse tags the reference opens.
+- **8, the close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on
+  `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`,
+  `claude/dev/README.md`, this file. Push once the user says so.
 
 ### Step 014 — expressions over several open tables (`EXPR-ALIAS`)
 

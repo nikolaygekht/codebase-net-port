@@ -22,8 +22,6 @@ namespace CodeBase.Net.Golden;
 /// </summary>
 internal sealed class CorpusExpressionDump
 {
-    private const string FileName = "CDXEXPR.expr.dump.txt";
-
     private static readonly string[] KnownSections =
     [
         "[constant expressions]",
@@ -104,11 +102,16 @@ internal sealed class CorpusExpressionDump
         ConstantExpressions.Concat(FieldExpressions).Concat(ClockDependentExpressions);
 
     /// <summary>
-    /// Reads the dump out of the corpus.
+    /// Reads a table's expression dump out of the corpus.
     /// </summary>
+    /// <param name="table">
+    /// The table whose dump to read: CDXEXPR, the expression case, unless a case with an expression
+    /// dump of its own is named, as WSTR is.
+    /// </param>
     /// <returns>The parsed dump.</returns>
-    public static CorpusExpressionDump Load()
+    public static CorpusExpressionDump Load(string table = "CDXEXPR")
     {
+        string fileName = table + ".expr.dump.txt";
         List<DumpExpression> constants = [];
         List<DumpExpression> fields = [];
         List<DumpExpression> clock = [];
@@ -152,7 +155,7 @@ internal sealed class CorpusExpressionDump
             fresh = [];
         }
 
-        foreach (string raw in File.ReadLines(Path.Combine(Corpus.Root, FileName)))
+        foreach (string raw in File.ReadLines(Path.Combine(Corpus.Root, fileName)))
         {
             string line = raw.Trim();
             if (line.Length == 0 || line.StartsWith('#'))
@@ -163,7 +166,7 @@ internal sealed class CorpusExpressionDump
                 Close();
                 section = line;
                 if (!KnownSections.Contains(section))
-                    throw new InvalidDataException($"{FileName} holds an unknown section {section}.");
+                    throw new InvalidDataException($"{fileName} holds an unknown section {section}.");
 
                 target = section switch
                 {
@@ -208,7 +211,7 @@ internal sealed class CorpusExpressionDump
                     // A fresh parse that failed would leave the record ungated, so it is refused.
                     int quote = line.IndexOf('"', StringComparison.Ordinal);
                     if (quote < 0)
-                        throw new InvalidDataException($"{FileName} has a fresh reading with no value: {line}");
+                        throw new InvalidDataException($"{fileName} has a fresh reading with no value: {line}");
 
                     fresh[ReadNumber(line, "fresh ")] = DumpEscape.ReadQuoted(line, ref quote);
                 }
@@ -254,7 +257,7 @@ internal sealed class CorpusExpressionDump
 
         Close();
         if (tagged.Count != taggedFor.Count)
-            throw new InvalidDataException($"{FileName} names a tag for {taggedFor.Count} of {tagged.Count} tag-context expressions.");
+            throw new InvalidDataException($"{fileName} names a tag for {taggedFor.Count} of {tagged.Count} tag-context expressions.");
 
         return new CorpusExpressionDump(
             picture, century, constants, fields, clock, rejections, visualFoxPro,
@@ -268,7 +271,7 @@ internal sealed class CorpusExpressionDump
     {
         int marker = line.IndexOf(field, StringComparison.Ordinal);
         if (marker < 0)
-            throw new InvalidDataException($"{FileName} has a line without {field}: {line}");
+            throw new InvalidDataException($"An expression dump has a line without {field}: {line}");
 
         int start = marker + field.Length;
         while (start < line.Length && line[start] == ' ')

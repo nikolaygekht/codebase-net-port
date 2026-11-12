@@ -358,7 +358,9 @@ blanks are **not** stripped (deliberately, u4util.c:2380-2383); remainder zero-p
 
 * Machine order: every UTF-16 code unit is byte-swapped to big-endian so memcmp works
   (`t4unicodeToMachine`, i4conv.c:588-603); used also as the generic `ASCEND()` handling
-  (i4conv.c:185-189).
+  (i4conv.c:185-189). Pad NUL; key length the expression's — an `'O'` field's width less two.
+  Witnessed by `WSTR`: every key of `W_ASC`, `W_DESC` and `O_ASC` rebuilds byte for byte (ADR-76).
+  A tag over `ASCEND`/`DESCEND` of a wide value is not witnessed and the port refuses it.
 * Collated: `t4convertSubSortCompressUnicode` (i4conv.c:484-583) mirrors §3.4 with 16-bit heads
   and 16-bit big-endian tails; output length `lenIn + lenIn*keySizeCharPerCharAdd` bytes
   (i4conv.c:496); trailing `L' '` stripped (i4conv.c:517-524).

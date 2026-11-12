@@ -72,6 +72,9 @@ internal static class KeyTypeResolver
             ExpressionType.Character or ExpressionType.Memo or ExpressionType.General =>
                 KeyPadding.Space,
 
+            // A wide string pads with NUL whatever its collation (i4init.c:620-628).
+            ExpressionType.WideString or ExpressionType.WideStringWithLength => KeyPadding.Nul,
+
             // Everything whose key is a fixed-width number pads with NUL: the numeric and date forms
             // go through the double transform, currency, integer, float and datetime have their own,
             // and a logical is a single letter that is never padded at all.

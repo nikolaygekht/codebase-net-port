@@ -42,6 +42,7 @@ turns out to be untested, add a generator case and regenerate.
 | `FLAGS30.DBF` + `.fpt` | `0x30` | **Every feature-flag byte set on a table that is not `0x31`.** An ordinary table with a memo, whose bytes 12-19 the generator sets to `1` after writing it; the reference opens and dumps it as an ordinary table, because it reads those bytes on `0x31` only (DBF-FORMAT.md §2.2). The dump does not show the bytes — the file does. 4 records. ADR-72. |
 | `RECNOTAG.DBF` + `.cdx` | `0x30` | **Tags over `RECNO()`**: `R_RECNO` over `RECNO()` alone and `R_NAMENO` over `NAME + STR(RECNO(), 4)`, ten records with names repeating. The reference keys each record by its own number (R4REINDX.C:391), and answers its three filters from `R_RECNO`. `R_NAMENO` is the corpus's first key with pad bytes inside it, which is what witnessed CDX-FORMAT.md §7's own-length rule. ADR-73. |
 | `DTMILLI.DBF` + `.cdx` | `0x30` | **CodeBase's `'7'` datetime with milliseconds**, which VFP never writes. 300 moments: seconds by a stride of 7919 across the day, so both flagged and unflagged seconds of `flags4dateTime` are reached, with milliseconds 0, 1, 123, 250, 499, 500, 501, 876, 998, 999; the day's edges; a repeated moment; one blank record. Tags `M_ASC` and `M_DESC` over the field by `i4create`. Its keys are `t4dateTimeToFoxMilli`'s. ADR-75. |
+| `WSTR.DBF` + `.cdx` | `0x30` | **CodeBase's `'W'` and `'O'` UTF-16 fields**, code page `0xC9` (cp1251). 26 records: ASCII, Cyrillic, a value of exactly the width and one cut at it, an empty and a never-assigned one (U+2000 tails), code points Windows best-fits and .NET does not, ones cp1251 holds, one with no near character, a surrogate pair, an embedded U+2000, a repeat. Tags `W_ASC`, `W_DESC` over `K_W`, `O_ASC` over `K_O`, `S_ASC` over `STR(K_W)`, by `i4create`. Beside the usual dumps, `WSTR.expr.dump.txt` (the field expressions and `STR` forms, their values, three refusals) and six filters over `STR(K_W)`. **Generated on a host whose ANSI code page is 1251**, because the reference narrows `STR` by it; the case refuses to run elsewhere. ADR-76, ADR-77. |
 
 ## Benchmark data — `benchmark/`
 
@@ -109,7 +110,7 @@ swept into every data-driven golden test. The gates that want these name them.
 The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
 records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters,
-`QRYGATE` 24, `TAGCTX`, `TAGGEN` and `LONGNAME` 8 each, `RECNOTAG` 10, `DTMILLI` 300, and `TAGBAD` and `FLAGS30` 4.
+`QRYGATE` 24, `TAGCTX`, `TAGGEN` and `LONGNAME` 8 each, `RECNOTAG` 10, `DTMILLI` 300, `WSTR` 26, and `TAGBAD` and `FLAGS30` 4.
 
 ### What `CMPMEMO` pins down
 
@@ -126,7 +127,7 @@ record with no memo shows `block=0 type=0 stored=0`. Only this table has one.
 
 `CMPMEMO.fpt`'s compressed bytes are what zlib 1.3.1 produced; see the generator README.
 
-`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `DTMILLI`, `IDXONE`, `LONGNAME`, `QRYGATE`, `RECNOTAG`, `TAGBAD`, `TAGCTX` and `TAGGEN` are the tables whose header byte 28 carries the
+`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `DTMILLI`, `IDXONE`, `LONGNAME`, `QRYGATE`, `RECNOTAG`, `TAGBAD`, `TAGCTX`, `TAGGEN` and `WSTR` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
 (`i4create.c:1404-1418`).
 

@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-4 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75) are committed locally and not pushed, and the tree is clean. Left in 013: the rest of sub-step 7a, the divergences gone through with the user, and 8, the close.**
+**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-5 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; 7a-5, the `'W'`/`'O'` UTF-16 fields read, keyed and sought, `STR()` by the table's code page with Windows' best-fit, ADR-76/77) are committed locally and not pushed, and the tree is clean. Left in 013: the rest of sub-step 7a, the divergences gone through with the user, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited

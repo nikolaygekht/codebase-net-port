@@ -21,6 +21,7 @@ Here a user hits an error.
 | A tag keyed through the date picture (`DTOC`, `CTOD`), under the engine's default options | reads it under its compiled-in picture | **Implemented 2026-11-12 (7a-3)**, user's call: ADR-42's refusal had never been written, and the gap gave a wrong record set; ADR-74. Documented on `CodeBaseEngine.ExpressionOptions`, `Table.SelectTag` and in `README.md` |
 | GENERAL on a code page other than 1252/437/850; other collations (croatian, spanish, loaded from disk) | supports some | `PORTING-PLAN.md` §2.3, later |
 | A non-compact FoxPro 2.x index | refuses it too | — |
+| ~~The `W` and `O` UTF-16 fields~~ | reads them | **Resolved 2026-11-12 (7a-5): supported**, user's call (ADR-76): read, machine-ordered keys and seeks, `STR()` by the table's code page (ADR-77), gated by `WSTR`; `W` on a `0x32` table refused as VFP 9's Blob |
 | Keys of the OLE-DB types; collated Unicode keys | supports them | `PORTING-PLAN.md` §2.2 / §2.3 |
 
 ## 2. Where the optimizer answers by a scan instead of a tag

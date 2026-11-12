@@ -121,6 +121,7 @@ internal static class ExpressionKey
         value.Type switch
         {
             T.Character or T.Memo or T.General => WriteText(value, hasTrim, destination),
+            T.WideString or T.WideStringWithLength => WriteWide(value, destination),
             T.NumericAsText => KeyTransform.FromDouble(FoxNumericOf(value), destination),
             T.DateAsText => KeyTransform.FromDouble(Dbf.FoxDate.ToJulian(value.Bytes), destination),
             T.Integer => KeyTransform.FromInt32(value.Integer, destination),
@@ -157,6 +158,28 @@ internal static class ExpressionKey
             at--;
 
         destination[at..].Fill((byte)' ');
+
+        return destination.Length;
+    }
+
+    /// <summary>
+    /// Writes a wide string's key, each UTF-16 code unit with its two bytes swapped.
+    /// </summary>
+    /// <value>
+    /// t4unicodeToMachine (i4conv.c:588-602). The field is little-endian, so swapping makes the key
+    /// big-endian, and plain byte comparison then orders it by code unit. Nothing pads it: the value is
+    /// always the expression's whole width.
+    /// </value>
+    private static int WriteWide(ExpressionValue value, Span<byte> destination)
+    {
+        ReadOnlySpan<byte> bytes = value.Bytes;
+        int units = Math.Min(bytes.Length, destination.Length) / 2;
+
+        for (int i = 0; i < units; i++)
+        {
+            destination[2 * i] = bytes[(2 * i) + 1];
+            destination[(2 * i) + 1] = bytes[2 * i];
+        }
 
         return destination.Length;
     }

@@ -39,6 +39,18 @@ public sealed class BlankRecordTests
     }
 
     [Theory]
+    [InlineData('W')]
+    [InlineData('O')]
+    public void Build_FillsAWideStringWithZeroThenSpaceInEachPair(char type)
+    {
+        // f4blank writes 00 20 per two bytes (F4FIELD.C:92-108): U+2000 to a little-endian reader,
+        // which is what the field holds. An odd last byte is left as the record's fill.
+        byte[] blank = BlankRecord.Build([Field("F", type, 5, 1)], 6);
+
+        blank.Should().Equal((byte)' ', 0x00, 0x20, 0x00, 0x20, (byte)' ');
+    }
+
+    [Theory]
     [InlineData('M')]
     [InlineData('G')]
     public void Build_FillsAFourByteMemoReferenceWithZeros(char type)

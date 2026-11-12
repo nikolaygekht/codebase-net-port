@@ -24,7 +24,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class QueryResultGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX", "TAGGEN", "LONGNAME", "RECNOTAG"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX", "TAGGEN", "LONGNAME", "RECNOTAG", "WSTR"];
 
     /// <summary>
     /// The gate, in record-number order: no tag selected, so the query walks its own record set and

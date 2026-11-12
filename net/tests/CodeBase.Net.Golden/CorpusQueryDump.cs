@@ -75,6 +75,7 @@ internal sealed class CorpusQueryDump
     public static CorpusQueryDump Load(string tableName)
     {
         string fileName = tableName + ".query.dump.txt";
+        Encoding text = FilterEncodingOf(tableName);
         List<DumpQueryCase> cases = [];
         string table = string.Empty;
         int recordCount = 0;
@@ -130,7 +131,7 @@ internal sealed class CorpusQueryDump
             if (line.StartsWith("query ", StringComparison.Ordinal))
             {
                 Close();
-                open = Builder.Start(line);
+                open = Builder.Start(line, text);
                 continue;
             }
 
@@ -152,6 +153,22 @@ internal sealed class CorpusQueryDump
             .Select(t => t.Name.TrimEnd())];
 
         return new CorpusQueryDump(table, recordCount, cases, collated);
+    }
+
+    /// <summary>
+    /// Chooses how a recorded filter's bytes become the text a caller would pass.
+    /// </summary>
+    /// <value>
+    /// The reference took the filter as bytes; the port takes a string and writes its non-ASCII
+    /// literals in the table's code page. So a table marked with a code page has its filters decoded
+    /// in it -- WSTR's Cyrillic literals are cp1251 -- and every other table byte for byte, as before.
+    /// </value>
+    private static Encoding FilterEncodingOf(string tableName)
+    {
+        byte mark = Corpus.ReadAllBytes(tableName + ".DBF")[29];
+        int? number = CodePageMap.NumberFor(CodePageMap.Resolve(mark));
+
+        return number is null ? Encoding.Latin1 : Encoding.GetEncoding(number.Value);
     }
 
     private static string Word(string line, string key)
@@ -208,7 +225,7 @@ internal sealed class CorpusQueryDump
         private List<int>? bits;
         private List<int>? recs;
 
-        public static Builder Start(string line)
+        public static Builder Start(string line, Encoding encoding)
         {
             // The generator escapes the filter with the same writer it escapes every other recorded
             // text with, so it comes back off with the shared reader rather than a second set of
@@ -219,7 +236,7 @@ internal sealed class CorpusQueryDump
 
             return new Builder
             {
-                filter = Encoding.Latin1.GetString(text),
+                filter = encoding.GetString(text),
                 note = end > 0 ? line[(end + 5)..] : string.Empty,
             };
         }

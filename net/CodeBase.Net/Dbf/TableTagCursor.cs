@@ -144,6 +144,10 @@ internal sealed class TableTagCursor
                     into[Math.Min(value.Length, into.Length)..].Fill(resolved.PadByte);
                 break;
 
+            case KeyKind.WideCharacter:
+                length = WideSearch(value, prefix, into);
+                break;
+
             case KeyKind.CollatedCharacter when prefix:
                 length = CollatedKey.WriteSearch(
                     value,
@@ -187,6 +191,40 @@ internal sealed class TableTagCursor
         return active;
     }
 
+
+    /// <summary>
+    /// Writes UTF-16 text as a wide tag's key, each code unit swapped (i4conv.c:184-189).
+    /// </summary>
+    /// <param name="value">The text, little-endian UTF-16.</param>
+    /// <param name="prefix">Whether a short value stands for a prefix rather than a whole key.</param>
+    /// <param name="into">Where to write, the key's width.</param>
+    /// <returns>How many bytes the search compares.</returns>
+    /// <value>
+    /// Whole code units only, so a key is never cut between the two bytes of one. A whole-key search
+    /// is padded with U+2000, which is what CodeBase fills the rest of a wide field with when it
+    /// assigns a shorter string, so a value is found by the text that was assigned.
+    /// </value>
+    private static int WideSearch(ReadOnlySpan<byte> value, bool prefix, Span<byte> into)
+    {
+        int length = Math.Min(value.Length, into.Length) & ~1;
+
+        for (int i = 0; i < length; i += 2)
+        {
+            into[i] = value[i + 1];
+            into[i + 1] = value[i];
+        }
+
+        if (prefix)
+            return length;
+
+        for (int i = length; i + 1 < into.Length; i += 2)
+        {
+            into[i] = 0x20;
+            into[i + 1] = 0x00;
+        }
+
+        return into.Length;
+    }
 
     /// <summary>Builds a search for a double-valued key.</summary>
     /// <param name="value">The value to look for.</param>

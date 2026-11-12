@@ -46,7 +46,7 @@ public sealed class SeekTypeGoldenTests
     {
         List<(string Table, string Tag)> tags = [.. EveryTag().Select(row => row.Data)];
 
-        tags.Should().HaveCount(65);
+        tags.Should().HaveCount(69);
         tags.Count(t => ReferenceType(t.Table, t.Tag) == 'C').Should().BeGreaterThan(0);
         tags.Count(t => ReferenceType(t.Table, t.Tag) != 'C').Should().BeGreaterThan(0);
     }
@@ -79,7 +79,8 @@ public sealed class SeekTypeGoldenTests
             table.Go(1).Should().Be(GoResult.Ok);
             Action act = () => seek(table);
 
-            if (type == 'C')
+            // A wide tag holds UTF-16 text, sought as such (ADR-76).
+            if (type is 'C' or 'W' or 'O')
             {
                 act.Should().NotThrow($"{tableName} tag {tagName} holds character keys");
                 continue;

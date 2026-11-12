@@ -19,7 +19,7 @@ public sealed class SeekGoldenTests
 {
     /// <summary>Every index file the corpus holds.</summary>
     private static readonly string[] IndexFiles =
-        ["CDXBASE.cdx", "CDXCOLL.cdx", "CDXDEEP.cdx", "DTMILLI.cdx", "IDXONE.cdx", "IDXONE.IDX", "LONGNAME.cdx", "RECNOTAG.cdx", "TAGCTX.cdx", "TAGGEN.cdx"];
+        ["CDXBASE.cdx", "CDXCOLL.cdx", "CDXDEEP.cdx", "DTMILLI.cdx", "IDXONE.cdx", "IDXONE.IDX", "LONGNAME.cdx", "RECNOTAG.cdx", "TAGCTX.cdx", "TAGGEN.cdx", "WSTR.cdx"];
 
     /// <summary>The same list, for the data-driven tests.</summary>
     public static TheoryData<string> AllIndexes()
@@ -45,8 +45,8 @@ public sealed class SeekGoldenTests
 
         // Part of the gate rather than commentary: a data-driven suite that discovers nothing reports
         // success having proved nothing.
-        cases.Should().Be(425);
-        runs.Should().Be(170);
+        cases.Should().Be(474);
+        runs.Should().Be(180);
     }
 
     [Theory]

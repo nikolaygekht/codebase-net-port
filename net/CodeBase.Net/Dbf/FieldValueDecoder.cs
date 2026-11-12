@@ -57,9 +57,17 @@ internal static class FieldValueDecoder
     /// </summary>
     /// <value>
     /// The list [c]f4double[/c] and [c]f4long[/c] both carry (F4DOUBLE.C:279-291, F4LONG.C:220-231).
-    /// A logical is not a number, and a datetime is two numbers rather than one.
+    /// A logical is not a number, and a datetime is two numbers rather than one. The wide strings are
+    /// the port's addition: the reference refuses to assign a number to one (F4DOUBLE.C:119-140) but
+    /// reads one as though its UTF-16 bytes were ASCII digits, which answers nothing (ADR-76).
     /// </value>
-    private static readonly char[] RefuseAsNumber = ['L', 'T', '7', '0'];
+    private static readonly char[] RefuseAsNumber = ['L', 'T', '7', '0', 'W', 'O'];
+
+    /// <summary>
+    /// The bytes of an O field that follow its text and count its characters.
+    /// </summary>
+    /// <value>Written by CodeBase (F4WSTR.C:111-115) and read back by nothing in it.</value>
+    private const int WideLengthSuffix = 2;
 
     /// <summary>
     /// Returns the bytes a field occupies, which is not always the width its descriptor declares.
@@ -202,6 +210,35 @@ internal static class FieldValueDecoder
 
         return FoxDateTime.ToDateTime(Bytes(record, field));
     }
+
+    /// <summary>
+    /// Reads a wide-string field as the characters it stores.
+    /// </summary>
+    /// <param name="record">The record to read from.</param>
+    /// <param name="field">The field to read.</param>
+    /// <returns>
+    /// Every UTF-16 code unit the field holds, an O field's two length bytes aside. Nothing is
+    /// trimmed: what CodeBase fills an unassigned character with is U+2000, and it is returned as a
+    /// character field's blanks are.
+    /// </returns>
+    /// <exception cref="CodeBaseException">The field is not a wide string.</exception>
+    public static string WideText(RecordBuffer record, FieldDefinition field)
+    {
+        Refuse(field, !IsWide(field), "read as wide text", "only a W or an O field holds it");
+
+        ReadOnlySpan<byte> bytes = Bytes(record, field);
+        if (field.Type == 'O')
+            bytes = bytes[..Math.Max(0, bytes.Length - WideLengthSuffix)];
+
+        return System.Text.Encoding.Unicode.GetString(bytes);
+    }
+
+    /// <summary>
+    /// Returns whether a field holds a UTF-16 string.
+    /// </summary>
+    /// <param name="field">The field to test.</param>
+    /// <returns>True for CodeBase's W and O.</returns>
+    public static bool IsWide(FieldDefinition field) => field.Type is 'W' or 'O';
 
     /// <summary>
     /// Returns whether a field's value is a reference to a memo entry.

@@ -63,6 +63,7 @@ public sealed class Table : IDisposable
     private int depth;
     private Encoding? textEncoding;
     private CaseMap? caseMap;
+    private WideNarrowing? narrowing;
     private TableTagCursor? selected;
     private bool closed;
 
@@ -210,6 +211,15 @@ public sealed class Table : IDisposable
     internal CaseMap CaseMap => caseMap ??= CodePageNumber is null && defaultEncoding is null
         ? CaseMap.Ascii
         : CaseMap.For(() => TextEncoding);
+
+    /// <summary>
+    /// Gets how STR narrows a wide field in this table's expressions.
+    /// </summary>
+    /// <value>
+    /// By the code page the table's text is read in, rather than the host's as CodeBase does
+    /// (ADR-77). Built on first use, so a table whose encoding is unavailable still opens.
+    /// </value>
+    internal WideNarrowing Narrowing => narrowing ??= WideNarrowing.For(() => TextEncoding.CodePage);
 
     /// <summary>
     /// Gets a value indicating whether a memo file accompanies the table.
@@ -639,6 +649,10 @@ public sealed class Table : IDisposable
     /// string itself: the value goes through the same conversion the keys did, so seeking SMITH in a
     /// [c]DESCEND(NAME)[/c] tag finds SMITH. The same holds for every overload that takes text.
     ///
+    /// A tag over a W or O field holds UTF-16 keys and is sought by the text as UTF-16; a whole-key
+    /// seek pads it with U+2000, as CodeBase pads an assignment, so a record is found by the text
+    /// that was assigned to it (ADR-76).
+    ///
     /// The value is sought as given, so a tag over [c]UPPER(NAME)[/c] is sought in capitals. Such a
     /// tag built by another engine over non-ASCII letters, under a case mapping other than the
     /// table's code page, holds keys this library does not compute; reindex it (ADR-65).
@@ -764,8 +778,17 @@ public sealed class Table : IDisposable
             "Seeking needs a tag to seek in, and none is selected. Call SelectTag first.");
     }
 
-    private KeySearch Search(string value, bool prefix) =>
-        Seeking().SearchFor(TextEncoding.GetBytes(value), prefix);
+    private KeySearch Search(string value, bool prefix)
+    {
+        TableTagCursor cursor = Seeking();
+
+        // A wide tag holds UTF-16 whatever the table's code page is (ADR-76).
+        byte[] bytes = cursor.KeyKind == KeyKind.WideCharacter
+            ? Encoding.Unicode.GetBytes(value)
+            : TextEncoding.GetBytes(value);
+
+        return cursor.SearchFor(bytes, prefix);
+    }
 
     private GoResult Exact(KeySearch search)
     {
@@ -993,6 +1016,7 @@ public sealed class Table : IDisposable
         Options = ExpressionOptions,
         Memo = opened.Memo is null ? null : field => GetMemoBytes(field),
         CaseMap = CaseMap,
+        Narrowing = Narrowing,
     };
 
     /// <summary>
@@ -1044,6 +1068,7 @@ public sealed class Table : IDisposable
                     Options = ExpressionOptions,
                     Memo = memoReader is null ? null : field => GetMemoBytes(field),
                     CaseMap = CaseMap,
+                    Narrowing = Narrowing,
                 },
                 System.IO.Path.GetFileNameWithoutExtension(Path),
                 LongFieldNames);
@@ -1098,6 +1123,10 @@ public sealed class Table : IDisposable
     /// is a fixed width and the padding is part of what the file holds, so a caller who wants it
     /// gone trims it. See ADR-21.
     ///
+    /// A W or O field, CodeBase's UTF-16 strings, is decoded as UTF-16 whatever the code page, an O
+    /// field less its two-byte count. Its unassigned tail is U+2000, which is what CodeBase fills
+    /// it with, not a space; trim it with [c]TrimEnd((char)0x2000)[/c]. See ADR-76.
+    ///
     /// Trim with [c]TrimEnd(' ')[/c] and not with [c]TrimEnd()[/c]. The padding is spaces, but the
     /// no-argument form removes every kind of trailing whitespace, and a tab or a newline at the end
     /// of a character field is data. See ADR-22.
@@ -1110,6 +1139,11 @@ public sealed class Table : IDisposable
     public string GetString(FieldDefinition field)
     {
         using Hold hold = Enter();
+
+        // A wide string is UTF-16 whatever the table's code page says (ADR-76).
+        if (FieldValueDecoder.IsWide(field))
+            return FieldValueDecoder.WideText(record, field);
+
         FieldValueDecoder.RefuseIfBinary(field);
 
         // Decoding recovers as much as the code page allows and never throws: a character the field

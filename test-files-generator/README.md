@@ -12,6 +12,8 @@ test CodeBase.NET. Run it only when the corpus needs new cases.
 
 - Windows with **MSVC** (Visual Studio 2019 or later — verified on 19.51).
 - The `original/source/` tree in this repository (read-only; never modified).
+- **A Windows ANSI code page of 1251** for case `WSTR`, whose `STR()` values the reference computes
+  through it; the case stops with an error on any other.
 
 Nothing else. No Windows SDK OLE-DB headers, no 32-bit-only SDK. zlib is vendored
 (below), so it needs no install.
@@ -83,6 +85,7 @@ test-files-generator/
 │  ├─ dump.h/.cpp      shared: the <NAME>.dump.txt writer
 │  └─ dump-index.h/.cpp shared: the <NAME>.cdx.dump.txt writer
 ├─ third_party/zlib/   zlib 1.3.1, compiled into codebase.lib (see below)
+├─ bestfit/            a C# tool writing the library's Windows best-fit supplement (its README)
 ├─ obj/                intermediates + per-file compile logs   [gitignored]
 ├─ bin/                testgen.exe, and bin\out\ default output [gitignored]
 └─ vfp/                the VFP 9 oracle — a different engine, see below
@@ -199,6 +202,7 @@ and its own subdirectory.
 | `FLAGS30.DBF` | `0x30` | an ordinary table with a memo whose eight flag bytes are set to `1` after `d4close`, then dumped through `d4open`: the reference reads the flags on `0x31` only. Dumped by `dumpTable` after `finishUndumped`, because the bytes are set between the two |
 | `RECNOTAG.DBF` | `0x30` | tags over `RECNO()`: `R_RECNO` over `RECNO()`, `R_NAMENO` over `NAME + STR(RECNO(), 4)`, both by `i4create`; ten records with names repeating, and three filters |
 | `DTMILLI.DBF` | `0x30` | the `'7'` datetime with milliseconds, assigned as `CCYYMMDDHH:MM:SS.MMM`: 300 moments over four days, one blank; ascending and descending tags. `dump.cpp` prints `r4dateTimeMilli` through `f4dateTime` as it does `r4dateTime` |
+| `WSTR.DBF` | `0x30` | the `'W'` and `'O'` UTF-16 fields, cp1251: 26 strings spelled as code units, four tags (two over `K_W`, one over `K_O`, one over `STR(K_W)`), an expression dump and six filters. **Needs the host's ANSI code page to be 1251** — `STR` of a wide field narrows by it — and stops with an error otherwise |
 
 One case is not a corpus case at all:
 

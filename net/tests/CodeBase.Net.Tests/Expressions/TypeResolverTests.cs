@@ -34,8 +34,41 @@ public sealed class TypeResolverTests
             Field("K_DBL", 'B', 8),
             Field("K_FLT", 'H', 4),
             Field("K_MEMO", 'M', 10),
+            Field("K_W", 'W', 20),
+            Field("K_O", 'O', 14),
         ],
         "CDXEXPR", longFieldNames: false);
+
+    [Theory]
+    [InlineData("K_W", 20)]
+    [InlineData("K_O", 12)]
+    [InlineData("STR(K_W)", 10)]
+    [InlineData("STR(K_W, 3)", 3)]
+    [InlineData("STR(K_W, 10, 2)", 10)]
+    public void AWideOperandHasTheLengthTheReferenceGivesIt(string expression, int length)
+    {
+        // W is its width and O its width less the count (e4parse.c:397-418); STR of a bare W is half
+        // its width, or the width it was given (e4parse.c:1404-1427).
+        Compile(expression).Length.Should().Be(length);
+    }
+
+    [Theory]
+    [InlineData("STR(K_O)", ErrorCode.TypeMismatch)]
+    [InlineData("STR(K_W, 11)", ErrorCode.NotSupported)]
+    [InlineData("K_W + K_W", ErrorCode.NotSupported)]
+    [InlineData("K_O + K_O", ErrorCode.NotSupported)]
+    [InlineData("ASCEND(K_W)", ErrorCode.NotSupported)]
+    [InlineData("DESCEND(K_O)", ErrorCode.NotSupported)]
+    [InlineData("K_W = K_W", ErrorCode.TypeMismatch)]
+    public void AWideOperandIsRefusedWhereItIsNotSupported(string expression, ErrorCode code)
+    {
+        // STR of an O takes the wide row and fails its parameter type, as in the reference. A width
+        // past the field would read the bytes after it. The rest have rows the corpus does not
+        // witness, so they are refused rather than guessed (ADR-76); comparison has no row at all.
+        Action act = () => Compile(expression);
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(code);
+    }
 
     [Theory]
     // The five that retarget a field loader, and the one that retargets a literal.

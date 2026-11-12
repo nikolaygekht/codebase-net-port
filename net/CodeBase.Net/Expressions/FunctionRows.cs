@@ -19,6 +19,12 @@ internal static class FunctionRows
     /// <summary>The loader for a character field, before the concatenation rewrite reaches it.</summary>
     public const int FieldCharacter = 0;
 
+    /// <summary>Loads a W field, CodeBase's UTF-16 string, at its whole width.</summary>
+    public const int FieldWideString = 1;
+
+    /// <summary>Loads an O field, CodeBase's UTF-16 string with a count after it, less the count.</summary>
+    public const int FieldWideStringWithLength = 2;
+
     /// <summary>The loader that materializes a character field, chosen when a kernel needs the bytes.</summary>
     /// <value>
     /// Not a row the parser ever chooses. Overload resolution rewrites a character loader into this
@@ -151,6 +157,9 @@ internal static class FunctionRows
 
     /// <summary>Formats a number as text.</summary>
     public const int Str = 107;
+
+    /// <summary>Narrows a W field to the table's code page, the wide overload of STR.</summary>
+    public const int StrWide = 108;
 
     /// <summary>Formats a number as text with leading zeros.</summary>
     public const int StrZero = 109;

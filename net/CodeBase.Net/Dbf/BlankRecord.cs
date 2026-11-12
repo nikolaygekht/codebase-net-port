@@ -8,7 +8,8 @@ namespace CodeBase.Net.Dbf;
 /// Built once when a table opens and copied whenever a record has to be blanked, which is what the
 /// C library does with its own prepared blank (D4OPEN.C:440-457, d4data.c:198-205). Blanking is
 /// per-field rather than a single fill, because a blank is not one byte for every type: the fixed
-/// binary types blank to zero and everything else blanks to spaces (f4blank, F4FIELD.C:135-169).
+/// binary types blank to zero, the wide strings to a zero and a space in each pair, and everything
+/// else to spaces (f4blank, F4FIELD.C:92-169).
 ///
 /// This is what makes reading at end of file safe. The cursor sits one past the last record with no
 /// bytes behind it, and a reader that left the previous record in the buffer would answer with the
@@ -34,6 +35,15 @@ internal static class BlankRecord
     private static readonly char[] ReferenceTypes = ['M', 'G', 'X'];
 
     /// <summary>
+    /// Types whose blank value is a zero and a space in each pair of bytes.
+    /// </summary>
+    /// <value>
+    /// CodeBase's UTF-16 strings (F4FIELD.C:92-108). Read little-endian, as the field is, each pair is
+    /// U+2000 rather than a space; the reference wrote it as though the field were big-endian.
+    /// </value>
+    private static readonly char[] WideTypes = ['W', 'O'];
+
+    /// <summary>
     /// Builds the blank record for a table's layout.
     /// </summary>
     /// <param name="fields">The table's fields, in file order.</param>
@@ -49,14 +59,22 @@ internal static class BlankRecord
 
         foreach (FieldDefinition field in fields)
         {
-            if (!BlanksToZero(field))
-                continue;
-
             // A descriptor that does not fit the record is the opener's to refuse, not this one's;
             // clamping here would hide it.
             int length = Math.Min(field.Length, recordLength - field.RecordOffset);
-            if (length > 0)
+            if (length <= 0)
+                continue;
+
+            if (BlanksToZero(field))
+            {
                 blank.AsSpan(field.RecordOffset, length).Clear();
+            }
+            else if (WideTypes.Contains(field.Type))
+            {
+                // Whole pairs only: an odd last byte keeps the fill, as f4blank's loop to len / 2 does.
+                for (int at = field.RecordOffset; at + 1 < field.RecordOffset + length; at += 2)
+                    blank[at] = 0x00;
+            }
         }
 
         return blank;

@@ -21,6 +21,8 @@ public sealed class FieldValueDecoderTests
     [InlineData('T')]
     [InlineData('7')]
     [InlineData('0')]
+    [InlineData('W')]
+    [InlineData('O')]
     public void Double_OfATypeTheReferenceRefuses_IsRefused(char type)
     {
         // f4double raises e4parm for these under the error checking the shipped build has on.
@@ -34,6 +36,8 @@ public sealed class FieldValueDecoderTests
     [InlineData('T')]
     [InlineData('7')]
     [InlineData('0')]
+    [InlineData('W')]
+    [InlineData('O')]
     public void Int32_OfATypeTheReferenceRefuses_IsRefused(char type)
     {
         Action act = () => Decode(type, 8, d => FieldValueDecoder.Int32(d.Record, d.Field));
@@ -162,6 +166,43 @@ public sealed class FieldValueDecoderTests
         FieldValueDecoder.DateTime(Buffer(record), Field('7', length: 8))
             .Should().Be(new DateTime(1981, 1, 1, 1, 2, 3, 456));
     }
+
+    [Fact]
+    public void WideText_OfAW_IsEveryCodeUnitItHolds()
+    {
+        // The tail CodeBase blanks with is U+2000, and it is returned with the rest (ADR-76).
+        byte[] contents = [0x41, 0x00, 0x1F, 0x04, 0x00, 0x20, 0x00, 0x20];
+
+        Decode('W', 8, d => FieldValueDecoder.WideText(d.Record, d.Field), contents)
+            .Should().Be("A\u041F\u2000\u2000");
+    }
+
+    [Fact]
+    public void WideText_OfAnO_LeavesOutTheTwoLengthBytes()
+    {
+        // The count of characters CodeBase writes after the text is read back by nothing.
+        byte[] contents = [0x41, 0x00, 0x42, 0x00, 0x02, 0x00];
+
+        Decode('O', 6, d => FieldValueDecoder.WideText(d.Record, d.Field), contents).Should().Be("AB");
+    }
+
+    [Theory]
+    [InlineData('C')]
+    [InlineData('M')]
+    public void WideText_OfAnythingButAWideString_IsRefused(char type)
+    {
+        Action act = () => Decode(type, 8, d => FieldValueDecoder.WideText(d.Record, d.Field));
+
+        act.Should().Throw<CodeBaseException>().WithMessage("*wide*");
+    }
+
+    [Theory]
+    [InlineData('W', true)]
+    [InlineData('O', true)]
+    [InlineData('C', false)]
+    [InlineData('Z', false)]
+    public void IsWide_IsTrueForTheTwoUtf16Types(char type, bool wide) =>
+        FieldValueDecoder.IsWide(Field(type, 8)).Should().Be(wide);
 
     [Theory]
     [InlineData('M')]

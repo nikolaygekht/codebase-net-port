@@ -45,7 +45,8 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
   VFP), read-tolerance for **0x32** (VFP9). Governed by `DBF-FORMAT.md`.
 - **VFP field types**: `C, N, F, D, L, M, G, I, B(double), Y(currency), T(datetime), H(binary
   float)` plus the `_NullFlags` nullable-field system (`'0'`) and auto-increment/auto-timestamp
-  CodeBase extensions, and CodeBase's `'7'` datetime with milliseconds (ADR-75). Governed by
+  CodeBase extensions, and CodeBase's `'7'` datetime with milliseconds (ADR-75) and its `'W'`/`'O'`
+  UTF-16 strings, machine-ordered keys and `STR()` included (ADR-76, ADR-77). Governed by
   `DBF-FORMAT.md` §5–§7.
 - **CDX compound indexes** (`S4FOX`): the tag-directory B-tree, interior nodes (big-endian
   recno/child), and **bit-packed compressed leaf nodes**. Governed by `CDX-FORMAT.md`.
@@ -76,7 +77,7 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - **MDX** (dBase IV compound index) and **NTX** (Clipper single-tag index). *Note the corrected
   naming:* MDX is dBase IV's format; NTX is Clipper's. We do neither. S4FOX only — which since
   §2.1 means CDX plus the compact single-tag `.IDX`, and **not** non-compact `.IDX`.
-- **OLE-DB `r5*` field types** (`O, P, Q, R, V(GUID), W, 1, 2, 3, 4, 5, 6`) beyond *read-tolerant
+- **OLE-DB `r5*` field types** (`P, Q, R, V(GUID), 1, 2, 3, 4, 5, 6`) beyond *read-tolerant
   recognition where a real VFP9 file demands it* — creation of these is not supported in v1.
 - **Report writer / styles / totals** (`report4*`, `style4*`, `area4*`, `group4*`, `obj4*`).
 - **Compressed DBF data** — CodeBase-proprietary, VFP-incompatible; refused at open, never written
@@ -803,8 +804,8 @@ something different. Never use it for keys, indexes, or memos.
   allocation slack — undefined, not a behaviour, so there is nothing to reproduce. The port clamps at
   the record boundary and treats the missing bytes as zero. Everywhere else the accessor widths are
   copied exactly, including reading a neighbouring field's bytes. (Step 001.)
-- The `W`-field blank byte-order upstream quirk (`0x00,0x20` per char) — decide replicate vs fix and
-  test the chosen behavior (`DBF-FORMAT.md` §11.2). Out of scope for v1 creation regardless.
+- The `W`-field blank byte-order upstream quirk (`0x00,0x20` per char, U+2000) — **reproduced**: read
+  back as stored and written so by the blank record (ADR-76), witnessed by `WSTR`.
 - **The optimizer reflects a constant-left comparison the way the reference *meant* to, not the way
   it does.** `if ( tagPos = 1 && constPos == 0 )` at m4map.c:216/243/251/278 is an assignment, so the
   condition C actually evaluates is `constPos == 0` alone. C# cannot compile the letter of it, so the

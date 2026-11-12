@@ -236,13 +236,13 @@ Constants from d4defs.h:2774-2821. `r4charBin`('Z') and `r4memoBin`('X') are cre
 | `'L'` | `r4log` | 1 | (1, 0, 0) (D4CREATE.C:1522) |
 | `'M'` | `r4memo` | 4 or 10 | len = 4 if compat 30 else 10 (D4CREATE.C:1604-1611) |
 | `'N'` | `r4num` | len | (len, dec, 0) (D4CREATE.C:1526) |
-| `'O'` | `r5wstrLen` | even(len+2) | (even4up(len+2) & 0xFF, (len+2)>>8, 0x04) (D4CREATE.C:1561-1563) — CodeBase extension |
+| `'O'` | `r5wstrLen` | even(len+2) | (even4up(len+2) & 0xFF, (len+2)>>8, 0x04) (D4CREATE.C:1561-1563) — CodeBase extension. Read on every version (D4OPEN.C:2555), length as `'C'` — witnessed by `WSTR` (§6.11) |
 | `'P'` | `r5ui4` | 4 | (4, 0, 0x04) (D4CREATE.C:1583-1585) — CodeBase ext.; **collides with VFP 'P' (Picture)** |
 | `'Q'` | `r5i2` | 2 | (2, 0, 0x04) (D4CREATE.C:1576-1578) — CodeBase ext.; VFP9 uses 'Q' as varbinary, accepted loosely when version = 0x32 (D4OPEN.C:2536-2549) |
 | `'R'` | `r5ui2` | 2 | (2, 0, 0x04) (D4CREATE.C:1576-1578) — CodeBase extension |
 | `'T'` | `r4dateTime` | 8 | (8, 0, 0x04) (D4CREATE.C:1572-1574) |
 | `'V'` | `r5guid` | 16 | (16, 0, 0x04), `LEN5GUID` = 16 (D4CREATE.C:1555-1557, d4defs.h:1721) — CodeBase GUID; VFP9 'V' (Varchar) accepted loosely when version = 0x32 (D4OPEN.C:2479-2492) |
-| `'W'` | `r5wstr` (`r4unicode`) | even(len) | (even4up(len & 0xFF), len >> 8, 0x04) (D4CREATE.C:1558-1559); `even4up(a) = a + (a & 1)` (d4defs.h:2309) — CodeBase ext.; **collides with VFP 'W' (Blob)** |
+| `'W'` | `r5wstr` (`r4unicode`) | even(len) | (even4up(len & 0xFF), len >> 8, 0x04) (D4CREATE.C:1558-1559); `even4up(a) = a + (a & 1)` (d4defs.h:2309) — CodeBase ext.; **collides with VFP 'W' (Blob)**: the reference reads it as `r5wstr` on every version (D4OPEN.C:2555); the port does so except on `0x32`, where it is VFP 9's Blob and refused (ADR-76) |
 | `'X'` | `r4memoBin` | 4 | stored as `'M'`, (4, 0, 0x04) (D4CREATE.C:1623-1626) |
 | `'Y'` | `r4currency` | 8 | (8, 4, 0x04) (D4CREATE.C:1569-1571) |
 | `'Z'` | `r4charBin` | len | stored as `'C'`, (len & 0xFF, len >> 8, 0x04) (D4CREATE.C:1565-1567) |
@@ -330,6 +330,8 @@ Right-justified ASCII decimal in a field of `len` bytes with `dec` decimals, pro
 
 `W`: fixed-size UTF-16LE (2 bytes/char), length forced even at create (D4CREATE.C:1558-1559). Assign copies the raw UTF-16 bytes (F4WSTR.C:80-93). Blank = repeated UTF-16LE space `00 20`-pattern written byte-wise as `0x00,0x20` pairs (F4FIELD.C:98-107 — note the byte order there produces 0x2000; see Open Questions).
 `O`: same, but the field is 2 bytes longer and the **last 2 bytes are a little-endian u16 character count** ("length of data in # characters at the end of the field ... extra bytes stored as NULLS", d4defs.h:2789-2794; `*lenPos = len / 2` at `ptr + len - 2`, F4WSTR.C:96-116).
+
+Witnessed by `WSTR` (cp1251, `0x30`): descriptors carry flag `0x04`; a shorter assignment is blanked first, so its tail is `00 20` pairs; a longer one is cut at the width; an `O` field's count is the assigned characters capped at its width less two (an empty assignment stores `00 00`, a record never assigned keeps the blank's `00 20`). Nothing reads the count back: an expression loads an `O` field at its width less two (e4parse.c:411-418) and its key is that long. A wide field is never trimmed — `00 20` is U+2000, not a space.
 
 ### 6.12 `V` GUID (CodeBase meaning)
 
@@ -429,7 +431,7 @@ The table above is what **CodeBase** knows; it is not what the **format** allows
 ## 11. Open questions / risks for the C# port
 
 1. **Currency string conversion bodies missing.** `c4atoCurrency`/`c4currencyToA` are declared (d4declar.h:455-456) but their implementation file is absent from this source drop; rounding/overflow semantics of text↔currency conversion are [UNVERIFIED]. The binary layout (int64 LE ×10⁴) is confirmed and sufficient for the port; implement conversions with decimal arithmetic and truncation-vs-rounding tests against VFP.
-2. **`W` blank byte order.** `f4blank` writes the pair `0x00,0x20` per character (F4FIELD.C:100-106), i.e. UTF-16LE U+2000, not U+0020 space. This looks like an upstream bug; the port must decide whether to replicate it bit-for-bit (round-trip fidelity) or blank with U+0020.
+2. **`W` blank byte order.** `f4blank` writes the pair `0x00,0x20` per character (F4FIELD.C:100-106), i.e. UTF-16LE U+2000, not U+0020 space. This looks like an upstream bug. **Resolved (ADR-76): reproduced** — read back as stored, written so by the blank record, witnessed by `WSTR`.
 3. **CodeBase-only types collide with VFP types.** `'W'` (CodeBase wide-string) is VFP9's Blob, `'P'` (CodeBase ui4) is VFP's Picture, `'Q'`/`'V'` differ from VFP9 varbinary/varchar (only loosely accepted when version = 0x32, D4OPEN.C:2479-2549). Files created with these CodeBase types are not VFP-portable; the port should gate them behind an "extensions" switch.
 4. **Auto-increment storage is incompatible with VFP.** CodeBase keeps the counter in header bytes 20-27 with flag bytes 12-16 under version 0x31 (§2.2, §7); VFP keeps next/step per-field at descriptor bytes 19-23. A VFP-native autoinc table is only readable read-only (D4OPEN.C:333-343). Decide whether the C# port should additionally implement the native VFP scheme.
 5. **DBC backlink unsupported.** The 263-byte area is always zeroed (D4CREATE.C:1697); tables that belong to a VFP database container will open, but the backlink is ignored and would be destroyed by a header-rewriting copy. Port should at minimum preserve those bytes on modify.

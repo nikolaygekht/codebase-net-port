@@ -18,6 +18,9 @@ internal enum KeyKind
     /// <summary>Character data weighed through a collation.</summary>
     CollatedCharacter,
 
+    /// <summary>CodeBase's UTF-16 text in machine order: each code unit's two bytes swapped.</summary>
+    WideCharacter,
+
     /// <summary>An eight-byte double, which numeric, float and true double fields all become.</summary>
     Double,
 
@@ -343,6 +346,12 @@ internal sealed class SeekConverter
         {
             ExpressionType.Character or ExpressionType.Memo or ExpressionType.General =>
                 collation == CollationName.Machine ? KeyKind.Character : KeyKind.CollatedCharacter,
+            ExpressionType.WideString or ExpressionType.WideStringWithLength =>
+                collation == CollationName.Machine ? KeyKind.WideCharacter : throw new CodeBaseException(
+                    ErrorCode.NotSupported,
+                    $"The key expression '{expression}' is a wide string collated {collation}, whose keys " +
+                    "come from CodeBase's Unicode weight tables, which this library does not have. Only " +
+                    "a machine-ordered wide tag is read."),
             ExpressionType.NumericAsText or ExpressionType.NumericAsDouble
                 or ExpressionType.DateAsDouble => KeyKind.Double,
             ExpressionType.DateAsText => KeyKind.Date,

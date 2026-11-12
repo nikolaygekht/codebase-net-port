@@ -69,6 +69,13 @@ it in [the decision record](claude/ARCHITECTURE-DECISIONS.md):
   library reads such a tag under whatever picture it was compiled with. Set the options to the
   picture the index was built with — `ExpressionOptions.CodeBase` for the C library's default build —
   and the tag is used.
+- **`STR()` of a `W` field narrows by the table's code page, not the machine's** (ADR-77). CodeBase
+  converts the UTF-16 text with Windows' ANSI code page, so its answer — and every key built from it —
+  depends on the computer. This library uses the code page the table's text is in and reproduces
+  Windows' best-fit mapping, so the two agree on a Windows machine whose ANSI code page is the table's.
+- **A `W` field on a Visual FoxPro 9 table (`0x32`) is refused** (ADR-76). There it is VFP 9's Blob;
+  CodeBase reads it as its own UTF-16 string and gets it wrong. Elsewhere `W` and `O` are read, and
+  their unassigned tail is U+2000, which is what CodeBase writes there — not a space.
 
 ## Requirements
 

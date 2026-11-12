@@ -106,7 +106,10 @@ internal enum ExpressionType : byte
     /// <summary>
     /// A wide string carrying its own length in characters at the end of the field.
     /// </summary>
-    /// <value>The C library's [c]r5wstrLen[/c] (d4defs.h:2795). Unreachable in this port.</value>
+    /// <value>
+    /// The C library's [c]r5wstrLen[/c] (d4defs.h:2795): an O field, at its width less the two bytes
+    /// of that count, which no expression sees (ADR-76).
+    /// </value>
     WideStringWithLength = (byte)'O',
 
     /// <summary>
@@ -136,7 +139,7 @@ internal enum ExpressionType : byte
     /// <summary>
     /// A string of sixteen-bit characters.
     /// </summary>
-    /// <value>The C library's [c]r5wstr[/c] (d4defs.h:2807). Unreachable in this port.</value>
+    /// <value>The C library's [c]r5wstr[/c] (d4defs.h:2807): a W field, UTF-16 at its width (ADR-76).</value>
     WideString = (byte)'W',
 
     /// <summary>

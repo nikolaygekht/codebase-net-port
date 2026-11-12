@@ -66,8 +66,6 @@ public sealed class FieldResolverTests
     }
 
     [Theory]
-    [InlineData('W')]
-    [InlineData('O')]
     [InlineData('V')]
     [InlineData('P')]
     [InlineData('Q')]
@@ -96,6 +94,52 @@ public sealed class FieldResolverTests
         Action act = () => Resolve(Legacy, recordLength: 9, Descriptor("F", type, length: 8));
 
         act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Data);
+    }
+
+    [Theory]
+    [InlineData('W', 0x03)]
+    [InlineData('W', 0x30)]
+    [InlineData('W', 0x31)]
+    [InlineData('W', 0xF5)]
+    [InlineData('O', 0x03)]
+    [InlineData('O', 0x30)]
+    [InlineData('O', 0x31)]
+    [InlineData('O', 0x32)]
+    public void Resolve_AWideStringIsReadOnAnyVersionTheReferenceReadsItOn(char type, byte version)
+    {
+        // CodeBase's two UTF-16 types carry no version test at open (D4OPEN.C:2555), so the port
+        // has none either -- except W on a Visual FoxPro 9 table, which is a different type.
+        ResolvedFields resolved = Resolve(
+            IDbfFormatVariant.Resolve(version), recordLength: 1 + 20, Descriptor("F", type, length: 20));
+
+        resolved.Fields[0].Type.Should().Be(type);
+        resolved.Fields[0].Length.Should().Be(20);
+    }
+
+    [Fact]
+    public void Resolve_AWOnAVisualFoxPro9Table_IsRefusedAsTheBlobItIsThere()
+    {
+        // Visual FoxPro 9 writes W for a Blob, a reference into the memo file. The reference reads
+        // it as a wide string whatever the version; the port refuses rather than misread it (ADR-76).
+        Action act = () => Resolve(
+            IDbfFormatVariant.Resolve(0x32), recordLength: 1 + 4, Descriptor("F", 'W', length: 4));
+
+        act.Should().Throw<CodeBaseException>()
+            .Where(e => e.Code == ErrorCode.FieldType)
+            .WithMessage("*Blob*");
+    }
+
+    [Theory]
+    [InlineData('W')]
+    [InlineData('O')]
+    public void Resolve_CombinesTheTwoLengthBytesOfAWideString(char type)
+    {
+        // Created as a character field is, the high half of the length in the decimal byte
+        // (D4CREATE.C:1558-1564), and read back the same way (D4OPEN.C:2555-2562).
+        ResolvedFields resolved = Resolve(recordLength: 1 + 300, Descriptor("WIDE", type, length: 44, decimals: 1));
+
+        resolved.Fields[0].Length.Should().Be(300);
+        resolved.Fields[0].Decimals.Should().Be(0);
     }
 
     [Fact]
@@ -212,7 +256,7 @@ public sealed class FieldResolverTests
                 descriptors[i] = Descriptor(
                     $"F{i}", type, length, decimals, (FieldFlags)random.Next(256));
 
-                fittingLength += type is 'C' or '0' ? length + (decimals << 8) : length;
+                fittingLength += type is 'C' or '0' or 'W' ? length + (decimals << 8) : length;
             }
 
             int recordLength = random.Next(2) == 0 ? fittingLength : random.Next(0, 4096);

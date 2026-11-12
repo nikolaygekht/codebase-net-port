@@ -153,6 +153,21 @@ public sealed class ExpressionKeyTests
         trimmed.Should().Equal(padded);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AWideValueKeysAsBigEndianUtf16(bool withLength)
+    {
+        ExpressionType type = withLength ? ExpressionType.WideStringWithLength : ExpressionType.WideString;
+        // t4unicodeToMachine swaps every code unit (i4conv.c:588-602), so a key sorts by code unit.
+        string text = "A\u0416\u2000";
+        byte[] key = new byte[6];
+
+        ExpressionKey.Write(ExpressionValue.Wide(Encoding.Unicode.GetBytes(text), type), false, false, key);
+
+        key.Should().Equal(Encoding.BigEndianUnicode.GetBytes(text));
+    }
+
     private static ExpressionValue Text(string text) => ExpressionValue.Text(Encoding.ASCII.GetBytes(text));
 
     private static byte[] DoubleKey(double value)

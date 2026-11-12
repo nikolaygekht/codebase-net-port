@@ -19,7 +19,7 @@ public sealed class CorpusLayoutTests
     private static readonly string[] ExpectedTables =
     [
         "CDXBASE", "CDXCOLL", "CDXDEEP", "CDXEXPR", "CDXTIME", "CMPMEMO", "CP1251", "CP936",
-        "DB3TYPE", "DTMILLI", "F2XMEMO", "FLAGS30", "IDXONE", "LONGNAME", "QRYGATE", "RECNOTAG", "TAGBAD", "TAGCTX", "TAGGEN", "VFPMEMO", "VFPNULL", "VFPTYPE",
+        "DB3TYPE", "DTMILLI", "F2XMEMO", "FLAGS30", "IDXONE", "LONGNAME", "QRYGATE", "RECNOTAG", "TAGBAD", "TAGCTX", "TAGGEN", "VFPMEMO", "VFPNULL", "VFPTYPE", "WSTR",
     ];
 
     /// <summary>The index files the corpus is documented to hold, with the table each belongs to.</summary>
@@ -38,6 +38,7 @@ public sealed class CorpusLayoutTests
         { "RECNOTAG", "RECNOTAG.cdx" },
         { "TAGCTX", "TAGCTX.cdx" },
         { "TAGGEN", "TAGGEN.cdx" },
+        { "WSTR", "WSTR.cdx" },
     };
 
     [Fact]

@@ -236,6 +236,8 @@ internal sealed class ExpressionParser
     private static int LoaderRow(char type) => type switch
     {
         'C' or 'Z' => FunctionRows.FieldCharacter,
+        'W' => FunctionRows.FieldWideString,
+        'O' => FunctionRows.FieldWideStringWithLength,
         'N' or 'F' => FunctionRows.FieldNumericAsText,
         'D' => FunctionRows.FieldDateAsText,
         'L' => FunctionRows.FieldLogical,
@@ -268,7 +270,9 @@ internal sealed class ExpressionParser
         if (row == FunctionRows.Space)
             length = FoldedNumber();
 
-        if (row is FunctionRows.Str or FunctionRows.StrZero)
+        if (row == FunctionRows.Str && operands == 1 && nodes[^1].Field?.Definition.Type is 'W' or 'O')
+            length = nodes[^1].Field!.Value.Definition.Length / 2;
+        else if (row is FunctionRows.Str or FunctionRows.StrZero)
             operands = FoldFormatWidth(operands, ref immediate, ref length);
 
         if (operands == 2 && row == FunctionRows.Right)
@@ -364,8 +368,10 @@ internal sealed class ExpressionParser
     /// <value>
     /// The width defaults to ten and the decimals to none, and the two are then reconciled the way
     /// the reference reconciles them: a width that leaves no room for a decimal point and one digit
-    /// takes the decimals down with it, and never below none. The wide-string overload is unreachable
-    /// here, because no field this library opens has that type.
+    /// takes the decimals down with it, and never below none. The wide-string overload is decided
+    /// before this, by its operand being a bare W or O field, whose result is half the field's width
+    /// (e4parse.c:1413-1424); given a width as well, the operand is no longer the last thing parsed,
+    /// so the width folds here and the overload is chosen by type later, as in the reference.
     /// </value>
     private int FoldFormatWidth(int operands, ref int immediate, ref int length)
     {

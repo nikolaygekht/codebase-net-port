@@ -81,4 +81,10 @@ internal sealed record EvaluationContext
     /// only, the default, is what an unmarked table gets unless the host named an encoding for it.
     /// </value>
     public CaseMap CaseMap { get; init; } = CaseMap.Ascii;
+
+    /// <summary>
+    /// Gets how STR narrows a wide field, which is by the table's code page.
+    /// </summary>
+    /// <value>Null where no table is behind the expression, and then STR of a wide field is refused.</value>
+    public WideNarrowing? Narrowing { get; init; }
 }

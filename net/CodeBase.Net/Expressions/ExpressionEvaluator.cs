@@ -136,6 +136,7 @@ internal sealed class ExpressionEvaluator
     {
         // ---- what a value enters through -----------------------------------
         FunctionRows.FieldCharacter or FunctionRows.FieldCharacterMaterialized
+            or FunctionRows.FieldWideString or FunctionRows.FieldWideStringWithLength
             or FunctionRows.FieldLogical or FunctionRows.FieldDateAsDouble
             or FunctionRows.FieldDateAsText or FunctionRows.FieldNumericAsDouble
             or FunctionRows.FieldNumericAsText or FunctionRows.FieldCurrency
@@ -198,7 +199,8 @@ internal sealed class ExpressionEvaluator
         >= FunctionRows.Conditional and <= FunctionRows.Conditional + 3 => Choose(node, operands),
 
         // ---- dates and the record ------------------------------------------
-        FunctionRows.Str or FunctionRows.Str + 1 => FormatNumber(node, operands[0], zeroFill: false),
+        FunctionRows.Str => FormatNumber(node, operands[0], zeroFill: false),
+        FunctionRows.StrWide => NarrowWide(node, operands[0], context),
         FunctionRows.StrZero => FormatNumber(node, operands[0], zeroFill: true),
         FunctionRows.DateToSortableText or FunctionRows.DateToSortableText + 1
             => SortableDateText(operands[0]),
@@ -265,6 +267,8 @@ internal sealed class ExpressionEvaluator
         {
             FunctionRows.FieldCharacter or FunctionRows.FieldCharacterMaterialized =>
                 ExpressionValue.Text(record.Field(field).ToArray()),
+            FunctionRows.FieldWideString or FunctionRows.FieldWideStringWithLength =>
+                ExpressionValue.Wide(record.Field(field)[..node.Length].ToArray(), node.Type),
             FunctionRows.FieldMemo =>
                 ExpressionValue.Text(MemoBytes(node, record, field, context)),
             FunctionRows.FieldNumericAsText =>
@@ -935,6 +939,25 @@ internal sealed class ExpressionEvaluator
     /// The zero-filling form is the same text with its leading blanks replaced, which is why a
     /// negative number keeps its sign where the digits start rather than in front of the zeros.
     /// </value>
+    /// <summary>
+    /// Narrows a wide operand by the table's code page (e4functi.c:2694-2716).
+    /// </summary>
+    /// <value>
+    /// The kernel marks nothing absent, as the reference's does not, so its result is never null.
+    /// </value>
+    private static ExpressionValue NarrowWide(ExpressionNode node, ExpressionValue operand, EvaluationContext context)
+    {
+        WideNarrowing narrowing = context.Narrowing
+            ?? throw new CodeBaseException(
+                ErrorCode.NotSupported,
+                "STR of a wide field narrows by the table's code page, and this expression has no table behind it.");
+
+        byte[] result = new byte[node.Length];
+        narrowing.Narrow(operand.Bytes, result);
+
+        return ExpressionValue.Text(result);
+    }
+
     private static ExpressionValue FormatNumber(ExpressionNode node, ExpressionValue operand, bool zeroFill)
     {
         int width = node.Length;

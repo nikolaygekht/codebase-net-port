@@ -624,7 +624,96 @@ public sealed class ExpressionEvaluatorTests
         value.TimestampTime.Should().Be(45296600);
     }
 
+    [Fact]
+    public void AWideFieldLoadsAsItsOwnTypeWithEveryByteItHolds()
+    {
+        // E4FIELD_WSTR (e4functi.c:36): the field's UTF-16 bytes, at its whole width.
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("K_W", WithWide));
+        RecordBuffer record = WideRecord("AB" + BlankWide + BlankWide, "CD");
+
+        ExpressionValue value = new ExpressionEvaluator(compiled).Evaluate(Context(record: record));
+
+        compiled.ResultType.Should().Be(ExpressionType.WideString);
+        value.Type.Should().Be(ExpressionType.WideString);
+        value.Bytes.ToArray().Should().Equal(Encoding.Unicode.GetBytes("AB" + BlankWide + BlankWide));
+    }
+
+    [Fact]
+    public void AnOFieldLoadsWithoutItsLengthBytes()
+    {
+        // E4FIELD_WSTR_LEN: the field less the two bytes that count its characters (e4parse.c:411-418).
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("K_O", WithWide));
+
+        ExpressionValue value = new ExpressionEvaluator(compiled).Evaluate(Context(record: WideRecord("ABCD", "CD")));
+
+        compiled.ResultType.Should().Be(ExpressionType.WideStringWithLength);
+        compiled.Length.Should().Be(4);
+        value.Bytes.ToArray().Should().Equal(Encoding.Unicode.GetBytes("CD"));
+    }
+
+    [Fact]
+    public void StrOfAWideFieldNarrowsItByTheContextsCodePage()
+    {
+        // Row 109 (e4functi.c:184), WideCharToMultiByte over half the field's bytes; the blank tail
+        // narrows to spaces (ADR-77).
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("STR(K_W)", WithWide));
+        RecordBuffer record = WideRecord("\u0416A" + BlankWide + BlankWide, "CD");
+
+        ExpressionValue value = new ExpressionEvaluator(compiled).Evaluate(
+            Context(record: record) with { Narrowing = WideNarrowing.For(() => 1251) });
+
+        compiled.ResultType.Should().Be(ExpressionType.Character);
+        value.Bytes.ToArray().Should().Equal(
+            [.. Encoding.GetEncoding(1251).GetBytes("\u0416A"), (byte)' ', (byte)' ']);
+    }
+
+    [Fact]
+    public void StrOfAWideFieldWithAWidthNarrowsThatMany()
+    {
+        // The width folds as a number's would and the operand then selects the wide row
+        // (e4parse.c:1404-1483), so the result is that many characters.
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("STR(K_W, 1)", WithWide));
+
+        ExpressionValue value = new ExpressionEvaluator(compiled).Evaluate(
+            Context(record: WideRecord("ABCD", "CD")) with { Narrowing = WideNarrowing.For(() => 1252) });
+
+        value.Bytes.ToArray().Should().Equal((byte)'A');
+    }
+
+    [Fact]
+    public void StrOfAWideFieldNeedsACodePageToNarrowBy()
+    {
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("STR(K_W)", WithWide));
+
+        Action act = () => new ExpressionEvaluator(compiled).Evaluate(Context(record: WideRecord("ABCD", "CD")));
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.NotSupported);
+    }
+
     // ----------------------------------------------------------------- plumbing
+
+    /// <summary>The blank CodeBase fills an unassigned wide character with.</summary>
+    private const string BlankWide = "\u2000";
+
+    private static readonly IFieldMetadata WithWide = new TableFieldMetadata(
+        [Field("K_W", 'W', 8), WideField("K_O", 'O', 6, offset: 9)], "T", longFieldNames: false);
+
+    /// <summary>
+    /// Builds a record with a four-character W field and an O field of two characters and its count.
+    /// </summary>
+    private static RecordBuffer WideRecord(string w, string o)
+    {
+        RecordBuffer record = new(1 + 8 + 6);
+        record.Raw[0] = (byte)' ';
+        Encoding.Unicode.GetBytes(w).CopyTo(record.Raw[1..]);
+        Encoding.Unicode.GetBytes(o).CopyTo(record.Raw[9..]);
+        record.Raw[13] = (byte)o.Length;
+
+        return record;
+    }
+
+    private static FieldDefinition WideField(string name, char type, int length, int offset) =>
+        new(name, type, type, length, 0, offset, false, false, false, false, null);
 
     private static readonly IFieldMetadata WithFloat = new TableFieldMetadata(
         [Field("K_FLT", 'H', 4)], "T", longFieldNames: false);

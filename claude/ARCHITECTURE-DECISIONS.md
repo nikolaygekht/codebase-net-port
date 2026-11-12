@@ -2635,3 +2635,72 @@ truncated second (i4conv.c:2292-2364). The public API grows no type. Gated by co
 
 **Rejected — reading the field as `'T'`.** The value would lose its milliseconds and a tag over it
 would be keyed differently from the stored keys, which a seek or a cursor landing would miss.
+
+## ADR-76 — CodeBase's `'W'` and `'O'` UTF-16 fields are read, keyed and sought; `'W'` on `0x32` is VFP 9's Blob · accepted
+
+**Date.** 2026-11-12. Decided by the user during step 013, sub-step 7a-5.
+
+**Context.** CodeBase has two UTF-16 field types (d4defs.h:2795-2808): `r5wstr` `'W'`, the code units
+at the field's width, and `r5wstrLen` `'O'`, the same followed by a `u16` count of characters that
+nothing in the reference reads back. The port refused both as types it does not read. The user wanted
+Unicode data storable and searchable. VFP 9 also writes `'W'`, meaning a Blob — a reference into the
+memo file — on a `0x32` table; the reference reads every `'W'` as a wide string whatever the version
+(D4OPEN.C:2555), so it would misread a VFP 9 Blob.
+
+**Decision.**
+
+1. `'W'` and `'O'` are read on every version the reference reads them on, except **`'W'` on a `0x32`
+   table, which is refused as a Blob**. `'O'` is not a VFP type and is read on `0x32` too.
+2. `GetString` returns the stored code units — an `'O'` field less its count — **unchanged**. A shorter
+   assignment leaves the rest as CodeBase blanks it, `00 20` per pair (F4FIELD.C:92-108), which is
+   U+2000 to a little-endian reader, not a space; it is returned as a `'C'` field's blanks are, and the
+   documentation says what it is. The blank record writes the same pairs.
+3. An expression loads either by its own row (`E4FIELD_WSTR`, `E4FIELD_WSTR_LEN`), `'O'` at its width
+   less two (e4parse.c:397-418). Only the bare field and `STR()` of one (ADR-77) are evaluated;
+   concatenation, `ASCEND` and `DESCEND` over a wide value are refused because the corpus does not
+   witness them, and the reference has no row that compares one.
+4. A machine-collated tag over either keys by swapping each code unit (`t4unicodeToMachine`,
+   i4conv.c:588-602), pad NUL. Under any other collation the keys come from CodeBase's Unicode weight
+   tables, which stay deferred: such a tag is refused when selected.
+5. `Seek(string)` and the other text seeks on a wide tag take the text as UTF-16, swapped the same way;
+   a whole-key seek pads with U+2000, so a record is found by the text that was assigned.
+6. Reading a wide field as a number is refused. The reference refuses only to assign one
+   (F4DOUBLE.C:119-140) and reads one as though its UTF-16 bytes were ASCII digits, which answers
+   nothing.
+
+Gated by corpus case `WSTR`: the stored bytes, all 104 keys of four tags rebuilt byte for byte, the
+key-level seeks, a seek and a step from every record, and the expression dump's shapes and values.
+
+**Rejected — trimming U+2000 in `GetString`.** It would also take a real U+2000 off the end of a value,
+and it is an interpretation the C library does not make.
+
+## ADR-77 — `STR()` of a wide field narrows by the table's code page, reproducing Windows' best-fit · accepted
+
+**Date.** 2026-11-12. Decided by the user during step 013, sub-step 7a-5.
+
+**Context.** The reference turns a `'W'` field into text with `WideCharToMultiByte(CP_ACP, 0, …)`
+(e4functi.c:2694-2716): the **host's** ANSI code page, Windows' best-fit mapping, a question mark for
+the rest, one byte per code unit over half the field's width. It is the only way a filter can compare a
+wide field, since no row compares one directly. A sweep of the BMP comparing that call with .NET's
+code-page encodings found them in agreement everywhere except 0 to 33 code points per single-byte code
+page, all in General Punctuation and nearby (U+2000-U+2044, U+20A4, U+2236), which Windows best-fits
+and .NET turns into `?`. On cp1251 the list includes U+2000 — the blank of every wide field.
+
+**Decision.** `STR(<W field>)` narrows by the **table's** code page — the one its text is read in —
+through .NET's encoding with its default best-fit, plus a generated supplement holding the code points
+Windows best-fits and .NET does not (`WindowsBestFitSupplement`, written by
+`test-files-generator/bestfit/` from Windows itself). One byte per code unit; each half of a surrogate
+pair is a question mark, as Windows gives. A multi-byte code page is refused. `STR(K_W, n)` is the
+reference's too — the width folds as a number's would and the operand then picks the wide row — and a
+width past the field's characters is refused, since the reference would read the bytes after the field.
+`STR()` of an `'O'` field fails its parameter type in both.
+
+**Consequence.** On a Windows host whose ANSI code page is the table's, the port and the reference
+agree, which the corpus witnesses: `WSTR` is cp1251 and was generated where the ANSI code page is 1251,
+and its case refuses to run anywhere else. On any other host the reference's answer depends on the
+machine and the port's does not. The supplement assumes .NET's tables; a test checks that every entry
+is still one .NET maps to `?`.
+
+**Rejected — the host's code page, as the reference.** A key built from it would change with the
+machine that reads the index. **Rejected — refusing `STR(W)`.** It is the only comparison a filter can
+make over a wide field.

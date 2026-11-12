@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-4 done; next 7a-5, the W field)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; next the remaining 7a items)
 
 ## Done so far
 
@@ -326,6 +326,44 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     - **Mutations.** Rounding forced in the transform: 5 unit, 1 golden red; the key path rounding: 1
       and 1; the field loaded as `'T'`: 1 and 1. `mutate4csharp --lines` over `FromDateTime`: 5/5.
     - Release 2944 passed (1 skipped) + 1346 golden, green.
+  - [x] 7a-5 — the `'W'` and `'O'` UTF-16 fields (2026-11-12). The user decided: both supported,
+    `W` told from VFP 9's Blob by version `0x32`; `STR(W)` by the table's code page with Windows'
+    best-fit reproduced; `GetString` as stored. ADR-76, ADR-77.
+    - **a, the supplement.** A BMP sweep found .NET's code-page encodings and `WideCharToMultiByte`
+      apart on 0-33 code points per single-byte code page (General Punctuation; U+2000 among them on
+      cp1251, the blank of a wide field). `test-files-generator/bestfit/` (C#, Windows only) writes
+      `WindowsBestFitSupplement.cs`: 260 entries over the 20 single-byte code pages `CodePageMap` names.
+    - **b, read.** `DbfVersion.VisualFoxPro9`; `FieldResolver` reads `W`/`O` on every version, `W` on
+      `0x32` refused as a Blob; `BlankRecord` `00 20` pairs; `FieldValueDecoder.WideText`/`IsWide`, `O`
+      less its count, both refused as numbers; `Table.GetString` decodes UTF-16 first.
+    - **c, expressions.** Loader rows 1 and 2; `STR(<bare W/O field>)` gets `len / 2` in the parser and the
+      wide row by overload, `STR(W, n)` width `n` (the reference's own behaviour, found writing the case);
+      `TypeResolver` lengths (`O` less two), a width past the field refused, any other wide-consuming row
+      refused; `WideNarrowing` (lazy, a 64K map per code page, multi-byte refused); the context's
+      `Narrowing`, wired into both of `Table`'s contexts.
+    - **d, keys and seeks.** `KeyKind.WideCharacter` (machine only; a collated wide tag refused), pad NUL,
+      `ExpressionKey` swaps each unit, `TableTagCursor.WideSearch` (whole-key seeks pad with U+2000),
+      `Table.Search` encodes UTF-16 for a wide tag.
+    - **e, generator.** `case-wstr.cpp` (cp1251, 26 rows spelled as code units, four tags, an expression
+      dump, six filters; stops unless `GetACP()` is 1251). Existing corpus byte-identical; six files added.
+      The dumps confirmed the design: blank `00 20`, the count bytes, the reference's `STR` keys equal
+      to the supplement's answers, its optimizer answering `STR(K_W)` filters from `S_ASC`.
+    - **f, golden.** `WSTR` in every list; `CorpusExpressionDump.Load(table)` parameterized; query
+      filters now decoded with the table's code page (a cp1251 literal); `SeekTypeGoldenTests` lets wide
+      tags take text. New `WideStringGoldenTests`: the expression dump's shapes, values at every record
+      and refusals; `GetString`; a seek by each record's assigned text; a step from every record on all
+      four tags. **All 104 keys rebuild byte for byte.** Counts: tables 23, indexed 13, indexes 12, tags
+      69, seeks 474, runs 180.
+    - **Mutations.** Unit/component: 7 read, 9 expression, 8 key/seek, all killed. Golden: supplement,
+      swap, `O` length, cursor `Narrowing`, seek pad, `STR` width all killed — the swap and the cursor's
+      `Narrowing` only after two gaps were closed (WSTR missing from the key test's own table list; no
+      golden path used the tag cursor's context, now the step test). `mutate4csharp` on
+      `WideNarrowing.cs`: 22/22, the file restored and verified.
+    - **g, records.** ADR-76, ADR-77; `DBF-FORMAT.md` §5, §6.11, §11.2 (the blank question resolved);
+      `KEY-COLLATION.md` §3.6; `EXPRESSIONS.md` row 108; `PORTING-PLAN.md` §2.1, §2.2 and the W-blank
+      item; README "Differences from CodeBase"; both corpus READMEs; `DIVERGENCES.md`; XML docs of
+      `GetString`, `Seek(string)`, `ExpressionType`.
+    - Release 3011 passed (1 skipped) + 1429 golden, green.
 - [ ] step 8 — close
 
 ## Notes for the next session

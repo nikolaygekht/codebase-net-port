@@ -35,6 +35,7 @@ public sealed class KeyTransformGoldenTests
         { "DTMILLI", "DTMILLI.cdx" },
         { "IDXONE", "IDXONE.cdx" },
         { "RECNOTAG", "RECNOTAG.cdx" },
+        { "WSTR", "WSTR.cdx" },
     };
 
     [Theory]
@@ -103,6 +104,7 @@ public sealed class KeyTransformGoldenTests
         ["DTMILLI"] = 600,
         ["IDXONE"] = 300,
         ["RECNOTAG"] = 20,
+        ["WSTR"] = 104,
     };
 
     [Fact]

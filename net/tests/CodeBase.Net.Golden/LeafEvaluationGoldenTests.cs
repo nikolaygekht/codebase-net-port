@@ -21,7 +21,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class LeafEvaluationGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX", "LONGNAME", "RECNOTAG"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX", "LONGNAME", "RECNOTAG", "WSTR"];
 
     [Theory]
     [MemberData(nameof(Tables))]

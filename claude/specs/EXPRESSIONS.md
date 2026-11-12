@@ -386,7 +386,7 @@ Pattern per relation: str, [log], numDoub, dateDoub, currency, dateTime, dateTim
 | 105 | CHR | 120 | r4str(1) | 1: r4numDoub | byte value of number (e4functi.c:941-947) | :181 |
 | 106 | DEL | 130 | r4str(1) | 0 | deletion-flag char of current record (e4functi.c:692-697) | :182 |
 | 107 | STR | 140 | r4str | 1..3: r4numDoub[,len[,dec]] | see §7.1 | :183 |
-| 108 | STR | 140 | r4str | 1: r5wstr | wide→ANSI narrow copy, out len = in len/2 (e4parse.c:1421-1426; e4functi.c:2694-2715) | :184 |
+| 108 | STR | 140 | r4str | 1: r5wstr | wide→ANSI narrow copy, out len = in len/2 (e4parse.c:1421-1426; e4functi.c:2694-2715). Chosen by the parser when the one argument is a bare `W`/`O` field; `STR(W, n)` folds `n` as the numeric form does and reaches this row by overload, out len `n`; `STR(O)` fails the parameter type. The reference narrows by the host's ANSI code page; the port by the table's, with Windows' best-fit (ADR-77) — witnessed by `WSTR`, generated on a cp1251 host | :184 |
 | 109 | STRZERO | 145 | r4str | 1..3 like STR | STR with leading blanks replaced by '0' (e4functi.c:2539-2577) | :186 |
 | 110 | SUBSTR | 150 | r4str | 1: r4str (+const 2nd/3rd) | see §7.2 | :187 |
 | 111 | TIME | 160 | r4str(8) | 0 | "HH:MM:SS" local time (D4DATE.C:703-742; len 8, e4parse.c:550-552) | :188 |

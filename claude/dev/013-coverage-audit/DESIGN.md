@@ -375,3 +375,109 @@ the seeks. No query case: no constant has the type, so no filter compares one.
 
 1. **The public API does not grow a type.** A `'7'` field is a datetime to a caller, as `'T'` is.
 2. **ADR-32 is superseded** by ADR-75.
+
+## 7a-5 — the `'W'` and `'O'` Unicode fields *(added 2026-11-12, at the user's call)*
+
+`DIVERGENCES.md` §1 (field types the port refuses), `PORTING-PLAN.md` §2.2. The user decided:
+**support `W` and `O`** — read, expressions, machine-order tags, seeks — told apart from VFP 9's
+Blob `'W'` by the table version; **`STR(W)` by the table's code page**, with Windows' best-fit
+reproduced; **`GetString` returns the stored characters as they are**. Collated Unicode keys stay
+deferred.
+
+### What they are
+
+CodeBase's wide strings: `r5wstr` `'W'` (`r4unicode`) and `r5wstrLen` `'O'` (d4defs.h:2795-2808). The
+field holds UTF-16 code units in the machine's order — little-endian on Windows, which is the
+corpus — copied verbatim from the caller's `WSTR5` (F4WSTR.C:80-120). `'O'` adds two trailing bytes,
+a `u16` count of characters, which **nothing in the reference ever reads back**: expressions, keys
+and seeks all see the field less those two bytes. VFP 9 also writes `'W'`, meaning Blob — a memo-like
+reference into the FPT — on a `0x32` table. The reference reads every `'W'` as `r5wstr` whatever the
+version (D4OPEN.C:2555), so it would misread a VFP 9 Blob; the port does not (decision 1).
+
+### What the reference does
+
+| Fact | Source |
+|---|---|
+| Length as `'C'`: the low byte in the length, the high byte in the decimals; `W` created even (`even4up`), `O` with two bytes more; flag `0x04` (binary) | D4CREATE.C:1558-1564, D4OPEN.C:2555-2562 |
+| Admitted on **any** version at open — no version test (creation needs `compatibility >= 30` for `W` only) | D4OPEN.C:2555; D4CREATE.C:988-1003 |
+| Blank is `00 20` per two bytes — U+2000 in little-endian, a space only to a big-endian reader. An assignment shorter than the field blanks it first, so the unassigned tail is U+2000 too; for `O` the two length bytes are blanked the same way before being written | F4FIELD.C:92-108, F4STR.C:155-166, F4WSTR.C:95-116 |
+| Loaded by its own row — `E4FIELD_WSTR` (`r5wstr`, the field's length) and `E4FIELD_WSTR_LEN` (`r5wstrLen`, the length **less two**) | e4functi.c:36-37, e4parse.c:397-418 |
+| No comparison rows for either type: a filter cannot compare one, only `STR()` of one | e4functi.c (no `r5wstr` operand among rows 42-105) |
+| `STR(<bare W field>)`, one argument: row 109, `WideCharToMultiByte(CP_ACP, 0, …)` over `len / 2` code units into `len / 2` bytes — the **host's** code page, Windows' best-fit, `?` for the rest. `STR(O)` takes row 109 too and then fails its parameter type | e4parse.c:1404-1427, e4functi.c:2694-2716 |
+| Key, machine collation (the default `collateNameUnicode`): every code unit byte-swapped, so the key is UTF-16 big-endian and sorts by code unit; length = the expression's; pad byte NUL | i4conv.c:184-189, 588-602; E4EXPR.C:668-681; i4init.c:620-632; C4CODE.C:1076 |
+| Key, any other collation: the Unicode weight tables — **deferred** | E4EXPR.C:684-710 |
+| Seek: the value's code units swapped the same way (`d4seekN` with raw wide bytes) | D4SEEK.C:1116-1130, 1320-1340 |
+
+### Windows' best-fit and .NET
+
+The reference's `STR()` is `WideCharToMultiByte`. A sweep of the BMP on this machine compared it
+with .NET's `Encoding.GetEncoding(cp)` (`System.Text.Encoding.CodePages`, default fallbacks) for the
+twenty single-byte code pages `CodePageMap` names: they agree everywhere except **0 to 33 code points
+per page, all in General Punctuation** (U+2000-U+2044, U+20A4, U+2236), which Windows best-fits — a
+space, `-`, `'`, `"`, `.`, `/`, `:`, NBSP — and .NET turns into `?`. On cp1251 the list includes
+**U+2000, the blank of a `W` field**, so without the supplement every padded value's `STR()` would
+differ. Surrogates agree (each code unit becomes `?`). The supplement is captured by a small Windows
+tool, kept beside the generator, and checked in as data — as the collation tables are.
+
+### What changes, in short
+
+- **Now:** `FieldResolver` refuses `'W'` and `'O'` as types it does not read; the expression engine
+  carries `WideString`/`WideStringWithLength` but nothing can reach them.
+- **After:** both read; `'W'` on a `0x32` table is refused as VFP 9's Blob; `GetString` decodes the
+  stored code units (`'O'` less its length bytes), blank U+2000 included; an expression loads either;
+  a machine-collated tag over one keys by swapped code units; `Seek(string)` on such a tag seeks the
+  UTF-16 form; `STR(W)` narrows by the table's code page with the supplement.
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `DbfVersion` | `VisualFoxPro9 = 0x32`, compared against the variant's normalized version (which keeps `0x32`) — no new variant member |
+| `FieldResolver` | `'W'`, `'O'` readable on any version; `'W'` refused on `0x32` (Blob); lengths by the default rule |
+| `BlankRecord` | `'W'`, `'O'` blank to `00 20` pairs |
+| `FieldValueDecoder` | the bytes of a wide field: its code units, `'O'` less two; refused as a number |
+| `Table.GetString` | decodes a wide field as UTF-16LE before the binary refusal |
+| `ExpressionParser` | loader rows 1 and 2; `STR(<bare W field>)` selects the wide row (the port's 108) with length `len / 2` |
+| `TypeResolver` | lengths: `W` its length, `O` its length less two |
+| `ExpressionEvaluator`, `ExpressionValue` | loads a wide value; the wide `STR` row narrows through the context's `WideNarrowing` |
+| `WideNarrowing` *(new)* | the code page's best-fit encoding plus the supplement; one byte per code unit; refuses a code page that is not single-byte or not available |
+| `WindowsBestFitSupplement` *(new, generated data)* | per code page, the code points Windows best-fits and .NET does not |
+| `EvaluationContext`, `Table` | the context carries the table's `WideNarrowing`, built on first use as `CaseMap` is |
+| `SeekConverter`, `KeyTypeResolver` | `KeyKind.WideCharacter` for a wide result under machine collation, refused under any other; pad byte NUL; `ASCEND`/`DESCEND` over a wide operand refused |
+| `ExpressionKey` | a wide value keys by swapping each code unit |
+| `TableTagCursor.SearchFor`, `Table` seeks | a wide tag takes the text as UTF-16, swapped; exact pads with U+2000, prefix does not |
+
+### Seams
+
+None new. `WideNarrowing` is a pure function of a code page and a string; it is tested directly
+with the code-page provider the test projects already register.
+
+### Corpus case
+
+**`WSTR.DBF` + `.cdx`** (`0x30`, code-page mark `0xC9`, cp1251): `ID` `I`, `K_W` `W` of 20 bytes,
+`K_O` `O` of 12 (stored 14). A few dozen records: ASCII, Cyrillic, mixed, full-width values, short
+ones (U+2000 tails), one blank, characters from the supplement list (U+2010, U+2024, U+2236), others
+cp1251 holds directly (U+2013, U+2116), Windows best-fit outside the list (U+0100), unmappable
+(U+4E2D), a surrogate pair, an embedded U+2000, repeats. Tags by `i4create`: `W_ASC`, `W_DESC` over
+`K_W`, `O_ASC` over `K_O`, `S_ASC` over `STR(K_W)`. Query cases over `STR(K_W)` (equality, a range, a
+Cyrillic literal). **The case needs the generating machine's ANSI code page to be 1251**, because the
+reference narrows by it: it checks `GetACP()` and fails loudly otherwise. Gates: the dump's raw
+bytes, `GetString`, every stored key rebuilt (the `S_ASC` keys witness the narrowing, the others the
+swap), the key-level seeks, a seek by each record's own text, the queries.
+
+### Decisions
+
+1. **`'W'` on a `0x32` table is VFP 9's Blob and refused**, on every other version CodeBase's wide
+   string — the reference reads it as a wide string everywhere and would misread a VFP 9 Blob.
+   `'O'` is not a VFP type and is read on any version, as the reference does.
+2. **`STR(W)` narrows by the table's code page, not the host's** (ADR-77). On a Windows host whose
+   ANSI code page is the table's they agree, which the corpus witnesses; elsewhere the port is the
+   deterministic one. Windows' best-fit is reproduced by the supplement. A multi-byte code page is
+   refused.
+3. **`GetString` returns the stored characters**, U+2000 tail included, as it returns a `'C'`
+   field's blanks; the documentation says what the tail is.
+4. **Only the bare field and `STR()` of a bare `W` are evaluated over a wide value.** Concatenation,
+   `ASCEND`, `DESCEND` over one are refused rather than left unwitnessed; collated Unicode keys stay
+   deferred (`PORTING-PLAN.md`).
+5. **ADRs:** ADR-76 (the two types read and keyed, `W` told from Blob by version), ADR-77 (`STR(W)`
+   by the table's code page with Windows' best-fit).

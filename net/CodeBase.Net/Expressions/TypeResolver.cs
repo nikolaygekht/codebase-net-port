@@ -159,6 +159,7 @@ internal sealed class TypeResolver
 
         int row = SelectOverload(node.Row, operands);
         row = MaterializeOperands(row, operands);
+        RefuseUnwitnessedWideOperation(row, operands);
 
         top -= operands;
         T type = FunctionTable.Row(row).ReturnType;
@@ -185,6 +186,34 @@ internal sealed class TypeResolver
 
         if (top >= StackDepth)
             throw Failure(ErrorCode.Overflow, "the expression needs more operand slots than the engine has");
+    }
+
+    /// <summary>
+    /// Refuses an operation over a wide string other than narrowing it with STR (ADR-76).
+    /// </summary>
+    /// <value>
+    /// The reference concatenates wide strings and converts them for a key with ASCEND and DESCEND,
+    /// but nothing in the corpus witnesses those rows, so they are refused rather than guessed at.
+    /// Comparison needs no rule here: the reference has no row that compares a wide string at all.
+    /// </value>
+    private void RefuseUnwitnessedWideOperation(int row, int operands)
+    {
+        if (row == FunctionRows.StrWide)
+            return;
+
+        FunctionRow entry = FunctionTable.Row(row);
+
+        for (int position = 0; position < operands; position++)
+        {
+            T type = entry.ParameterCount < 0 ? entry.Parameter1 : entry.ParameterType(position);
+
+            if (type is T.WideString or T.WideStringWithLength)
+            {
+                throw Failure(
+                    ErrorCode.NotSupported,
+                    "a wide string is used other than by STR, which this library does not evaluate");
+            }
+        }
     }
 
     /// <summary>
@@ -324,6 +353,16 @@ internal sealed class TypeResolver
                 lengths[top] = node.Field!.Value.Definition.Length;
                 return;
 
+            // A W field is its width; an O field is its width less the two bytes that count its
+            // characters, which no expression sees (e4parse.c:397-418).
+            case T.WideString:
+                lengths[top] = node.Field!.Value.Definition.Length;
+                return;
+
+            case T.WideStringWithLength:
+                lengths[top] = node.Field!.Value.Definition.Length - 2;
+                return;
+
             case T.Logical:
                 AssignLogicalDetail(row, ref immediate);
                 lengths[top] = sizeof(int);
@@ -442,6 +481,19 @@ internal sealed class TypeResolver
 
             case FunctionRows.LongToBinary:
                 lengths[top] = sizeof(int);
+                return;
+
+            case FunctionRows.StrWide:
+                // One byte per character narrowed. A width past the field's characters would have
+                // the reference read whatever bytes follow the field (e4functi.c:2694-2716).
+                if (declared > lengths[top] / 2)
+                {
+                    throw Failure(
+                        ErrorCode.NotSupported,
+                        $"STR of a wide field is asked for {declared} characters and the field holds {lengths[top] / 2}");
+                }
+
+                lengths[top] = declared;
                 return;
 
             case FunctionRows.Upper:

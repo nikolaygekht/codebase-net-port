@@ -39,6 +39,7 @@ found and fixed.
 | 7a-2 | **A tag over `RECNO()`** *(added 2026-11-12; the user decided `RECNO()` supported, the other three refused)*. Its own plan below | its own sub-steps below |
 | 7a-3 | **A tag keyed through the date picture** *(added 2026-11-12; ADR-42's refusal, never implemented — a wrong record set found while reviewing it)*. Its own plan below | its own sub-steps below |
 | 7a-4 | **The `'7'` field, full support** *(added 2026-11-12, at the user's call)*. Its own plan below | its own sub-steps below |
+| 7a-5 | **The `'W'` and `'O'` Unicode fields** *(added 2026-11-12, at the user's call: read, keys, seeks, `STR(W)` by the table's code page)*. Its own plan below | its own sub-steps below |
 | 8 | **Close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`, `claude/dev/README.md`, root `STATE.md` | the gate |
 
 ## Gate
@@ -180,3 +181,35 @@ Design: `DESIGN.md` §7a-4.
 | c | Generator: `case-dtmilli.cpp`, `dump.cpp` printing `r4dateTimeMilli` like `r4dateTime`; regenerate, existing files byte-identical | `git status net/corpus` additions only |
 | d | Golden: `DTMILLI` into the lists, counts by exactly the case | green; dropping the flag reddens the key rebuild |
 | e | Records: ADR-75 (supersedes ADR-32); `DBF-FORMAT.md` §5, `KEY-COLLATION.md` §2.8 as witnessed; corpus READMEs; `DIVERGENCES.md`; `PORTING-PLAN.md` §2.3; `mutate4csharp` on `KeyTransform.cs` | survivors explained |
+
+## 7a-5 — the `'W'` and `'O'` Unicode fields
+
+Design: `DESIGN.md` §7a-5.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 1 Unit | `FieldResolver`: `W`/`O` admitted on `0x30`, `0x31`, `0x03`; `W` refused on `0x32`, `O` admitted there. `BlankRecord`: `00 20` pairs. `FieldValueDecoder`: `O` less two bytes. `WideNarrowing`: one byte per code unit, a supplement code point (U+2000 on 1251 gives a space), best-fit through the encoding (U+0100), `?` for the unmappable and for each half of a surrogate pair, a multi-byte code page refused; and that every supplement entry is one .NET does not already map (the supplement's own premise). `ExpressionKey`: a wide value swaps each unit. `SeekConverter`: a wide tag under GENERAL refused; `ASCEND(K_W)` refused. Parser and resolver: `K_W`, `K_O` load with their lengths; `STR(K_W)` length `len / 2`, `STR(K_W, 3)` length 3 (the reference folds the width and picks the wide row by type, found while writing the case); `STR(K_O)` and `STR(K_W, 11)` (past the field) refused |
+| 2 Component | a wide table image: `GetString` with its U+2000 tail; an expression over `STR(K_W)` on a cp1251 image; a key rebuilt for a record; `Seek` exact and prefix on a wide tag |
+| 4 Golden | `WSTR`: layout, records (raw bytes and `GetString`), every key of all four tags rebuilt, index and key-level seeks, a seek by each record's own text, the queries |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Supplement tool: `test-files-generator/bestfit/` (C# console, Windows only) writes `WindowsBestFitSupplement.cs`; its README | its output checked in; rerun reproduces it |
+| b | Read: variant, resolver, blank, decoder, `GetString` (tests red, then green) | mutating each reddens a test |
+| c | Expressions: loader rows and lengths, `STR(W)` parse, `WideNarrowing`, context wiring | the U+2000 narrowing test red without the supplement |
+| d | Keys and seeks: `KeyKind.WideCharacter`, pad byte, `ExpressionKey`, the refusals, `SearchFor` and the text seek | the swap test red before |
+| e | Generator: `case-wstr.cpp` (checks `GetACP() == 1251`), queries; regenerate, existing files byte-identical | `git status net/corpus` additions only |
+| f | Golden: `WSTR` into the lists; counts by exactly the case | green; dropping the swap or the supplement reddens a golden test |
+| g | Records: ADR-76, ADR-77; `DBF-FORMAT.md` §5 (W, O as witnessed), `KEY-COLLATION.md` (wide machine keys), `EXPRESSIONS.md` (`STR(W)`); corpus READMEs; `DIVERGENCES.md`; `PORTING-PLAN.md` §2; README "Differences from CodeBase" (`STR(W)` by the table's code page, Blob on `0x32`); `mutate4csharp` on `WideNarrowing.cs` | survivors explained |
+
+### Risks
+
+- **The supplement assumes .NET's code-page tables.** A later `System.Text.Encoding.CodePages` that
+  best-fits more would make an entry redundant, not wrong; one that best-fits less would be caught by
+  the premise test only for entries already listed. The golden `S_ASC` keys catch the cp1251 case.
+- **The case depends on the generating host.** Regenerating on a machine whose ANSI code page is not
+  1251 fails at `WSTR` by design rather than writing different keys.

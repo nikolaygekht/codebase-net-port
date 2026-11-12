@@ -33,6 +33,8 @@ public sealed class SeekConverterKindTests
         new("K_TS", 'T', 'T', 8, 0, 67, false, false, false, false, null),
         new("K_LOG", 'L', 'L', 1, 0, 75, false, false, false, false, null),
         new("K_SFLT", 'H', 'H', 4, 0, 76, false, false, false, false, null),
+        new("K_W", 'W', 'W', 20, 0, 80, false, false, false, false, null),
+        new("K_O", 'O', 'O', 14, 0, 100, false, false, false, false, null),
     ];
 
     [Theory]
@@ -53,9 +55,31 @@ public sealed class SeekConverterKindTests
     [InlineData("K_LOG", "", 1, "Logical")]
     [InlineData("RECNO()", "", 8, "Double")]
     [InlineData("K_TEXT + STR(RECNO(), 4)", "", 14, "Character")]
+    [InlineData("K_W", "", 20, "WideCharacter")]
+    [InlineData("K_O", "", 12, "WideCharacter")]
+    [InlineData("STR(K_W)", "", 10, "Character")]
     public void ATagKeysByTheTypeItsExpressionProduces(string expression, string collation, int keyLength, string kind)
     {
         Converter(expression, keyLength, collation).Kind.Should().Be(Enum.Parse<KeyKind>(kind));
+    }
+
+    [Fact]
+    public void AWideTagPadsWithZeros()
+    {
+        // i4init.c:620-628: a wide tag's pad character is NUL, under any collation.
+        Converter("K_W", 20, "").PadByte.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("K_W", 40)]
+    [InlineData("K_O", 24)]
+    public void AWideTagUnderACollationIsRefused(string expression, int keyLength)
+    {
+        // Its keys would be the Unicode weight tables', which this library does not have
+        // (E4EXPR.C:684-710); only machine order is read (ADR-76).
+        Action act = () => Converter(expression, keyLength, "GENERAL");
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.NotSupported);
     }
 
     [Theory]

@@ -173,6 +173,13 @@ internal readonly struct ExpressionValue
     public static ExpressionValue Text(byte[] value, int trimmedLength = -1) =>
         new(ExpressionType.Character, 0, 0, value, trimmedLength < 0 ? value.Length : trimmedLength, false);
 
+    /// <summary>Builds a wide string, CodeBase's UTF-16 text.</summary>
+    /// <param name="value">The UTF-16 bytes, at the value's full declared width.</param>
+    /// <param name="type">Which of the two wide types it is.</param>
+    /// <returns>The value.</returns>
+    public static ExpressionValue Wide(byte[] value, ExpressionType type) =>
+        new(type, 0, 0, value, value.Length, false);
+
     /// <summary>Builds a numeric value in the text form a record stores it in.</summary>
     /// <param name="value">The bytes.</param>
     /// <returns>The value.</returns>

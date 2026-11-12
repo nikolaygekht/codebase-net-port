@@ -111,6 +111,27 @@ public sealed class RecordKeyTests
         key[..10].Should().NotEqual("APPLE     "u8.ToArray());
     }
 
+    [Fact]
+    public void ARecordNumberKeyIsBuiltFromTheNumberOfTheRecordItIsFor()
+    {
+        // The reference sets the record number before it builds each key (R4REINDX.C:391), so a
+        // RECNO() key is the record's own number. Rebuilding one -- to land a tag on the current
+        // record -- has to be told that number; the buffer alone does not carry it (ADR-73).
+        SeekConverter converter = Converter("RECNO()", 8);
+        ExpressionValueSource source = new(converter.Compiled, new EvaluationContext());
+        RecordBuffer record = new(21);
+        byte[] third = new byte[8];
+        byte[] seventh = new byte[8];
+        byte[] keyOfThree = new byte[8];
+
+        RecordKey.Write(converter, source, record, 3, third);
+        RecordKey.Write(converter, source, record, 7, seventh);
+        RecordKey.WriteValue(converter, ExpressionValue.Numeric(3), keyOfThree);
+
+        third.Should().Equal(keyOfThree);
+        seventh.Should().NotEqual(third);
+    }
+
     private static ExpressionValue Text(string value) =>
         ExpressionValue.Text(System.Text.Encoding.ASCII.GetBytes(value));
 

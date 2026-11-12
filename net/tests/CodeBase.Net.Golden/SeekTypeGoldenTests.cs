@@ -1,5 +1,6 @@
 using System.Text;
 using AwesomeAssertions;
+using CodeBase.Net.Expressions;
 using CodeBase.Net.TestUtils;
 using Xunit;
 
@@ -45,7 +46,7 @@ public sealed class SeekTypeGoldenTests
     {
         List<(string Table, string Tag)> tags = [.. EveryTag().Select(row => row.Data)];
 
-        tags.Should().HaveCount(61);
+        tags.Should().HaveCount(63);
         tags.Count(t => ReferenceType(t.Table, t.Tag) == 'C').Should().BeGreaterThan(0);
         tags.Count(t => ReferenceType(t.Table, t.Tag) != 'C').Should().BeGreaterThan(0);
     }
@@ -56,7 +57,12 @@ public sealed class SeekTypeGoldenTests
     {
         char type = ReferenceType(tableName, tagName);
 
-        using CodeBaseEngine engine = new();
+        // The picture and century the dump was taken under, because a tag keyed through the picture is
+        // refused until it is chosen (ADR-74), and T_DTOC and T_CTOD are among every tag.
+        using CodeBaseEngine engine = new()
+        {
+            ExpressionOptions = ExpressionOptions.CodeBase.WithCentury(Expressions.Century),
+        };
         using Table table = engine.OpenTable(Corpus.PathOf(tableName + ".DBF"));
         table.SelectTag(table.Tags[tagName]);
 
@@ -142,6 +148,27 @@ public sealed class SeekTypeGoldenTests
         if (compiled is not null)
             return compiled.Type;
 
+        // A sum at the top level, RECNOTAG's NAME + STR(RECNO(), 4): the reference picks the row of
+        // "+" by its operands' types, so the left operand's type picks the row, and its return type is
+        // the key's. Asserted to be one row rather than assumed.
+        int plus = TopLevelPlus(expression);
+        if (plus > 0)
+        {
+            string left = expression[..plus].Trim();
+            DumpField operand = CorpusDump.Load(tableName).Fields
+                .Single(f => f.Name.Equals(left, StringComparison.OrdinalIgnoreCase));
+            List<int> sums =
+            [
+                .. Functions.Rows
+                    .Where(r => r.Name == "+" && r.ParameterTypes[0] == operand.Type)
+                    .Select(r => r.ReturnType)
+                    .Distinct(),
+            ];
+            sums.Should().ContainSingle($"the reference has one row of + for a '{operand.Type}' left operand");
+
+            return (char)sums[0];
+        }
+
         // Only EMPTY(K_TEXT) reaches here. Every row of the function table under one name returns
         // the same type, which is asserted rather than assumed.
         string function = expression[..expression.IndexOf('(', StringComparison.Ordinal)];
@@ -149,6 +176,30 @@ public sealed class SeekTypeGoldenTests
         returns.Should().ContainSingle($"the reference records one return type for {function}");
 
         return (char)returns[0];
+    }
+
+    /// <summary>
+    /// Finds a plus sign outside every parenthesis, or -1 where there is none.
+    /// </summary>
+    private static int TopLevelPlus(string expression)
+    {
+        int depth = 0;
+        for (int i = 0; i < expression.Length; i++)
+        {
+            switch (expression[i])
+            {
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    depth--;
+                    break;
+                case '+' when depth == 0:
+                    return i;
+            }
+        }
+
+        return -1;
     }
 
     private static string WithoutSpaces(string text) => text.Replace(" ", string.Empty, StringComparison.Ordinal);

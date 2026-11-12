@@ -211,3 +211,110 @@ None changed. `FieldDefinition.Name` can now be longer than ten characters; its 
 ### Open questions
 
 None.
+
+---
+
+## 7a-2 — a tag over `RECNO()` *(added 2026-11-12, at the user's call)*
+
+`DIVERGENCES.md` §1, ADR-49. The user decided: **`RECNO()` is supported in a tag; `DATE()`, `TIME()`
+and `RECCOUNT()` stay refused**, and are documented as divergences.
+
+### Goal
+
+A tag whose expression reads `RECNO()` opens, walks, seeks and synchronizes with the table's cursor
+as the reference's does, and the optimizer may answer a filter from it. **Verified when** corpus case
+`RECNOTAG` is gated — every stored key rebuilt from its record, the seeks, the query dumps — and the
+three other functions are still refused, with that refusal documented to callers.
+
+### What the reference does
+
+| Fact | Source |
+|---|---|
+| `RECNO()` is `d4recNo(data)`, the current record's number, as a double | E4FUNCTI.C:2509-2516, row 146 |
+| Building a tag sets `recNum` to each record's number before its key is evaluated, so a `RECNO()` key is that record's own number — the same every time for the same record | R4REINDX.C:387-391, r4reinde.c:762-767 |
+| `DATE()`, `TIME()`, `RECCOUNT()` read the clock or the table's size: a key rebuilt later differs from the stored one | ADR-49 |
+
+### What changes, in short
+
+- **Now:** `SeekConverter.RefuseIfNotTheSameTwice` refuses all four. And the value source a tag
+  rebuilds a record's key with (`ExpressionValueSource.Read`) replaces the record and its deletion flag
+  in the context but **not its number**, so a `RECNO()` key would be rebuilt as 0 — the cursor's
+  synchronization after a move by record number would land on the wrong entry.
+- **After:** `RECNO()` leaves the refused set. `IKeyValueSource.Read` and `RecordKey.Write` take the
+  record's number beside its buffer, and the key is evaluated with it. The other three stay refused,
+  and the refusal is documented on `Table.SelectTag` and in `README.md` "Differences from CodeBase".
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `SeekConverter` | `RefuseIfNotTheSameTwice` no longer lists `RecordNumber`; its doc says why `RECNO()` is the same twice |
+| `IKeyValueSource` / `ExpressionValueSource` | `Read(record, recordNumber)`: the number goes into the context with the buffer and the deletion flag |
+| `RecordKey.Write` | takes the record number and passes it on |
+| `TableTagCursor.Synchronize` | passes the record it was given |
+
+### Corpus case
+
+**`RECNOTAG.DBF`** (`0x30`): `ID` and `NAME C(10)`, ten records with names repeating. Tags by
+`i4create`: `R_RECNO` over `RECNO()`, `R_NAMENO` over `NAME + STR(RECNO(), 4)` (the idiom that makes
+a name tag unique). Filters through `dump-query.cpp`: a range over `RECNO()`, one walked in
+`R_NAMENO`'s order, one beside a name term.
+
+### Decisions
+
+1. **The number travels with the buffer**, not through the context the cursor was built with: the
+   context is built once per cursor, the number changes per record.
+2. **No `DESCEND(RECNO())`**: a descending numeric tag is untested in this port and is its own question.
+3. **ADR-49 is superseded in part** by a new ADR: `RECNO()` key-legal, the three others not.
+
+---
+
+## 7a-3 — a tag keyed through the date picture *(added 2026-11-12, at the user's call)*
+
+`DIVERGENCES.md` §1, ADR-42. Reviewing the entry found that ADR-42's refusal was never implemented,
+and that the gap gives a **wrong record set**. The user decided: implement it as ADR-42 wrote it.
+
+### The defect
+
+`CDXEXPR`'s `T_DTOC` is keyed `DTOC(K_DATE)` under the reference's picture `MM/DD/YY`. Opened with the
+engine's default options (picture `CCYYMMDD`), the port selects the tag without complaint — both
+pictures are eight characters, so the key-length check cannot tell them apart — and the optimizer
+answers from the stored keys while the per-record check reads through the default picture:
+
+| Filter | `Query.Count` | per record |
+|---|---|---|
+| `DTOC(K_DATE) = "01/01/00"` | 2 | 0 |
+| `DTOC(K_DATE) = "20000101"` | 0 | 1 |
+
+No gate saw it: no query case filters on `DTOC`, and every golden test over `T_DTOC` configures the
+reference's picture.
+
+### Goal
+
+A tag whose key passes through the date picture — `DTOC` or `CTOD` anywhere in its expression — is
+refused when selected unless the caller has chosen the engine's `ExpressionOptions`, and so is never
+used by the optimizer under the default. Once chosen, the tag works as it does now. **Verified when**
+under the default the tag is refused naming the function and a `DTOC` filter's `Query.Count` equals the
+per-record count, and under the reference's picture the same filters count what `T_DTOC`'s stored keys
+(the reference's bytes) say.
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `ExpressionOptions` | an internal `Unchosen` instance — `Invariant`'s values, marked not chosen — and `IsChosen`; every public instance, and every `With*` result, is chosen |
+| `CodeBaseEngine` | its `ExpressionOptions` defaults to `Unchosen`, so the getter's values are unchanged |
+| `SeekConverter` | refuses, beside `RefuseIfNotTheSameTwice`, an expression with a `DateToText` or `TextToDate` node when the options are not chosen — `ErrorCode.NotSupported`, naming the function and the setting |
+
+No plumbing: the options already reach `SeekConverter.For`, and `Table.QueryTags` already leaves out a
+tag whose cursor cannot be built.
+
+### Decisions
+
+1. **"Chosen" is a property of the options object, not a flag on the engine.** It needs no new
+   parameter anywhere, and a caller who assigns `ExpressionOptions.Invariant` on purpose has chosen it
+   — ADR-42's word is "explicitly configured", not "configured to a reference picture".
+2. **No new corpus case.** The reference's keys for `T_DTOC` are in `CDXEXPR.cdx.dump.txt`; the gate
+   counts them.
+3. **ADR-42 is not superseded**; this implements it. A new ADR-74 records that it had not been, and
+   how "explicitly" is decided.

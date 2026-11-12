@@ -453,9 +453,13 @@ public sealed class Table : IDisposable
     /// </summary>
     /// <param name="tag">The tag to follow, or null to go back to record order.</param>
     /// <exception cref="CodeBaseException">
-    /// The tag belongs to another table, or its key expression is not a plain field name of this one — in
-    /// which case its keys cannot be padded correctly and reading them would be wrong rather than slow.
-    /// The table's other tags are unaffected (ADR-28).
+    /// The tag belongs to another table, or its key expression cannot be read or keyed by this library.
+    /// That includes an expression reading DATE(), TIME() or RECCOUNT(), whose value is not the same
+    /// twice, so a key built from it could never be found again; the message names the function. The C
+    /// library opens such a tag; this one refuses it (ADR-73). RECNO() is accepted. So is an expression
+    /// reading DTOC or CTOD, whose keys depend on the date picture the index was built with, until
+    /// [clink=CodeBase.Net.CodeBaseEngine.ExpressionOptions]CodeBaseEngine.ExpressionOptions[/clink] is
+    /// set to say which picture that was (ADR-74). The table's other tags are unaffected (ADR-28).
     /// </exception>
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public void SelectTag(Tag? tag)

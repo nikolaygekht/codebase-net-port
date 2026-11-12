@@ -397,7 +397,7 @@ internal sealed class TableTagCursor
         // (d4seekSynchToCurrentPos, D4SEEK.C:1141), and it does not need the expression engine here
         // because a selectable tag's expression is always a bare field name (ADR-28).
         byte[] into = Buffer;
-        int length = RecordKey.Write(Converter, Source, current, into);
+        int length = RecordKey.Write(Converter, Source, current, (int)record, into);
         KeySearch key = KeySearch.Into(into, length, Converter.KeyLength, Converter.PadByte);
 
         // The record number is what picks this entry out of a run of equal keys, which is exactly

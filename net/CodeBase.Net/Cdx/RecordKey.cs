@@ -18,8 +18,9 @@ internal interface IKeyValueSource
     /// Returns the value the key is built from, for a record.
     /// </summary>
     /// <param name="record">The record to read.</param>
+    /// <param name="recordNumber">The number of the record the buffer holds.</param>
     /// <returns>The value.</returns>
-    ExpressionValue Read(RecordBuffer record);
+    ExpressionValue Read(RecordBuffer record, int recordNumber);
 }
 
 /// <summary>
@@ -50,12 +51,13 @@ internal sealed class ExpressionValueSource : IKeyValueSource
 
     /// <inheritdoc/>
     /// <value>
-    /// The deletion flag comes off the record rather than from the context, because it is the one
-    /// record-dependent thing a key may legally read: it is the same answer every time for the same
-    /// record, which is what a stored key needs.
+    /// The deletion flag and the record number come with the record rather than from the context,
+    /// because they are the record-dependent things a key may legally read: each is the same answer
+    /// every time for the same record, which is what a stored key needs. The reference sets the
+    /// number before it builds each key (R4REINDX.C:391), so a RECNO() key is the record's own.
     /// </value>
-    public ExpressionValue Read(RecordBuffer record) =>
-        evaluator.Evaluate(context with { Record = record, Deleted = record.Deleted });
+    public ExpressionValue Read(RecordBuffer record, int recordNumber) =>
+        evaluator.Evaluate(context with { Record = record, Deleted = record.Deleted, RecordNumber = recordNumber });
 }
 
 /// <summary>
@@ -78,12 +80,17 @@ internal static class RecordKey
     /// <param name="converter">The tag's resolved converter.</param>
     /// <param name="source">Where the value comes from.</param>
     /// <param name="record">The record to read.</param>
+    /// <param name="recordNumber">The number of the record the buffer holds.</param>
     /// <param name="destination">Where to write, at least the tag's key length.</param>
     /// <returns>How many bytes were written.</returns>
     /// <exception cref="CodeBaseException">The stored value cannot be read as its declared type.</exception>
     public static int Write(
-        SeekConverter converter, IKeyValueSource source, RecordBuffer record, Span<byte> destination) =>
-        WriteValue(converter, source.Read(record), destination);
+        SeekConverter converter,
+        IKeyValueSource source,
+        RecordBuffer record,
+        int recordNumber,
+        Span<byte> destination) =>
+        WriteValue(converter, source.Read(record, recordNumber), destination);
 
     /// <summary>
     /// Writes the key a tag holds for an evaluated value.

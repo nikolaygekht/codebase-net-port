@@ -17,8 +17,8 @@ Here a user hits an error.
 | A table with compressed data (`0x31`, flag byte 14) | reads it | ADR-56, **user's call** |
 | ~~A table with long field names (CodeBase's descriptor layout, flag byte 16)~~ | reads it | **Resolved 2026-11-12 (7a-1): supported**, user's call (ADR-72). The layout is read and gated by `LONGNAME`; the feature flags are read on `0x31` only, as the reference, gated by `FLAGS30` |
 | A field of type `7` (datetime with milliseconds, a CodeBase extension) | reads it | ADR-32 |
-| A tag over `DATE()`, `TIME()`, `RECNO()`, `RECCOUNT()` | opens it | ADR-49 (a key that can never be found again) |
-| A tag whose expression reads a two-digit year, under the default date policy | takes the century from the system clock | ADR-42 |
+| A tag over `DATE()`, `TIME()`, `RECCOUNT()` | opens it | **Kept 2026-11-12 (7a-2)**, user's call: ADR-73, which supersedes ADR-49 in part; documented on `Table.SelectTag` and in `README.md`. ~~`RECNO()`~~ is **supported** now, gated by `RECNOTAG` |
+| A tag keyed through the date picture (`DTOC`, `CTOD`), under the engine's default options | reads it under its compiled-in picture | **Implemented 2026-11-12 (7a-3)**, user's call: ADR-42's refusal had never been written, and the gap gave a wrong record set; ADR-74. Documented on `CodeBaseEngine.ExpressionOptions`, `Table.SelectTag` and in `README.md` |
 | GENERAL on a code page other than 1252/437/850; other collations (croatian, spanish, loaded from disk) | supports some | `PORTING-PLAN.md` §2.3, later |
 | A non-compact FoxPro 2.x index | refuses it too | — |
 | Keys of the OLE-DB types; collated Unicode keys | supports them | `PORTING-PLAN.md` §2.2 / §2.3 |
@@ -64,5 +64,7 @@ already planned as step 014.
 
 1. ~~**Long field names are refused with no ADR, and possibly on the wrong version.**~~ Resolved in
    7a-1: supported, and the flags read on `0x31` only (ADR-72).
-2. **ADR-49 and ADR-42 refuse tags the reference opens.** A table with such a tag reads, but the tag
-   cannot be used.
+2. **ADR-49 and ADR-42 refuse tags the reference opens.** ADR-49 resolved in 7a-2: `RECNO()`
+   supported, the other three kept and documented (ADR-73). ADR-42 turned out to refuse nothing — its
+   refusal was never implemented, and a tag keyed through the date picture answers a query wrongly;
+   that is 7a-3.

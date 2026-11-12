@@ -73,8 +73,14 @@ public sealed class CodeBaseEngine : IDisposable
     /// which means a tag whose expression reads a two-digit year is refused rather than keyed
     /// differently on a different machine. Set this to reproduce a particular build's answers. See
     /// ADR-42.
+    ///
+    /// Left unset, it reads and writes dates as [c]ExpressionOptions.Invariant[/c] does, but a tag whose
+    /// key passes through the date picture -- DTOC or CTOD anywhere in its expression -- is refused,
+    /// because the index does not record which picture built its keys and two pictures of one length
+    /// key the same date differently. Setting it, even to [c]Invariant[/c], says which picture that was.
+    /// The C library reads such a tag under whatever picture it was compiled with (ADR-74).
     /// </value>
-    public ExpressionOptions ExpressionOptions { get; set; } = ExpressionOptions.Invariant;
+    public ExpressionOptions ExpressionOptions { get; set; } = ExpressionOptions.Unchosen;
 
     /// <summary>
     /// Gets or sets which of a table's tags a query may be answered with.

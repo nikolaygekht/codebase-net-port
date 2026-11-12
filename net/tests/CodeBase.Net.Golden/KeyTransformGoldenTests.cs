@@ -33,6 +33,7 @@ public sealed class KeyTransformGoldenTests
         { "CDXDEEP", "CDXDEEP.cdx" },
         { "CDXTIME", "CDXTIME.cdx" },
         { "IDXONE", "IDXONE.cdx" },
+        { "RECNOTAG", "RECNOTAG.cdx" },
     };
 
     [Theory]
@@ -71,7 +72,7 @@ public sealed class KeyTransformGoldenTests
                 open.Go((int)stored.Record);
                 byte[] built = new byte[converter.KeyLength];
 
-                RecordKey.Write(converter, source, open.CurrentRecord, built).Should().Be(converter.KeyLength);
+                RecordKey.Write(converter, source, open.CurrentRecord, (int)stored.Record, built).Should().Be(converter.KeyLength);
 
                 built.Should().Equal(
                     stored.Key,
@@ -99,6 +100,7 @@ public sealed class KeyTransformGoldenTests
         ["CDXDEEP"] = 2400,
         ["CDXTIME"] = 512,
         ["IDXONE"] = 300,
+        ["RECNOTAG"] = 20,
     };
 
     [Fact]

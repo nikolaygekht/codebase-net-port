@@ -36,6 +36,8 @@ found and fixed.
 | 7 | **F4 + F5 — the tag cursor and the public API.** `TableTagCursor.SearchFor` per branch, `TypedSeekFor`; one test per public forwarding member of `Table`, `Tag`, `FieldCollection` and `CodeBaseEngine` that it reaches its target (ADR-67), plus `Table.QueryTags` and `Table.ReadMemo`'s own logic | off 0%; the nullable-seek fix's mutation reddens a layer-2 test, not only the golden one; no public member left at 0% |
 | 7a | **The divergences — each resolved or documented.** *(Added 2026-10-31, at the user's call.)* Go through `DIVERGENCES.md` entry by entry with the user, and for each decide one of: **fix** it (test first, as any defect here), **keep** it as a divergence by decision, or **defer** it to a named later step. A kept one gets an ADR where it has none (long field names first), and the user-facing documentation it lacks — the XML docs of the API that meets it and a "Differences from CodeBase" section in `README.md`. A deferred one gets its row in `PORTING-PLAN.md`. `DIVERGENCES.md` is rewritten to say, per entry, which it became and where | every entry in `DIVERGENCES.md` names its outcome and its record (ADR, docs, test or plan row); each fix has a failing-first test and a mutation that reddens it; `README.md` lists every kept divergence a caller can meet |
 | 7a-1 | **Long field names, read** *(added 2026-11-12, the first 7a entry; the user decided support)*. Its own plan below | its own gate below |
+| 7a-2 | **A tag over `RECNO()`** *(added 2026-11-12; the user decided `RECNO()` supported, the other three refused)*. Its own plan below | its own sub-steps below |
+| 7a-3 | **A tag keyed through the date picture** *(added 2026-11-12; ADR-42's refusal, never implemented — a wrong record set found while reviewing it)*. Its own plan below | its own sub-steps below |
 | 8 | **Close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`, `claude/dev/README.md`, root `STATE.md` | the gate |
 
 ## Gate
@@ -109,3 +111,47 @@ git status --short corpus      &:: only LONGNAME.* and FLAGS30.* — no existing
   `FLAGS30` sets every byte, so the corpus witnesses both.
 - **`dump.cpp` changing an existing dump.** Its new branch is taken only on `0x31` with `flags[4] = 1`;
   sub-step d's byte-identical check catches the rest.
+
+---
+
+## 7a-2 — a tag over `RECNO()`
+
+Design: `DESIGN.md` §7a-2.
+
+### Tests
+
+| Layer | Tests | Catches |
+|---|---|---|
+| 1 Unit | `SeekConverterKindTests`: a `RECNO()` tag resolves (numeric, 8 bytes); `DATE()`, `TIME()`, `RECCOUNT()` still refused, each naming its function | the refused set |
+| 2 Component | a `RECNO()` key rebuilt for a record is that record's number, and differs between two records (over `ExpressionValueSource`) | the number reaching the context — what layer 4 alone would show only as a mislanded cursor |
+| 4 Golden | `RECNOTAG`: every stored key rebuilt from its record (`KeyTransformGoldenTests`), index, seek and seek-type gates, the query gates | the reference's keys and answers |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Tests for the refused set and the key's number (red), then `SeekConverter`, `IKeyValueSource`, `RecordKey`, `TableTagCursor` (green) | removing the number from the context reddens the layer-2 test |
+| b | Generator: `case-recnotag.cpp`; regenerate; existing files byte-identical | `git status net/corpus`: additions only |
+| c | Golden: `RECNOTAG` into the index, seek, key-rebuild and query lists; counts raised by exactly the new case | green; reverting `Read`'s number reddens `KeyTransformGoldenTests` |
+| d | Records: ADR-73 (supersedes ADR-49 in part); `Table.SelectTag` XML doc; `README.md` "Differences from CodeBase"; `EXPRESSIONS.md` if it lists the refused set; corpus READMEs; `DIVERGENCES.md`; `mutate4csharp` on `SeekConverter.cs`'s refusal and `RecordKey.cs` | survivors explained |
+
+---
+
+## 7a-3 — a tag keyed through the date picture
+
+Design: `DESIGN.md` §7a-3.
+
+### Tests
+
+| Layer | Tests | Catches |
+|---|---|---|
+| 1 Unit | `SeekConverterKindTests`: `DTOC(K_DATE)` and `CTOD(K_TEXT)` refused under the unchosen options, naming the function; accepted under `ExpressionOptions.Invariant` and `.CodeBase` chosen; an expression without either accepted unchosen. `ExpressionOptions`: the default is unchosen, every factory and `With*` result chosen | the rule |
+| 4 Golden | over `CDXEXPR`: default engine — `T_DTOC` refused, absent from `QueryTags`, and a `DTOC` filter's count equal to the per-record count; reference picture — for each distinct stored `T_DTOC` key, the filter naming it counts as many records as the reference stored under it, by tag and per record alike | the wrong record set, against the reference's keys |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | The tests above (red), then `ExpressionOptions`, `CodeBaseEngine`, `SeekConverter` (green) | each red first; mutating the check reddens both layers |
+| b | Golden tests that select every tag under default options, if any now meet the refusal: configure the picture the dump was taken under, as `ExpressionTagGoldenTests` does | Release green |
+| c | Records: ADR-74; `CodeBaseEngine.ExpressionOptions` and `Table.SelectTag` docs; `README.md` "Differences from CodeBase"; `DIVERGENCES.md`; `mutate4csharp` on `SeekConverter.cs`'s new check | survivors explained |

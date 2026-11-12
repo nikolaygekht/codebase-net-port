@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 done; the next divergence)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-3 done; the next divergence)
 
 ## Done so far
 
@@ -194,7 +194,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
   - Release 2895 (1 skipped) + 1133 green.
 - [ ] step 7a — the divergences, each resolved or documented (added at the user's call)
   - [x] 7a-1 — long field names, read (2026-11-12). The user decided **support**, and the feature
-    flags read on `0x31` only, as the reference (ADR-72). Not yet committed.
+    flags read on `0x31` only, as the reference (ADR-72). Committed `ce0ba23`.
     - **a, flags.** `FeatureFlags.Parse(bytes, extended)` returns all clear unless the version is
       `0x31`. The old not-extended test set the bytes to 9, which no flag reads as set, so it passed
       on the defect; it sets 1 now and checks all five flags. Layer 2: VFPTYPE with byte 16 = 1
@@ -234,6 +234,69 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
       and `:113` `>` to `>=`, each moving the same `ErrorCode.Data` refusal one check earlier; `:66`
       the same in the short run, which predates this step.
     - Release 2913 passed, 1 skipped, + 1233 golden, green.
+  - [x] 7a-2 — a tag over `RECNO()` (2026-11-12). The user decided: `RECNO()` supported, `DATE()`,
+    `TIME()`, `RECCOUNT()` kept refused and documented (ADR-73, superseding ADR-49 in part).
+    - **The reference keys `RECNO()` by the record's own number**: building a tag sets `recNum` before
+      each key (R4REINDX.C:387-391, r4reinde.c:762-767), so the key is stable.
+    - **a, library.** `SeekConverter.RefuseIfNotTheSameTwice` no longer lists `RECNO`.
+      `IKeyValueSource.Read` and `RecordKey.Write` take the record's number beside its buffer: the
+      value source replaced the record and its deletion flag in the context but not its number, so a
+      `RECNO()` key would have been rebuilt as 0 and the cursor's synchronization would have landed
+      wrong. Tests: `SeekConverterKindTests` (`RECNO()` keys as a double, `K_TEXT + STR(RECNO(), 4)`
+      as text, the three others still refused); `RecordKeyTests` (a `RECNO()` key is the number of the
+      record it is built for). Each change mutated reddens its test.
+    - **b, generator.** `case-recnotag.cpp`: `R_RECNO` over `RECNO()`, `R_NAMENO` over
+      `NAME + STR(RECNO(), 4)`, ten records, three filters — the reference answers all three from
+      `R_RECNO`. Existing corpus byte-identical; five files added.
+    - **c, golden — and a seek defect it found.** `R_NAMENO`'s `prefix-half` case, `"beta   "` in a
+      14-byte tag, is found by the reference and was missed by the port: a search value with trailing
+      pad was compared over the whole key length, the reference compares it over the length given
+      (b4block.c:2303-2325). Every earlier witness had a value as long as the key, where the readings
+      agree; this is the corpus's first key with pad inside it. Fixed in `KeySearch` (the loop's width
+      and the successor's width are the value's), test first: `KeySearchTests` gained the shorter
+      padded value and its successor. CDX-FORMAT.md §7 corrected. `SeekTypeGoldenTests`' helper
+      learned a top-level `+`, its type taken from the reference's function table by the left
+      operand's type. Counts raised by exactly the new case (tables 21, indexed 11, tags 63, seeks
+      396, seek-next runs 170, key rebuilds `RECNOTAG` 20); `LeafEvaluation`'s floor for it is 2.
+      Mutated, the number in the context reddens `KeyTransformGoldenTests` for `RECNOTAG`, and the
+      comparison width seven seek gates.
+    - **d, records.** ADR-73; CDX-FORMAT.md §7; `README.md` gained "Differences from CodeBase" with
+      this entry; `Table.SelectTag`'s exception doc (its old text, "not a plain field name", predated
+      expression tags); both corpus READMEs; `DIVERGENCES.md`.
+    - **`mutate4csharp`**: `RecordKey.cs` 7/7. `KeySearch.cs` 41/47, then two killed by new
+      assertions (a key differing in its first byte; one holding a non-pad byte just past the value's
+      length). Four equivalent: `:145` and `:156` `>=` to `>` (equal lengths give the same answer by
+      either branch; the second is a fast path only), `:166` `<` to `<=` (the buffer holds the pad
+      byte at `Length` anyway), `:169` `<` to `<=` (reached only when the bytes differ).
+    - Seen, not acted on: `TableTagCursor.Synchronize`'s comment says a selectable tag's expression
+      "is always a bare field name (ADR-28)", which stopped being true in step 010.
+  - [x] 7a-3 — a tag keyed through the date picture (2026-11-12). Reviewing ADR-42's entry found its
+    refusal had never been written, and the gap gave a **wrong record set**: `CDXEXPR`'s `T_DTOC`
+    (keyed under `MM/DD/YY`) was used under the default picture `CCYYMMDD`, so
+    `DTOC(K_DATE) = "01/01/00"` counted 2 by the tag and 0 by the records. The user decided: implement
+    ADR-42 as written (ADR-74).
+    - **a, library.** `ExpressionOptions.IsChosen` and an internal `Unchosen` instance (`Invariant`'s
+      values, unmarked) as `CodeBaseEngine`'s default; every public and derived instance is chosen.
+      `SeekConverter.RefuseIfThroughAnUnchosenPicture` refuses a key with a `DTOC` (either row) or
+      `CTOD` node under unchosen options, naming the function and the setting. `QueryTags` already
+      skips a tag that cannot be selected, so the optimizer is covered with no change. Tests:
+      `SeekConverterKindTests` (four expressions refused unchosen, accepted under `CodeBase` and under
+      `Invariant` chosen; `DTOS` and a bare date need no choice), `ExpressionOptionsTests`.
+    - **b, golden.** `DatePictureTagGoldenTests` over `CDXEXPR`: under the default, `T_DTOC` is refused
+      and absent from `QueryTags`, and every `DTOC` filter counts what the records say; under
+      `ExpressionOptions.CodeBase`, each filter naming a stored `T_DTOC` key counts exactly the records
+      the reference stored under it, by tag and per record. `QueryEquivalenceGoldenTests`' every-tag
+      gate and `SeekTypeGoldenTests` select every tag, `T_DTOC` and `T_CTOD` among them, and now set
+      the picture and century the dump was taken under, as `ExpressionTagGoldenTests` already did.
+    - **c, records.** ADR-74; `CodeBaseEngine.ExpressionOptions` and `Table.SelectTag` docs;
+      `README.md` "Differences from CodeBase"; `DIVERGENCES.md`.
+    - **Mutations.** The check disabled: 3 unit and 2 golden tests red; the engine's default chosen
+      again: 1 unit and 2 golden red. `mutate4csharp --lines` over the new check: its one site, the
+      second `DTOC` row, survived — no test reached `DTOC` over a computed date — and is killed by
+      `DTOC(K_DATE + 1)`.
+    - A note for the mutation checks by hand: a golden run with `--no-build` after building only the
+      unit project reads a stale library from the golden project's own `bin`; build the solution.
+    - Release 2924 passed (1 skipped) + 1305 golden, green.
 - [ ] step 8 — close
 
 ## Notes for the next session

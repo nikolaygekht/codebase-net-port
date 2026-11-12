@@ -40,6 +40,7 @@ turns out to be untested, add a generator case and regenerate.
 | `TAGBAD.DBF` + `.cdx` | `0x30` | **The index the reference writes and refuses to open.** `T_TEXT` by `i4create`, then `G_DESC` over `DESCEND(K_TEXT)` added by `i4tagAdd` under GENERAL, which records key length 20 where the open resolves 40. No `.cdx.dump.txt` — the reference cannot open the index — but `TAGBAD.open.dump.txt` records its answer, `refused errorCode=-310`, and the table dump is taken without the index. 4 records, cp1252. |
 | `LONGNAME.DBF` + `.cdx` + `.fpt` | `0x31` | **CodeBase's long-field-name layout** (`flags[4] = 1`), which FoxPro cannot read: each descriptor is its last 21 bytes, a 2-byte length and the name, with no 263-byte reserve. Names given in mixed case and stored as given (`Customer_Name`), reported upper-cased after open; `SHIP_STATE` is ten characters and `ORDER_TOTAL` eleven; a nullable long-named date puts `_NullFlags` in the layout too; a long-named memo with one payload past a block. Four tags by `i4create` over long names, one in mixed case, and five filters through `dump-query.cpp`, one qualified by the alias. 8 records. See DBF-FORMAT.md §4.2, ADR-72. |
 | `FLAGS30.DBF` + `.fpt` | `0x30` | **Every feature-flag byte set on a table that is not `0x31`.** An ordinary table with a memo, whose bytes 12-19 the generator sets to `1` after writing it; the reference opens and dumps it as an ordinary table, because it reads those bytes on `0x31` only (DBF-FORMAT.md §2.2). The dump does not show the bytes — the file does. 4 records. ADR-72. |
+| `RECNOTAG.DBF` + `.cdx` | `0x30` | **Tags over `RECNO()`**: `R_RECNO` over `RECNO()` alone and `R_NAMENO` over `NAME + STR(RECNO(), 4)`, ten records with names repeating. The reference keys each record by its own number (R4REINDX.C:391), and answers its three filters from `R_RECNO`. `R_NAMENO` is the corpus's first key with pad bytes inside it, which is what witnessed CDX-FORMAT.md §7's own-length rule. ADR-73. |
 
 ## Benchmark data — `benchmark/`
 
@@ -107,7 +108,7 @@ swept into every data-driven golden test. The gates that want these name them.
 The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge cases (zero,
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
 records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters,
-`QRYGATE` 24, `TAGCTX`, `TAGGEN` and `LONGNAME` 8 each, and `TAGBAD` and `FLAGS30` 4.
+`QRYGATE` 24, `TAGCTX`, `TAGGEN` and `LONGNAME` 8 each, `RECNOTAG` 10, and `TAGBAD` and `FLAGS30` 4.
 
 ### What `CMPMEMO` pins down
 
@@ -124,7 +125,7 @@ record with no memo shows `block=0 type=0 stored=0`. Only this table has one.
 
 `CMPMEMO.fpt`'s compressed bytes are what zlib 1.3.1 produced; see the generator README.
 
-`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `IDXONE`, `LONGNAME`, `QRYGATE`, `TAGBAD`, `TAGCTX` and `TAGGEN` are the tables whose header byte 28 carries the
+`CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `IDXONE`, `LONGNAME`, `QRYGATE`, `RECNOTAG`, `TAGBAD`, `TAGCTX` and `TAGGEN` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
 (`i4create.c:1404-1418`).
 

@@ -2544,3 +2544,69 @@ flag, which is what the reference reads.
 
 **Rejected — keeping the refusal.** The layout is the reference's own, documented and now witnessed;
 refusing it refused tables the reference opens.
+
+## ADR-73 — RECNO() may key a tag; DATE(), TIME() and RECCOUNT() may not · accepted
+
+**Date.** 2026-11-12. Decided by the user during step 013, sub-step 7a-2. Supersedes ADR-49 in part.
+
+**Context.** ADR-49 refused a tag whose expression reads `DATE()`, `TIME()`, `RECNO()` or
+`RECCOUNT()`, on the ground that such a key could never be found again. For three of them that holds:
+the clock and the table's size change, so a key rebuilt later is not the one stored. For `RECNO()` it
+does not. The reference sets the record number to each record's own before it evaluates that record's
+key (R4REINDX.C:387-391, r4reinde.c:762-767), and `RECNO()` reads it (E4FUNCTI.C:2509-2516), so a
+record keys by its own number every time — `NAME + STR(RECNO(), 4)` is the usual way to make a name
+tag unique.
+
+**Decision.** `RECNO()` is key-legal; the other three stay refused when the tag is selected, naming
+the function. A key rebuilt for a record — to land a tag on the table's current record — is evaluated
+with that record's number, which travels with its buffer rather than in the context a cursor was built
+with. Gated by corpus case `RECNOTAG`: every stored key rebuilt from its record, the seeks, and the
+reference's own query answers, which use the `RECNO()` tag.
+
+**Consequence.** The three refusals are a divergence a caller can meet, documented on
+`Table.SelectTag` and in `README.md`.
+
+**Found on the way, and fixed.** `RECNOTAG`'s `NAME + STR(RECNO(), 4)` is the corpus's first key with
+pad bytes inside it, and it showed that a search value with trailing pad was compared over the whole
+key length. The reference compares it over the length it was given, pad included
+(b4block.c:2303-2325): `"beta   "` in a 14-byte tag finds `"beta         1"`, which the port missed.
+Every earlier witness had a value as long as the key, where the two readings agree. CDX-FORMAT.md §7
+is corrected.
+
+**Rejected — refusing all four, as before.** It refused a tag the reference keys and maintains
+correctly.
+
+**Rejected — opening all four for walking by their stored keys.** Landing on the current record
+rebuilds its key, which for the other three would not be the stored one; and the optimizer must never
+answer a filter from them.
+
+## ADR-74 — A tag keyed through the date picture is refused until a caller chooses the picture · accepted
+
+**Date.** 2026-11-12. Decided by the user during step 013, sub-step 7a-3. Implements ADR-42.
+
+**Context.** ADR-42 decided that a tag whose key passes through the date picture is refused unless the
+picture is explicitly configured: the index records a key's length and not the picture, and two
+pictures of one length (`MM/DD/YY`, `DD.MM.YY`) key the same date differently. Going through
+`DIVERGENCES.md` found that the refusal was never written. `CDXEXPR`'s `T_DTOC`, keyed under
+`MM/DD/YY`, was selected under the engine's default picture `CCYYMMDD` — eight characters too — and the
+optimizer answered from its stored keys while the per-record check read through the default:
+`DTOC(K_DATE) = "01/01/00"` counted 2 by the tag and 0 by the records. A wrong record set, unseen
+because no query case filters on `DTOC` and every golden test over `T_DTOC` configured the picture.
+
+**Decision.** A key expression with `DTOC` or `CTOD` anywhere in it is refused when the tag is
+selected, naming the function and the setting, unless the engine's `ExpressionOptions` were chosen.
+"Chosen" is a mark on the options object: an engine's untouched default is an internal instance with
+`Invariant`'s values marked unchosen; every public instance and everything derived from one is chosen,
+so a caller who assigns `ExpressionOptions.Invariant` on purpose has chosen it. `Table.QueryTags`
+already leaves out a tag that cannot be selected, so the optimizer never uses such a tag under the
+default either. Gated against the reference's own keys for `T_DTOC` in `CDXEXPR.cdx.dump.txt`.
+
+**Consequence.** Under the default, such a tag cannot be used; a `DTOC` filter still works, by the
+per-record check, under the default picture. A caller who sets the picture the tag was built with gets
+the tag back. `README.md` lists it under "Differences from CodeBase".
+
+**Rejected — a flag on the engine, passed down.** The options already reach `SeekConverter.For`; a
+mark on them needs no new parameter on any path.
+
+**Rejected — refusing only when the picture is the invariant one.** "Explicitly configured" is ADR-42's
+word, and a caller may choose `CCYYMMDD` on purpose.

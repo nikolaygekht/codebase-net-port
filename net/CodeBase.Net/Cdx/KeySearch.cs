@@ -11,11 +11,13 @@ namespace CodeBase.Net.Cdx;
 /// [c]"CUSTOMER-A"[/c] finds [c]"CUSTOMER-ACCT-0599  "[/c] and reports it as a match. That is what a
 /// partial seek is for.
 ///
-/// A value **with trailing pad** stands for the whole key. It is compared against the key over the full
-/// key length, with its pad bytes taking part — so [c]"AB      "[/c] does *not* match
-/// [c]"AB\0\0\0\0\0\0"[/c], because at the third byte a NUL sorts below a space. Stripping the pad and
-/// comparing two bytes would match it, and the reference implementation does not: it lands on
-/// [c]"AB      "[/c] instead. A value that is entirely pad is this same case.
+/// A value **with trailing pad** is compared over the length it was given, with its pad bytes taking
+/// part like any other — so [c]"AB      "[/c] does *not* match [c]"AB\0\0\0\0\0\0"[/c], because at the
+/// third byte a NUL sorts below a space. Stripping the pad and comparing two bytes would match it, and
+/// the reference implementation does not: it lands on [c]"AB      "[/c] instead. Nor is the value
+/// padded out further than it was given: [c]"beta   "[/c] in a fourteen-byte tag finds
+/// [c]"beta         1"[/c], because the reference compares the seven bytes and no more
+/// (b4block.c:2303-2325). A value that is entirely pad is this same case.
 ///
 /// Comparison is unsigned throughout. Signed bytes would misorder every accented character in a collated
 /// key and every complemented negative in a numeric one.
@@ -55,11 +57,11 @@ internal readonly struct KeySearch
     /// </value>
     public int Length { get; }
 
-    /// <summary>Gets a value indicating whether the value stands for a whole key rather than a prefix.</summary>
+    /// <summary>Gets a value indicating whether the value's trailing pad bytes take part in the comparison.</summary>
     /// <value>
-    /// True when the caller supplied trailing pad bytes. The comparison then runs over the whole key
-    /// length with those pad bytes participating, which is what makes a key continuing below the pad sort
-    /// *before* the value.
+    /// True when the caller supplied trailing pad bytes. The comparison then runs over the length the
+    /// caller supplied with those pad bytes participating, which is what makes a key continuing below the
+    /// pad sort *before* the value.
     /// </value>
     public bool ComparesPadded { get; }
 
@@ -111,8 +113,8 @@ internal readonly struct KeySearch
         while (content > 0 && copy[content - 1] == padByte)
             content--;
 
-        // An all-pad value keeps its length and compares as a whole key (b4block.c:2211-2216). Any other
-        // value that carried pad compares as a whole key too; one that carried none is a prefix.
+        // An all-pad value keeps its length (b4block.c:2211-2216). Any value that carried pad compares
+        // over the length given, pad included (b4block.c:2303-2325); one that carried none is a prefix.
         bool allPad = length > 0 && content == 0;
 
         return new KeySearch(
@@ -154,10 +156,10 @@ internal readonly struct KeySearch
         if (paddedWidth == keyLength && key.Length >= keyLength)
             return key[..keyLength].SequenceCompareTo(value.AsSpan(0, keyLength));
 
-        // The narrow cases keep the loop, because the buffer does not hold what they need: a caller
-        // that filled fewer bytes than the key length has no pad stored past its own width, and a
-        // stored key shorter than the key length must be compared over what there is.
-        int width = Math.Min(key.Length, keyLength);
+        // The narrow cases keep the loop: a caller that filled fewer bytes than the key length is
+        // compared over its own width and no further (b4block.c:2303-2325), and a stored key shorter
+        // than that must be compared over what there is.
+        int width = Math.Min(key.Length, paddedWidth);
 
         for (int i = 0; i < width; i++)
         {
@@ -200,10 +202,10 @@ internal readonly struct KeySearch
     /// </remarks>
     public bool TryIncrement(out KeySearch incremented)
     {
-        // The value as it compares: content alone for a prefix, and the whole key width for a value that
+        // The value as it compares: content alone for a prefix, and the width supplied for a value that
         // compares padded — the successor has to be computed at the width the comparison runs over, or it
         // lands inside the value rather than past it.
-        int width = ComparesPadded ? keyLength : Length;
+        int width = ComparesPadded ? paddedWidth : Length;
         byte[] next = new byte[width];
 
         value.AsSpan(0, Math.Min(Length, width)).CopyTo(next);

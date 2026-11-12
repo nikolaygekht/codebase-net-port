@@ -166,6 +166,7 @@ internal sealed class SeekConverter
             options);
 
         RefuseIfNotTheSameTwice(compiled, expression);
+        RefuseIfThroughAnUnchosenPicture(compiled, expression, options);
 
         // One compile, one resolution, one refusal: the pad byte follows from the same result type
         // the kind does, so it is read off the expression already compiled here rather than by
@@ -261,11 +262,13 @@ internal sealed class SeekConverter
     /// Refuses an expression whose value is not the same twice (Decision 5).
     /// </summary>
     /// <value>
-    /// A key built from the clock or from where the cursor happens to be is a key nothing can find
-    /// again, and the reference does not forbid it — it simply produces a tag nobody can maintain.
-    /// This port refuses it when the tag is [i]selected[/i], and says which function made it so,
-    /// because a caller who sees the name can fix the expression. A filter over the same functions
-    /// evaluates normally; it is only a stored key that cannot survive them.
+    /// A key built from the clock or from the table's size is a key nothing can find again, and the
+    /// reference does not forbid it — it simply produces a tag nobody can maintain. This port refuses
+    /// it when the tag is [i]selected[/i], and says which function made it so, because a caller who
+    /// sees the name can fix the expression. A filter over the same functions evaluates normally; it
+    /// is only a stored key that cannot survive them. RECNO() is not among them: the reference sets
+    /// the record number before it builds each key (R4REINDX.C:391), so a record keys by its own
+    /// number every time (ADR-73).
     /// </value>
     private static void RefuseIfNotTheSameTwice(CompiledExpression compiled, string expression)
     {
@@ -275,7 +278,6 @@ internal sealed class SeekConverter
             {
                 FunctionRows.Today => "DATE",
                 FunctionRows.Time => "TIME",
-                FunctionRows.RecordNumber => "RECNO",
                 FunctionRows.RecordCount => "RECCOUNT",
                 _ => null,
             };
@@ -286,6 +288,43 @@ internal sealed class SeekConverter
                     ErrorCode.NotSupported,
                     $"The key expression '{expression}' uses {name}(), whose value is not the same " +
                     "twice, so a key built from it could never be found again.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Refuses an expression that passes a date through the picture when nobody chose the picture.
+    /// </summary>
+    /// <value>
+    /// The index records a key's length and not the picture it was built with, and MM/DD/YY and DD.MM.YY
+    /// are one length and key the same date differently. Read under a picture nobody vouched for, such a
+    /// tag would be walked by keys this library does not compute and would answer a query differently
+    /// from the per-record check of the same filter. The caller who sets the engine's options says which
+    /// picture built the tag (ADR-42, ADR-74).
+    /// </value>
+    private static void RefuseIfThroughAnUnchosenPicture(
+        CompiledExpression compiled, string expression, ExpressionOptions options)
+    {
+        if (options.IsChosen)
+            return;
+
+        foreach (ExpressionNode node in compiled.Nodes)
+        {
+            string? name = node.Row switch
+            {
+                FunctionRows.DateToText or FunctionRows.DateToText + 1 => "DTOC",
+                FunctionRows.TextToDate => "CTOD",
+                _ => null,
+            };
+
+            if (name is not null)
+            {
+                throw new CodeBaseException(
+                    ErrorCode.NotSupported,
+                    $"The key expression '{expression}' uses {name}(), whose keys depend on the date " +
+                    "picture the index was built with, and the index does not record it. Set " +
+                    "CodeBaseEngine.ExpressionOptions to that picture -- ExpressionOptions.CodeBase for " +
+                    "the C library's default build.");
             }
         }
     }

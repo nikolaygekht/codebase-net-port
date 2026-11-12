@@ -20,14 +20,14 @@ public sealed class IndexGoldenTests
 {
     /// <summary>Every index file the corpus holds, with the table it belongs to.</summary>
     public static TheoryData<string> AllIndexes() =>
-        ["CDXBASE.cdx", "CDXCOLL.cdx", "CDXDEEP.cdx", "CDXTIME.cdx", "IDXONE.cdx", "IDXONE.IDX", "LONGNAME.cdx", "TAGCTX.cdx", "TAGGEN.cdx"];
+        ["CDXBASE.cdx", "CDXCOLL.cdx", "CDXDEEP.cdx", "CDXTIME.cdx", "IDXONE.cdx", "IDXONE.IDX", "LONGNAME.cdx", "RECNOTAG.cdx", "TAGCTX.cdx", "TAGGEN.cdx"];
 
     [Fact]
     public void TheGateCoversEveryIndexInTheCorpus()
     {
         // Part of the gate rather than commentary: a data-driven suite that discovers nothing reports
-        // success having proved nothing. Nine files, and the two shapes of one tree among them.
-        AllIndexes().Should().HaveCount(9);
+        // success having proved nothing. Ten files, and the two shapes of one tree among them.
+        AllIndexes().Should().HaveCount(10);
     }
 
     [Theory]

@@ -464,12 +464,19 @@ search value means one of *two* things, decided by whether the caller supplied t
 - **No trailing pad ⇒ a prefix.** Only the value's own length is compared, so a 10-byte
   `"CUSTOMER-A"` against a 20-byte key finds `"CUSTOMER-ACCT-0599  "` and reports `r4success`
   (`CDXDEEP.cdx`, tag `D_PFX`, case `prefix-half`). This is the partial seek.
-- **Trailing pad ⇒ the whole key.** The value is compared across the full key length with its pad
-  bytes taking part. So `"AB      "` in an 8-byte tag does **not** match the stored key
-  `"AB\x00\x00\x00\x00\x00\x00"`, even though stripping the pad and comparing two bytes would:
-  a NUL is below a space, so that key sorts *before* the value, and the seek lands on `"AB      "`
-  instead (`CDXBASE.cdx`, tag `T_BIN`, cases `middle-key` and `prefix-half`). An all-pad value is this
-  same case, which is what "compare the full original length" in the pseudocode above amounts to.
+- **Trailing pad ⇒ compared over the length given, pad included.** So `"AB      "` in an 8-byte tag
+  does **not** match the stored key `"AB\x00\x00\x00\x00\x00\x00"`, even though stripping the pad
+  and comparing two bytes would: a NUL is below a space, so that key sorts *before* the value, and the
+  seek lands on `"AB      "` instead (`CDXBASE.cdx`, tag `T_BIN`, cases `middle-key` and
+  `prefix-half`). An all-pad value is this same case, which is what "compare the full original length"
+  in the pseudocode above amounts to.
+- **…and no further than the length given.** A padded value shorter than the key is *not* padded out
+  to the key's length: the stripped bytes are compared back one by one against the key
+  (b4block.c:2303-2325), and comparison stops at the value's own end. So `"beta   "` (7 bytes) in a
+  14-byte `NAME + STR(RECNO(), 4)` tag finds `"beta         1"` with `r4success` (`RECNOTAG.cdx`, tag
+  `R_NAMENO`, case `prefix-half`). *Corrected 2026-11-12:* this section said "the whole key", which
+  every earlier witness — values as long as the key — could not tell apart; `RECNOTAG` is the first
+  key with pad bytes inside it.
 
 The two rules are what the `b4calcBlanks` stripping plus the sub-pad-byte handling at b4block.c:2245-2416
 add up to; the second is easy to miss because every exact-length hit behaves identically under either

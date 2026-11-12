@@ -30,7 +30,7 @@ public sealed class KeyLengthGoldenTests
     [Fact]
     public void TheGateCoversEveryIndexedTable()
     {
-        IndexedTables().Should().HaveCount(10);
+        IndexedTables().Should().HaveCount(11);
     }
 
     [Theory]

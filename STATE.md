@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 (long field names read, ADR-72) are committed locally and not pushed, and the tree is clean. Left in 013: the rest of sub-step 7a, the divergences gone through with the user, and 8, the close.**
+**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-3 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74) are committed locally and not pushed, and the tree is clean. Left in 013: the rest of sub-step 7a, the divergences gone through with the user, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -1017,8 +1017,11 @@ Sub-steps 1–7 are done, and 7a's first entry, 7a-1; the record is the step's
   the XML docs of the API that meets it and a "Differences from CodeBase" section in `README.md`; a
   deferred one gets its row in `PORTING-PLAN.md`. **Long field names are done** (7a-1, 2026-11-12):
   supported, the feature flags read on `0x31` only, gated by new corpus cases `LONGNAME` and
-  `FLAGS30` (ADR-72). Next from its "worth looking at first": ADR-49 and ADR-42, which refuse tags
-  the reference opens.
+  `FLAGS30` (ADR-72). **Tags over `RECNO()` are supported** (7a-2, ADR-73), `DATE()`/`TIME()`/
+  `RECCOUNT()` kept refused and documented; on the way, a padded search value shorter than its key
+  is now compared over its own length, as the reference does (CDX-FORMAT.md §7). **ADR-42's refusal
+  is implemented** (7a-3, ADR-74): it had never been written, and a `DTOC` tag answered queries wrongly
+  under the default picture. Next: the rest of `DIVERGENCES.md` §1–§3.
 - **8, the close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on
   `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`,
   `claude/dev/README.md`, this file. Push once the user says so.

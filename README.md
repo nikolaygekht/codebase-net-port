@@ -54,6 +54,22 @@ against a brute-force full scan.
 Multi-table joins, Unicode collated keys, additional collations and DBT memo are possible later; see
 [the porting plan](claude/PORTING-PLAN.md) for the full scope and the priority of each capability.
 
+## Differences from CodeBase
+
+Where this library deliberately answers differently from the C library, each with the decision behind
+it in [the decision record](claude/ARCHITECTURE-DECISIONS.md):
+
+- **A tag keyed by `DATE()`, `TIME()` or `RECCOUNT()` is refused when selected** (ADR-73). Such a key
+  is the clock or the table's size at the moment it was built, so it can never be found again; the C
+  library opens the tag and maintains an index that disagrees with itself. The refusal names the
+  function. A tag keyed by `RECNO()` is supported — a record's number is the same every time.
+- **A tag keyed through the date picture — `DTOC` or `CTOD` in its expression — is refused until
+  `CodeBaseEngine.ExpressionOptions` is set** (ADR-42, ADR-74). The index does not record which
+  picture built its keys, and two pictures of one length key the same date differently, so the C
+  library reads such a tag under whatever picture it was compiled with. Set the options to the
+  picture the index was built with — `ExpressionOptions.CodeBase` for the C library's default build —
+  and the tag is used.
+
 ## Requirements
 
 .NET 8 or later. No native dependencies, no NuGet dependencies, and nothing platform-specific in the

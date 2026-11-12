@@ -197,6 +197,7 @@ and its own subdirectory.
 | `TAGBAD.DBF` | `0x30` | that refused file, kept: `T_TEXT` by `i4create`, `G_DESC` over `DESCEND(K_TEXT)` added by `i4tagAdd` under GENERAL. The table is dumped with `autoOpen` off; `TAGBAD.open.dump.txt` records what `i4open` answered (`refused errorCode=-310`), and the case fails if the index ever opens |
 | `LONGNAME.DBF` | `0x31` | CodeBase's long-field-name layout, chosen by `d4create` itself when a name passes ten characters (D4CREATE.C:869): mixed-case names stored as given, a 10- and an 11-character name, a nullable long-named date (so `_NullFlags` is in the layout), a long-named memo; four tags by `i4create` and five filters. `dump.cpp` prints this layout in the usual descriptor line, taking its branch only on `0x31` with `flags[4] = 1`, so every other dump is unchanged |
 | `FLAGS30.DBF` | `0x30` | an ordinary table with a memo whose eight flag bytes are set to `1` after `d4close`, then dumped through `d4open`: the reference reads the flags on `0x31` only. Dumped by `dumpTable` after `finishUndumped`, because the bytes are set between the two |
+| `RECNOTAG.DBF` | `0x30` | tags over `RECNO()`: `R_RECNO` over `RECNO()`, `R_NAMENO` over `NAME + STR(RECNO(), 4)`, both by `i4create`; ten records with names repeating, and three filters |
 
 One case is not a corpus case at all:
 

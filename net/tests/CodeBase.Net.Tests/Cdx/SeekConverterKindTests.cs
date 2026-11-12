@@ -14,7 +14,8 @@ namespace CodeBase.Net.Tests.Cdx;
 /// The kinds are i4init.c:557-753's rows as KEY-COLLATION.md section 2 lists them: text keys as
 /// its bytes, or as weights under a collation; every number, a date as a double and numeric text
 /// key through the double transform; and each of the others through its own. The refusal is
-/// 010-expr's Decision 5: a key built from the clock or the cursor could never be found again.
+/// 010-expr's Decision 5: a key built from the clock or the table's size could never be found again.
+/// A record's own number can be: the reference sets it before each key it builds (ADR-73).
 /// </value>
 [Trait("Layer", "Component")]
 public sealed class SeekConverterKindTests
@@ -50,6 +51,8 @@ public sealed class SeekConverterKindTests
     [InlineData("K_TS", "", 8, "DateTime")]
     [InlineData("K_SFLT", "", 4, "Single")]
     [InlineData("K_LOG", "", 1, "Logical")]
+    [InlineData("RECNO()", "", 8, "Double")]
+    [InlineData("K_TEXT + STR(RECNO(), 4)", "", 14, "Character")]
     public void ATagKeysByTheTypeItsExpressionProduces(string expression, string collation, int keyLength, string kind)
     {
         Converter(expression, keyLength, collation).Kind.Should().Be(Enum.Parse<KeyKind>(kind));
@@ -58,7 +61,6 @@ public sealed class SeekConverterKindTests
     [Theory]
     [InlineData("DTOS(DATE())", 8, "DATE")]
     [InlineData("TIME()", 8, "TIME")]
-    [InlineData("STR(RECNO(), 10)", 10, "RECNO")]
     [InlineData("STR(RECCOUNT(), 10)", 10, "RECCOUNT")]
     [InlineData("K_TEXT + TIME()", 18, "TIME")]
     public void AKeyThatIsNotTheSameTwiceIsRefusedByName(string expression, int keyLength, string function)
@@ -67,6 +69,35 @@ public sealed class SeekConverterKindTests
 
         act.Should().Throw<CodeBaseException>()
             .Where(e => e.Code == ErrorCode.NotSupported && e.Message.Contains(function + "()"));
+    }
+
+    [Theory]
+    [InlineData("DTOC(K_DATE)", 8, "DTOC")]
+    [InlineData("K_TEXT + DTOC(K_DATE)", 18, "DTOC")]
+    [InlineData("DTOC(K_DATE + 1)", 8, "DTOC")]
+    [InlineData("DTOS(CTOD(K_TEXT))", 8, "CTOD")]
+    public void AKeyThroughTheDatePictureIsRefusedUntilThePictureIsChosen(string expression, int keyLength, string function)
+    {
+        // The index records a key's length and not the picture it was built with, and two pictures of
+        // one length -- MM/DD/YY, DD.MM.YY -- give different keys for the same date. Under options nobody
+        // chose, such a tag would be read through a picture nobody asked for (ADR-42, ADR-74).
+        Action act = () => Converter(expression, keyLength, "", ExpressionOptions.Unchosen);
+
+        act.Should().Throw<CodeBaseException>()
+            .Where(e => e.Code == ErrorCode.NotSupported
+                && e.Message.Contains(function + "()")
+                && e.Message.Contains("ExpressionOptions"));
+
+        Converter(expression, keyLength, "", ExpressionOptions.CodeBase).Kind.Should().Be(KeyKind.Character);
+        Converter(expression, keyLength, "", ExpressionOptions.Invariant).Kind
+            .Should().Be(KeyKind.Character, "Invariant assigned on purpose is a choice");
+    }
+
+    [Fact]
+    public void AKeyThatDoesNotPassThroughThePictureNeedsNoChoice()
+    {
+        Converter("DTOS(K_DATE)", 8, "", ExpressionOptions.Unchosen).Kind.Should().Be(KeyKind.Character);
+        Converter("K_DATE", 8, "", ExpressionOptions.Unchosen).Kind.Should().Be(KeyKind.Date);
     }
 
     [Fact]
@@ -90,6 +121,10 @@ public sealed class SeekConverterKindTests
     }
 
     private static SeekConverter Converter(string expression, int keyLength, string collation) =>
+        Converter(expression, keyLength, collation, ExpressionOptions.Invariant);
+
+    private static SeekConverter Converter(
+        string expression, int keyLength, string collation, ExpressionOptions options) =>
         SeekConverter.For(
             IndexHeader.Parse(
                 IndexImage.SingleTag(keyLength, IndexImage.NodeOf(0), expression: expression, collation: collation)
@@ -98,6 +133,6 @@ public sealed class SeekConverterKindTests
                 "an image"),
             Fields,
             1252,
-            ExpressionOptions.Invariant,
+            options,
             "T", longFieldNames: false);
 }

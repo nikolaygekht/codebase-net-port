@@ -33,7 +33,7 @@ public sealed class KeySearchTests
     }
 
     [Fact]
-    public void For_AValueWithTrailingPadStandsForTheWholeKey()
+    public void For_AValueWithTrailingPadComparesItsPadLikeContent()
     {
         // The case the corpus settled: stripping the pad and comparing two bytes would match
         // "AB\0\0\0\0\0\0", and the reference implementation does not — a NUL sorts below a space, so
@@ -46,6 +46,23 @@ public sealed class KeySearchTests
         search.Matches(Key("AB      ")).Should().BeTrue();
         search.Compare(new byte[] { 0x41, 0x42, 0, 0, 0, 0, 0, 0 }).Should().BeNegative();
         search.Compare(Key("ABC     ")).Should().BePositive();
+    }
+
+    [Fact]
+    public void For_AValueWithTrailingPadShorterThanTheKeyComparesOverItsOwnLength()
+    {
+        // RECNOTAG's R_NAMENO, case prefix-half: "beta   " in a 14-byte NAME + STR(RECNO(), 4) tag.
+        // The reference compares the seven bytes it was given, pad included (b4block.c:2303-2325),
+        // and finds "beta         1"; padding the value out to fourteen would put a space where the
+        // key holds '1' and miss it.
+        KeySearch search = Search("beta   ", keyLength: 14);
+
+        search.Matches(Key("beta         1")).Should().BeTrue();
+        search.Matches(Key("beta   x      ")).Should().BeTrue("the eighth byte is past the value's own length");
+        search.Compare(Key("beta  x       ")).Should().BePositive("an 'x' is above the value's space");
+        search.Compare(Key("ceta          ")).Should().BePositive("the first byte decides as well as the last");
+        search.Compare(new byte[] { 0x62, 0x65, 0x74, 0x61, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 })
+            .Should().BeNegative("a NUL is below the value's space");
     }
 
     [Fact]
@@ -123,6 +140,15 @@ public sealed class KeySearchTests
 
         next.Bytes.ToArray().Should().Equal(
             (byte)'M', (byte)'I', (byte)'D', (byte)'D', (byte)'L', (byte)'E', 0x20, 0x21);
+    }
+
+    [Fact]
+    public void TryIncrement_APaddedValueShorterThanTheKeyRaisesItsOwnLastByte()
+    {
+        // The successor is taken at the width the value compares over, which is the width supplied.
+        Search("AB  ", keyLength: 8).TryIncrement(out KeySearch next).Should().BeTrue();
+
+        next.Bytes.ToArray().Should().Equal((byte)'A', (byte)'B', 0x20, 0x21);
     }
 
     [Fact]

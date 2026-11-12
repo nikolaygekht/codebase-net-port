@@ -40,10 +40,20 @@ public sealed class ExpressionOptions
     /// </value>
     public static ExpressionOptions CodeBase { get; } = new(ReferencePicture, null);
 
-    private ExpressionOptions(string datePicture, int? century)
+    /// <summary>
+    /// Gets the settings an engine has before a caller sets any: the invariant ones, marked as unchosen.
+    /// </summary>
+    /// <value>
+    /// They read and write dates exactly as [c]Invariant[/c] does. The mark matters only to a tag whose
+    /// key passes through the date picture, which is refused under them (ADR-74).
+    /// </value>
+    internal static ExpressionOptions Unchosen { get; } = new("CCYYMMDD", null, isChosen: false);
+
+    private ExpressionOptions(string datePicture, int? century, bool isChosen = true)
     {
         DatePicture = datePicture;
         Century = century;
+        IsChosen = isChosen;
     }
 
     /// <summary>
@@ -65,6 +75,17 @@ public sealed class ExpressionOptions
     /// year by one hundred. Null refuses, which is the default.
     /// </value>
     public int? Century { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether a caller chose these settings rather than leaving the engine's default.
+    /// </summary>
+    /// <value>
+    /// An index records a key's length and not the picture the key was built with, and two pictures of
+    /// one length give different keys for the same date. So a tag keyed through the picture can only be
+    /// read under a picture somebody vouched for. Every public instance, and every one derived from any
+    /// instance, is chosen; only an engine's untouched default is not (ADR-42, ADR-74).
+    /// </value>
+    internal bool IsChosen { get; }
 
     /// <summary>
     /// Returns these settings with a century to complete a two-digit year with.

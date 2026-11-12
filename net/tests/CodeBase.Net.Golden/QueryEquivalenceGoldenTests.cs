@@ -74,7 +74,7 @@ public sealed class QueryEquivalenceGoldenTests
         {
             TheoryData<string, bool> cases = [];
 
-            foreach (string table in new[] { "CDXEXPR", "CDXBASE", "CDXDEEP", "CDXCOLL", "QRYGATE", "TAGCTX", "TAGGEN", "LONGNAME" })
+            foreach (string table in new[] { "CDXEXPR", "CDXBASE", "CDXDEEP", "CDXCOLL", "QRYGATE", "TAGCTX", "TAGGEN", "LONGNAME", "RECNOTAG" })
             {
                 cases.Add(table, false);
                 cases.Add(table, true);
@@ -114,9 +114,12 @@ public sealed class QueryEquivalenceGoldenTests
     [MemberData(nameof(Cases))]
     public void EveryFilterUnderEveryTagReturnsWhatAFullScanReturns(string table, bool widened)
     {
+        // Every tag is selected, CDXEXPR's T_DTOC and T_CTOD among them, and a tag keyed through the date
+        // picture is refused until the picture is chosen (ADR-74): the one the dump was taken under.
         using var engine = new CodeBaseEngine
         {
             QueryTagScope = widened ? QueryTagScope.AllSeekable : QueryTagScope.Compatible,
+            ExpressionOptions = ExpressionOptions.CodeBase.WithCentury(CorpusExpressionDump.Load().Century),
         };
 
         using Table opened = engine.OpenTable(Corpus.PathOf(table + ".DBF"));

@@ -33,7 +33,7 @@ public sealed class KeyTypeResolverTests
         // fixed-width numeric key pads with NUL (i4init.c:557-604).
         IndexHeader header = Header("KEYFIELD", keyLength: 8);
 
-        KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", fieldType)]).Should().Be(expected);
+        KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", fieldType)], longFieldNames: false).Should().Be(expected);
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public sealed class KeyTypeResolverTests
         // The engine upper-cases field names on open, and an expression may carry blanks the index kept.
         IndexHeader header = Header("  keyfield ", keyLength: 8);
 
-        KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", 'C')]).Should().Be(KeyPadding.Space);
+        KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", 'C')], longFieldNames: false).Should().Be(KeyPadding.Space);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class KeyTypeResolverTests
         // field table is never consulted — the reason a GENERAL tag was readable before this existed.
         IndexHeader header = Header("KEYFIELD", keyLength: 40, collation: "GENERAL");
 
-        KeyTypeResolver.PadByteFor(header, []).Should().Be(KeyPadding.Nul);
+        KeyTypeResolver.PadByteFor(header, [], longFieldNames: false).Should().Be(KeyPadding.Nul);
     }
 
     [Fact]
@@ -61,11 +61,11 @@ public sealed class KeyTypeResolverTests
         // The line ADR-28 drew, and this is where it goes away. The padding follows from the key's
         // type, and the type of a key is the type of the expression that builds it, so an expression
         // that is not a field name has a pad byte like any other -- worked out by compiling it.
-        KeyTypeResolver.PadByteFor(Header("UPPER(NAME)", keyLength: 20), [Field("NAME", 'C')])
+        KeyTypeResolver.PadByteFor(Header("UPPER(NAME)", keyLength: 20), [Field("NAME", 'C')], longFieldNames: false)
             .Should().Be(KeyPadding.Space);
 
         // And one whose result is not text pads with NUL, however textual its operand was.
-        KeyTypeResolver.PadByteFor(Header("VAL(NAME)", keyLength: 8), [Field("NAME", 'C')])
+        KeyTypeResolver.PadByteFor(Header("VAL(NAME)", keyLength: 8), [Field("NAME", 'C')], longFieldNames: false)
             .Should().Be(KeyPadding.Nul);
     }
 
@@ -74,7 +74,7 @@ public sealed class KeyTypeResolverTests
     {
         // What remains refused is what the reference refuses too. The message names the expression,
         // because that is what a caller has to act on.
-        Action act = () => KeyTypeResolver.PadByteFor(Header("-NAME", keyLength: 20), [Field("NAME", 'C')]);
+        Action act = () => KeyTypeResolver.PadByteFor(Header("-NAME", keyLength: 20), [Field("NAME", 'C')], longFieldNames: false);
 
         act.Should().Throw<CodeBaseException>().WithMessage("*-NAME*");
     }
@@ -84,7 +84,7 @@ public sealed class KeyTypeResolverTests
     {
         IndexHeader header = Header("GONE", keyLength: 8);
 
-        Action act = () => KeyTypeResolver.PadByteFor(header, [Field("NAME", 'C')]);
+        Action act = () => KeyTypeResolver.PadByteFor(header, [Field("NAME", 'C')], longFieldNames: false);
 
         act.Should().Throw<CodeBaseException>().WithMessage("*GONE*");
     }
@@ -101,7 +101,7 @@ public sealed class KeyTypeResolverTests
     {
         IndexHeader header = Header("KEYFIELD", keyLength: 8);
 
-        KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", fieldType)]).Should().Be(expected);
+        KeyTypeResolver.PadByteFor(header, [Field("KEYFIELD", fieldType)], longFieldNames: false).Should().Be(expected);
     }
 
     private static IndexHeader Header(string expression, int keyLength, string collation = "") =>

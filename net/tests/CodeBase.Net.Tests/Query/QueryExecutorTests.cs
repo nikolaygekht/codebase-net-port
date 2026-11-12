@@ -27,7 +27,7 @@ public sealed class QueryExecutorTests
             new FieldDefinition("K_CODE", 'C', 'C', 4, 0, 5, false, false, false, false, null),
             new FieldDefinition("K_LOG", 'L', 'L', 1, 0, 9, false, false, false, false, null),
         ],
-        "T");
+        "T", longFieldNames: false);
 
     private static readonly QueryTag[] Tags =
     [

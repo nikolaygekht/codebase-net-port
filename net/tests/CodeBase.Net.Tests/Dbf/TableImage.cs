@@ -47,6 +47,37 @@ internal static class TableImage
     }
 
     /// <summary>
+    /// Opens a version 0x31 table in the long-name layout with two character fields, ID and CUSTOMER_NAME.
+    /// </summary>
+    /// <param name="records">
+    /// The records, deletion flag included: three characters of ID, then ten of the name, for
+    /// example [c]" 001SMITH     "[/c].
+    /// </param>
+    /// <returns>The open table, and the engine that owns it.</returns>
+    public static (CodeBaseEngine Engine, Table Table) OpenWithLongNames(params string[] records)
+    {
+        const int recordLength = 1 + 3 + 10;
+        byte[] descriptors = DescriptorBytes.LongRegion(
+            DescriptorBytes.Long("ID", 'C', storedOffset: 1, length: 3),
+            DescriptorBytes.Long("CUSTOMER_NAME", 'C', storedOffset: 4, length: 10));
+        int headerLength = 32 + descriptors.Length;
+
+        byte[] header = HeaderBytes.Build(
+            version: 0x31,
+            recordCount: records.Length,
+            headerLength: headerLength,
+            recordLength: recordLength,
+            flags: [0, 0, 0, 0, 1, 0, 0, 0]);
+
+        byte[] image = [.. header, .. descriptors, .. Encoding.ASCII.GetBytes(string.Concat(records))];
+        if (image.Length != headerLength + (records.Length * recordLength))
+            throw new ArgumentException($"Each record must be {recordLength} characters.", nameof(records));
+
+        CodeBaseEngine engine = new(new StubFactory(new InMemorySource(image)), new NoCompanions());
+        return (engine, engine.OpenTable("memory.dbf"));
+    }
+
+    /// <summary>
     /// Builds the bytes of a table holding the given records.
     /// </summary>
     /// <param name="records">The records, deletion flag included.</param>

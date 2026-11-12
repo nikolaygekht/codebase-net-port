@@ -69,7 +69,7 @@ public sealed class ExpressionValueGoldenTests
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
 
-        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR");
+        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR", table.LongFieldNames);
         List<string> failures = [];
 
         foreach (DumpExpression compiled in Oracle.FieldExpressions.Where(e => !Outstanding(e)))
@@ -182,6 +182,8 @@ public sealed class ExpressionValueGoldenTests
     private sealed class EmptyFields : IFieldMetadata
     {
         public static EmptyFields Instance { get; } = new();
+
+        public bool LongFieldNames => false;
 
         public FieldReference? Find(string? alias, string name) => null;
     }

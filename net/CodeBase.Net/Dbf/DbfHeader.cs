@@ -98,7 +98,7 @@ internal readonly struct DbfHeader
     /// <summary>
     /// Gets the CodeBase feature flags, which are meaningful only on a version 0x31 table.
     /// </summary>
-    /// <value>All clear in a table written by Visual FoxPro itself.</value>
+    /// <value>All clear on any other version, whatever bytes 12 to 19 hold.</value>
     public FeatureFlags Flags { get; }
 
     /// <summary>
@@ -170,7 +170,7 @@ internal readonly struct DbfHeader
         }
 
         FeatureFlags flags = FeatureFlags.Parse(
-            flagBytes, validate: version == DbfVersion.VisualFoxProExtended);
+            flagBytes, extended: version == DbfVersion.VisualFoxProExtended);
 
         return new DbfHeader(
             version,

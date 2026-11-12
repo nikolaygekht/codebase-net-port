@@ -57,13 +57,13 @@ public sealed class KeyTransformGoldenTests
         using IndexFileReader reader = IndexFileReader.Open(
             new InMemorySource(Corpus.ReadAllBytes(indexFile)),
             indexFile,
-            header => KeyTypeResolver.PadByteFor(header, fields));
+            header => KeyTypeResolver.PadByteFor(header, fields, open.LongFieldNames));
 
         foreach (CdxTag tag in reader.Tags)
         {
             DumpIndexTag expected = index.RealTags.Single(t => t.Name.TrimEnd() == tag.Name.TrimEnd());
             SeekConverter converter = SeekConverter.For(
-                tag.Header, fields, codePage, ExpressionOptions.Invariant, tableName);
+                tag.Header, fields, codePage, ExpressionOptions.Invariant, tableName, open.LongFieldNames);
             ExpressionValueSource source = new(converter.Compiled, open.EvaluationContext());
 
             foreach (DumpIndexKey stored in expected.Keys)

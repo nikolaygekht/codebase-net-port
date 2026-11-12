@@ -154,6 +154,8 @@ public sealed class TagEligibilityTests
         private static readonly FieldDefinition Name =
             new("NAME", 'C', 'C', 20, 0, 1, false, false, false, false, null);
 
+        public bool LongFieldNames => false;
+
         public FieldReference? Find(string? alias, string name) =>
             string.Equals(name, "NAME", StringComparison.OrdinalIgnoreCase)
                 ? new FieldReference(1, Name)

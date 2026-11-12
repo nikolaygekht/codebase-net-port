@@ -31,7 +31,7 @@ public sealed class ExpressionParserTests
             Field("K_TS", 'T', 8),
             Field("K_LOG", 'L', 1),
         ],
-        "CDXEXPR");
+        "CDXEXPR", longFieldNames: false);
 
     [Theory]
     // The seven precedence levels, and that equal priority groups from the left.
@@ -132,7 +132,7 @@ public sealed class ExpressionParserTests
     {
         // The two binary types arrive under their own letters and load where their unmarked forms
         // load, which is what the reference's conversion of them back to character and memo means.
-        IFieldMetadata one = new TableFieldMetadata([Field("F", type, 8)], "T");
+        IFieldMetadata one = new TableFieldMetadata([Field("F", type, 8)], "T", longFieldNames: false);
 
         ExpressionParser.Parse("F", one).Nodes[0].Row.Should().Be(row);
     }
@@ -304,11 +304,34 @@ public sealed class ExpressionParserTests
     {
         // Unreachable through an open table, because the opener admits no such type and hides the
         // null-flags field. It is reachable through this seam, which is what the seam is for.
-        IFieldMetadata one = new TableFieldMetadata([Field("F", '0', 1)], "T");
+        IFieldMetadata one = new TableFieldMetadata([Field("F", '0', 1)], "T", longFieldNames: false);
 
         Action act = () => ExpressionParser.Parse("F", one);
 
         act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void ANameLongerThanTenCharactersResolvesWhenTheTableHoldsLongNames()
+    {
+        // The parser takes the table's long-name flag from the metadata, not from its caller, so
+        // every compile path over the table gets it (e4parse.c:2404-2417).
+        IFieldMetadata longNames = new TableFieldMetadata(
+            [Field("CUSTOMER_NAME", 'C', 20)], "T", longFieldNames: true);
+
+        ExpressionParser.Parse("UPPER(customer_name)", longNames).Nodes[0].Field!.Value.Definition.Name
+            .Should().Be("CUSTOMER_NAME");
+    }
+
+    [Fact]
+    public void ANameLongerThanTenCharactersIsRefusedWhenTheTableHoldsShortNames()
+    {
+        IFieldMetadata shortNames = new TableFieldMetadata(
+            [Field("CUSTOMER_NAME", 'C', 20)], "T", longFieldNames: false);
+
+        Action act = () => ExpressionParser.Parse("CUSTOMER_NAME", shortNames);
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.UnrecognizedValue);
     }
 
     private static ParsedExpression Parse(string expression) => ExpressionParser.Parse(expression, Fields);

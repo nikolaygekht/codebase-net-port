@@ -19,7 +19,7 @@ public sealed class CorpusLayoutTests
     private static readonly string[] ExpectedTables =
     [
         "CDXBASE", "CDXCOLL", "CDXDEEP", "CDXEXPR", "CDXTIME", "CMPMEMO", "CP1251", "CP936",
-        "DB3TYPE", "F2XMEMO", "IDXONE", "QRYGATE", "TAGBAD", "TAGCTX", "TAGGEN", "VFPMEMO", "VFPNULL", "VFPTYPE",
+        "DB3TYPE", "F2XMEMO", "FLAGS30", "IDXONE", "LONGNAME", "QRYGATE", "TAGBAD", "TAGCTX", "TAGGEN", "VFPMEMO", "VFPNULL", "VFPTYPE",
     ];
 
     /// <summary>The index files the corpus is documented to hold, with the table each belongs to.</summary>
@@ -32,6 +32,7 @@ public sealed class CorpusLayoutTests
         { "CDXTIME", "CDXTIME.cdx" },
         { "IDXONE", "IDXONE.cdx" },
         { "IDXONE", "IDXONE.IDX" },
+        { "LONGNAME", "LONGNAME.cdx" },
         { "QRYGATE", "QRYGATE.cdx" },
         { "TAGCTX", "TAGCTX.cdx" },
         { "TAGGEN", "TAGGEN.cdx" },
@@ -55,6 +56,8 @@ public sealed class CorpusLayoutTests
     [InlineData("CP1251")]
     [InlineData("CP936")]
     [InlineData("F2XMEMO")]
+    [InlineData("FLAGS30")]
+    [InlineData("LONGNAME")]
     [InlineData("VFPMEMO")]
     [InlineData("VFPNULL")]
     public void Corpus_PairsEveryMemoTableWithAnFpt(string table)

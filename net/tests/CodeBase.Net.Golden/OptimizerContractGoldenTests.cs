@@ -348,6 +348,6 @@ public sealed class OptimizerContractGoldenTests
         using CodeBaseEngine engine = Engine();
         using Table table = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
 
-        return new TableFieldMetadata([.. table.Fields], "CDXEXPR");
+        return new TableFieldMetadata([.. table.Fields], "CDXEXPR", table.LongFieldNames);
     }
 }

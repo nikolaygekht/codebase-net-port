@@ -108,6 +108,6 @@ public sealed class ConversionSearchTests
         byte[] image = IndexImage.SingleTag(keyLength, root: 1024, expression: expression, collation: collation).Build();
 
         return SeekConverter.For(
-            IndexHeader.Parse(image, "an image"), Fields, codePage: 1252, ExpressionOptions.Invariant, alias: "T");
+            IndexHeader.Parse(image, "an image"), Fields, codePage: 1252, ExpressionOptions.Invariant, alias: "T", longFieldNames: false);
     }
 }

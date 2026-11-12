@@ -38,7 +38,7 @@ public sealed class VisualFoxProFunctionGoldenTests
         using CodeBaseEngine engine = new() { ExpressionOptions = ExpressionOptions.CodeBase.WithCentury(20) };
         using Table oracle = engine.OpenTable(Corpus.PathOf(Oracle));
 
-        IFieldMetadata fields = new TableFieldMetadata([], "VFPFVAL");
+        IFieldMetadata fields = new TableFieldMetadata([], "VFPFVAL", longFieldNames: false);
         List<string> failures = [];
         int compared = 0;
 
@@ -85,7 +85,7 @@ public sealed class VisualFoxProFunctionGoldenTests
         using CodeBaseEngine engine = new() { ExpressionOptions = ExpressionOptions.CodeBase.WithCentury(20) };
         using Table table = engine.OpenTable(Corpus.PathOf(Tags));
 
-        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "VFPFUNC");
+        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "VFPFUNC", table.LongFieldNames);
         List<string> failures = [];
         int compared = 0;
 

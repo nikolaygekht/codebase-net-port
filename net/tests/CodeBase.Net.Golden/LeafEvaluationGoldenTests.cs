@@ -21,7 +21,7 @@ namespace CodeBase.Net.Golden;
 [Trait("Layer", "Golden")]
 public sealed class LeafEvaluationGoldenTests
 {
-    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX"];
+    public static TheoryData<string> Tables => ["CDXEXPR", "CDXBASE", "CDXDEEP", "QRYGATE", "TAGCTX", "LONGNAME"];
 
     [Theory]
     [MemberData(nameof(Tables))]
@@ -47,12 +47,13 @@ public sealed class LeafEvaluationGoldenTests
                 "the records {0} reaches", filter.Filter);
         }
 
-        // 48 filters across the five tables qualify -- 24, 9, 8, QRYGATE's six controls and TAGCTX's
-        // one -- so a table contributing none would mean the plan stopped producing single-leaf trees
-        // rather than the gate passing. TAGCTX's filters are there to be refused a tag, so its floor
-        // is its lone control.
-        checkedFilters.Should().BeGreaterThanOrEqualTo(
-            table == "TAGCTX" ? 1 : 6, "the gate needs filters it applies to");
+        // 51 filters across the six tables qualify -- 24, 9, 8, QRYGATE's six controls, TAGCTX's one
+        // and LONGNAME's three -- so a table contributing none would mean the plan stopped producing
+        // single-leaf trees rather than the gate passing. TAGCTX's filters are there to be refused a
+        // tag, so its floor is its lone control; LONGNAME's are there to name long fields, and three
+        // of its five are a single tagged term.
+        int floor = table switch { "TAGCTX" => 1, "LONGNAME" => 3, _ => 6 };
+        checkedFilters.Should().BeGreaterThanOrEqualTo(floor, "the gate needs filters it applies to");
     }
 
     /// <summary>

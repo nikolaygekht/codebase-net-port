@@ -74,7 +74,7 @@ public sealed class QueryEquivalenceGoldenTests
         {
             TheoryData<string, bool> cases = [];
 
-            foreach (string table in new[] { "CDXEXPR", "CDXBASE", "CDXDEEP", "CDXCOLL", "QRYGATE", "TAGCTX", "TAGGEN" })
+            foreach (string table in new[] { "CDXEXPR", "CDXBASE", "CDXDEEP", "CDXCOLL", "QRYGATE", "TAGCTX", "TAGGEN", "LONGNAME" })
             {
                 cases.Add(table, false);
                 cases.Add(table, true);

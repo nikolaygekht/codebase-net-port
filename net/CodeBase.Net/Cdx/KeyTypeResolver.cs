@@ -25,6 +25,7 @@ internal static class KeyTypeResolver
     /// </summary>
     /// <param name="header">The tag's header, which carries the expression text and the collation.</param>
     /// <param name="fields">The fields of the table the tag indexes.</param>
+    /// <param name="longFieldNames">Whether that table stores long field names, from its header.</param>
     /// <param name="alias">
     /// The name a field reference in the expression may be qualified by. Empty by default, which
     /// leaves a qualified name resolving to nothing — the same answer the reference gives when no
@@ -42,7 +43,7 @@ internal static class KeyTypeResolver
     /// other tags working (ADR-28).
     /// </value>
     public static byte PadByteFor(
-        IndexHeader header, IReadOnlyList<FieldDefinition> fields, string alias = "")
+        IndexHeader header, IReadOnlyList<FieldDefinition> fields, bool longFieldNames, string alias = "")
     {
         // A collation other than machine order settles it by itself: every collated key pads with NUL,
         // character keys included. No expression is consulted, and none is needed (ADR-27).
@@ -51,7 +52,7 @@ internal static class KeyTypeResolver
 
         string expression = header.Expression.Trim();
         CompiledExpression compiled = TypeResolver.Resolve(
-            ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias)));
+            ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias, longFieldNames)));
 
         return PadByteOf(compiled.ResultType, header, expression);
     }

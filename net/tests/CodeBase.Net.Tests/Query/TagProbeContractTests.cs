@@ -41,7 +41,7 @@ public sealed class TagProbeContractTests : TagProbeContract
                 [.. table.Fields],
                 table.CodePageNumber ?? CodePageMap.UnmarkedCodePage,
                 ExpressionOptions.Invariant,
-                "CDXBASE")));
+                "CDXBASE", longFieldNames: false)));
     }
 
     private static IReadOnlyList<string> ReadKeys()
@@ -107,7 +107,7 @@ public sealed class DescendingTagProbeContractTests : TagProbeContract
                 [.. table.Fields],
                 table.CodePageNumber ?? CodePageMap.UnmarkedCodePage,
                 ExpressionOptions.Invariant,
-                "CDXBASE")));
+                "CDXBASE", longFieldNames: false)));
     }
 
     private static IReadOnlyList<string> ReadKeys()

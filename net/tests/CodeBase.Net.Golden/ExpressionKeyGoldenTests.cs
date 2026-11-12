@@ -36,7 +36,7 @@ public sealed class ExpressionKeyGoldenTests
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
 
-        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR");
+        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR", table.LongFieldNames);
         List<string> failures = [];
         int compared = 0;
 
@@ -103,7 +103,7 @@ public sealed class ExpressionKeyGoldenTests
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
 
-        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR");
+        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR", table.LongFieldNames);
         List<string> failures = [];
 
         foreach (DumpIndexTag tag in Index.RealTags)
@@ -128,7 +128,7 @@ public sealed class ExpressionKeyGoldenTests
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
 
-        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR");
+        IFieldMetadata fields = new TableFieldMetadata([.. table.Fields], "CDXEXPR", table.LongFieldNames);
         List<string> failures = [];
         int compared = 0;
 

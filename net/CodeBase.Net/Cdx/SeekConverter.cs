@@ -136,6 +136,7 @@ internal sealed class SeekConverter
     /// <param name="codePage">The table's code page number.</param>
     /// <param name="options">The date picture and century policy the expression is read under.</param>
     /// <param name="alias">The name a field reference may be qualified by.</param>
+    /// <param name="longFieldNames">Whether the table stores long field names, from its header.</param>
     /// <returns>The converter.</returns>
     /// <exception cref="CodeBaseException">
     /// The expression cannot be compiled, produces a type this library does not key, cannot be used
@@ -147,7 +148,8 @@ internal sealed class SeekConverter
         IReadOnlyList<FieldDefinition> fields,
         int codePage,
         ExpressionOptions options,
-        string alias)
+        string alias,
+        bool longFieldNames)
     {
         string expression = header.Expression.Trim();
         CollationName collation = header.Collation;
@@ -159,7 +161,7 @@ internal sealed class SeekConverter
         // resolved for this tag, as the reference parses it, because the tag's collation and a bare
         // memo change lengths -- and lengths are what the optimizer matches a filter's terms on.
         CompiledExpression compiled = TypeResolver.Resolve(
-            ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias), [alias]),
+            ExpressionParser.Parse(expression, new TableFieldMetadata(fields, alias, longFieldNames), [alias]),
             TagContext.For(collation, codePage),
             options);
 

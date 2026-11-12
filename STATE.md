@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-01 · **step 013 (`013-coverage-audit`) is in progress: its plan and sub-steps 1–7 are committed locally and not pushed, and the tree is clean. Left in 013: sub-step 7a, the divergences gone through with the user, and 8, the close.**
+**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 (long field names read, ADR-72) are committed locally and not pushed, and the tree is clean. Left in 013: the rest of sub-step 7a, the divergences gone through with the user, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -1008,15 +1008,17 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ### Step 013 — finish it: sub-steps 7a and 8 — `claude/dev/013-coverage-audit/`
 
-Sub-steps 1–7 are done; the record is the step's [`STATE.md`](claude/dev/013-coverage-audit/STATE.md).
+Sub-steps 1–7 are done, and 7a's first entry, 7a-1; the record is the step's
+[`STATE.md`](claude/dev/013-coverage-audit/STATE.md).
 
 - **7a, with the user.** Go through [`DIVERGENCES.md`](claude/dev/013-coverage-audit/DIVERGENCES.md)
   entry by entry and decide for each: fix it (test first), keep it by decision, or defer it to a
   named step. A kept one gets an ADR where it has none and the user-facing documentation it lacks —
   the XML docs of the API that meets it and a "Differences from CodeBase" section in `README.md`; a
-  deferred one gets its row in `PORTING-PLAN.md`. Start with its "worth looking at first": **long
-  field names are refused with no ADR**, and the flag is checked on any version where the reference
-  reads it only on `0x31`; then ADR-49 and ADR-42, which refuse tags the reference opens.
+  deferred one gets its row in `PORTING-PLAN.md`. **Long field names are done** (7a-1, 2026-11-12):
+  supported, the feature flags read on `0x31` only, gated by new corpus cases `LONGNAME` and
+  `FLAGS30` (ADR-72). Next from its "worth looking at first": ADR-49 and ADR-42, which refuse tags
+  the reference opens.
 - **8, the close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on
   `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`,
   `claude/dev/README.md`, this file. Push once the user says so.

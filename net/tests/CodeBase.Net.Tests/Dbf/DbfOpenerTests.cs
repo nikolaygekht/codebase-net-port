@@ -187,6 +187,22 @@ public sealed class DbfOpenerTests
         Open(files, "/data/VFPTYPE.DBF").Header.RecordCount.Should().Be(32);
     }
 
+    [Fact]
+    public void Open_APlainTableWithTheLongFieldNameByteSet_ReadsItsOrdinaryDescriptors()
+    {
+        // As above, for flags[4]: on a 0x30 table the byte declares no long-name layout, so the
+        // descriptors are the ordinary 32-byte ones and read exactly as the unaltered file's.
+        byte[] table = Corpus.ReadAllBytes("VFPTYPE.DBF");
+        table[0].Should().Be(DbfVersion.VisualFoxPro);
+        OpenedTable plain = Open(new FakeFileSystem(("/data/VFPTYPE.DBF", table)), "/data/VFPTYPE.DBF");
+
+        byte[] altered = (byte[])table.Clone();
+        altered[16] = 1;
+        OpenedTable opened = Open(new FakeFileSystem(("/data/VFPTYPE.DBF", altered)), "/data/VFPTYPE.DBF");
+
+        opened.Descriptors.Should().Equal(plain.Descriptors);
+    }
+
     private static FakeFileSystem CorpusFileSystem() => new(
         (TablePath, Corpus.ReadAllBytes("VFPMEMO.DBF")),
         (MemoPath, Corpus.ReadAllBytes("VFPMEMO.fpt")));

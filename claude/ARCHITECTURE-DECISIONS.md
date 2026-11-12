@@ -2510,3 +2510,37 @@ make `DTOC` and `CTOD` disagree on the same picture.
 
 **Rejected — refusing such a picture.** It is the picture two of the reference's own builds ship
 with; the meaning is not in doubt.
+
+## ADR-72 — Long field names are read, and the feature flags are read on version 0x31 only · accepted
+
+**Date.** 2026-11-12. Decided by the user during step 013, sub-step 7a-1.
+
+**Context.** CodeBase writes a table whose field names exceed ten characters in a layout of its own
+(DBF-FORMAT.md §4.2): version `0x31`, `flags[4] = 1`, and each descriptor its last 21 bytes, a
+two-byte length and the name. FoxPro cannot read it; the reference reads it, and expressions over it
+may name fields longer than ten characters (e4parse.c:2404-2417). The port refused the layout outright,
+with no ADR — the one refusal `DIVERGENCES.md` found undecided. It also reported the feature flags on
+every version while the reference reads them on `0x31` only (D4OPEN.C:2150-2200), so a `0x30` table
+with byte 16 set was refused as a long-name table; the compressed-data refusal escaped only because
+`DbfOpener` checks the version a second time.
+
+**Decision.** The layout is read: the descriptor run is walked as the reference walks it, ending at a
+`0x0D` or two bytes before the region's end (D4OPEN.C:2709-2731), and both layouts decode their shared
+21 bytes through one routine. The table's long-name flag reaches every expression compiled over it as
+a required argument of `TableFieldMetadata`, so no compile path — filter, tag at open, tag cursor,
+optimizer probe — can leave it at a default; a default is what had every path refusing long names. On
+any version but `0x31`, all eight flag bytes are ignored. Gated by corpus cases `LONGNAME` (the layout,
+its tags and queries) and `FLAGS30` (a `0x30` table with every flag byte set, which the reference
+reads as ordinary).
+
+**Consequence.** Reading only: the port writes no table yet. When `WRITE` comes, a name longer than ten
+characters makes it write this layout as D4CREATE.C does — the caller's name as given, not
+upper-cased, no 263-byte reserve, `0x0D 0x1A` at the end.
+
+**Rejected — inferring the flag from the field names** (any name longer than ten characters). It needs
+no plumbing, and differs from the reference only in the error code for a long name that matches no
+field in a long-layout table whose names are all short. Rejected by the user in favour of the header's
+flag, which is what the reference reads.
+
+**Rejected — keeping the refusal.** The layout is the reference's own, documented and now witnessed;
+refusing it refused tables the reference opens.

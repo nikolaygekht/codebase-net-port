@@ -27,6 +27,7 @@ internal sealed class TableTagCursor
     private readonly int codePage;
     private readonly EvaluationContext evaluation;
     private readonly string alias;
+    private readonly bool longFieldNames;
 
     private SeekConverter? converter;
     private IKeyValueSource? source;
@@ -42,6 +43,7 @@ internal sealed class TableTagCursor
     /// <param name="codePage">The table's code page, which says which weights a collation means.</param>
     /// <param name="evaluation">What evaluating the tag's expression needs besides the record.</param>
     /// <param name="alias">The name a field reference in the expression may be qualified by.</param>
+    /// <param name="longFieldNames">Whether the table stores long field names, from its header.</param>
     /// <exception cref="CodeBaseException">
     /// The tag's key expression is not one this library can type, so its keys cannot be padded correctly.
     /// </exception>
@@ -50,13 +52,15 @@ internal sealed class TableTagCursor
         IReadOnlyList<FieldDefinition> fields,
         int codePage,
         EvaluationContext evaluation,
-        string alias)
+        string alias,
+        bool longFieldNames)
     {
         this.tag = tag;
         this.fields = fields;
         this.codePage = codePage;
         this.evaluation = evaluation;
         this.alias = alias;
+        this.longFieldNames = longFieldNames;
 
         // Resolving the converter here is the point rather than a side effect. It compiles the tag's
         // key expression, and a tag whose expression this library cannot read has to be refused when
@@ -318,7 +322,8 @@ internal sealed class TableTagCursor
     }
 
     private SeekConverter Converter =>
-        converter ??= SeekConverter.For(tag.Inner.Header, fields, codePage, evaluation.Options, alias);
+        converter ??= SeekConverter.For(
+            tag.Inner.Header, fields, codePage, evaluation.Options, alias, longFieldNames);
 
     private IKeyValueSource Source => source ??= new ExpressionValueSource(Converter.Compiled, evaluation);
 

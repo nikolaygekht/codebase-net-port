@@ -88,7 +88,7 @@ internal sealed class DbfOpener
             // declared an index and opens without it would navigate in record order and answer
             // differently, silently — the same reason a declared memo file is an error when missing.
             if ((header.TableFlags & ProductionIndexFlag) != 0)
-                index = OpenIndex(path, fields.Fields);
+                index = OpenIndex(path, fields.Fields, header.Flags.UsesLongFieldNames);
 
             return new OpenedTable(data, memo, index, header, variant, descriptors, fields, memoHeader);
         }
@@ -249,11 +249,13 @@ internal sealed class DbfOpener
     /// </summary>
     /// <param name="tablePath">The table file.</param>
     /// <param name="fields">The table's fields, which settle each tag's pad byte (ADR-28).</param>
+    /// <param name="longFieldNames">Whether the table stores long field names, from its header.</param>
     /// <returns>The open index.</returns>
     /// <exception cref="CodeBaseException">
     /// The header declares an index and no file accompanies the table, or the file cannot be read.
     /// </exception>
-    private IndexFileReader OpenIndex(string tablePath, IReadOnlyList<FieldDefinition> fields)
+    private IndexFileReader OpenIndex(
+        string tablePath, IReadOnlyList<FieldDefinition> fields, bool longFieldNames)
     {
         string? indexPath = companions.Resolve(tablePath, IndexExtension)
             ?? throw new CodeBaseException(
@@ -281,7 +283,7 @@ internal sealed class DbfOpener
         string alias = Path.GetFileNameWithoutExtension(indexPath);
 
         return IndexFileReader.Open(
-            source, indexPath, header => KeyTypeResolver.PadByteFor(header, fields, alias));
+            source, indexPath, header => KeyTypeResolver.PadByteFor(header, fields, longFieldNames, alias));
     }
 }
 

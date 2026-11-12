@@ -28,6 +28,7 @@ public sealed class SeekByValueGoldenTests
         { "CDXCOLL", "C_GEN", "K_TEXT" },
         { "CDXDEEP", "D_WIDE", "K_WIDE" },
         { "IDXONE", "X_WIDE", "K_WIDE" },
+        { "LONGNAME", "STATE", "SHIP_STATE" },
         { "TAGCTX", "T_TEXT", "K_TEXT" },
         { "TAGCTX", "T_ASC", "K_TEXT" },
         { "TAGCTX", "T_DESC", "K_TEXT" },
@@ -41,7 +42,7 @@ public sealed class SeekByValueGoldenTests
     {
         // A data-driven suite that discovered nothing would report success having proved nothing.
         // The last four are sought through their tag's ASCEND or DESCEND, by the plain value (ADR-64).
-        CharacterTags().Should().HaveCount(12);
+        CharacterTags().Should().HaveCount(13);
     }
 
     [Theory]

@@ -28,7 +28,7 @@ public sealed class QueryDecomposerTests
             new FieldDefinition("K_DATE", 'D', 'D', 8, 0, 35, false, false, false, false, null),
             new FieldDefinition("K_LOG", 'L', 'L', 1, 0, 43, false, false, false, false, null),
         ],
-        "T");
+        "T", longFieldNames: false);
 
     private static readonly QueryTag[] Tags =
     [

@@ -43,7 +43,7 @@ public sealed class TagContextGoldenTests
             DumpExpression expected = tagged.Compiled;
 
             CompiledExpression resolved = TypeResolver.Resolve(
-                ExpressionParser.Parse(expected.Expression, new TableFieldMetadata([.. table.Fields], tagged.Table)),
+                ExpressionParser.Parse(expected.Expression, new TableFieldMetadata([.. table.Fields], tagged.Table, table.LongFieldNames)),
                 context);
 
             string where = $"{expected.Expression} for {tagged.Table}.{tagged.Tag}";
@@ -177,7 +177,7 @@ public sealed class TagContextGoldenTests
             [.. table.Fields],
             table.CodePageNumber ?? CodePageMap.UnmarkedCodePage,
             ExpressionOptions.Invariant,
-            tableName);
+            tableName, table.LongFieldNames);
 
     private static EvaluationContext Context(Table table) => new()
     {

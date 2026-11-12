@@ -42,7 +42,7 @@ public sealed class ExpressionFieldLoaderTests
         Field("_NullFlags", '0', 2, 78),
     ];
 
-    private static readonly IFieldMetadata Fields = new TableFieldMetadata(Definitions, "T");
+    private static readonly IFieldMetadata Fields = new TableFieldMetadata(Definitions, "T", longFieldNames: false);
 
     [Fact]
     public void ANumericFieldEntersAsTheTextTheRecordHolds()

@@ -251,6 +251,15 @@ public sealed class Table : IDisposable
     public IReadOnlyList<FieldDescriptor> Descriptors => opened.Descriptors;
 
     /// <summary>
+    /// Gets a value indicating whether the table stores its field names in CodeBase's long-name layout.
+    /// </summary>
+    /// <value>
+    /// Every expression compiled over the table takes it, because only then may an expression name a
+    /// field longer than ten characters (e4parse.c:2404-2417).
+    /// </value>
+    internal bool LongFieldNames => opened.Header.Flags.UsesLongFieldNames;
+
+    /// <summary>
     /// Gets the record the cursor is on.
     /// </summary>
     /// <value>
@@ -962,7 +971,7 @@ public sealed class Table : IDisposable
         Encoding literals = filter.Any(c => c > (char)0x7F) ? TextEncoding : Encoding.Latin1;
 
         return TypeResolver.Resolve(
-            ExpressionParser.Parse(filter, new TableFieldMetadata([.. Fields], alias), [alias], encoding: literals),
+            ExpressionParser.Parse(filter, new TableFieldMetadata([.. Fields], alias, LongFieldNames), [alias], encoding: literals),
             options: ExpressionOptions);
     }
 
@@ -1003,7 +1012,8 @@ public sealed class Table : IDisposable
                 [.. Fields],
                 CodePageNumber ?? CodePageMap.UnmarkedCodePage,
                 ExpressionOptions,
-                System.IO.Path.GetFileNameWithoutExtension(Path)));
+                System.IO.Path.GetFileNameWithoutExtension(Path),
+                LongFieldNames));
     }
 
     private TableTagCursor CursorFor(Tag tag)
@@ -1031,7 +1041,8 @@ public sealed class Table : IDisposable
                     Memo = memoReader is null ? null : field => GetMemoBytes(field),
                     CaseMap = CaseMap,
                 },
-                System.IO.Path.GetFileNameWithoutExtension(Path));
+                System.IO.Path.GetFileNameWithoutExtension(Path),
+                LongFieldNames);
             tagCursors[tag] = cursor;
         }
 

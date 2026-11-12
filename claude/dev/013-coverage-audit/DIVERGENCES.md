@@ -15,7 +15,7 @@ Here a user hits an error.
 | What | The reference | Where decided |
 |---|---|---|
 | A table with compressed data (`0x31`, flag byte 14) | reads it | ADR-56, **user's call** |
-| A table with long field names (CodeBase's descriptor layout, flag byte 16) | reads it | **no ADR**; and the port checks the flag on any version, where the reference reads the flags only on `0x31` (recorded in 012 as seen, not acted on) |
+| ~~A table with long field names (CodeBase's descriptor layout, flag byte 16)~~ | reads it | **Resolved 2026-11-12 (7a-1): supported**, user's call (ADR-72). The layout is read and gated by `LONGNAME`; the feature flags are read on `0x31` only, as the reference, gated by `FLAGS30` |
 | A field of type `7` (datetime with milliseconds, a CodeBase extension) | reads it | ADR-32 |
 | A tag over `DATE()`, `TIME()`, `RECNO()`, `RECCOUNT()` | opens it | ADR-49 (a key that can never be found again) |
 | A tag whose expression reads a two-digit year, under the default date policy | takes the century from the system clock | ADR-42 |
@@ -62,7 +62,7 @@ already planned as step 014.
 
 ## Worth looking at first
 
-1. **Long field names are refused with no ADR, and possibly on the wrong version.** The one refusal
-   with no recorded decision.
+1. ~~**Long field names are refused with no ADR, and possibly on the wrong version.**~~ Resolved in
+   7a-1: supported, and the flags read on `0x31` only (ADR-72).
 2. **ADR-49 and ADR-42 refuse tags the reference opens.** A table with such a tag reads, but the tag
    cannot be used.

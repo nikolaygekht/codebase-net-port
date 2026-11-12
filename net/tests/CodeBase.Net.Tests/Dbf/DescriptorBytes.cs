@@ -67,4 +67,40 @@ internal static class DescriptorBytes
     /// </summary>
     /// <param name="descriptors">The descriptors, in order.</param>
     public static byte[] Region(params byte[][] descriptors) => Region(0, descriptors);
+
+    /// <summary>
+    /// Builds one descriptor in the long-name layout: the 32-byte one's last 21 bytes, a length, a name.
+    /// </summary>
+    /// <param name="name">The name, written whole and followed by a zero byte.</param>
+    /// <param name="type">The type letter.</param>
+    /// <param name="storedOffset">The stored record offset.</param>
+    /// <param name="length">The length byte.</param>
+    /// <param name="decimals">The decimal-count byte.</param>
+    /// <param name="flags">The field flags.</param>
+    /// <param name="declaredLength">
+    /// The length to store before the name, when it should differ from the name's length plus one.
+    /// </param>
+    public static byte[] Long(
+        string name = "FIELD",
+        char type = 'C',
+        int storedOffset = 1,
+        byte length = 10,
+        byte decimals = 0,
+        FieldFlags flags = FieldFlags.None,
+        short? declaredLength = null)
+    {
+        byte[] tail = Build("", type, storedOffset, length, decimals, flags)[11..];
+        byte[] encoded = Encoding.ASCII.GetBytes(name);
+        byte[] nameLength = new byte[2];
+        BinaryPrimitives.WriteInt16LittleEndian(nameLength, declaredLength ?? (short)(encoded.Length + 1));
+
+        return [.. tail, .. nameLength, .. encoded, 0];
+    }
+
+    /// <summary>
+    /// Builds a long-name descriptor region as the C library writes one, ending in 0x0D and 0x1A.
+    /// </summary>
+    /// <param name="descriptors">The descriptors, in order.</param>
+    public static byte[] LongRegion(params byte[][] descriptors) =>
+        [.. descriptors.SelectMany(d => d), FieldDescriptor.Terminator, 0x1A];
 }

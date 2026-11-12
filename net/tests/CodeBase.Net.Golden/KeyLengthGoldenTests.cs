@@ -30,7 +30,7 @@ public sealed class KeyLengthGoldenTests
     [Fact]
     public void TheGateCoversEveryIndexedTable()
     {
-        IndexedTables().Should().HaveCount(9);
+        IndexedTables().Should().HaveCount(10);
     }
 
     [Theory]
@@ -50,7 +50,7 @@ public sealed class KeyLengthGoldenTests
                     [.. table.Fields],
                     table.CodePageNumber ?? CodePageMap.UnmarkedCodePage,
                     ExpressionOptions.Invariant,
-                    tableName);
+                    tableName, table.LongFieldNames);
             }
             catch (CodeBaseException error)
             {

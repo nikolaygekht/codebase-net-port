@@ -83,7 +83,7 @@ public sealed class SeekConverterKindTests
             Fields,
             1252,
             options,
-            "T");
+            "T", longFieldNames: false);
 
         converter.KeyLength.Should().Be(10);
         converter.Kind.Should().Be(KeyKind.Character);
@@ -99,5 +99,5 @@ public sealed class SeekConverterKindTests
             Fields,
             1252,
             ExpressionOptions.Invariant,
-            "T");
+            "T", longFieldNames: false);
 }

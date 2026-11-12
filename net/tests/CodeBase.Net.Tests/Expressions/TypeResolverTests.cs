@@ -35,7 +35,7 @@ public sealed class TypeResolverTests
             Field("K_FLT", 'H', 4),
             Field("K_MEMO", 'M', 10),
         ],
-        "CDXEXPR");
+        "CDXEXPR", longFieldNames: false);
 
     [Theory]
     // The five that retarget a field loader, and the one that retargets a literal.
@@ -280,7 +280,7 @@ public sealed class TypeResolverTests
     {
         // The key spends one leading byte on whether the value is there (e4parse.c:445-448).
         IFieldMetadata nullable = new TableFieldMetadata(
-            [new FieldDefinition("K_MEMO", 'M', 'M', 10, 0, 1, false, false, false, false, 0)], "T");
+            [new FieldDefinition("K_MEMO", 'M', 'M', 10, 0, 1, false, false, false, false, 0)], "T", longFieldNames: false);
 
         TypeResolver.Resolve(ExpressionParser.Parse("K_MEMO", nullable), Tag(0))
             .Length.Should().Be(239);

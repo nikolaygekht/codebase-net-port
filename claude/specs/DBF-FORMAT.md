@@ -79,6 +79,10 @@ Values **accepted** on open (`dfile4setup`, D4OPEN.C:2144-2224):
 
 ### 2.2 CodeBase `flags[8]` (bytes 12-19, only meaningful when version = 0x31)
 
+On any other version the reader never looks at these bytes — neither validates nor honours them
+(the whole block is inside `if ( d4->version == 0x31 )`, D4OPEN.C:2150-2201). Witnessed by corpus
+case `FLAGS30`: a `0x30` table with all eight bytes set to `1` opens and reads as an ordinary table.
+
 Each is a whole byte, value `0` or `1` (d4data.h:3073-3081, D4CREATE.C:1406-1456, D4OPEN.C:2158-2200):
 
 | Index (file offset) | Meaning when 1 |
@@ -197,6 +201,22 @@ When any field name exceeds 10 characters, version is 0x31 with `flags[4]=1`, an
 | name | nameLen | NUL-terminated field name |
 
 Reader: D4OPEN.C:2421-2435 (the `FIELD4IMAGE*` is aimed at `info + offset - 11` so `image->type` etc. line up). This layout is **not readable by FoxPro**.
+
+Witnessed by corpus case `LONGNAME` (2026-11-12):
+
+- **The name is stored as the caller gave it, not upper-cased** — the writer copies `fieldData[i].name`
+  itself (D4CREATE.C:1645), unlike the short layout's upper-cased 11-byte image. Open upper-cases it
+  in memory (`c4upper(longName)`, D4OPEN.C:316), so the stored name and the field name reported
+  differ in case: `Customer_Name` on disk, `CUSTOMER_NAME` after open.
+- **`_NullFlags` is written in the same layout** (D4CREATE.C:1672-1680), stored as `_NullFlags`.
+- **The run ends** at a `0x0D` where the next descriptor would begin **or** when the offset reaches two
+  bytes before the end of the descriptor region (`infoLen - 2`, D4OPEN.C:2716) — the writer's
+  closing `0x0D 0x1A` sits there. An offset past `headerLen` or negative is `e4data` (E83805,
+  D4OPEN.C:2728-2729).
+- **`headerLen`** follows §2.3's long-layout formula exactly: `LONGNAME`, six fields plus
+  `_NullFlags`, is 308 bytes, and its first record begins there.
+- **An expression may name a field longer than ten characters** only in such a table; elsewhere the
+  name is refused with `e4unrecValue` while it is scanned (e4parse.c:2404-2417).
 
 ---
 

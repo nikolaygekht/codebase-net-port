@@ -139,12 +139,18 @@ public sealed class DbfHeaderTests
     public void Parse_TableThatIsNotExtended_IgnoresTheFlagBytesEntirely(byte version)
     {
         // Only version 0x31 declares that the flags mean anything. The C library reads these bytes
-        // for no other version, so refusing a file over them would refuse files it opens.
-        byte[] bytes = HeaderBytes.Build(version: version, flags: [9, 9, 9, 9, 9, 9, 9, 9]);
+        // for no other version (D4OPEN.C:2150-2200), so neither refusing a file over them nor
+        // reporting a flag from them is right. Each byte holds 1 — the one value a flag reads as
+        // set — so a flag reported from any of them would show here.
+        byte[] bytes = HeaderBytes.Build(version: version, flags: [1, 1, 1, 1, 1, 1, 1, 1]);
 
         DbfHeader header = DbfHeader.Parse(bytes);
 
         header.Version.Should().Be(version);
+        header.Flags.HasAutoIncrementField.Should().BeFalse();
+        header.Flags.MayHaveCompressedMemos.Should().BeFalse();
+        header.Flags.HasCompressedData.Should().BeFalse();
+        header.Flags.HasAutoTimestampField.Should().BeFalse();
         header.Flags.UsesLongFieldNames.Should().BeFalse();
     }
 

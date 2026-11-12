@@ -25,7 +25,7 @@ public sealed class ResidualFilterTests
             new FieldDefinition("K_NNUM", 'N', 'N', 12, 3, 5, false, false, false, false, 0),
             new FieldDefinition("_NullFlags", '0', '0', 1, 0, 17, false, false, false, false, null),
         ],
-        "T");
+        "T", longFieldNames: false);
 
     private static readonly FieldDefinition NullFlags =
         new("_NullFlags", '0', '0', 1, 0, 17, false, false, false, false, null);

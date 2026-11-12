@@ -20,11 +20,19 @@ internal sealed class TableFieldMetadata : IFieldMetadata
     /// </summary>
     /// <param name="fields">The table's fields, in table order.</param>
     /// <param name="alias">The name the table answers to when a field is qualified.</param>
-    public TableFieldMetadata(IReadOnlyList<FieldDefinition> fields, string alias)
+    /// <param name="longFieldNames">
+    /// Whether the table stores long field names: its header's long-name flag. Required, so no path
+    /// that compiles an expression over a table can leave it at a default.
+    /// </param>
+    public TableFieldMetadata(IReadOnlyList<FieldDefinition> fields, string alias, bool longFieldNames)
     {
         this.fields = fields;
         this.alias = alias;
+        LongFieldNames = longFieldNames;
     }
+
+    /// <inheritdoc/>
+    public bool LongFieldNames { get; }
 
     /// <inheritdoc/>
     public FieldReference? Find(string? aliasUsed, string name)

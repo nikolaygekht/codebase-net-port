@@ -176,7 +176,7 @@ public sealed class ExpressionResolutionGoldenTests
         // The third count's own gate. These have no reference row, so the transcription gate cannot
         // see them and the resolution gate has nothing to compare; what makes them right is Visual
         // FoxPro's answers, and what makes that meaningful is that every row is actually exercised.
-        IFieldMetadata fields = new TableFieldMetadata([], "VFPFVAL");
+        IFieldMetadata fields = new TableFieldMetadata([], "VFPFVAL", longFieldNames: false);
 
         string[] reaching =
         [
@@ -237,6 +237,6 @@ public sealed class ExpressionResolutionGoldenTests
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
 
-        return new TableFieldMetadata([.. table.Fields], "CDXEXPR");
+        return new TableFieldMetadata([.. table.Fields], "CDXEXPR", table.LongFieldNames);
     }
 }

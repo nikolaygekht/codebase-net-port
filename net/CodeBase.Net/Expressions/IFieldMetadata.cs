@@ -18,4 +18,14 @@ internal interface IFieldMetadata
     /// <param name="name">The field name, as the expression spelled it.</param>
     /// <returns>The field, or null where there is no such field.</returns>
     FieldReference? Find(string? alias, string name);
+
+    /// <summary>
+    /// Gets a value indicating whether the table stores its field names in CodeBase's long-name layout.
+    /// </summary>
+    /// <value>
+    /// Only then may an expression name a field longer than ten characters; otherwise such a name is
+    /// refused while it is being scanned, before any field is looked for (e4parse.c:2404-2417). It is
+    /// the metadata's to say, so every compile path over a table gets it from the table.
+    /// </value>
+    bool LongFieldNames { get; }
 }

@@ -139,6 +139,6 @@ public sealed class SeekConverterTagContextTests
             keyLength, root: 1024, typeCode: typeCode, expression: expression, collation: collation).Build();
 
         return SeekConverter.For(
-            IndexHeader.Parse(image, "an image"), Fields, codePage, ExpressionOptions.Invariant, alias: "T");
+            IndexHeader.Parse(image, "an image"), Fields, codePage, ExpressionOptions.Invariant, alias: "T", longFieldNames: false);
     }
 }

@@ -4,7 +4,11 @@ using System.Text;
 namespace CodeBase.Net.Dbf;
 
 /// <summary>
-/// One 32-byte field descriptor, exactly as the file stores it.
+/// One field descriptor, exactly as the file stores it.
+///
+/// Ordinarily a descriptor is 32 bytes with the name in its first eleven. A table in CodeBase's
+/// long-name layout stores the same last 21 bytes followed by a name of any length instead, and
+/// both decode to this one view.
 ///
 /// This is the stored view, not the engine's view. Creating a table rewrites some of what the
 /// caller asked for before storing it: the binary memo type is stored under the memo letter and the
@@ -19,9 +23,14 @@ namespace CodeBase.Net.Dbf;
 public readonly struct FieldDescriptor
 {
     /// <summary>
-    /// The number of bytes a descriptor occupies.
+    /// The number of bytes a descriptor occupies in the ordinary layout.
     /// </summary>
     public const int Size = 32;
+
+    /// <summary>
+    /// The number of bytes after the name, from the type letter on, which both layouts share.
+    /// </summary>
+    internal const int TailSize = Size - NameLength;
 
     /// <summary>
     /// The byte that ends the descriptor region, standing where a further descriptor would begin.
@@ -52,7 +61,8 @@ public readonly struct FieldDescriptor
     /// Gets the field name as stored, with its case preserved.
     /// </summary>
     /// <value>
-    /// Up to ten characters, ended by a zero byte. Case matters here: the engine upper-cases names
+    /// Up to ten characters, ended by a zero byte, or of any length in a table using the long-name
+    /// layout. Case matters here: the engine upper-cases names
     /// when it opens a table, so the name a field reports can differ from this one, and the
     /// null-flags field is recognized by comparing these stored bytes exactly.
     /// </value>
@@ -125,15 +135,24 @@ public readonly struct FieldDescriptor
                 $"A field descriptor is {Size} bytes; only {bytes.Length} remain.");
         }
 
-        return new FieldDescriptor(
-            ReadName(bytes[..NameLength]),
-            (char)bytes[11],
-            BinaryPrimitives.ReadInt32LittleEndian(bytes[12..]),
-            bytes[16],
-            bytes[17],
-            (FieldFlags)bytes[18],
-            bytes[31]);
+        return FromParts(bytes[..NameLength], bytes[NameLength..Size]);
     }
+
+    /// <summary>
+    /// Builds a descriptor from its name bytes and the 21 bytes from the type letter on.
+    /// </summary>
+    /// <param name="name">The stored name, ended by a zero byte or by the span's end.</param>
+    /// <param name="tail">At least [c]TailSize[/c] bytes, laid out as the 32-byte descriptor's from offset 11.</param>
+    /// <returns>The decoded descriptor.</returns>
+    internal static FieldDescriptor FromParts(ReadOnlySpan<byte> name, ReadOnlySpan<byte> tail) =>
+        new(
+            ReadName(name),
+            (char)tail[0],
+            BinaryPrimitives.ReadInt32LittleEndian(tail[1..]),
+            tail[5],
+            tail[6],
+            (FieldFlags)tail[7],
+            tail[20]);
 
     /// <summary>
     /// Returns the descriptor rendered as its name, type and length.

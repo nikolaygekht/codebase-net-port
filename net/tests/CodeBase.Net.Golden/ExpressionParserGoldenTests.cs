@@ -202,6 +202,6 @@ public sealed class ExpressionParserGoldenTests
         using CodeBaseEngine engine = new();
         using Table table = engine.OpenTable(Corpus.PathOf("CDXEXPR.DBF"));
 
-        return new TableFieldMetadata([.. table.Fields], "CDXEXPR");
+        return new TableFieldMetadata([.. table.Fields], "CDXEXPR", table.LongFieldNames);
     }
 }

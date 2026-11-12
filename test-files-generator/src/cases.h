@@ -34,6 +34,8 @@ int caseQryGate( CODE4 *cb, const char *outDir );   /* QRYGATE.DBF — 0x30 + CD
 int caseTagCtx ( CODE4 *cb, const char *outDir );   /* TAGCTX.DBF  — 0x30 + CDX + FPT, tags parsed in a tag's context */
 int caseTagGen ( CODE4 *cb, const char *outDir );   /* TAGGEN.DBF  — 0x30 + CDX + FPT, ASCEND, DESCEND and memo under GENERAL */
 int caseTagBad ( CODE4 *cb, const char *outDir );   /* TAGBAD.DBF  — 0x30 + CDX, the GENERAL DESCEND tag i4tagAdd writes and the reference refuses */
+int caseLongName( CODE4 *cb, const char *outDir );  /* LONGNAME.DBF — 0x31 + CDX + FPT, the long-field-name descriptor layout */
+int caseFlags30( CODE4 *cb, const char *outDir );   /* FLAGS30.DBF  — 0x30 + FPT, every feature-flag byte set, read as ordinary */
 
 /* The one benchmark case: a workload, not an expectation. It writes into a
  * `benchmark` subdirectory of the output and has no dump, because nothing

@@ -388,7 +388,9 @@ VFP reserved area, the `t4dblToFox` sign rule.
   encodings and the binary types —
   `claude/dev/003-memo-and-binary-types/SUMMARY.md`. **The read half is complete:** the gate asserts
   every field of every record of all seven corpus dumps with nothing skipped. Compressed memo
-  entries, refused until step 012 (ADR-23), are now read and gated by `CMPMEMO` (ADR-55).
+  entries, refused until step 012 (ADR-23), are now read and gated by `CMPMEMO` (ADR-55). CodeBase's
+  long-field-name layout, refused until step 013, is now read and gated by `LONGNAME`, and the feature
+  flags are read on version `0x31` only, gated by `FLAGS30` (ADR-72).
 - **Gate:** for every DBF in `net/corpus/`, C# decodes every field of every record identically to the
   checked-in dump (byte/value-exact including blank/`00000000` dates, currency ×10⁴, datetime
   julian+ms, 4-byte memo refs read as ints).

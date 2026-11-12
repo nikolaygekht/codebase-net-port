@@ -69,6 +69,41 @@ public sealed class HeaderAndDescriptorGoldenTests
         CorpusDump.Load("VFPNULL").Descriptors[^1].Name.Should().Be("_NullFlags");
     }
 
+    [Fact]
+    public void Descriptors_InTheLongNameLayoutKeepTheCaseTheyWereCreatedWith()
+    {
+        // The long layout stores the caller's string as given (D4CREATE.C:1645), not an upper-cased
+        // copy, and open upper-cases it (D4OPEN.C:316). So the stored names and the field names the
+        // reference reports differ in case -- the descriptor test above holds the stored ones, the
+        // field tests the reported ones.
+        CorpusDump dump = CorpusDump.Load("LONGNAME");
+
+        dump.Version.Should().Be(DbfVersion.VisualFoxProExtended);
+        dump.Descriptors.Select(d => d.Name).Should().Equal(
+            "ID", "Customer_Name", "ORDER_TOTAL", "SHIP_STATE", "Delivery_Date_Requested",
+            "Delivery_Instructions_For_The_Courier", "_NullFlags");
+        dump.Fields[1].Name.Should().Be("CUSTOMER_NAME");
+    }
+
+    [Fact]
+    public void Header_OfANonExtendedTableReportsNoFlagFromItsFlagBytes()
+    {
+        // FLAGS30 is a 0x30 table whose generator set all eight flag bytes to 1 after writing it, and
+        // the reference opened and dumped it as an ordinary table. Its bytes are checked here first,
+        // because a case that lost them would pass this test proving nothing.
+        byte[] file = Corpus.ReadAllBytes("FLAGS30.DBF");
+        file[0].Should().Be(DbfVersion.VisualFoxPro);
+        file.AsSpan(12, 8).ToArray().Should().OnlyContain(b => b == 1);
+
+        FeatureFlags flags = DbfHeader.Parse(file).Flags;
+
+        flags.HasAutoIncrementField.Should().BeFalse();
+        flags.MayHaveCompressedMemos.Should().BeFalse();
+        flags.HasCompressedData.Should().BeFalse();
+        flags.HasAutoTimestampField.Should().BeFalse();
+        flags.UsesLongFieldNames.Should().BeFalse();
+    }
+
     [Theory]
     [MemberData(nameof(AllTables))]
     public void Descriptors_AccountForEveryByteOfTheRecord(string tableName)

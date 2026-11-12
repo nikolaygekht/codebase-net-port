@@ -39,7 +39,7 @@ public sealed class ExpressionEvaluatorTests
             Field("K_NNUM", 'N', 12, decimals: 3, nullBit: 0),
             Field("_NullFlags", '0', 1),
         ],
-        "T");
+        "T", longFieldNames: false);
 
     // ------------------------------------------------------------------ text
 
@@ -608,7 +608,7 @@ public sealed class ExpressionEvaluatorTests
     // ----------------------------------------------------------------- plumbing
 
     private static readonly IFieldMetadata WithFloat = new TableFieldMetadata(
-        [Field("K_FLT", 'H', 4)], "T");
+        [Field("K_FLT", 'H', 4)], "T", longFieldNames: false);
 
     // ------------------------------------------------- conversions under a tag
 

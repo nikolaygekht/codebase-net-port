@@ -68,7 +68,6 @@ internal sealed class ExpressionParser
     /// <param name="text">The expression's text.</param>
     /// <param name="fields">What the expression's names refer to.</param>
     /// <param name="aliases">The table aliases a field reference may be qualified by.</param>
-    /// <param name="longFieldNames">Whether the table the expression is over holds long field names.</param>
     /// <param name="encoding">
     /// The code page a string literal is encoded back to. Latin1 by default, which maps each
     /// character to the byte it was read from and is therefore what the expression's text already
@@ -83,10 +82,9 @@ internal sealed class ExpressionParser
         string text,
         IFieldMetadata fields,
         IReadOnlyCollection<string>? aliases = null,
-        bool longFieldNames = false,
         Encoding? encoding = null)
     {
-        IReadOnlyList<ExpressionToken> tokens = ExpressionLexer.Tokenize(text, aliases, longFieldNames);
+        IReadOnlyList<ExpressionToken> tokens = ExpressionLexer.Tokenize(text, aliases, fields.LongFieldNames);
         ExpressionParser parser = new(text, tokens, fields, encoding ?? Encoding.Latin1);
         parser.ParseExpression();
         return new ParsedExpression(text, parser.Finish());

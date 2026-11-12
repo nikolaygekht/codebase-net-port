@@ -18,7 +18,7 @@ namespace CodeBase.Net.Tests.Expressions;
 /// </summary>
 public sealed class VisualFoxProFunctionTests
 {
-    private static readonly IFieldMetadata None = new TableFieldMetadata([], "T");
+    private static readonly IFieldMetadata None = new TableFieldMetadata([], "T", longFieldNames: false);
 
     [Theory]
     [InlineData("ABS(-1)", 1)]

@@ -51,10 +51,52 @@ static int dumpRawHeaderAndDescriptors( FILE *out, const char *path )
    fprintf( out, "hasMdxMemo   0x%02X\n", h[28] );
    fprintf( out, "codePage     0x%02X\n", h[29] );
 
+   fprintf( out, "\n[descriptors]   (as stored on disk)\n" );
+
+   /* CodeBase's long-name layout (version 0x31, flags[4] = 1): each descriptor
+    * is the 32-byte one's last 21 bytes, a 2-byte length, then a NUL-ended name
+    * of that length (D4CREATE.C:1635-1648). Walked here exactly as the reader
+    * walks it (D4OPEN.C:2709-2731), and printed in the same line format, so a
+    * name longer than ten characters only widens its column. Only such a file
+    * takes this branch; every other dump is unchanged. */
+   if ( h[0] == 0x31 && h[16] == 1 )
+   {
+      static unsigned char info[65536];
+      unsigned infoLen = headerLen - 32, offset = 0;
+
+      if ( fread( info, 1, infoLen, fp ) != infoLen )
+      {
+         fclose( fp );
+         fprintf( stderr, "  ERROR: truncated long-name descriptors in %s\n", path );
+         return 1;
+      }
+
+      for ( i = 0; info[offset] != 0x0D && offset != infoLen - 2; i++ )
+      {
+         const unsigned char *t = info + offset;   /* the 21 bytes from type on */
+         unsigned nameLen = (unsigned)( t[21] | ( t[22] << 8 ) );
+
+         fprintf( out, "%d %-10s type=%c offset=%lu len=%u dec=%u flags=0x%02X hasTag=%u\n",
+                  i + 1, (const char *)( t + 23 ), t[0],
+                  (unsigned long)( t[1] | ( t[2] << 8 ) | ( t[3] << 16 ) | ( (unsigned long)t[4] << 24 ) ),
+                  t[5], t[6], t[7], t[20] );
+
+         offset += 21 + 2 + nameLen;
+         if ( offset > infoLen )
+         {
+            fclose( fp );
+            fprintf( stderr, "  ERROR: long-name descriptor %d runs past the header in %s\n", i + 1, path );
+            return 1;
+         }
+      }
+
+      fclose( fp );
+      return 0;
+   }
+
    /* Descriptors run from offset 32 up to the 0x0D terminator. */
    nFields = (int)( ( headerLen - 32 - 1 ) / 32 );
 
-   fprintf( out, "\n[descriptors]   (as stored on disk)\n" );
    for ( i = 0; i < nFields; i++ )
    {
       char name[12];

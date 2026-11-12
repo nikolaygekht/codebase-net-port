@@ -117,7 +117,7 @@ public sealed class TagProbeKeyTests
     }
 
     private static SeekConverter Converter(IndexHeader header) =>
-        SeekConverter.For(header, Fields, 1252, ExpressionOptions.Invariant, "T");
+        SeekConverter.For(header, Fields, 1252, ExpressionOptions.Invariant, "T", longFieldNames: false);
 
     private static IndexHeader Header(string expression, int keyLength, string collation) =>
         IndexHeader.Parse(Image(expression, keyLength, collation), "an image");

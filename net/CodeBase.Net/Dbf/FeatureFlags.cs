@@ -73,43 +73,43 @@ internal readonly struct FeatureFlags
     /// Reads the eight flag bytes.
     /// </summary>
     /// <param name="bytes">The eight bytes at offset 12 of the header.</param>
-    /// <param name="validate">
-    /// Whether the values are required to be ones a writer could have produced. The C library
-    /// applies this test only to a version 0x31 table, and ignores these bytes entirely otherwise,
-    /// so a stray value in a plain Visual FoxPro table must not stop it being read.
+    /// <param name="extended">
+    /// Whether the table's version is 0x31, the one version that declares these bytes to be flags.
+    /// The C library reads them on no other version (D4OPEN.C:2150-2200), so on any other they are
+    /// neither checked nor reported, and a stray value in a plain Visual FoxPro table changes nothing.
     /// </param>
-    /// <returns>The decoded flags.</returns>
+    /// <returns>The decoded flags; all clear when the table is not extended.</returns>
     /// <exception cref="CodeBaseException">
-    /// Validation was asked for and a flag holds a value other than 0 or 1, or a flag beyond the
-    /// five this library knows is set. Either means the table declares a feature that cannot be
+    /// The table is extended and a flag holds a value other than 0 or 1, or a flag beyond the five
+    /// this library knows is set. Either means the table declares a feature that cannot be
     /// honoured, and reading it as though it did not would misread the data.
     /// </exception>
-    public static FeatureFlags Parse(ReadOnlySpan<byte> bytes, bool validate)
+    public static FeatureFlags Parse(ReadOnlySpan<byte> bytes, bool extended)
     {
-        if (validate)
-        {
-            // The C library compares all eight bytes against a mask built only from the five it
-            // knows, each required to be exactly 1 to survive (D4OPEN.C:2152-2187). So a value of 2
-            // in a known flag fails just as a set unknown flag does.
-            for (int i = 0; i < KnownCount; i++)
-            {
-                if (bytes[i] > 1)
-                {
-                    throw new CodeBaseException(
-                        ErrorCode.Data,
-                        $"Feature flag {i} holds {bytes[i]}; a flag is a whole byte holding 0 or 1.");
-                }
-            }
+        if (!extended)
+            return default;
 
-            for (int i = KnownCount; i < Count; i++)
+        // The C library compares all eight bytes against a mask built only from the five it
+        // knows, each required to be exactly 1 to survive (D4OPEN.C:2152-2187). So a value of 2
+        // in a known flag fails just as a set unknown flag does.
+        for (int i = 0; i < KnownCount; i++)
+        {
+            if (bytes[i] > 1)
             {
-                if (bytes[i] != 0)
-                {
-                    throw new CodeBaseException(
-                        ErrorCode.Data,
-                        $"Feature flag {i} is set, so the table uses an extension this library " +
-                        "does not implement.");
-                }
+                throw new CodeBaseException(
+                    ErrorCode.Data,
+                    $"Feature flag {i} holds {bytes[i]}; a flag is a whole byte holding 0 or 1.");
+            }
+        }
+
+        for (int i = KnownCount; i < Count; i++)
+        {
+            if (bytes[i] != 0)
+            {
+                throw new CodeBaseException(
+                    ErrorCode.Data,
+                    $"Feature flag {i} is set, so the table uses an extension this library " +
+                    "does not implement.");
             }
         }
 

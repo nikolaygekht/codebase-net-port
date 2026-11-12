@@ -133,7 +133,7 @@ public sealed class RecordKeyTests
     }
 
     private static SeekConverter Converter(string expression, int keyLength, string collation = "") =>
-        SeekConverter.For(Header(expression, keyLength, collation), Fields, 1252, ExpressionOptions.Invariant, "T");
+        SeekConverter.For(Header(expression, keyLength, collation), Fields, 1252, ExpressionOptions.Invariant, "T", longFieldNames: false);
 
     private static IndexHeader Header(string expression, int keyLength, string collation) =>
         IndexHeader.Parse(Image(expression, keyLength, collation), "an image");

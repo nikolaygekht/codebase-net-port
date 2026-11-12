@@ -32,7 +32,7 @@ public sealed class CaseMapGoldenTests
 
         CdxTag tag = table.Tags[tagName].Inner;
         SeekConverter converter = SeekConverter.For(
-            tag.Header, [.. table.Fields], table.CodePageNumber!.Value, table.ExpressionOptions, "VFPFUNC");
+            tag.Header, [.. table.Fields], table.CodePageNumber!.Value, table.ExpressionOptions, "VFPFUNC", table.LongFieldNames);
         ExpressionEvaluator evaluator = new(converter.Compiled);
 
         List<string> failures = [];

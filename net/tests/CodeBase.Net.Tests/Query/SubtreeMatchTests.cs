@@ -118,6 +118,8 @@ public sealed class SubtreeMatchTests
             new("BONUS", 'N', 'N', 12, 2, 48, false, false, false, false, null),
         ];
 
+        public bool LongFieldNames => false;
+
         public FieldReference? Find(string? alias, string name)
         {
             for (int index = 0; index < All.Length; index++)

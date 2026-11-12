@@ -74,11 +74,15 @@ internal static class FoxDateTime
     /// Renders a stored datetime the way the C library renders it.
     /// </summary>
     /// <param name="bytes">The field's bytes. Only the first eight are read.</param>
+    /// <param name="includeMilliseconds">
+    /// True for the CodeBase type that keeps them: the second is then not rounded, and a non-zero
+    /// fraction follows as a point and three digits (F4FIELD.C:1859-1891, ADR-75).
+    /// </param>
     /// <returns>
     /// Eight characters of date followed by the time. The date is eight spaces when the field is
     /// blank, so a blank datetime renders as spaces and a zero time rather than as an empty string.
     /// </returns>
-    public static string ToText(ReadOnlySpan<byte> bytes)
+    public static string ToText(ReadOnlySpan<byte> bytes, bool includeMilliseconds = false)
     {
         (int julian, int milliseconds) = ToParts(bytes);
 
@@ -99,14 +103,18 @@ internal static class FoxDateTime
         long remainder = milliseconds - (seconds * 1000);
 
         // The reference rounds the second up at half rather than truncating, because the stored
-        // milliseconds are thrown away (F4FIELD.C:1868-1873).
-        if (remainder >= 500)
+        // milliseconds are thrown away (F4FIELD.C:1868-1873) -- except where it keeps them.
+        if (!includeMilliseconds && remainder >= 500)
             seconds++;
 
         string time =
             (seconds / 3600).ToString("D2", CultureInfo.InvariantCulture) + ":" +
             (seconds / 60 % 60).ToString("D2", CultureInfo.InvariantCulture) + ":" +
             (seconds % 60).ToString("D2", CultureInfo.InvariantCulture);
+
+        // The reference blank-fills its buffer and trims it, so a whole second has no fraction.
+        if (includeMilliseconds && remainder != 0)
+            time += "." + remainder.ToString("D3", CultureInfo.InvariantCulture);
 
         return date + time;
     }

@@ -141,6 +141,10 @@ internal static class KeyTransform
     /// <param name="julianDay">The Julian day number the field stores.</param>
     /// <param name="milliseconds">The milliseconds since midnight the field stores.</param>
     /// <param name="destination">Where to write, at least eight bytes.</param>
+    /// <param name="keepMilliseconds">
+    /// True for the CodeBase type 7 ([c]t4dateTimeToFoxMilli[/c], i4conv.c:2292-2364): the
+    /// milliseconds are kept rather than rounded, and the table is consulted for the truncated second.
+    /// </param>
     /// <returns>How many bytes were written.</returns>
     /// <remarks>
     /// [c]t4dateTimeToFox[/c] (i4conv.c:2209-2287), and the one transform here that is not
@@ -149,7 +153,8 @@ internal static class KeyTransform
     /// converted. See [clink=CodeBase.Net.Cdx.DateTimeKeyFlags]DateTimeKeyFlags[/clink] for why the
     /// table exists.
     /// </remarks>
-    public static int FromDateTime(int julianDay, int milliseconds, Span<byte> destination)
+    public static int FromDateTime(
+        int julianDay, int milliseconds, Span<byte> destination, bool keepMilliseconds = false)
     {
         int extra = milliseconds % 1000;
         int rounded = milliseconds - extra;
@@ -157,9 +162,12 @@ internal static class KeyTransform
         if (extra >= 500)
             rounded += 1000;
 
-        double value = julianDay + (rounded / 86400000.0);
+        // The CodeBase type 7 keeps the fraction and looks the flag up by the truncated second
+        // (t4dateTimeToFoxMilli, i4conv.c:2292-2364); everything else is the 'T' transform.
+        int time = keepMilliseconds ? milliseconds : rounded;
+        double value = julianDay + (time / 86400000.0);
 
-        if (DateTimeKeyFlags.NeedsDecrement(rounded / 1000))
+        if (DateTimeKeyFlags.NeedsDecrement(time / 1000))
             value = BitConverter.UInt64BitsToDouble(DecrementLowByte(BitConverter.DoubleToUInt64Bits(value)));
 
         return FromDouble(value, destination);

@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-3 done; the next divergence)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-4 done; next 7a-5, the W field)
 
 ## Done so far
 
@@ -297,6 +297,35 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     - A note for the mutation checks by hand: a golden run with `--no-build` after building only the
       unit project reads a stale library from the golden project's own `bin`; build the solution.
     - Release 2924 passed (1 skipped) + 1305 golden, green.
+  - [x] 7a-4 — the `'7'` field, a datetime with milliseconds (2026-11-12). The user decided full
+    support (ADR-75, superseding ADR-32).
+    - **What it is.** CodeBase's `r4dateTimeMilli`: `'T'`'s eight bytes with the milliseconds kept.
+      Opened by `'T'`'s rules; VFP never writes one. The port already had the expression type and its
+      comparison rows, but keyed it through the `'T'` transform, which rounds.
+    - **a, read.** `FieldResolver` (readable, VFP-or-later, `'T'`'s lengths), `BlankRecord` (zeros),
+      `FieldValueDecoder` (width, refused as a number, read as a datetime), `FoxDateTime.ToText`'s
+      `includeMilliseconds` back (ADR-32 had removed it as dead): no rounding, `.MMM` only when
+      non-zero. Public API unchanged — `GetDateTime` keeps the milliseconds; `GetString` refuses it as
+      it refuses `'T'` (binary).
+    - **b, expressions and keys.** Loader row 17 (`FieldTimestampWithMilliseconds`), a
+      `TimestampWithMilliseconds` value, `KeyTransform.FromDateTime`'s `keepMilliseconds` (no rounding,
+      flag by the truncated second), set by `ExpressionKey` for that type. Tests: `KeyTransformTests`
+      (agrees with `'T'` on a whole second, sorts a fraction between its seconds, orders by
+      millisecond), `ExpressionKeyTests`, `ExpressionEvaluatorTests` (the loader keeps the fraction),
+      decoder, blank, resolver and text tests.
+    - **c, generator.** `case-dtmilli.cpp`: 300 moments, seconds by a stride of 7919, ten millisecond
+      values, the day's edges, a repeat, a blank; `M_ASC`/`M_DESC`. `dump.cpp` prints `r4dateTimeMilli`
+      as `r4dateTime`. Existing corpus byte-identical; four files added.
+    - **d, golden.** `DTMILLI` in the layout, index, seek and key-rebuild lists; the record gate's text
+      check covers `'7'`. **All 600 stored keys rebuild byte for byte**, which witnesses the
+      millisecond branch of `t4dateTimeToFoxMilli` as built on Windows. Counts by exactly the case
+      (tables 22, indexed 12, tags 65, seeks 425, key rebuilds 600).
+    - **e, records.** ADR-75; `PORTING-PLAN.md` §2.1 and §2.3; `DBF-FORMAT.md` §5; `KEY-COLLATION.md`
+      §2.8; both corpus READMEs; `DIVERGENCES.md`; `ExpressionType` and `FieldResolver` docs that said
+      the type was unreachable.
+    - **Mutations.** Rounding forced in the transform: 5 unit, 1 golden red; the key path rounding: 1
+      and 1; the field loaded as `'T'`: 1 and 1. `mutate4csharp --lines` over `FromDateTime`: 5/5.
+    - Release 2944 passed (1 skipped) + 1346 golden, green.
 - [ ] step 8 — close
 
 ## Notes for the next session

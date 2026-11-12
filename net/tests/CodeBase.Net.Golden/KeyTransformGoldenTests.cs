@@ -32,6 +32,7 @@ public sealed class KeyTransformGoldenTests
         { "CDXCOLL", "CDXCOLL.cdx" },
         { "CDXDEEP", "CDXDEEP.cdx" },
         { "CDXTIME", "CDXTIME.cdx" },
+        { "DTMILLI", "DTMILLI.cdx" },
         { "IDXONE", "IDXONE.cdx" },
         { "RECNOTAG", "RECNOTAG.cdx" },
     };
@@ -99,6 +100,7 @@ public sealed class KeyTransformGoldenTests
         ["CDXCOLL"] = 68,
         ["CDXDEEP"] = 2400,
         ["CDXTIME"] = 512,
+        ["DTMILLI"] = 600,
         ["IDXONE"] = 300,
         ["RECNOTAG"] = 20,
     };

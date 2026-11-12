@@ -201,8 +201,10 @@ bit extraction `(1 << (flagNum & 7)) & flags[flagNum >> 3]`, F4FLAG.C:161-193). 
 be copied verbatim.**
 
 `t4dateTimeToFoxMilli` (`r4dateTimeMilli` `'7'`, CodeBase-only) is identical except the
-milliseconds are kept (no rounding) while the flag lookup still uses the whole second
-(i4conv.c:2292-2364). Seek-side string parsers: `t4strToDateTime` expects `CCYYMMDDHH:MM:SS`
+milliseconds are kept (no rounding) while the flag lookup still uses the whole second — the
+**truncated** one, `ms / 1000 + 1` (i4conv.c:2292-2364). Witnessed by `DTMILLI`: all 600 stored keys
+rebuild byte for byte. (Under `S4DATA_ALIGN`/`S4BYTE_SWAP` the C drops the milliseconds instead; the
+corpus is the Windows build, which keeps them.) Seek-side string parsers: `t4strToDateTime` expects `CCYYMMDDHH:MM:SS`
 (i4conv.c:608-637); `time4long` converts `HHxMMxSS[.MMM]` to ms (i4conv.c:201-221).
 
 ### 2.9 Logical `'L'` — 1 byte

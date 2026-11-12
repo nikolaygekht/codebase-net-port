@@ -42,6 +42,19 @@ public sealed class FoxDateTimeAndCurrencyTests
         FoxDateTime.ToText(Stored(2444606, milliseconds))[8..].Should().Be(expected);
     }
 
+    [Theory]
+    [InlineData(0, "00:00:00")]
+    [InlineData(1, "00:00:00.001")]
+    [InlineData(500, "00:00:00.500")]
+    [InlineData(999, "00:00:00.999")]
+    [InlineData(1500, "00:00:01.500")]
+    public void ToText_WithMilliseconds_KeepsThemAndRoundsNothing(int milliseconds, string expected)
+    {
+        // The '7' type's text (F4FIELD.C:1859-1891): no rounding, and the fraction only when there is
+        // one, because the reference's buffer is blank-filled and trimmed.
+        FoxDateTime.ToText(Stored(2444606, milliseconds), includeMilliseconds: true)[8..].Should().Be(expected);
+    }
+
     [Fact]
     public void ToDateTime_KeepsTheMillisecondsTheTextThrowsAway()
     {

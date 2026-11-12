@@ -27,6 +27,7 @@ public sealed class BlankRecordTests
     [InlineData('I')]
     [InlineData('Y')]
     [InlineData('T')]
+    [InlineData('7')]
     [InlineData('B')]
     [InlineData('X')]
     [InlineData('Z')]

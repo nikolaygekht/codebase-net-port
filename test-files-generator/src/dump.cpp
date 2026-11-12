@@ -227,8 +227,10 @@ int dumpTable( CODE4 *cb, const char *outDir, const char *fileName )
                   fprintf( out, " str=[%s]", f4str( f ) );
                   break;
                case r4dateTime:
+               case r4dateTimeMilli:
                   /* f4str does not decode datetimes; f4dateTime does
-                   * (F4FIELD.C:1940). Blank datetimes come back empty. */
+                   * (F4FIELD.C:1940). Blank datetimes come back empty. The
+                   * '7' type's text carries a non-zero fraction as ".MMM". */
                   fprintf( out, " str=[%s]", f4dateTime( f ) );
                   break;
                default:

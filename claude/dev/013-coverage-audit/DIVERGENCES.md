@@ -16,7 +16,7 @@ Here a user hits an error.
 |---|---|---|
 | A table with compressed data (`0x31`, flag byte 14) | reads it | ADR-56, **user's call** |
 | ~~A table with long field names (CodeBase's descriptor layout, flag byte 16)~~ | reads it | **Resolved 2026-11-12 (7a-1): supported**, user's call (ADR-72). The layout is read and gated by `LONGNAME`; the feature flags are read on `0x31` only, as the reference, gated by `FLAGS30` |
-| A field of type `7` (datetime with milliseconds, a CodeBase extension) | reads it | ADR-32 |
+| ~~A field of type `7` (datetime with milliseconds, a CodeBase extension)~~ | reads it | **Resolved 2026-11-12 (7a-4): supported**, user's call (ADR-75, superseding ADR-32): read, evaluated and keyed, gated by `DTMILLI` |
 | A tag over `DATE()`, `TIME()`, `RECCOUNT()` | opens it | **Kept 2026-11-12 (7a-2)**, user's call: ADR-73, which supersedes ADR-49 in part; documented on `Table.SelectTag` and in `README.md`. ~~`RECNO()`~~ is **supported** now, gated by `RECNOTAG` |
 | A tag keyed through the date picture (`DTOC`, `CTOD`), under the engine's default options | reads it under its compiled-in picture | **Implemented 2026-11-12 (7a-3)**, user's call: ADR-42's refusal had never been written, and the gap gave a wrong record set; ADR-74. Documented on `CodeBaseEngine.ExpressionOptions`, `Table.SelectTag` and in `README.md` |
 | GENERAL on a code page other than 1252/437/850; other collations (croatian, spanish, loaded from disk) | supports some | `PORTING-PLAN.md` §2.3, later |

@@ -24,7 +24,7 @@ public sealed class RecordGoldenTests
     {
         // Part of the gate rather than commentary: a data-driven suite that discovers nothing
         // reports success having proved nothing.
-        AllTables().Should().HaveCount(21);
+        AllTables().Should().HaveCount(22);
     }
 
     [Theory]
@@ -160,8 +160,12 @@ public sealed class RecordGoldenTests
         if (value.Text is not null && field.Type == 'D')
             RenderDate(table, field).Should().Be(value.Text, because);
 
-        if (value.Text is not null && field.Type == 'T')
-            FoxDateTime.ToText(table.GetRawBytes(field)).Should().Be(value.Text, because);
+        // The '7' type keeps its milliseconds, and its text shows a non-zero fraction (ADR-75).
+        if (value.Text is not null && field.Type is 'T' or '7')
+        {
+            FoxDateTime.ToText(table.GetRawBytes(field), includeMilliseconds: field.Type == '7')
+                .Should().Be(value.Text, because);
+        }
     }
 
     /// <summary>

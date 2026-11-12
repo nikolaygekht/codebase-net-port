@@ -38,6 +38,7 @@ found and fixed.
 | 7a-1 | **Long field names, read** *(added 2026-11-12, the first 7a entry; the user decided support)*. Its own plan below | its own gate below |
 | 7a-2 | **A tag over `RECNO()`** *(added 2026-11-12; the user decided `RECNO()` supported, the other three refused)*. Its own plan below | its own sub-steps below |
 | 7a-3 | **A tag keyed through the date picture** *(added 2026-11-12; ADR-42's refusal, never implemented — a wrong record set found while reviewing it)*. Its own plan below | its own sub-steps below |
+| 7a-4 | **The `'7'` field, full support** *(added 2026-11-12, at the user's call)*. Its own plan below | its own sub-steps below |
 | 8 | **Close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`, `claude/dev/README.md`, root `STATE.md` | the gate |
 
 ## Gate
@@ -155,3 +156,27 @@ Design: `DESIGN.md` §7a-3.
 | a | The tests above (red), then `ExpressionOptions`, `CodeBaseEngine`, `SeekConverter` (green) | each red first; mutating the check reddens both layers |
 | b | Golden tests that select every tag under default options, if any now meet the refusal: configure the picture the dump was taken under, as `ExpressionTagGoldenTests` does | Release green |
 | c | Records: ADR-74; `CodeBaseEngine.ExpressionOptions` and `Table.SelectTag` docs; `README.md` "Differences from CodeBase"; `DIVERGENCES.md`; `mutate4csharp` on `SeekConverter.cs`'s new check | survivors explained |
+
+---
+
+## 7a-4 — the `'7'` field
+
+Design: `DESIGN.md` §7a-4.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 1 Unit | `FieldResolver` admits `'7'` on `0x30` and refuses it on `0x03`/`0xF5`; `FieldValueDecoder` and `BlankRecord` treat it as `'T'`; `FoxDateTime.ToText` with milliseconds; `KeyTransform.FromDateTime` keeping milliseconds differs from rounding at 600 ms and agrees at 0 |
+| 2 Component | a `'7'` table image: `GetDateTime` keeps milliseconds; an expression over the field loads `TimestampWithMilliseconds`; a key rebuilt for a record keeps its milliseconds |
+| 4 Golden | `DTMILLI`: records and text against the dump, every key rebuilt (`KeyTransformGoldenTests`), index, seek and seek-type gates |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Read: resolver, decoder, blank, text (tests red, then green) | mutating each reddens a test |
+| b | Expressions and keys: loader row, value type, `FromDateTime`'s flag, `ExpressionKey`/`SeekConverter` | the 600 ms key test red before |
+| c | Generator: `case-dtmilli.cpp`, `dump.cpp` printing `r4dateTimeMilli` like `r4dateTime`; regenerate, existing files byte-identical | `git status net/corpus` additions only |
+| d | Golden: `DTMILLI` into the lists, counts by exactly the case | green; dropping the flag reddens the key rebuild |
+| e | Records: ADR-75 (supersedes ADR-32); `DBF-FORMAT.md` §5, `KEY-COLLATION.md` §2.8 as witnessed; corpus READMEs; `DIVERGENCES.md`; `PORTING-PLAN.md` §2.3; `mutate4csharp` on `KeyTransform.cs` | survivors explained |

@@ -253,7 +253,7 @@ Constants from d4defs.h:2774-2821. `r4charBin`('Z') and `r4memoBin`('X') are cre
 | `'4'` | `r5dbTimeStamp` | 16 | (16, 0, 0x04) (D4CREATE.C:1595-1596) — CodeBase/OLE-DB extension |
 | `'5'` | `r5date` | 8 | (sizeof(double), 0, 0x04) (D4CREATE.C:1580-1582) — OLE automation date — CodeBase extension |
 | `'6'` | `r5ui8` | 8 | (8, 0, 0x04) (D4CREATE.C:1587-1589) — CodeBase extension |
-| `'7'` | `r4dateTimeMilli` | 8 | (8, 0, 0x04) (D4CREATE.C:1572-1574) — CodeBase extension (datetime keeping milliseconds) |
+| `'7'` | `r4dateTimeMilli` | 8 | (8, 0, 0x04) (D4CREATE.C:1572-1574) — CodeBase extension (datetime keeping milliseconds). Opened by `'T'`'s rules (D4OPEN.C:2595-2632); blank is eight zeros (F4FIELD.C:146); text `CCYYMMDDHH:MM:SS` plus `.MMM` only when the milliseconds are non-zero, the second never rounded (F4FIELD.C:1859-1891) — witnessed by `DTMILLI` |
 
 Open-time length validation (D4OPEN.C:2448-2649). **Most of it does not fire in a release build** — read the switch case by case before relying on any of it:
 

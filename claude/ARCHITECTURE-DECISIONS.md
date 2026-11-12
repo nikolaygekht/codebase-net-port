@@ -2610,3 +2610,28 @@ mark on them needs no new parameter on any path.
 
 **Rejected — refusing only when the picture is the invariant one.** "Explicitly configured" is ADR-42's
 word, and a caller may choose `CCYYMMDD` on purpose.
+
+## ADR-75 — The `'7'` datetime-with-milliseconds type is read, evaluated and keyed · accepted
+
+**Date.** 2026-11-12. Decided by the user during step 013, sub-step 7a-4. Supersedes ADR-32.
+
+**Context.** `'7'` (`r4dateTimeMilli`) is a CodeBase field type that VFP never writes: the eight
+bytes of `'T'` — Julian day and milliseconds since midnight — with the milliseconds kept where `'T'`
+keeps whole seconds. ADR-32 put it out of scope because no corpus case could gate it and the decoder
+was not ready. Going through `DIVERGENCES.md` the user decided a separate type deserves full support.
+Investigating it found that the port's expression engine already knew the type
+(`TimestampWithMilliseconds`, its comparison rows) but keyed it through the `'T'` transform, which
+rounds the milliseconds away.
+
+**Decision.** `'7'` is admitted on `version >= 0x30` with `'T'`'s rules (D4OPEN.C:2595-2632): blanks
+to zeros, reads through the same public API as `'T'` — a `DateTime`, its milliseconds included —
+loads into an expression by its own row (`E4FIELD_DTTIME_MILLI`) as `TimestampWithMilliseconds`, and
+keys by `t4dateTimeToFoxMilli`: the milliseconds kept, the `flags4dateTime` decrement looked up by the
+truncated second (i4conv.c:2292-2364). The public API grows no type. Gated by corpus case `DTMILLI`:
+300 moments, every one of its 600 stored keys rebuilt byte for byte from its record.
+
+**Consequence.** The reference compiles the millisecond branch on Windows; under `S4DATA_ALIGN` or
+`S4BYTE_SWAP` it drops the milliseconds instead. The corpus is the Windows build's, and so is the port.
+
+**Rejected — reading the field as `'T'`.** The value would lose its milliseconds and a tag over it
+would be keyed differently from the stored keys, which a seek or a cursor landing would miss.

@@ -126,8 +126,9 @@ internal static class ExpressionKey
             T.Integer => KeyTransform.FromInt32(value.Integer, destination),
             T.Currency => KeyTransform.FromInt64(value.Scaled, destination),
             T.BinaryFloat => KeyTransform.FromSingle((float)value.Number, destination),
-            T.Timestamp or T.TimestampWithMilliseconds =>
-                KeyTransform.FromDateTime(value.TimestampDay, value.TimestampTime, destination),
+            T.Timestamp => KeyTransform.FromDateTime(value.TimestampDay, value.TimestampTime, destination),
+            T.TimestampWithMilliseconds => KeyTransform.FromDateTime(
+                value.TimestampDay, value.TimestampTime, destination, keepMilliseconds: true),
             T.Logical => KeyTransform.FromLogical(value.Logical, destination),
             _ => KeyTransform.FromDouble(value.Number, destination),
         };

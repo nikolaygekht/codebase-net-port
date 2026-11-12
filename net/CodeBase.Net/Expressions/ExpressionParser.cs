@@ -244,6 +244,7 @@ internal sealed class ExpressionParser
         'B' => FunctionRows.FieldDouble,
         'Y' => FunctionRows.FieldCurrency,
         'T' => FunctionRows.FieldTimestamp,
+        '7' => FunctionRows.FieldTimestampWithMilliseconds,
         'H' => FunctionRows.FieldBinaryFloat,
         _ => -1,
     };

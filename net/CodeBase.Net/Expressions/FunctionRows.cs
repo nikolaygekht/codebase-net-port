@@ -54,6 +54,9 @@ internal static class FunctionRows
     /// <summary>The loader for a timestamp field.</summary>
     public const int FieldTimestamp = 16;
 
+    /// <summary>The loader for a timestamp field that keeps its milliseconds, the CodeBase type 7.</summary>
+    public const int FieldTimestampWithMilliseconds = 17;
+
     /// <summary>The loader for an integer field as a double, which a promotion selects.</summary>
     public const int FieldIntegerAsDouble = 18;
 

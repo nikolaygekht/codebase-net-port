@@ -19,6 +19,7 @@ public sealed class FieldValueDecoderTests
     [Theory]
     [InlineData('L')]
     [InlineData('T')]
+    [InlineData('7')]
     [InlineData('0')]
     public void Double_OfATypeTheReferenceRefuses_IsRefused(char type)
     {
@@ -31,6 +32,7 @@ public sealed class FieldValueDecoderTests
     [Theory]
     [InlineData('L')]
     [InlineData('T')]
+    [InlineData('7')]
     [InlineData('0')]
     public void Int32_OfATypeTheReferenceRefuses_IsRefused(char type)
     {
@@ -147,6 +149,18 @@ public sealed class FieldValueDecoderTests
 
         FieldValueDecoder.Bytes(buffer, field).Length.Should().Be(8);
         FieldValueDecoder.DateTime(buffer, field).Should().Be(new DateTime(1981, 1, 1));
+    }
+
+    [Fact]
+    public void DateTime_OfADateTimeWithMilliseconds_KeepsThem()
+    {
+        // The CodeBase '7' type stores what 'T' stores, and is read the same way (ADR-75).
+        byte[] record = new byte[1 + 8];
+        BinaryPrimitives.WriteInt32LittleEndian(record.AsSpan(1), 2444606);
+        BinaryPrimitives.WriteInt32LittleEndian(record.AsSpan(5), 3_723_456);
+
+        FieldValueDecoder.DateTime(Buffer(record), Field('7', length: 8))
+            .Should().Be(new DateTime(1981, 1, 1, 1, 2, 3, 456));
     }
 
     [Theory]

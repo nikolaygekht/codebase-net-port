@@ -45,7 +45,8 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
   VFP), read-tolerance for **0x32** (VFP9). Governed by `DBF-FORMAT.md`.
 - **VFP field types**: `C, N, F, D, L, M, G, I, B(double), Y(currency), T(datetime), H(binary
   float)` plus the `_NullFlags` nullable-field system (`'0'`) and auto-increment/auto-timestamp
-  CodeBase extensions. Governed by `DBF-FORMAT.md` §5–§7.
+  CodeBase extensions, and CodeBase's `'7'` datetime with milliseconds (ADR-75). Governed by
+  `DBF-FORMAT.md` §5–§7.
 - **CDX compound indexes** (`S4FOX`): the tag-directory B-tree, interior nodes (big-endian
   recno/child), and **bit-packed compressed leaf nodes**. Governed by `CDX-FORMAT.md`.
 - **Compact single-tag `.IDX` files**, *read* — the same S4FOX format entered differently: the tag
@@ -98,8 +99,6 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - **Multi-table relations** (`relate4createSlave` and the join/skip machinery in `r4relate.c`).
   The *optimizer itself* is now IN scope (§2.1, `QUERY`); only joins are deferred.
 - Unicode (`r5wstr`/`r5wstrLen`) collated index keys (CodeBase extension; VFP has none).
-- The **`'7'` datetime-with-milliseconds** field type (CodeBase extension; VFP never writes one, and
-  the C library admits it only on `version >= 0x30`). Refused at open — ADR-32.
 - Additional VFP collations beyond GENERAL (DUTCH, NORDAN, croatian/spanish/avaya tables) — the
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself.

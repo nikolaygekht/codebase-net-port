@@ -140,7 +140,8 @@ internal sealed class ExpressionEvaluator
             or FunctionRows.FieldDateAsText or FunctionRows.FieldNumericAsDouble
             or FunctionRows.FieldNumericAsText or FunctionRows.FieldCurrency
             or FunctionRows.FieldDouble or FunctionRows.FieldInteger
-            or FunctionRows.FieldTimestamp or FunctionRows.FieldIntegerAsDouble
+            or FunctionRows.FieldTimestamp or FunctionRows.FieldTimestampWithMilliseconds
+            or FunctionRows.FieldIntegerAsDouble
             or FunctionRows.FieldCurrencyAsDouble or FunctionRows.FieldBinaryFloat
             or FunctionRows.FieldIntegerAsFloat or FunctionRows.FieldMemo
             => LoadField(node, context),
@@ -278,6 +279,8 @@ internal sealed class ExpressionEvaluator
                 ExpressionValue.Currency(BinaryPrimitives.ReadInt64LittleEndian(record.Field(field))),
             FunctionRows.FieldTimestamp =>
                 MakeTimestamp(FoxDateTime.ToParts(record.Field(field))),
+            FunctionRows.FieldTimestampWithMilliseconds =>
+                ExpressionValue.TimestampWithMilliseconds(FoxDateTime.ToParts(record.Field(field))),
             FunctionRows.FieldDateAsDouble =>
                 ExpressionValue.Date(FoxDate.ToJulian(record.Field(field))),
             FunctionRows.FieldBinaryFloat =>

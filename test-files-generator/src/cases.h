@@ -37,6 +37,7 @@ int caseTagBad ( CODE4 *cb, const char *outDir );   /* TAGBAD.DBF  — 0x30 + CD
 int caseLongName( CODE4 *cb, const char *outDir );  /* LONGNAME.DBF — 0x31 + CDX + FPT, the long-field-name descriptor layout */
 int caseFlags30( CODE4 *cb, const char *outDir );   /* FLAGS30.DBF  — 0x30 + FPT, every feature-flag byte set, read as ordinary */
 int caseRecnoTag( CODE4 *cb, const char *outDir );  /* RECNOTAG.DBF — 0x30 + CDX, tags over RECNO() */
+int caseDtMilli( CODE4 *cb, const char *outDir );   /* DTMILLI.DBF  — 0x30 + CDX, the '7' datetime with milliseconds */
 
 /* The one benchmark case: a workload, not an expectation. It writes into a
  * `benchmark` subdirectory of the output and has no dump, because nothing

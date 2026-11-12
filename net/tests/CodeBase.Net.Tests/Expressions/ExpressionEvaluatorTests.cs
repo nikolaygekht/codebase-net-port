@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text;
 using AwesomeAssertions;
 using CodeBase.Net.Cdx;
@@ -605,10 +606,31 @@ public sealed class ExpressionEvaluatorTests
         new ExpressionEvaluator(compiled).IsConstant(1).Should().BeFalse();
     }
 
+    [Fact]
+    public void ADatetimeWithMillisecondsLoadsAsItsOwnTypeAndKeepsThem()
+    {
+        // The CodeBase '7' type has its own loader row, E4FIELD_DTTIME_MILLI (e4functi.c:54), whose
+        // value keeps the milliseconds a 'T' field's text and key round away (ADR-75).
+        CompiledExpression compiled = TypeResolver.Resolve(ExpressionParser.Parse("K_DTMS", WithMilliseconds));
+        RecordBuffer record = new(1 + 8);
+        BinaryPrimitives.WriteInt32LittleEndian(record.Raw[1..], 2451559);
+        BinaryPrimitives.WriteInt32LittleEndian(record.Raw[5..], 45296600);
+
+        ExpressionValue value = new ExpressionEvaluator(compiled).Evaluate(Context(record: record));
+
+        compiled.ResultType.Should().Be(ExpressionType.TimestampWithMilliseconds);
+        value.Type.Should().Be(ExpressionType.TimestampWithMilliseconds);
+        value.TimestampDay.Should().Be(2451559);
+        value.TimestampTime.Should().Be(45296600);
+    }
+
     // ----------------------------------------------------------------- plumbing
 
     private static readonly IFieldMetadata WithFloat = new TableFieldMetadata(
         [Field("K_FLT", 'H', 4)], "T", longFieldNames: false);
+
+    private static readonly IFieldMetadata WithMilliseconds = new TableFieldMetadata(
+        [Field("K_DTMS", '7', 8)], "T", longFieldNames: false);
 
     // ------------------------------------------------- conversions under a tag
 

@@ -74,7 +74,6 @@ public sealed class FieldResolverTests
     [InlineData('R')]
     [InlineData('1')]
     [InlineData('4')]
-    [InlineData('7')]
     [InlineData('~')]
     [InlineData('\0')]
     public void Resolve_ATypeThisLibraryDoesNotRead_IsRejected(char type)
@@ -91,6 +90,7 @@ public sealed class FieldResolverTests
     [InlineData('H')]
     [InlineData('Y')]
     [InlineData('T')]
+    [InlineData('7')]
     public void Resolve_AVisualFoxProTypeOnAnOlderTable_IsRejectedAsCorruptData(char type)
     {
         Action act = () => Resolve(Legacy, recordLength: 9, Descriptor("F", type, length: 8));
@@ -115,6 +115,7 @@ public sealed class FieldResolverTests
     [InlineData('C', 0)]     // a character field of no width at all
     [InlineData('B', 6)]     // a double that is not eight bytes
     [InlineData('T', 4)]
+    [InlineData('7', 4)]
     [InlineData('Y', 7)]
     public void Resolve_ALengthTheCLibraryToleratesIsTolerated(char type, byte length)
     {

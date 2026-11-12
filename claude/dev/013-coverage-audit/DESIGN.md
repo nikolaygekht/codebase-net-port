@@ -318,3 +318,60 @@ tag whose cursor cannot be built.
    counts them.
 3. **ADR-42 is not superseded**; this implements it. A new ADR-74 records that it had not been, and
    how "explicitly" is decided.
+
+---
+
+## 7a-4 — the `'7'` field, a datetime with milliseconds *(added 2026-11-12, at the user's call)*
+
+`DIVERGENCES.md` §1, ADR-32. The user decided: **full support** — read, expressions, tags.
+
+### What it is
+
+A CodeBase extension (`r4dateTimeMilli`, d4defs.h:2821) that VFP never writes and cannot open. The
+same eight bytes as `'T'` — Julian day, then milliseconds since midnight, both `i32 LE` — but the
+milliseconds are kept where `'T'` keeps whole seconds. Admitted only on `version >= 0x30` (D4OPEN.C:
+2598, 2625), by `'T'`'s rules — its length is not checked either. A caller who created one wanted
+milliseconds.
+
+### What the reference does
+
+| Fact | Source |
+|---|---|
+| Blank is eight zero bytes, as `'T'` | F4FIELD.C:140-150 |
+| Loaded into an expression by its own row, `E4FIELD_DTTIME_MILLI`, type `r4dateTimeMilli`; compared by its own six rows | e4functi.c:54, 118-161 |
+| Text form `CCYYMMDDHH:MM:SS.MMM` | F4FIELD.C:1924-1940 |
+| Key: `t4dateTimeToFoxMilli` — `day + ms / 86400000.0` with the milliseconds **not** rounded, then the same `flags4dateTime` decrement as `'T'`, looked up by the **truncated** second (`ms / 1000 + 1`); `t4dblToFox`. Under `S4DATA_ALIGN`/`S4BYTE_SWAP` the milliseconds are dropped instead; the Windows build keeps them, which the corpus witnesses | i4conv.c:2292-2364 |
+| Key length 8 | E4EXPR.C:994-1015 |
+
+### What changes, in short
+
+- **Now:** `FieldResolver` refuses `'7'` (ADR-32). And the port already half-knows it: the expression
+  type `TimestampWithMilliseconds` and its comparison rows exist, but its key goes through
+  `KeyTransform.FromDateTime`, which **rounds** — a `'7'` tag would key 12:00:00.600 as 12:00:01.
+- **After:** `'7'` reads as `'T'` does, through the same public API (`GetDateTime`, with its
+  milliseconds), blanks to zeros, loads into an expression as `TimestampWithMilliseconds`, renders
+  its text with `.MMM`, and keys without rounding.
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `FieldResolver` | `'7'` readable; Visual-FoxPro-or-later only; lengths as `'T'` |
+| `BlankRecord`, `FieldValueDecoder` | `'7'` beside `'T'`: zero blank, natural width, refused as a number, read as a datetime |
+| `FoxDateTime.ToText` | an argument for the `.MMM` tail (ADR-32 removed it as dead; now it has a caller) |
+| `ExpressionParser.LoaderRow`, `FunctionRows`, `ExpressionEvaluator`, `ExpressionValue` | `'7'` loads by row 18 into a `TimestampWithMilliseconds` value |
+| `KeyTransform.FromDateTime` | a `keepMilliseconds` flag: no rounding, flag by the truncated second |
+| `ExpressionKey`, `SeekConverter` | the flag set for a `TimestampWithMilliseconds` result, so a seek by `DateTime` and a rebuilt key agree with the stored one |
+
+### Corpus case
+
+**`DTMILLI.DBF`** (`0x30`): an `ID` and a `'7'` field over a few hundred moments spread across the
+day — milliseconds 0, 1, 499, 500, 501, 999 and others, on seconds both flagged and not in
+`flags4dateTime`, the day's edges, one blank. Tags by `i4create`: ascending and descending over the
+field. Gates: the decoded values and text, every stored key rebuilt from its record (the transform),
+the seeks. No query case: no constant has the type, so no filter compares one.
+
+### Decisions
+
+1. **The public API does not grow a type.** A `'7'` field is a datetime to a caller, as `'T'` is.
+2. **ADR-32 is superseded** by ADR-75.

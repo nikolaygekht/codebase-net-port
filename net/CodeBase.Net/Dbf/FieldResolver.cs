@@ -26,17 +26,18 @@ internal static class FieldResolver
     /// The stored type letters this library reads.
     /// </summary>
     /// <value>
-    /// The CodeBase and OLE-DB extensions are absent deliberately. They are real types the C
-    /// library knows, but creating or reading them is outside this port's first version, and
-    /// accepting them would mean shipping their length rules with no corpus case behind them.
+    /// The CodeBase and OLE-DB extensions are absent deliberately, except the datetime with
+    /// milliseconds, 7, which is read as a datetime is (ADR-75). The others are real types the C
+    /// library knows, but reading them is outside this port's first version, and accepting them would
+    /// mean shipping their length rules with no corpus case behind them.
     /// </value>
     private static readonly char[] ReadableTypes =
-        ['C', 'N', 'F', 'D', 'L', 'M', 'G', 'I', 'B', 'Y', 'T', 'H', '0'];
+        ['C', 'N', 'F', 'D', 'L', 'M', 'G', 'I', 'B', 'Y', 'T', '7', 'H', '0'];
 
     /// <summary>
     /// The stored type letters that Visual FoxPro introduced.
     /// </summary>
-    private static readonly char[] VisualFoxProOnlyTypes = ['B', 'H', 'Y', 'T', '0'];
+    private static readonly char[] VisualFoxProOnlyTypes = ['B', 'H', 'Y', 'T', '7', '0'];
 
     /// <summary>
     /// Resolves every descriptor into a field, and checks that they account for the record.
@@ -168,7 +169,7 @@ internal static class FieldResolver
         'B' => variant.AllowsVisualFoxProTypes ? (descriptor.Length, (int)descriptor.Decimals) : (descriptor.Length, 0),
 
         // Types that genuinely have decimal places.
-        'N' or 'F' or 'Y' or 'T' or 'H' => (descriptor.Length, descriptor.Decimals),
+        'N' or 'F' or 'Y' or 'T' or '7' or 'H' => (descriptor.Length, descriptor.Decimals),
 
         // Everything else, which is the character type and the null-flags field: the decimal byte
         // is the high half of a 16-bit length, so the field can reach 65535 bytes.

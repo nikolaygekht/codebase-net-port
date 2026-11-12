@@ -153,6 +153,19 @@ internal readonly struct ExpressionValue
     public static ExpressionValue Timestamp(int julian, int milliseconds) =>
         new(ExpressionType.Timestamp, 0, ((long)julian << 32) | (uint)milliseconds, null, 0, false);
 
+    /// <summary>Builds a timestamp that keeps its milliseconds, as the CodeBase type 7 does.</summary>
+    /// <param name="julian">The julian day.</param>
+    /// <param name="milliseconds">Milliseconds since midnight.</param>
+    /// <returns>The value.</returns>
+    public static ExpressionValue TimestampWithMilliseconds(int julian, int milliseconds) =>
+        new(ExpressionType.TimestampWithMilliseconds, 0, ((long)julian << 32) | (uint)milliseconds, null, 0, false);
+
+    /// <summary>Builds a timestamp that keeps its milliseconds from a field's two halves.</summary>
+    /// <param name="parts">The julian day and the milliseconds since midnight.</param>
+    /// <returns>The value.</returns>
+    public static ExpressionValue TimestampWithMilliseconds((int Julian, int Milliseconds) parts) =>
+        TimestampWithMilliseconds(parts.Julian, parts.Milliseconds);
+
     /// <summary>Builds a string value.</summary>
     /// <param name="value">The bytes, at the value's full declared width.</param>
     /// <param name="trimmedLength">How far the value reaches, or minus one for the whole width.</param>

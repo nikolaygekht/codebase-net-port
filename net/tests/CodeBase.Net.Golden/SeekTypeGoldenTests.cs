@@ -46,7 +46,7 @@ public sealed class SeekTypeGoldenTests
     {
         List<(string Table, string Tag)> tags = [.. EveryTag().Select(row => row.Data)];
 
-        tags.Should().HaveCount(63);
+        tags.Should().HaveCount(65);
         tags.Count(t => ReferenceType(t.Table, t.Tag) == 'C').Should().BeGreaterThan(0);
         tags.Count(t => ReferenceType(t.Table, t.Tag) != 'C').Should().BeGreaterThan(0);
     }

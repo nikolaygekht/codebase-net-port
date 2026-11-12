@@ -44,6 +44,53 @@ public sealed class KeyTransformTests
         return key;
     }
 
+    private static byte[] DateTimeKeepingMilliseconds(int julianDay, int milliseconds)
+    {
+        byte[] key = new byte[8];
+        KeyTransform.FromDateTime(julianDay, milliseconds, key, keepMilliseconds: true).Should().Be(8);
+        return key;
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(43_200_000)]
+    [InlineData(86_399_000)]
+    public void DateTime_KeepingMillisecondsAgreesWithRoundingOnAWholeSecond(int milliseconds)
+    {
+        // The two transforms differ only in what they do with a fraction (i4conv.c:2209-2364).
+        DateTimeKeepingMilliseconds(Day2000, milliseconds).Should().Equal(DateTime(Day2000, milliseconds));
+    }
+
+    [Theory]
+    [InlineData(43_200_001)]
+    [InlineData(43_200_499)]
+    [InlineData(43_200_500)]
+    [InlineData(43_200_999)]
+    public void DateTime_KeepingMillisecondsKeysAFractionBetweenItsTwoSeconds(int milliseconds)
+    {
+        // The '7' type's key (t4dateTimeToFoxMilli) keeps the fraction the 'T' key rounds away, so it
+        // sorts strictly between the keys of the whole seconds either side of it.
+        int second = milliseconds - (milliseconds % 1000);
+        byte[] key = DateTimeKeepingMilliseconds(Day2000, milliseconds);
+
+        Compare(key, DateTime(Day2000, second)).Should().BePositive();
+        Compare(key, DateTime(Day2000, second + 1000)).Should().BeNegative();
+    }
+
+    [Fact]
+    public void DateTime_KeepingMillisecondsKeysInTheOrderOfTheMilliseconds()
+    {
+        int[] ascending = [0, 1, 2, 499, 500, 501, 998, 999, 1000, 1001, 59_999, 60_000];
+
+        for (int i = 1; i < ascending.Length; i++)
+        {
+            Compare(
+                    DateTimeKeepingMilliseconds(Day2000, ascending[i - 1]),
+                    DateTimeKeepingMilliseconds(Day2000, ascending[i]))
+                .Should().BeNegative($"{ascending[i - 1]} ms sorts before {ascending[i]} ms");
+        }
+    }
+
     [Fact]
     public void Double_KeysSortInTheSameOrderAsTheValues()
     {

@@ -20,7 +20,7 @@ internal static class BlankRecord
     /// Types whose blank value is zero bytes rather than spaces, whatever their width.
     /// </summary>
     /// <value>The fixed-width binary types, taken from [c]f4blank[/c]'s own list.</value>
-    private static readonly char[] ZeroBlankTypes = ['I', 'Y', 'T', 'B', 'X', 'Z'];
+    private static readonly char[] ZeroBlankTypes = ['I', 'Y', 'T', '7', 'B', 'X', 'Z'];
 
     /// <summary>
     /// Types whose blank value depends on which reference encoding the field uses.

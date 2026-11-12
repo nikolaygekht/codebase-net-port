@@ -83,6 +83,19 @@ public sealed class ExpressionKeyTests
     }
 
     [Fact]
+    public void ATimestampWithMillisecondsKeepsThemInItsKey()
+    {
+        // The '7' type, loaded as its own expression type, keys without rounding (ADR-75).
+        byte[] key = new byte[8];
+        byte[] expected = new byte[8];
+        KeyTransform.FromDateTime(2451559, 45296600, expected, keepMilliseconds: true);
+
+        ExpressionKey.Write(ExpressionValue.TimestampWithMilliseconds(2451559, 45296600), false, false, key);
+
+        key.Should().Equal(expected);
+    }
+
+    [Fact]
     public void AStringIsPaddedWithBlanksOrCutToTheKey()
     {
         byte[] padded = new byte[5];

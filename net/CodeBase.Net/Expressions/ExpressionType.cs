@@ -173,8 +173,8 @@ internal enum ExpressionType : byte
     /// A timestamp accurate to the millisecond.
     /// </summary>
     /// <value>
-    /// The C library's [c]r4dateTimeMilli[/c] (d4defs.h:2821). Unreachable in this port: it arrives
-    /// only from a field type the opener refuses.
+    /// The C library's [c]r4dateTimeMilli[/c] (d4defs.h:2821): a CodeBase type 7 field's value, which
+    /// keeps the milliseconds a timestamp rounds away, in its text and in its key (ADR-75).
     /// </value>
     TimestampWithMilliseconds = (byte)'7',
 }

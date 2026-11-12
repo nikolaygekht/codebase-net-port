@@ -73,6 +73,7 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseLongName( &cb, outDir );
    if ( rc == 0 ) rc = caseFlags30( &cb, outDir );
    if ( rc == 0 ) rc = caseRecnoTag( &cb, outDir );
+   if ( rc == 0 ) rc = caseDtMilli( &cb, outDir );
 
    /* Last, and not part of the corpus proper: the benchmark table, into
     * <outDir>\benchmark, with no dump. */

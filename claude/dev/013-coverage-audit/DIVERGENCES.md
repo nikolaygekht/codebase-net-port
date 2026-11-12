@@ -14,7 +14,7 @@ Here a user hits an error.
 
 | What | The reference | Where decided |
 |---|---|---|
-| A table with compressed data (`0x31`, flag byte 14) | reads it | ADR-56, **user's call** |
+| A table with compressed data (`0x31`, flag byte 14) | reads it | **Kept 2026-11-12 (7a)**, user's call reconfirmed: ADR-56. Only compressed memo entries are supported (ADR-55). Documented on `CodeBaseEngine.OpenTable` and in `README.md` |
 | ~~A table with long field names (CodeBase's descriptor layout, flag byte 16)~~ | reads it | **Resolved 2026-11-12 (7a-1): supported**, user's call (ADR-72). The layout is read and gated by `LONGNAME`; the feature flags are read on `0x31` only, as the reference, gated by `FLAGS30` |
 | ~~A field of type `7` (datetime with milliseconds, a CodeBase extension)~~ | reads it | **Resolved 2026-11-12 (7a-4): supported**, user's call (ADR-75, superseding ADR-32): read, evaluated and keyed, gated by `DTMILLI` |
 | A tag over `DATE()`, `TIME()`, `RECCOUNT()` | opens it | **Kept 2026-11-12 (7a-2)**, user's call: ADR-73, which supersedes ADR-49 in part; documented on `Table.SelectTag` and in `README.md`. ~~`RECNO()`~~ is **supported** now, gated by `RECNOTAG` |

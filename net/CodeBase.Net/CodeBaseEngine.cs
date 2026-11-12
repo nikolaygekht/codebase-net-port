@@ -152,7 +152,9 @@ public sealed class CodeBaseEngine : IDisposable
     /// <exception cref="CodeBaseException">
     /// The file contradicts itself or its own length, names a field type this library cannot read,
     /// declares a memo file that is not beside it, or holds data compressed by CodeBase, which this
-    /// library does not support.
+    /// library does not support. That is CodeBase's whole-table compression, a version 0x31 table
+    /// whose records are stored in compressed blocks (ADR-56); compressed memo entries in an ordinary
+    /// table are read and decompressed (ADR-55).
     /// </exception>
     /// <exception cref="ObjectDisposedException">The engine has been closed.</exception>
     public Table OpenTable(string path)

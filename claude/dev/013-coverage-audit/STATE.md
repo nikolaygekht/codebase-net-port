@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; next the remaining 7a items)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; next the GENERAL-on-other-code-pages row of `DIVERGENCES.md` §1, an open question to the user)
 
 ## Done so far
 

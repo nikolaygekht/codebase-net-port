@@ -69,6 +69,10 @@ it in [the decision record](claude/ARCHITECTURE-DECISIONS.md):
   library reads such a tag under whatever picture it was compiled with. Set the options to the
   picture the index was built with — `ExpressionOptions.CodeBase` for the C library's default build —
   and the tag is used.
+- **A table whose records CodeBase compressed is refused when opened** (ADR-56). That is CodeBase's
+  whole-table compression — `d4compress`, or a table created with compressed data — which Visual
+  FoxPro cannot read either, and which even CodeBase opens read-only. Copy it to an uncompressed
+  table with CodeBase first. Compressed memo entries in an ordinary table are read (ADR-55).
 - **`STR()` of a `W` field narrows by the table's code page, not the machine's** (ADR-77). CodeBase
   converts the UTF-16 text with Windows' ANSI code page, so its answer — and every key built from it —
   depends on the computer. This library uses the code page the table's text is in and reproduces

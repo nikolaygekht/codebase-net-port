@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-5 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; 7a-5, the `'W'`/`'O'` UTF-16 fields read, keyed and sought, `STR()` by the table's code page with Windows' best-fit, ADR-76/77) are committed locally and not pushed, and the tree is clean. Left in 013: the rest of sub-step 7a, the divergences gone through with the user, and 8, the close.**
+**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-5 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; 7a-5, the `'W'`/`'O'` UTF-16 fields read, keyed and sought, `STR()` by the table's code page with Windows' best-fit, ADR-76/77) and ADR-56 kept and documented are committed and pushed, and the tree is clean. Left in 013: the rest of sub-step 7a — next the GENERAL-on-other-code-pages row — and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -108,8 +108,14 @@ its indexes rather than reading them, which is what the whole port exists for �
 can be read whole, its records read in an index tag's order, and the read path is cached.
 `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4028 tests**,
-1133 of them golden.
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4441 tests**,
+1429 of them golden (3011 unit, 1 skipped).
+
+**Since 2026-11-12 it also reads** CodeBase's long-field-name layout (ADR-72), tags over `RECNO()`
+(ADR-73), the `'7'` datetime with milliseconds (ADR-75), and the `'W'`/`'O'` UTF-16 fields with
+machine-ordered tags, text seeks and `STR()` (ADR-76, ADR-77) — each gated by a new corpus case
+(`LONGNAME`, `FLAGS30`, `RECNOTAG`, `DTMILLI`, `WSTR`). A tag keyed through the date picture is refused
+until the picture is chosen (ADR-74), closing a wrong record set.
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -320,7 +326,35 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-11-01), the ones before it, and the four before those
+## 2. This session (2026-11-12), the ones before it, and the four before those
+
+**Step 013, sub-step 7a: `DIVERGENCES.md` gone through with the user, five entries turned into
+support.** Each one designed and planned in the step's `DESIGN.md`/`PLAN.md` first, tests red first,
+a corpus case where the corpus had none, mutants on both test layers. Commits `ce0ba23`, `d5993f9`,
+`3052ead`, `d6979ce`.
+
+- **7a-1, long field names, read** (ADR-72). The feature flags are read on `0x31` only, as the
+  reference — the port had misread them on `0x30`. Cases `LONGNAME`, `FLAGS30`.
+- **7a-2, tags over `RECNO()`** (ADR-73); `DATE()`, `TIME()`, `RECCOUNT()` stay refused and
+  documented. Found on the way: a padded seek value shorter than its key was compared over the key's
+  width; now over its own, as the reference (`CDX-FORMAT.md` §7). Case `RECNOTAG`.
+- **7a-3, ADR-42's refusal, which had never been implemented** (ADR-74). A tag keyed through `DTOC`
+  or `CTOD` answered a query wrongly under the default picture — `DTOC(K_DATE) = "01/01/00"` counted
+  2 through the tag and 0 per record. Refused now until `CodeBaseEngine.ExpressionOptions` is chosen.
+- **7a-4, the `'7'` datetime with milliseconds** (ADR-75, superseding ADR-32): read, evaluated, keyed
+  without rounding. The expression engine already had the type and keyed it through `'T'`'s rounding
+  transform. Case `DTMILLI`, 600 keys rebuilt.
+- **7a-5, the `'W'`/`'O'` UTF-16 fields** (ADR-76, ADR-77): read (the U+2000 blank kept), keyed and
+  sought in machine order, `W` on `0x32` refused as VFP 9's Blob; `STR(W)` narrows by the table's code
+  page. .NET's code-page encodings and Windows' `WideCharToMultiByte` disagree on a few punctuation
+  code points — U+2000 among them on cp1251 — so a new Windows tool, `test-files-generator/bestfit/`,
+  writes the supplement the library carries. Case `WSTR`, which needs a host whose ANSI code page is
+  1251.
+- **Kept, by the user's call:** compressed data stays refused (ADR-56 reconfirmed — only compressed
+  memo entries are read), now documented in `README.md` and on `OpenTable`. OLE-DB types: no.
+- `README.md` gained a "Differences from CodeBase" section.
+
+### Before it (2026-11-01)
 
 **Step 013, sub-steps 4 to 7: the code only the Golden layer reached now has tests of its own, and
 the tests found defects.** Planned on 2026-10-31 with sub-steps 1–3 (a fresh `crap4csharp`
@@ -1008,7 +1042,7 @@ because it planned to measure before `COLLATION` and the reverse happened.
 
 ### Step 013 — finish it: sub-steps 7a and 8 — `claude/dev/013-coverage-audit/`
 
-Sub-steps 1–7 are done, and 7a's first entry, 7a-1; the record is the step's
+Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
 [`STATE.md`](claude/dev/013-coverage-audit/STATE.md).
 
 - **7a, with the user.** Go through [`DIVERGENCES.md`](claude/dev/013-coverage-audit/DIVERGENCES.md)
@@ -1021,7 +1055,18 @@ Sub-steps 1–7 are done, and 7a's first entry, 7a-1; the record is the step's
   `RECCOUNT()` kept refused and documented; on the way, a padded search value shorter than its key
   is now compared over its own length, as the reference does (CDX-FORMAT.md §7). **ADR-42's refusal
   is implemented** (7a-3, ADR-74): it had never been written, and a `DTOC` tag answered queries wrongly
-  under the default picture. Next: the rest of `DIVERGENCES.md` §1–§3.
+  under the default picture. **The `'7'` field** (7a-4, ADR-75) and **the `'W'`/`'O'` fields**
+  (7a-5, ADR-76/77) are supported; **compressed data stays refused** (ADR-56, reconfirmed and
+  documented). Next, still in §1, one row at a time — the user asked not to rush them:
+  - **GENERAL on code pages other than 1252/437/850, and CodeBase's other collations** — the open
+    question put to the user: defer to a future step whose weights come from the VFP oracle, defer
+    without a plan, or do now (not advised: needs the VM).
+  - **A non-compact FoxPro 2.x index** — not a divergence (the reference refuses it too); remove.
+  - **OLE-DB keys, collated Unicode keys** — record as deferred (the user: no to OLE-DB).
+  Then §2–§3 with the user: confirm ADR-53, 61, 58, 45/50 and step 010's debt (`MOD`/`SQRT` by
+  VFP, `PROPER`); then the documentation pass — "Differences from CodeBase" entries and XML docs for
+  ADR-43, 56 (done), 58, 61, 63, 64, 65, 66, 69, 71, and §2's scans. Proposed, undecided: a VFP-oracle
+  `T` table covering all 86400 seconds, to check `flags4dateTime` against VFP itself.
 - **8, the close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on
   `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`,
   `claude/dev/README.md`, this file. Push once the user says so.

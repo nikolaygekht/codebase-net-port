@@ -637,8 +637,8 @@ public sealed class Table : IDisposable
     /// <returns>Ok with the cursor on it, or NoRecord with the cursor on no record.</returns>
     /// <exception cref="CodeBaseException">
     /// No tag is selected, or the selected tag's keys are not character. Text is never converted: a
-    /// numeric, integer or date tag is sought through the overload of that type, and the cursor does
-    /// not move when the seek is refused.
+    /// numeric, integer, date, currency or datetime tag is sought through the overload of that type,
+    /// and the cursor does not move when the seek is refused.
     /// </exception>
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     /// <remarks>
@@ -747,6 +747,57 @@ public sealed class Table : IDisposable
     /// <exception cref="CodeBaseException">No tag is selected, or its keys are not dates.</exception>
     public SeekResult SeekAtOrBefore(DateOnly value) =>
         Position(Seeking().SearchForDate(value), forwards: false);
+
+    /// <summary>Moves to the record whose key is exactly a currency.</summary>
+    /// <param name="value">The value to look for, in at most four decimals.</param>
+    /// <returns>Ok, or NoRecord with the cursor on no record.</returns>
+    /// <exception cref="CodeBaseException">
+    /// No tag is selected, its keys are not currencies, or the value has a fifth decimal, which no
+    /// currency can hold (ADR-80). A refusal leaves the cursor and a running search where they were.
+    /// </exception>
+    public GoResult Seek(decimal value) => Exact(Seeking().SearchForCurrency(value));
+
+    /// <summary>Moves to the first record at or after a currency.</summary>
+    /// <param name="value">The value to look for, in at most four decimals.</param>
+    /// <returns>Found, After, or Eof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, its keys are not currencies, or the value has a fifth decimal.</exception>
+    public SeekResult SeekAtOrAfter(decimal value) =>
+        Position(Seeking().SearchForCurrency(value), forwards: true);
+
+    /// <summary>Moves to the last record at or before a currency.</summary>
+    /// <param name="value">The value to look for, in at most four decimals.</param>
+    /// <returns>Found, Before, or Bof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, its keys are not currencies, or the value has a fifth decimal.</exception>
+    public SeekResult SeekAtOrBefore(decimal value) =>
+        Position(Seeking().SearchForCurrency(value), forwards: false);
+
+    /// <summary>Moves to the record whose key is exactly a moment.</summary>
+    /// <param name="value">The moment to look for, as wall-clock time: its kind is not looked at.</param>
+    /// <returns>Ok, or NoRecord with the cursor on no record.</returns>
+    /// <exception cref="CodeBaseException">
+    /// No tag is selected, its keys are not datetimes, or a CodeBase type 7 tag is sought finer than a
+    /// millisecond. A refusal leaves the cursor and a running search where they were.
+    /// </exception>
+    /// <value>
+    /// A tag over a T field holds whole seconds, so the moment is rounded half up to one, as the
+    /// field's key and its value are (ADR-79); its key is Visual FoxPro's, so a seek finds what Visual
+    /// FoxPro finds on every day (ADR-78). A tag over a type 7 field is sought to the millisecond.
+    /// </value>
+    public GoResult Seek(DateTime value) => Exact(Seeking().SearchForDateTime(value));
+
+    /// <summary>Moves to the first record at or after a moment.</summary>
+    /// <param name="value">The moment to look for, as wall-clock time.</param>
+    /// <returns>Found, After, or Eof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, its keys are not datetimes, or a type 7 tag is sought finer than a millisecond.</exception>
+    public SeekResult SeekAtOrAfter(DateTime value) =>
+        Position(Seeking().SearchForDateTime(value), forwards: true);
+
+    /// <summary>Moves to the last record at or before a moment.</summary>
+    /// <param name="value">The moment to look for, as wall-clock time.</param>
+    /// <returns>Found, Before, or Bof.</returns>
+    /// <exception cref="CodeBaseException">No tag is selected, its keys are not datetimes, or a type 7 tag is sought finer than a millisecond.</exception>
+    public SeekResult SeekAtOrBefore(DateTime value) =>
+        Position(Seeking().SearchForDateTime(value), forwards: false);
 
     /// <summary>
     /// Moves to the next record still matching the search that is running.

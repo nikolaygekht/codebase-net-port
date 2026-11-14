@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-6 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed, and the tree is clean; 7a-6 and 7a-7 are not pushed. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-8, `Seek(decimal)` and `Seek(DateTime)`, then the rest of 7a, and 8, the close.**
+**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-8 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed, and the tree is clean; 7a-6 to 7a-8 are not pushed. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). **7a-8:** `Seek(decimal)` and `Seek(DateTime)` with their positional siblings (ADR-80). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-9, `MOD` and `SQRT` raising as VFP does, then the rest of 7a, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -108,8 +108,8 @@ its indexes rather than reading them, which is what the whole port exists for �
 can be read whole, its records read in an index tag's order, and the read path is cached.
 `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4453 tests**,
-1432 of them golden (3021 unit, 1 skipped).
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4470 tests**,
+1438 of them golden (3032 unit, 1 skipped).
 
 **Since 2026-11-12 it also reads** CodeBase's long-field-name layout (ADR-72), tags over `RECNO()`
 (ADR-73), the `'7'` datetime with milliseconds (ADR-75), and the `'W'`/`'O'` UTF-16 fields with
@@ -209,8 +209,8 @@ while (table.SeekNext() == GoResult.Ok)
 
 **One method per behaviour.** Whether a miss repositions, and whether a short value is a prefix, are
 each a choice of method rather than a status code to read or a trailing space to remember. `Seek` also
-takes a `double`, an `int` and a `DateOnly` where the tag's keys are of that kind, and refuses by name
-where they are not.
+takes a `double`, an `int`, a `DateOnly`, a `decimal` and a `DateTime` where the tag's keys are of that
+kind, and refuses by name where they are not (ADR-58, ADR-80).
 
 Behind it: the `COLL4ARR.C` weight tables for cp1252, cp437 and cp850 **copied verbatim**, every
 numeric transform including `t4dblToFox`'s `-0.0` wraparound, the `GENERAL` head-and-tail key with its
@@ -347,7 +347,10 @@ them before ~1029 and after ~6771, where a seek into a VFP-written tag would mis
 VFP now (ADR-78), the bitmap stays for `'7'`; and since VFP stores `DTOT(d) + n` one millisecond
 short half the time, `GetDateTime` reads `T` to the second (ADR-79). Risk R7 retired. Before it,
 the rest of `DIVERGENCES.md` was decided, and five optimizer improvements recorded for later.
-Tests: 3021 unit (1 skipped), 1432 golden.
+Then **7a-8**: `Seek(decimal)` and `Seek(DateTime)` with their positional siblings — a `T` moment
+rounds to the second, a fifth decimal or a `'7'` value finer than a millisecond is refused (ADR-80);
+every currency and datetime in the corpus, `VFPTIME`'s 100 422 included, is found by its own value.
+Tests: 3032 unit (1 skipped), 1438 golden.
 
 ### Before it (2026-11-12)
 
@@ -1096,7 +1099,7 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   VFP does; `PROPER` to be added; collated Unicode keys to be supported, OLE-DB types not; where the
   optimizer scans kept as it is, five improvements recorded in `PORTING-PLAN.md` §2.3. Left of 7a,
   each designed and planned first, in this order (the user's, 2026-11-14): **7a-7** the `T` table,
-  **7a-8** `Seek(decimal)`/`Seek(DateTime)`, **7a-9** `MOD`/`SQRT` raising, **7a-10** `PROPER`,
+  ~~**7a-8** `Seek(decimal)`/`Seek(DateTime)`~~ (done), **7a-9** `MOD`/`SQRT` raising, **7a-10** `PROPER`,
   **7a-11** the `CBnnnnn` collations, **7a-12** collated Unicode keys, **7a-13** VFP's GENERAL on
   other code pages, **7a-14** the documentation pass —
   `CB00004`'s refusal, "Differences from CodeBase" entries and XML docs for ADR-43, 45/50, 56 (done),

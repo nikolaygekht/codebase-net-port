@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 and 7a-7 done; next 7a-8, `Seek(decimal)` and `Seek(DateTime)`)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-8 done; next 7a-9, `MOD` and `SQRT` raising as VFP does)
 
 ## Done so far
 
@@ -408,7 +408,24 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
         none in the new rounding — line 68's day-range guard (`||` to `&&`; no unit test has a Julian
         day between 1 and 1 721 425, a date before AD 1, out of scope by ADR-33) and three in `ToText`
         (lines 108, 127), all from earlier steps. The file restored and verified.
-    - [ ] 7a-8 — `Seek(decimal)` and `Seek(DateTime)` added (ADR-58 kept otherwise).
+    - [x] 7a-8 — `Seek(decimal)` and `Seek(DateTime)` (2026-11-14), ADR-80.
+      - **a.** Component (`TableTypedSeekTests`, 7 new, the 'Y' refusal now names `decimal`, a 'T'
+        one `DateTime`) and golden (`CurrencyAndDateTimeSeekGoldenTests`), red: they did not compile.
+      - **b.** `TableTagCursor`: `SearchForCurrency` (a fifth decimal refused before the buffer is
+        touched), `SearchForDateTime` (`T` rounded half up to the second on the ticks; `'7'` to the
+        millisecond, finer refused), `Expect` split out of `Numeric`, `TypedSeekFor` names both.
+        `Table`: six overloads. Every currency of `CDXEXPR.T_CUR` and every datetime of
+        `CDXTIME` (both tags), `DTMILLI` and `VFPTIME` — 100 422, with every second where the old
+        bitmap was off — found by its own value; positional seeks a second past each `CDXTIME` value
+        agree with the sorted values. Mutations: no `'7'` branch reddens both layers; no
+        fifth-decimal refusal and `T` truncated instead of rounded redden the component layer (the
+        corpus holds neither kind of value).
+      - **c.** ADR-80; `STATE.md` §1; `DIVERGENCES.md` §3 (ADR-58); XML docs of the six overloads and
+        `Seek(string)`. `crap4csharp`: the new members 3.0 and below at 100%; `SearchFor` (text,
+        12.0) untouched. `mutate4csharp` on `TableTagCursor.cs`: 72 killed, 13 survived, **none in
+        the new code** — `WideSearch`'s pad loop (line 220) and the step and landing paths (417-538),
+        which the golden layer covers and the tool does not run; the file restored and verified.
+      - Release 3032 passed (1 skipped) + 1438 golden, green.
     - [ ] 7a-9 — `MOD` by zero and `SQRT` of a negative raise an error, as VFP does (were 0).
     - [ ] 7a-10 — `PROPER` added, gated by `VFPFUNC.CDX`'s `T_PROPER`.
     - [ ] 7a-11 — CodeBase's `CBnnnnn` collations, supported.

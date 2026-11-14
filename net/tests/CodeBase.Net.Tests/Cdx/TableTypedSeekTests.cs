@@ -221,7 +221,8 @@ public sealed class TableTypedSeekTests
     [InlineData('I', 4, "Seek it with an int.")]
     [InlineData('N', 8, "Seek it with a double.")]
     [InlineData('D', 8, "Seek it with a DateOnly.")]
-    [InlineData('Y', 8, "No seek by value is available")]
+    [InlineData('Y', 8, "Seek it with a decimal.")]
+    [InlineData('T', 8, "Seek it with a DateTime.")]
     public void TextIsRefusedOnATagThatIsNotCharacter_NamingTheSeekToUse(char type, int length, string advice)
     {
         (CodeBaseEngine engine, Table table) = Open(new KeyField("K", type, length, type == 'Y' ? 4 : 0), [], []);
@@ -244,6 +245,124 @@ public sealed class TableTypedSeekTests
 
             act.Should().Throw<CodeBaseException>()
                 .Where(e => e.Code == ErrorCode.Info && e.Message.Contains("an integer"));
+        }
+    }
+
+    // ------------------------------------------------------------------ by currency and datetime
+
+    [Fact]
+    public void ACurrencyTagIsSoughtByADecimal_ExactlyOrToEitherSide()
+    {
+        (CodeBaseEngine engine, Table table) = Currencies(12.5m, -3m, 100m);
+        using (engine)
+        {
+            table.Seek(12.5m).Should().Be(GoResult.Ok);
+            table.RecordNumber.Should().Be(1);
+
+            table.SeekAtOrAfter(50m).Should().Be(SeekResult.After);
+            table.RecordNumber.Should().Be(3);
+
+            table.SeekAtOrBefore(50m).Should().Be(SeekResult.Before);
+            table.RecordNumber.Should().Be(1);
+
+            table.SeekAtOrAfter(200m).Should().Be(SeekResult.Eof);
+            table.Seek(12.4999m).Should().Be(GoResult.NoRecord);
+        }
+    }
+
+    [Fact]
+    public void ACurrencyWithAFifthDecimalIsRefused_AndTheSearchThatWasRunningSurvives()
+    {
+        // A currency holds ten-thousandths; the key transform would truncate a fifth decimal, and a
+        // positional seek would then report Found for a value no key equals (ADR-80).
+        (CodeBaseEngine engine, Table table) = Currencies(12.5m, -3m, 100m);
+        using (engine)
+        {
+            table.Seek(12.5m).Should().Be(GoResult.Ok);
+
+            table.Invoking(t => t.SeekAtOrAfter(12.50001m)).Should().Throw<CodeBaseException>()
+                .Where(e => e.Code == ErrorCode.Info && e.Message.Contains("ten-thousandths"));
+
+            table.RecordNumber.Should().Be(1);
+            table.Invoking(t => t.SeekNext()).Should().NotThrow("the currency search is still running");
+        }
+    }
+
+    [Fact]
+    public void ADateTimeTagIsSoughtByADateTime_ExactlyOrToEitherSide()
+    {
+        (CodeBaseEngine engine, Table table) = Moments(
+            'T',
+            new DateTime(2000, 1, 1, 10, 0, 0),
+            new DateTime(1999, 12, 31, 23, 59, 59),
+            new DateTime(2026, 11, 14, 12, 0, 0));
+        using (engine)
+        {
+            table.Seek(new DateTime(2000, 1, 1, 10, 0, 0)).Should().Be(GoResult.Ok);
+            table.RecordNumber.Should().Be(1);
+
+            table.SeekAtOrAfter(new DateTime(2000, 1, 1)).Should().Be(SeekResult.After);
+            table.RecordNumber.Should().Be(1);
+
+            table.SeekAtOrBefore(new DateTime(2000, 1, 1)).Should().Be(SeekResult.Before);
+            table.RecordNumber.Should().Be(2);
+
+            table.SeekAtOrAfter(new DateTime(2030, 1, 1)).Should().Be(SeekResult.Eof);
+        }
+    }
+
+    [Theory]
+    [InlineData(499, GoResult.Ok)]
+    [InlineData(500, GoResult.NoRecord)] // half up, to 10:00:01
+    [InlineData(-500, GoResult.Ok)]      // 09:59:59.500, up to 10:00:00
+    [InlineData(-501, GoResult.NoRecord)]
+    public void ATimestampSeekRoundsToTheSecond_AsTheKeysDo(int milliseconds, GoResult expected)
+    {
+        // A T field holds seconds, and its key, its text and GetDateTime all round half up (ADR-79).
+        DateTime ten = new(2000, 1, 1, 10, 0, 0);
+        (CodeBaseEngine engine, Table table) = Moments('T', ten);
+        using (engine)
+            table.Seek(ten.AddMilliseconds(milliseconds)).Should().Be(expected);
+    }
+
+    [Fact]
+    public void AMillisecondTagIsSoughtWithItsMilliseconds()
+    {
+        DateTime ten = new(2000, 1, 1, 10, 0, 0);
+        (CodeBaseEngine engine, Table table) = Moments('7', ten.AddMilliseconds(250), ten.AddMilliseconds(750));
+        using (engine)
+        {
+            table.Seek(ten.AddMilliseconds(750)).Should().Be(GoResult.Ok);
+            table.RecordNumber.Should().Be(2);
+
+            table.Seek(ten.AddMilliseconds(500)).Should().Be(GoResult.NoRecord);
+            table.SeekAtOrAfter(ten.AddMilliseconds(500)).Should().Be(SeekResult.After);
+            table.RecordNumber.Should().Be(2);
+        }
+    }
+
+    [Fact]
+    public void AMillisecondValueFinerThanAMillisecondIsRefused()
+    {
+        DateTime ten = new(2000, 1, 1, 10, 0, 0);
+        (CodeBaseEngine engine, Table table) = Moments('7', ten);
+        using (engine)
+        {
+            table.Invoking(t => t.Seek(ten.AddTicks(1))).Should().Throw<CodeBaseException>()
+                .Where(e => e.Code == ErrorCode.Info && e.Message.Contains("millisecond"));
+        }
+    }
+
+    [Fact]
+    public void ADecimalOrADateTimeIsRefusedOnATagOfAnotherKind()
+    {
+        (CodeBaseEngine engine, Table table) = Integers(1, 2);
+        using (engine)
+        {
+            table.Invoking(t => t.Seek(1m)).Should().Throw<CodeBaseException>()
+                .Where(e => e.Code == ErrorCode.Info && e.Message.Contains("a currency"));
+            table.Invoking(t => t.Seek(new DateTime(2000, 1, 1))).Should().Throw<CodeBaseException>()
+                .Where(e => e.Code == ErrorCode.Info && e.Message.Contains("a datetime"));
         }
     }
 
@@ -275,6 +394,54 @@ public sealed class TableTypedSeekTests
             int order = a.Key.AsSpan().SequenceCompareTo(b.Key);
             return order != 0 ? order : a.Record.CompareTo(b.Record);
         }))];
+
+    private static (CodeBaseEngine Engine, Table Table) Currencies(params decimal[] values) =>
+        Open(
+            new KeyField("PRICE", 'Y', 8, 4),
+            [.. values.Select(v => Int64((long)(v * 10000m)))],
+            Sorted(values.Select((v, i) => (CurrencyKey(v), (uint)(i + 1)))));
+
+    private static (CodeBaseEngine Engine, Table Table) Moments(char type, params DateTime[] values) =>
+        Open(
+            new KeyField("STAMP", type, 8),
+            [.. values.Select(Moment)],
+            Sorted(values.Select((v, i) => (MomentKey(v, keepMilliseconds: type == '7'), (uint)(i + 1)))));
+
+    private static byte[] Int64(long value)
+    {
+        byte[] bytes = new byte[8];
+        BinaryPrimitives.WriteInt64LittleEndian(bytes, value);
+        return bytes;
+    }
+
+    private static byte[] CurrencyKey(decimal value)
+    {
+        byte[] key = new byte[8];
+        KeyTransform.FromCurrency(value, key);
+        return key;
+    }
+
+    /// <summary>The Julian day of 0001-01-01, which [c]DateOnly.DayNumber[/c] counts from.</summary>
+    private const int JulianOffset = 1_721_426;
+
+    private static byte[] Moment(DateTime value)
+    {
+        byte[] bytes = new byte[8];
+        BinaryPrimitives.WriteInt32LittleEndian(bytes, DateOnly.FromDateTime(value).DayNumber + JulianOffset);
+        BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(4), (int)value.TimeOfDay.TotalMilliseconds);
+        return bytes;
+    }
+
+    private static byte[] MomentKey(DateTime value, bool keepMilliseconds)
+    {
+        byte[] key = new byte[8];
+        KeyTransform.FromDateTime(
+            DateOnly.FromDateTime(value).DayNumber + JulianOffset,
+            (int)value.TimeOfDay.TotalMilliseconds,
+            key,
+            keepMilliseconds);
+        return key;
+    }
 
     private static byte[] Text(string value) => Encoding.Latin1.GetBytes(value);
 

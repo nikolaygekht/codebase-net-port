@@ -273,3 +273,22 @@ stops for the user's decision before any code.
 | c1 | `FromDateTime`'s `T` path; unit tests adjusted first (red on the bitmap test's other days) | VFPTIME rebuild green; CDXTIME, DTMILLI green; dividing instead of multiplying, or keeping the bitmap, reddens VFPTIME |
 | c2 | `GetDateTime` rounds `T` | unit red then green; golden on VFPTIME; keeping milliseconds reddens it |
 | d | Records as planned, plus ADR-78, ADR-79, `KEY-COLLATION.md` §2.8 and §9 item 1 rewritten, `DBF-FORMAT.md` on VFP's `.999` | — |
+
+## 7a-8 — `Seek(decimal)` and `Seek(DateTime)`
+
+Design: `DESIGN.md` §7a-8.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 2 Component (`TableTypedSeekTests`, table images) | each overload finds its key; a wrong kind of tag refused naming the kind; text on a currency or datetime tag names the new overload; a fifth decimal and a sub-millisecond `'7'` value refused with the cursor unmoved; a `T` seek rounds 10:00:00.500 to 10:00:01 and .499 down; a `'7'` seek keeps milliseconds; `SeekAtOrAfter`/`SeekAtOrBefore` between two keys land After/Before |
+| 4 Golden (new `CurrencyAndDateTimeSeekGoldenTests`) | every record of `CDXEXPR.T_CUR`, `CDXTIME.T_TS` and `T_TSD`, `DTMILLI.M_ASC` and `VFPTIME.TS` sought by its own value through the public API, landing on a record with that value — VFPTIME's 100 422 including every second where the old bitmap was off; positional seeks half a step past each `CDXTIME` value |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Component and golden tests, red | they fail to compile, then fail |
+| b | `SearchForCurrency`, `SearchForDateTime`, the six overloads, `TypedSeekFor` | green; mutations: dropping the `'7'` branch, dropping the fifth-decimal refusal, rounding `T` down — each reddens a test |
+| c | Records: ADR-80; `README.md` and `STATE.md` §1 where they list the overloads; XML docs | `crap4csharp` on the changed files; `mutate4csharp` on `TableTagCursor.cs` |

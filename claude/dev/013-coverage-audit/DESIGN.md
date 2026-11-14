@@ -601,3 +601,48 @@ ms about half the time. The key and the text form round it away; `GetDateTime` d
 
 Decisions: **ADR-78**, the `T` key follows VFP's conversion (the bitmap kept for `'7'`); **ADR-79**,
 `GetDateTime` returns a `T` field to the second. Both the user's, 2026-11-14.
+
+## 7a-8 — `Seek(decimal)` and `Seek(DateTime)` *(added 2026-11-14, at the user's call)*
+
+ADR-58 made text seekable on character tags only and left currency and datetime tags with no seek
+by value at all, "ordinary work when a caller needs it". The user asked for it. 7a-7 made it worth
+more: a datetime seek now finds what Visual FoxPro finds, on every day.
+
+### What changes, in short
+
+- **`Table`:** `Seek(decimal)`, `SeekAtOrAfter(decimal)`, `SeekAtOrBefore(decimal)` for a currency
+  tag; `Seek(DateTime)`, `SeekAtOrAfter(DateTime)`, `SeekAtOrBefore(DateTime)` for a datetime tag,
+  `T` or `'7'`. Each forwards to a search builder, as the double and date overloads do.
+- **`TableTagCursor`:** `SearchForCurrency` and `SearchForDateTime`, through the existing `Numeric`
+  path, so a wrong kind of tag is refused the same way and before the search buffer is written.
+  `TypedSeekFor` names the two new overloads, so text sought in such a tag says what to use.
+- **The value goes through the keys' own conversion:** a currency through `KeyTransform.FromCurrency`;
+  a datetime split into its Julian day and milliseconds since midnight and through
+  `KeyTransform.FromDateTime`, which for `T` is VFP's formula (ADR-78) and for `'7'` keeps the
+  milliseconds. `DateTime.Kind` is not looked at: a field stores wall-clock time with no zone, and
+  so does the search.
+
+### What a value the tag cannot hold does
+
+| Tag | A value finer than the tag holds | Decision |
+|---|---|---|
+| currency | more than four decimals | **refused** (`CodeBaseException`, `Info`) before the buffer is written — `FromCurrency` would truncate it, and a positional seek reporting `Found` for a value no key equals would be a lie |
+| `T` | milliseconds, or ticks below them | **rounded half up to the second** — the field's own domain, as the key, the text form and `GetDateTime` already round it (ADR-78, ADR-79) |
+| `'7'` | ticks below a millisecond | **refused**, as for currency: the field holds milliseconds |
+
+A currency outside the field's range is refused by `FromCurrency` already (`Data`).
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `Table` | six public overloads, XML docs |
+| `TableTagCursor` | `SearchForCurrency`, `SearchForDateTime`, `TypedSeekFor` |
+| `KeyKind` | the `DateTime` member's doc: VFP's conversion, the bitmap for `'7'` |
+
+### Decisions
+
+1. **Exact type, as ADR-58:** a `decimal` seeks a currency tag only, not a numeric one; a `DateTime`
+   seeks a datetime tag only, not a date one.
+2. **No `SeekAtOrAfter(int)`/`SeekAtOrBefore(int)`** here, though `Seek(int)` lacks them: not asked.
+3. **ADR-80** records the rounding and refusal rules above.

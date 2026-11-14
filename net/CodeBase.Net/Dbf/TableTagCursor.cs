@@ -247,6 +247,75 @@ internal sealed class TableTagCursor
     public KeySearch SearchForDate(DateOnly value) =>
         Numeric(KeyKind.Date, "a date", into => KeyTransform.FromDate(value, into));
 
+    /// <summary>Builds a search for a currency-valued key.</summary>
+    /// <param name="value">The value to look for.</param>
+    /// <returns>The search.</returns>
+    /// <exception cref="CodeBaseException">
+    /// This tag's keys are not currencies, or the value has more than four decimals (ADR-80).
+    /// </exception>
+    /// <value>
+    /// A currency holds ten-thousandths. The key transform would cut a fifth decimal off, and a seek
+    /// for the cut value would then report Found for a value no key equals, so it is refused instead,
+    /// before the search buffer that a running search still reads is touched.
+    /// </value>
+    public KeySearch SearchForCurrency(decimal value)
+    {
+        Expect(KeyKind.Currency, "a currency");
+
+        if (decimal.Round(value, 4) != value)
+        {
+            throw new CodeBaseException(
+                ErrorCode.Info,
+                $"{value} has more than four decimals, and a currency is held in ten-thousandths, so no " +
+                $"key in tag '{tag.Name}' can equal it.");
+        }
+
+        return Numeric(KeyKind.Currency, "a currency", into => KeyTransform.FromCurrency(value, into));
+    }
+
+    /// <summary>Builds a search for a datetime-valued key.</summary>
+    /// <param name="value">The moment to look for, read as wall-clock time whatever its kind.</param>
+    /// <returns>The search.</returns>
+    /// <exception cref="CodeBaseException">
+    /// This tag's keys are not datetimes, or a CodeBase type 7 tag is sought finer than a millisecond.
+    /// </exception>
+    /// <value>
+    /// A T key is a whole second, so the moment is rounded half up to one, as the key, the text form
+    /// and a read of the field all round it (ADR-78, ADR-79). A type 7 key keeps milliseconds and
+    /// nothing finer, so a moment with ticks below one is refused rather than cut (ADR-80).
+    /// </value>
+    public KeySearch SearchForDateTime(DateTime value)
+    {
+        SeekConverter resolved = Expect(KeyKind.DateTime, "a datetime");
+        bool keepMilliseconds = resolved.Compiled.ResultType == ExpressionType.TimestampWithMilliseconds;
+        long ticks = value.TimeOfDay.Ticks;
+        int milliseconds;
+
+        if (keepMilliseconds)
+        {
+            if (ticks % TimeSpan.TicksPerMillisecond != 0)
+            {
+                throw new CodeBaseException(
+                    ErrorCode.Info,
+                    $"Tag '{tag.Name}' holds milliseconds and nothing finer, and {value:HH:mm:ss.fffffff} " +
+                    "is not a whole millisecond.");
+            }
+
+            milliseconds = (int)(ticks / TimeSpan.TicksPerMillisecond);
+        }
+        else
+        {
+            milliseconds = (int)((ticks + (TimeSpan.TicksPerSecond / 2)) / TimeSpan.TicksPerSecond * 1000);
+        }
+
+        int julian = (int)FoxDate.ToJulian(value.Year, value.Month, value.Day);
+
+        return Numeric(
+            KeyKind.DateTime,
+            "a datetime",
+            into => KeyTransform.FromDateTime(julian, milliseconds, into, keepMilliseconds));
+    }
+
     /// <summary>
     /// Names the seek a caller should have used for a tag of a kind that does not take text.
     /// </summary>
@@ -257,10 +326,15 @@ internal sealed class TableTagCursor
         KeyKind.Double => "Seek it with a double.",
         KeyKind.Int32 => "Seek it with an int.",
         KeyKind.Date => "Seek it with a DateOnly.",
+        KeyKind.Currency => "Seek it with a decimal.",
+        KeyKind.DateTime => "Seek it with a DateTime.",
         _ => "No seek by value is available for this kind of key yet.",
     };
 
-    private KeySearch Numeric(KeyKind expected, string what, KeyWriter write)
+    /// <summary>
+    /// Returns this tag's converter, refusing a tag whose keys are not of the kind a search is for.
+    /// </summary>
+    private SeekConverter Expect(KeyKind expected, string what)
     {
         SeekConverter resolved = Converter;
 
@@ -270,6 +344,13 @@ internal sealed class TableTagCursor
                 ErrorCode.Info,
                 $"Tag '{tag.Name}' holds {resolved.Kind} keys, so it cannot be searched for {what}.");
         }
+
+        return resolved;
+    }
+
+    private KeySearch Numeric(KeyKind expected, string what, KeyWriter write)
+    {
+        SeekConverter resolved = Expect(expected, what);
 
         int indicator = resolved.HasNullIndicator ? 1 : 0;
         int length = write(Buffer.AsSpan(indicator));

@@ -2757,3 +2757,30 @@ store one — loses the fraction on reading, as it already did in every key and 
 
 **Rejected — the stored count.** It is an artifact of VFP's arithmetic that no other path of either
 engine treats as meaningful.
+
+## ADR-80 — `Seek(decimal)` and `Seek(DateTime)`: a `T` moment rounds to the second, anything finer than a tag holds is refused · accepted
+
+**Date.** 2026-11-14. Step 013, sub-step 7a-8; the overloads at the user's call, the rules below
+proposed with them.
+
+**Context.** ADR-58 left currency and datetime tags without a seek by value, to be added when a caller
+needed one. Each new overload has to say what happens to a value finer than the tag's keys: a
+`decimal` can carry more than a currency's four decimals, a `DateTime` carries ticks below the
+second a `T` field holds and below the millisecond a `'7'` field holds.
+
+**Decision.** `Seek`, `SeekAtOrAfter` and `SeekAtOrBefore` take a `decimal` on a currency tag and a
+`DateTime` on a datetime tag, exact type as ADR-58 — not on numeric or date tags. The value goes
+through the keys' own transform. A **`T`** moment is rounded half up to the second, because that is
+the field's own domain: its key, its text and `GetDateTime` already round it (ADR-78, ADR-79). A
+**currency with a fifth decimal** and a **`'7'` moment finer than a millisecond** are refused with
+`CodeBaseException` (`Info`), before the search buffer is written, so the cursor and a running search
+survive. `DateTime.Kind` is not looked at: a field holds wall-clock time with no zone.
+
+**Consequence.** Every currency and datetime key in the corpus is reached by its record's own value,
+including all 100 422 of `VFPTIME`. A caller seeking `DateTime.Now` in a `T` tag finds the second it
+falls in; in a `'7'` tag it is told to truncate first.
+
+**Rejected — rounding a currency or a `'7'` moment silently.** The key transform would cut the value,
+and a positional seek would then report `Found` for a value no key equals. **Rejected — refusing a `T`
+moment with milliseconds.** Every other path treats it as the second it rounds to, so a refusal would
+make the seek the one place that disagrees, and `DateTime.Now` unusable.

@@ -46,8 +46,8 @@ terms by a tag are recorded for later in `PORTING-PLAN.md` §2.3, beside the col
 - **ADR-69** (**user's call**) — a `Bottom` that finds nothing sets `Eof` in every path; the
   reference returns `r4eof` in all three but leaves `relate4eof` false in two.
 - **ADR-58** — `Seek(string)` only on a character tag; the reference silently converts text to a
-  number. **Kept 2026-11-14, user's call, and `Seek(decimal)` and `Seek(DateTime)` to be added** so
-  currency and datetime tags can be sought by value.
+  number. **Kept 2026-11-14, user's call, and `Seek(decimal)` and `Seek(DateTime)` added** (7a-8,
+  ADR-80), so currency and datetime tags are sought by value.
 - **ADR-64** (**user's call**) — a `DESCEND` tag is sought through the tag's transform.
 - **ADR-65** (**user's call**) — `UPPER`/`LOWER` by the table's code page; the reference uses the
   host's.

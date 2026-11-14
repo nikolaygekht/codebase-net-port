@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-12 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-5 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; 7a-5, the `'W'`/`'O'` UTF-16 fields read, keyed and sought, `STR()` by the table's code page with Windows' best-fit, ADR-76/77) and ADR-56 kept and documented are committed and pushed, and the tree is clean. Left in 013: the rest of sub-step 7a — next the GENERAL-on-other-code-pages row — and 8, the close.**
+**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-6 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed, and the tree is clean; 7a-6 is not pushed. The collation row is decided and split into 7a-7 to 7a-9. Next: `DIVERGENCES.md` §2–§3 with the user, then 7a-7, a VFP-written `T` table, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -326,7 +326,21 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-11-12), the ones before it, and the four before those
+## 2. This session (2026-11-14), the ones before it, and the four before those
+
+**Step 013, sub-step 7a: the collation row decided, and the VFP oracle no longer needs the user.**
+The row split three ways (`DIVERGENCES.md` §1): CodeBase's `CBnnnnn` collations to be supported
+(7a-8); the disk-loaded `CB00004` refused, since its three tables exist nowhere but on a CodeBase
+user's own disk; VFP's GENERAL on other code pages to be tried, by weights recovered from VFP's own
+keys (7a-9). Reading `i4init.c` for it found that GENERAL on cp1251 matches no branch in the
+reference, to be checked in 7a-9. Then **7a-6**: `test-files-generator/vfp/run-in-vm.ps1` runs an
+oracle script in the VMware VM through `vmrun`, credentials from the environment, with a wrapper
+that turns an untrapped error into a file and a timeout that kills a hung `vfp9.exe`. Its first job
+was the second `vfpfunc.prg` run, now in the corpus: `VFPFUNC` byte-identical, `VFPFVAL` changed in
+its three `CTOD` rows only. That made a VFP-written `T` table cheap, so 7a-7 is back, ~1.5 MB
+accepted. Tests unchanged: 3011 unit (1 skipped), 1429 golden.
+
+### Before it (2026-11-12)
 
 **Step 013, sub-step 7a: `DIVERGENCES.md` gone through with the user, five entries turned into
 support.** Each one designed and planned in the step's `DESIGN.md`/`PLAN.md` first, tests red first,
@@ -1057,16 +1071,21 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   is implemented** (7a-3, ADR-74): it had never been written, and a `DTOC` tag answered queries wrongly
   under the default picture. **The `'7'` field** (7a-4, ADR-75) and **the `'W'`/`'O'` fields**
   (7a-5, ADR-76/77) are supported; **compressed data stays refused** (ADR-56, reconfirmed and
-  documented). Next, still in §1, one row at a time — the user asked not to rush them:
-  - **GENERAL on code pages other than 1252/437/850, and CodeBase's other collations** — the open
-    question put to the user: defer to a future step whose weights come from the VFP oracle, defer
-    without a plan, or do now (not advised: needs the VM).
+  documented). **The collation row is decided** (2026-11-14) and split three ways in
+  `DIVERGENCES.md`: CodeBase's `CBnnnnn` collations supported; the disk-loaded one (`CB00004`)
+  refused, since no such tables exist anywhere; VFP's GENERAL on other code pages tried, by weights
+  recovered from VFP's keys. **7a-6 is done, uncommitted:** the VFP VM runs unattended through
+  `test-files-generator/vfp/run-in-vm.ps1` (`vmrun`, credentials from the environment), and the
+  second `vfpfunc.prg` run is in the corpus — changed only in the three `CTOD` rows. Next, in this
+  order, each designed and planned first:
+  - **7a-7** — a VFP-written `T` table (~1.5 MB accepted) to check `flags4dateTimeFlags` against VFP.
+  - **7a-8** — CodeBase's `CBnnnnn` collations; **7a-9** — VFP's GENERAL on other code pages; and
+    `CB00004`'s refusal recorded (ADR, documentation).
   - **A non-compact FoxPro 2.x index** — not a divergence (the reference refuses it too); remove.
   - **OLE-DB keys, collated Unicode keys** — record as deferred (the user: no to OLE-DB).
   Then §2–§3 with the user: confirm ADR-53, 61, 58, 45/50 and step 010's debt (`MOD`/`SQRT` by
   VFP, `PROPER`); then the documentation pass — "Differences from CodeBase" entries and XML docs for
-  ADR-43, 56 (done), 58, 61, 63, 64, 65, 66, 69, 71, and §2's scans. Proposed, undecided: a VFP-oracle
-  `T` table covering all 86400 seconds, to check `flags4dateTime` against VFP itself.
+  ADR-43, 56 (done), 58, 61, 63, 64, 65, 66, 69, 71, and §2's scans.
 - **8, the close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on
   `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`,
   `claude/dev/README.md`, this file. Push once the user says so.
@@ -1114,15 +1133,10 @@ contained. `PERF10K` has the two tags it needs.
 **Its own step, and its own method write-up**, the way step 009 earned its numbers — not a benchmark
 bolted onto a closed step.
 
-### The VFP oracle's second run, whenever it is convenient — it blocks nothing
+### The VFP oracle's further runs
 
-The first run is committed and its findings are recorded. Three probe rows were changed *after* it,
-so the script and the committed corpus disagree on three lines until someone re-runs
-`DO vfpfunc.prg` and `copy-vfp-corpus.bat`: the `CTOD` rows now straddle the pinned `ROLLOVER 29`
-(`01/15/28` and `01/15/29` replace `29`/`30`) so a single dump proves the rule that currently takes
-two runs to see. Nothing depends on it — the rule is already in `specs/EXPRESSIONS.md` §7.3.
-
-The runs ADR-44 authorises next are separate scripts, none written: code-page marks beyond
+The second `vfpfunc.prg` run is in the corpus (2026-11-14, step 013 7a-6), and the VM now runs
+unattended through `test-files-generator/vfp/run-in-vm.ps1`. The runs ADR-44 authorises next are separate scripts, none written: code-page marks beyond
 CodeBase's five constants, a VFP 9 `0x32` table with a memo, `V`/`Q`/`W` fields, native
 auto-increment, a DBC backlink, and an insert-and-split tree with a non-empty free list — the last
 two being ADR-11's, which is unblocked but still open.

@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; next the GENERAL-on-other-code-pages row of `DIVERGENCES.md` §1, an open question to the user)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6, the VFP oracle run unattended, done; next 7a-7, a VFP-written `T` table)
 
 ## Done so far
 
@@ -364,6 +364,28 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
       item; README "Differences from CodeBase"; both corpus READMEs; `DIVERGENCES.md`; XML docs of
       `GetString`, `Seek(string)`, `ExpressionType`.
     - Release 3011 passed (1 skipped) + 1429 golden, green.
+  - Decided with the user, 2026-11-14, each to be designed and planned before it starts:
+    - [x] 7a-6 — the VFP oracle run unattended (2026-11-14). `vmrun` reaches the VM (VMware
+      Workstation, guest Windows 7; credentials from the environment, never the repository).
+      - **a.** `test-files-generator/vfp/run-in-vm.ps1`: checks the VM runs, clears the guest job
+        folder and the host `out\`, copies the script with a generated wrapper (`TRY`/`CATCH` into
+        `done.txt`, console into `console.txt`, `QUIT`), runs `vfp9.exe -t` interactively, copies
+        `out\` back. Its output equals the hand run byte for byte.
+      - **b.** Failure paths, each exit 1: an untrapped error (`107 Operator/operand type mismatch.
+        | fails line 2`); a `MESSAGEBOX` killed at a 20 s timeout, no `vfp9.exe` left in the guest;
+        `VFP_VM_VMX` unset, named. `-Script` also takes a full path.
+      - **c.** Second run published: `VFPFUNC.DBF`/`.CDX` byte-identical to the first run (version
+        counter unmoved), `VFPFVAL.DBF` records 65, 66, 77 only, the two dumps in those lines and
+        `VFPFUNC`'s `generated` date. Release 3011 passed (1 skipped) + 1429 golden, green.
+      - **d.** `vfp/README.md` (running it; what the second run settled), `FOR-DEVELOPERS.md`,
+        `net/corpus/README.md`, `STATE.md`.
+    - [ ] 7a-7 — a VFP-written `T` table: every second of one day plus a sample across the calendar,
+      ~1.5 MB accepted, to check `flags4dateTimeFlags` against VFP itself (`KEY-COLLATION.md` §9
+      item 1). Reinstated: the 2026-11-14 morning dropped it as too costly, and the unattended run
+      made it cheap.
+    - [ ] 7a-8 — CodeBase's `CBnnnnn` collations, supported.
+    - [ ] 7a-9 — VFP's GENERAL on other code pages, by weights recovered from VFP's keys; tried.
+    - [ ] the disk-loaded collation (`CB00004`) refused: an ADR and the documentation.
 - [ ] step 8 — close
 
 ## Notes for the next session

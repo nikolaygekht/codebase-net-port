@@ -481,3 +481,44 @@ swap), the key-level seeks, a seek by each record's own text, the queries.
    deferred (`PORTING-PLAN.md`).
 5. **ADRs:** ADR-76 (the two types read and keyed, `W` told from Blob by version), ADR-77 (`STR(W)`
    by the table's code page with Windows' best-fit).
+
+## 7a-6 — the VFP oracle, run unattended *(added 2026-11-14, at the user's call)*
+
+Until now a VFP oracle run needed the user: start the VM, `DO` the script by hand, copy `out\` back.
+That made every VFP question cost a round trip, and it is why 7a-7 (a `T` table) and 7a-9 (GENERAL
+weights) were not on the table before. VMware Workstation's `vmrun` can do all of it from the host.
+
+### What changes, in short
+
+- **New:** `test-files-generator/vfp/run-in-vm.ps1 [-Script vfpfunc.prg] [-TimeoutSeconds 600]`.
+  It checks the VM is running (it does not start it — the VM is the user's), clears the guest's job
+  folder, copies the script in with a generated wrapper, runs `vfp9.exe -t` on the wrapper in the
+  logged-in session, waits, and copies the job's `out\` back to the host's `vfp\out\`, which
+  `copy-vfp-corpus.bat` already publishes from. It exits non-zero, saying why, on any failure.
+- **The wrapper** is written by the `.ps1`, not checked in: `TRY … DO <script> WITH "<guest out>"
+  … CATCH` into `done.txt` (`OK` or the error, procedure and line), `SET ALTERNATE` into
+  `console.txt`, then `QUIT`. Without it, an error VFP does not trap opens a dialog nobody can see
+  and the run hangs.
+- **A timeout:** a run past `-TimeoutSeconds` has its `vfp9.exe` killed in the guest and fails —
+  a dialog the wrapper could not prevent (a `MESSAGEBOX`, a "file not found") must not hang the host.
+- **The second `vfpfunc.prg` run** goes into the corpus: `VFPFVAL.DBF` changes in records 65, 66 and
+  77 only (the three `CTOD` rows changed after the first run), the two dumps in their `CTOD` lines
+  and `VFPFUNC`'s `generated` date. Nothing in the suite reads those rows: they reach no row of the
+  Visual FoxPro band, and the oracle's counts (77 records, 71 cases) do not move.
+
+### Configuration
+
+Nothing about the user's machine goes into the repository. `VFP_VM_VMX` names the `.vmx`;
+`VFP_VM_USER` and `VFP_VM_PASS` are the guest's logged-in user, which `-interactive` requires;
+`VFP_VM_EXE` overrides the guest's `vfp9.exe` (default `C:\Program Files\Microsoft Visual FoxPro
+9\vfp9.exe`); `VMRUN` overrides the host's `vmrun.exe` (default VMware Workstation's install path).
+A missing one is named, not guessed.
+
+### Decisions
+
+1. **The script never starts or stops the VM.** Starting it needs no credentials but takes minutes,
+   and the guest must also have its user logged in, which only the user can see to.
+2. **The wrapper is generated, not committed**, because it carries the guest paths and nothing worth
+   reviewing. The oracle scripts stay runnable by hand exactly as before.
+3. **`out\` on the host is emptied before the copy**, so a file left by another script's run cannot
+   be published by `copy-vfp-corpus.bat` under this one's name.

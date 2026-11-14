@@ -79,8 +79,8 @@ count        77
   main       CHR(65)                        -> "A" len=1
   main       CHR(0)                         -> "\x00" len=1   ; a NUL is a byte
   main       DTOS(CTOD("01/15/00"))         -> "20000115" len=8   ; cb reads the clock
-  main       DTOS(CTOD("01/15/29"))         -> "19290115" len=8
-  main       DTOS(CTOD("01/15/30"))         -> "19300115" len=8   ; the pivot, if there is one
+  main       DTOS(CTOD("01/15/28"))         -> "20280115" len=8   ; below ROLLOVER 29 -- expect 20xx
+  main       DTOS(CTOD("01/15/29"))         -> "19290115" len=8   ; AT ROLLOVER 29 -- expect 19xx, the boundary is inclusive
   main       DTOS(CTOD("01/15/50"))         -> "19500115" len=8
   main       DTOS(CTOD("01/15/70"))         -> "19700115" len=8
   main       DTOS(CTOD("01/15/99"))         -> "19990115" len=8
@@ -91,4 +91,4 @@ count        77
   exact-on   "AAA" = "AAAA"                 -> FALSE
   exact-on   "AAAA" = "AAA"                 -> FALSE
   century-on DTOC(CTOD("01/15/2000"))       -> "01/15/2000" len=10   ; picture length
-  century-on DTOS(CTOD("01/15/30"))         -> "19300115" len=8   ; the pivot again
+  century-on DTOS(CTOD("01/15/29"))         -> "19290115" len=8   ; the boundary again, with the display on

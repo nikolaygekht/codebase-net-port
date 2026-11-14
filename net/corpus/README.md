@@ -69,7 +69,8 @@ measurement rather than free to tidy: change them and its numbers stop being a b
 ## VFP-produced cases — `vfp/`
 
 **Two files landed on 2026-08-29**, from the first script; the rest of this section is the
-convention they follow.
+convention they follow. A second run of the same script on 2026-11-14 changed `VFPFVAL.DBF` in its
+three `CTOD` rows only, rewritten after the first run to straddle the pinned rollover.
 
 | Files | Covers |
 |---|---|

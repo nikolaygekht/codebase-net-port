@@ -316,7 +316,15 @@ cases are about what CodeBase does *not* do — an index over the thirteen funct
 `0x32` table with a memo, code-page marks beyond its five constants. **ADR-44** has the rules and the
 run order.
 
-In the VM:
+From the host, with the VM running and its user logged in (VMware Workstation; the settings are
+environment variables listed at the top of the script):
+
+```powershell
+test-files-generator\vfp\run-in-vm.ps1                       # vfpfunc.prg -> .\out\
+test-files-generator\vfp\run-in-vm.ps1 -Script other.prg
+```
+
+or by hand, in the VM:
 
 ```foxpro
 DO vfpfunc.prg                  && test-files-generator\vfp -> .\out\

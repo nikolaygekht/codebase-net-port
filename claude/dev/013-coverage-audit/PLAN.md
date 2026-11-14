@@ -213,3 +213,23 @@ Design: `DESIGN.md` §7a-5.
   the premise test only for entries already listed. The golden `S_ASC` keys catch the cp1251 case.
 - **The case depends on the generating host.** Regenerating on a machine whose ANSI code page is not
   1251 fails at `WSTR` by design rather than writing different keys.
+
+## 7a-6 — the VFP oracle, run unattended
+
+Design: `DESIGN.md` §7a-6. No library code and no .NET test: the tool is verified by running it.
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | `run-in-vm.ps1` | run on `vfpfunc.prg`: `done.txt` is `OK`, and `out\` equals the hand run of 2026-11-14 byte for byte but the dump's `generated` line |
+| b | Failure paths | a script with an untrapped error exits non-zero and prints VFP's message; a script stopped at a `MESSAGEBOX` is killed at a short `-TimeoutSeconds` and leaves no `vfp9.exe` in the guest; an unset variable is named |
+| c | Publish the second run: `copy-vfp-corpus.bat` | `git status net/corpus` shows `VFPFVAL.DBF` and the two dumps only; the suite green in Release |
+| d | Records: `vfp/README.md` (running it, and what the second run settled), `FOR-DEVELOPERS.md`, `net/corpus/README.md` if it dates the run, this step's `STATE.md` | — |
+
+### Risks
+
+- **`vmrun` blocks on a hung guest program** whatever its own options say; the timeout is the
+  `.ps1`'s, around the `vmrun` process, and the kill goes through `vmrun killProcessInGuest`.
+- **The guest user name may not be ASCII** (it is not on the user's VM); it is passed from the
+  environment as a string, never through a code-page conversion of the script's own text.

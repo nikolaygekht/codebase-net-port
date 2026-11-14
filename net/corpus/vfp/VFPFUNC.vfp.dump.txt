@@ -5,7 +5,7 @@
 # are for review only -- the stored bits are in the file.
 table        VFPFUNC.DBF
 producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
-generated    08/29/26   (header stamp frozen to 26-01-01)
+generated    11/14/26   (header stamp frozen to 26-01-01)
 codePage     1251
 collate      MACHINE
 century      OFF

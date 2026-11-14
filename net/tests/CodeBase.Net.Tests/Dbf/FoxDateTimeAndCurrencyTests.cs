@@ -64,6 +64,16 @@ public sealed class FoxDateTimeAndCurrencyTests
                    .Should().Be(new DateTime(1981, 1, 1, 0, 0, 1, 500));
     }
 
+    [Theory]
+    [InlineData(1499, 1)]
+    [InlineData(1500, 2)]
+    [InlineData(86_399_999, 86_400)] // rounds into the next day, as the text form's hours run on
+    public void ToDateTime_RoundedToTheSecond_RoundsHalfUp(int milliseconds, int seconds)
+    {
+        FoxDateTime.ToDateTime(Stored(2444606, milliseconds), roundToSecond: true)
+                   .Should().Be(new DateTime(1981, 1, 1).AddSeconds(seconds));
+    }
+
     [Fact]
     public void ToText_RendersAnHourCountThatRunsPastADay()
     {

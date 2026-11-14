@@ -1225,7 +1225,11 @@ public sealed class Table : IDisposable
     /// Gets a datetime field of the current record.
     /// </summary>
     /// <param name="field">The field to read.</param>
-    /// <returns>The moment, with its milliseconds, or null where the field is blank.</returns>
+    /// <returns>
+    /// The moment, or null where the field is blank. A [c]T[/c] field is read to the nearest second,
+    /// as Visual FoxPro shows it: it stores [c]DTOT(d) + n[/c] one millisecond short about half the
+    /// time (ADR-79). A CodeBase type 7 field keeps its milliseconds.
+    /// </returns>
     /// <exception cref="CodeBaseException">The field is not a datetime one.</exception>
     /// <exception cref="ObjectDisposedException">The table has been closed.</exception>
     public DateTime? GetDateTime(FieldDefinition field)

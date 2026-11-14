@@ -324,7 +324,7 @@ Right-justified ASCII decimal in a field of `len` bytes with `dec` decimals, pro
 | 0-3 | Julian day number (same epoch/algorithm as `D`, §6.3; `date4long` of "YYYYMMDD", F4FIELD.C:2040) |
 | 4-7 | Milliseconds since midnight = `hour*3600000 + min*60000 + sec*1000 (+ ms)` (`time4long`, i4conv.c:201-221) |
 
-`T` ignores/rounds milliseconds on conversion to text (round up at ≥500ms, F4FIELD.C:1868-1873 — "FoxPro ignores this part"); `'7'` keeps them, rendering as `HH:MM:SS.mmm` (F4FIELD.C:1886-1890). Invalid date or time components are stored as 0 ("leave the field as blank, for Fox ODBC compatibility", F4FIELD.C:2044-2048). Blank = 8 zero bytes (F4FIELD.C:145-156). AutoTimestamp fills this format with UTC now (`date4timeNowFull`: `dtTime[0] = julian`, `dtTime[1] = ms`, D4DATE.C:788-806).
+`T` ignores/rounds milliseconds on conversion to text (round up at ≥500ms, F4FIELD.C:1868-1873 — "FoxPro ignores this part"). **Visual FoxPro writes a `T` field one millisecond short** about half the time: it holds a datetime as a double of days and truncates it into bytes 4-7, so `DTOT(d) + n` lands as `n·1000 − 1` — 43 136 of the 86 400 seconds of 2000-01-01 in `net/corpus/vfp/VFPTIME`. Every rounding path absorbs it; the port's `GetDateTime` rounds a `T` field to the second (ADR-79); `'7'` keeps them, rendering as `HH:MM:SS.mmm` (F4FIELD.C:1886-1890). Invalid date or time components are stored as 0 ("leave the field as blank, for Fox ODBC compatibility", F4FIELD.C:2044-2048). Blank = 8 zero bytes (F4FIELD.C:145-156). AutoTimestamp fills this format with UTC now (`date4timeNowFull`: `dtTime[0] = julian`, `dtTime[1] = ms`, D4DATE.C:788-806).
 
 ### 6.11 `W` wide string / `O` wide string with length
 

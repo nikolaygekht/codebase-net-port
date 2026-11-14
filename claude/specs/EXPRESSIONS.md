@@ -950,7 +950,8 @@ All produce byte sequences that sort ascending with unsigned memcmp:
   (ms rounded to whole seconds, ≥500 rounds up)/86400000.0 as double; then a **FoxPro compatibility
   fixup**: for second-of-day values flagged in a precomputed bitset (`flags4dateTime`) the low
   mantissa byte is decremented (with borrow) before `t4dblToFox` (i4conv.c:2262-2286). The ms
-  variant skips rounding (i4conv.c:2292-2364).
+  variant skips rounding (i4conv.c:2292-2364). The bitset approximates Visual FoxPro's actual
+  conversion, since deciphered and used by the port for `'T'` (`KEY-COLLATION.md` §2.8, ADR-78).
 * **date (text) → key**: `t4dblToFox(date4long(text))` (E4EXPR.C:468-471).
 * **num (text) → key**: `t4dblToFox(c4atod(text,len))` (E4EXPR.C:459-466).
 * **logical → key**: 1 byte, `'T'` or `'F'` (E4EXPR.C:512-536). (ASCEND() of a logical instead
@@ -1092,7 +1093,7 @@ Selected by exactly one of S4FOX / S4CLIPPER / S4MDX / S4NDX at build time.
    * null semantics of §6.
 3. **Index keys**: implement §9 transforms bit-exactly (t4dblToFox sign-flip/complement scheme,
    int/i8 sign-bit flip + big-endian, 'T'/'F' logicals, 0x80 null prefix byte, hasTrim NUL→blank,
-   datetime rounding + `flags4dateTime` fixup) — CDX compatibility is decided entirely by these
+   datetime rounding + VFP's conversion, `KEY-COLLATION.md` §2.8) — CDX compatibility is decided entirely by these
    bytes plus STR()/DTOS()/TTOC() text formats (§7).
 4. **Deterministic formatting**: port `c4dtoa45` semantics (right-justify, blank pad, fixed
    decimals, `*` overflow) with `MidpointRounding` matched against VFP STR() output; validate with
@@ -1117,10 +1118,9 @@ Selected by exactly one of S4FOX / S4CLIPPER / S4MDX / S4NDX at build time.
 2. **[CLOSED — the picture is 8 characters, witnessed through `T_DTOC`'s key length, §7.3.]**
    **Default `dateFormat` value** is initialized outside this drop; DTOC()-based key lengths depend
    on it (key len = picture length, e4parse.c:500-509).
-3. **`flags4dateTime` bitset** (`flags4dateTimeInit`, used i4conv.c:2218-2219, 2263) encodes which
-   seconds-of-day need the mantissa-decrement FoxPro fixup; the generator was not located in the
-   e4/i4 files read — must be extracted (search F4FLAG.C / f4flag usage) before datetime index keys
-   can be produced bit-exactly.
+3. ~~**`flags4dateTime` bitset**~~ — resolved: the table is in i4conv.c:1513-2191 and copied; the
+   conversion it approximates was deciphered from Visual FoxPro's keys (`KEY-COLLATION.md` §2.8,
+   ADR-78).
 4. **`t4curToFox` body** (i4conv.c:1360) and `currency4compare`/`date4timeCompare` internals were
    not transcribed; needed for currency/datetime tags.
 5. **Collation tables** (`coll4arr.c`, `COLLATE4`, `collate4subSortCompress` etc.,

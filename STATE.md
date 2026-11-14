@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-6 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed, and the tree is clean; 7a-6 is not pushed. Every row of `DIVERGENCES.md` is now decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-7, a VFP-written `T` table, then the rest of 7a, and 8, the close.**
+**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-6 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed, and the tree is clean; 7a-6 and 7a-7 are not pushed. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-8, `Seek(decimal)` and `Seek(DateTime)`, then the rest of 7a, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -108,8 +108,8 @@ its indexes rather than reading them, which is what the whole port exists for �
 can be read whole, its records read in an index tag's order, and the read path is cached.
 `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4441 tests**,
-1429 of them golden (3011 unit, 1 skipped).
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4453 tests**,
+1432 of them golden (3021 unit, 1 skipped).
 
 **Since 2026-11-12 it also reads** CodeBase's long-field-name layout (ADR-72), tags over `RECNO()`
 (ADR-73), the `'7'` datetime with milliseconds (ADR-75), and the `'W'`/`'O'` UTF-16 fields with
@@ -330,15 +330,24 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 **Step 013, sub-step 7a: the collation row decided, and the VFP oracle no longer needs the user.**
 The row split three ways (`DIVERGENCES.md` §1): CodeBase's `CBnnnnn` collations to be supported
-(7a-8); the disk-loaded `CB00004` refused, since its three tables exist nowhere but on a CodeBase
+(7a-11); the disk-loaded `CB00004` refused, since its three tables exist nowhere but on a CodeBase
 user's own disk; VFP's GENERAL on other code pages to be tried, by weights recovered from VFP's own
-keys (7a-9). Reading `i4init.c` for it found that GENERAL on cp1251 matches no branch in the
-reference, to be checked in 7a-9. Then **7a-6**: `test-files-generator/vfp/run-in-vm.ps1` runs an
+keys (7a-13). Reading `i4init.c` for it found that GENERAL on cp1251 matches no branch in the
+reference, to be checked in 7a-13. Then **7a-6**: `test-files-generator/vfp/run-in-vm.ps1` runs an
 oracle script in the VMware VM through `vmrun`, credentials from the environment, with a wrapper
 that turns an untrapped error into a file and a timeout that kills a hung `vfp9.exe`. Its first job
 was the second `vfpfunc.prg` run, now in the corpus: `VFPFUNC` byte-identical, `VFPFVAL` changed in
-its three `CTOD` rows only. That made a VFP-written `T` table cheap, so 7a-7 is back, ~1.5 MB
-accepted. Tests unchanged: 3011 unit (1 skipped), 1429 golden.
+its three `CTOD` rows only. That made a VFP-written `T` table cheap, so 7a-7 came back, and it
+found something: **VFP's datetime key, which CodeBase's authors called undeciphered**, is
+`fl(fl(day·86400 + s) × fl(1/86400))` — the seconds times a rounded reciprocal, whose error grows
+with the day. Found by testing formulas against all 100 422 keys VFP wrote in `VFPTIME`; it also
+reproduces all 256 of CodeBase's `CDXTIME`. The bitmap CodeBase carries is that formula sampled
+around 2000 — exact on 2000-01-01, one unit off on a few seconds of 1900 and 2026 and on half of
+them before ~1029 and after ~6771, where a seek into a VFP-written tag would miss. `T` keys follow
+VFP now (ADR-78), the bitmap stays for `'7'`; and since VFP stores `DTOT(d) + n` one millisecond
+short half the time, `GetDateTime` reads `T` to the second (ADR-79). Risk R7 retired. Before it,
+the rest of `DIVERGENCES.md` was decided, and five optimizer improvements recorded for later.
+Tests: 3021 unit (1 skipped), 1432 golden.
 
 ### Before it (2026-11-12)
 
@@ -1078,8 +1087,7 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   `test-files-generator/vfp/run-in-vm.ps1` (`vmrun`, credentials from the environment), and the
   second `vfpfunc.prg` run is in the corpus — changed only in the three `CTOD` rows. Next, in this
   order, each designed and planned first:
-  - **7a-7** — a VFP-written `T` table (~1.5 MB accepted) to check `flags4dateTimeFlags` against VFP.
-  - **7a-8** — CodeBase's `CBnnnnn` collations; **7a-9** — VFP's GENERAL on other code pages; and
+  - **7a-11** — CodeBase's `CBnnnnn` collations; **7a-13** — VFP's GENERAL on other code pages; and
     `CB00004`'s refusal recorded (ADR, documentation).
   - **A non-compact FoxPro 2.x index** — not a divergence (the reference refuses it too); remove.
   - **OLE-DB keys, collated Unicode keys** — record as deferred (the user: no to OLE-DB).
@@ -1087,7 +1095,10 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   `Seek(decimal)`/`Seek(DateTime)` to be added; `MOD` by zero and `SQRT` of a negative to raise as
   VFP does; `PROPER` to be added; collated Unicode keys to be supported, OLE-DB types not; where the
   optimizer scans kept as it is, five improvements recorded in `PORTING-PLAN.md` §2.3. Left of 7a,
-  each designed and planned first: those four, 7a-7 to 7a-9, and the documentation pass —
+  each designed and planned first, in this order (the user's, 2026-11-14): **7a-7** the `T` table,
+  **7a-8** `Seek(decimal)`/`Seek(DateTime)`, **7a-9** `MOD`/`SQRT` raising, **7a-10** `PROPER`,
+  **7a-11** the `CBnnnnn` collations, **7a-12** collated Unicode keys, **7a-13** VFP's GENERAL on
+  other code pages, **7a-14** the documentation pass —
   `CB00004`'s refusal, "Differences from CodeBase" entries and XML docs for ADR-43, 45/50, 56 (done),
   58, 61, 63, 64, 65, 66, 69, 71, and §2's scans.
 - **8, the close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on

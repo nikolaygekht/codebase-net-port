@@ -146,13 +146,21 @@ internal static class KeyTransform
     /// milliseconds are kept rather than rounded, and the table is consulted for the truncated second.
     /// </param>
     /// <returns>How many bytes were written.</returns>
-    /// <remarks>
-    /// [c]t4dateTimeToFox[/c] (i4conv.c:2209-2287), and the one transform here that is not
-    /// arithmetic. The milliseconds round to the nearest second, the day and the rounded time become
-    /// one double, and then a table decides whether that double is nudged down before it is
-    /// converted. See [clink=CodeBase.Net.Cdx.DateTimeKeyFlags]DateTimeKeyFlags[/clink] for why the
-    /// table exists.
-    /// </remarks>
+    /// <value>
+    /// A [c]T[/c] key is Visual FoxPro's conversion (ADR-78): the milliseconds round half up to a
+    /// second, the moment becomes a count of seconds, and that count is multiplied by the double
+    /// nearest one 86400th -- a multiplication by a rounded reciprocal, not a division, so the result
+    /// can sit one step away from the nearest double to the true day fraction, by an amount that
+    /// depends on the day. Found by testing formulas against every key Visual FoxPro wrote in
+    /// [c]VFPTIME[/c], all of which it reproduces, as it does every key the reference wrote in
+    /// [c]CDXTIME[/c].
+    ///
+    /// The reference instead adds the day to the fraction and nudges the sum down where a table says
+    /// so ([c]t4dateTimeToFox[/c], i4conv.c:2209-2287). That table is the same conversion sampled
+    /// around 2000, and away from it the two differ by one unit in the last byte, so a seek built the
+    /// reference's way misses a key Visual FoxPro wrote. The CodeBase type 7 keeps the reference's
+    /// transform, being its own type: see [clink=CodeBase.Net.Cdx.DateTimeKeyFlags]DateTimeKeyFlags[/clink].
+    /// </value>
     public static int FromDateTime(
         int julianDay, int milliseconds, Span<byte> destination, bool keepMilliseconds = false)
     {
@@ -162,9 +170,12 @@ internal static class KeyTransform
         if (extra >= 500)
             rounded += 1000;
 
+        if (!keepMilliseconds)
+            return FromDouble(((long)julianDay * 86400 + (rounded / 1000)) * (1.0 / 86400.0), destination);
+
         // The CodeBase type 7 keeps the fraction and looks the flag up by the truncated second
-        // (t4dateTimeToFoxMilli, i4conv.c:2292-2364); everything else is the 'T' transform.
-        int time = keepMilliseconds ? milliseconds : rounded;
+        // (t4dateTimeToFoxMilli, i4conv.c:2292-2364).
+        int time = milliseconds;
         double value = julianDay + (time / 86400000.0);
 
         if (DateTimeKeyFlags.NeedsDecrement(time / 1000))

@@ -197,8 +197,29 @@ key = t4dblToFox(val)
 `flags4dateTimeFlags` is an 86400-bit (10800-byte + 2 trailing zero bytes) empirical bitmap,
 indexed by *second-of-day + 1*, marking datetimes whose double must be decremented by 1 ULP-byte
 to match FoxPro's undeciphered conversion (table i4conv.c:1513-2191; wiring i4conv.c:2197-2206;
-bit extraction `(1 << (flagNum & 7)) & flags[flagNum >> 3]`, F4FLAG.C:161-193). **This table must
-be copied verbatim.**
+bit extraction `(1 << (flagNum & 7)) & flags[flagNum >> 3]`, F4FLAG.C:161-193).
+
+**Visual FoxPro's conversion, deciphered** (2026-11-14, step 013 7a-7, the VFP oracle `VFPTIME`):
+
+```
+s   = round_half_up(ms / 1000)                 # as above
+val = fl( fl(day * 86400 + s) * fl(1 / 86400) )   # IEEE double throughout; day * 86400 + s is exact
+key = t4dblToFox(val)
+```
+
+The moment in whole seconds, multiplied by the double nearest 1/86400 — a multiplication by a
+rounded reciprocal, not a division. It reproduces **all 100 422 keys** Visual FoxPro 9 wrote in
+`net/corpus/vfp/VFPTIME` (every second of 2000-01-01, and every 37th second of six days across all
+three binades of the Julian day) and **all 256** CodeBase wrote in `CDXTIME`. The reciprocal's error
+grows with the day, so the correction depends on the day as well as the second; the bitmap is this
+formula **sampled around 2000**. It agrees on every second of 2000-01-01 and differs by one unit in
+the last byte on 7 and 3 of 2 337 sampled seconds of 1900-01-01 and 2026-11-14, and on about half of
+them below 2²¹ (before ~1029) and above 2²² (after ~6771). **The port keys `'T'` by the formula
+(ADR-78); the bitmap is kept, verbatim, for `'7'` alone.**
+
+Visual FoxPro also *writes* a datetime by truncating a double of days into the field: `DTOT(d) + n`
+lands as `n·1000 − 1` ms about half the time (`VFPTIME`: 43 136 of 86 400). The rounding above
+absorbs it; the port's `GetDateTime` rounds a `'T'` field to the second for the same reason (ADR-79).
 
 `t4dateTimeToFoxMilli` (`r4dateTimeMilli` `'7'`, CodeBase-only) is identical except the
 milliseconds are kept (no rounding) while the flag lookup still uses the whole second — the
@@ -548,8 +569,9 @@ capped at keyLen−1 (D4SEEK.C:44-63); numeric seeks prefix `0x80` before `dtok`
    per-string with different alphabets for cp437/cp850 box-drawing and Greek characters.
 3. Trailing-blank stripping *before* collation (u4util.c:2242-2250) and the partial-seek
    tail suppression (u4util.c:2256-2264) are engine-specific behaviors, not culture behaviors.
-4. Numeric/date/datetime keys additionally embed the empirical `flags4dateTimeFlags` ULP
-   correction (§2.8), which no general-purpose library reproduces.
+4. Datetime keys follow Visual FoxPro's multiply-by-reciprocal conversion, and the `'7'` key the
+   empirical `flags4dateTimeFlags` ULP correction (§2.8), which no general-purpose library
+   reproduces.
 
 **Port requirement:** copy verbatim, as static byte arrays in C#:
 all 8 translation arrays + 2 distinct compress arrays from COLL4ARR.C (§3.3, ~256×2 bytes
@@ -562,10 +584,10 @@ statement holds for the croatian/spanish/avaya tables.)
 
 ## 9. Open questions / risks for the C# port
 
-1. **`flags4dateTimeFlags` provenance** — the table is an empirical patch ("FoxPro appears to
-   have an unusual conversion algorithm which could not be deciphered", i4conv.c:1509-1512).
-   Port it blindly; add round-trip tests against VFP-generated CDX files with datetimes covering
-   many seconds-of-day, since any transcription error breaks seek equality silently.
+1. ~~**`flags4dateTimeFlags` provenance**~~ — **resolved 2026-11-14** (step 013, 7a-7). The
+   round-trip against a VFP-generated CDX was made (`VFPTIME`, 100 422 keys) and deciphered the
+   conversion the table approximates; see §2.8. The table is exact only near 2000; `'T'` now keys by
+   the formula (ADR-78).
 2. **`compress4` (contractions) unimplemented** — the engine errors on contraction entries
    (u4util.c:2316-2320). None of the shipped tables use them, but disk-loaded custom collations
    (`collate4test`) could. Decide whether the port supports disk-loaded collations at all.

@@ -167,6 +167,22 @@ public sealed class FieldValueDecoderTests
             .Should().Be(new DateTime(1981, 1, 1, 1, 2, 3, 456));
     }
 
+    [Theory]
+    [InlineData(3_722_999, 3)] // Visual FoxPro's own one-short-of-a-second
+    [InlineData(3_723_456, 3)]
+    [InlineData(3_723_500, 4)] // half up, as the text form and the key round
+    public void DateTime_OfADateTime_IsTheNearestSecond(int milliseconds, int second)
+    {
+        // A T field holds seconds; Visual FoxPro writes DTOT(d) + n one millisecond short about half
+        // the time, and shows it as the second it means (ADR-79).
+        byte[] record = new byte[1 + 8];
+        BinaryPrimitives.WriteInt32LittleEndian(record.AsSpan(1), 2444606);
+        BinaryPrimitives.WriteInt32LittleEndian(record.AsSpan(5), milliseconds);
+
+        FieldValueDecoder.DateTime(Buffer(record), Field('T', length: 8))
+            .Should().Be(new DateTime(1981, 1, 1, 1, 2, second));
+    }
+
     [Fact]
     public void WideText_OfAW_IsEveryCodeUnitItHolds()
     {

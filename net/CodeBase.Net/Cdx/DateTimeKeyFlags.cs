@@ -1,16 +1,19 @@
 namespace CodeBase.Net.Cdx;
 
 /// <summary>
-/// The seconds of the day whose datetime key needs a one-byte decrement.
+/// The seconds of the day whose CodeBase type 7 datetime key needs a one-byte decrement.
 ///
 /// FoxPro's own datetime-to-key conversion could not be worked out by the C library's authors, so
 /// they recorded which values it disagrees with instead of deriving a rule. Their comment says as
 /// much (i4conv.c:1506-1509). The result is this bitmap: one bit per second of the day, set where
 /// the computed double must be nudged down before it becomes a key.
 ///
-/// It is data, and there is no algorithm behind it to check it against. What proves the copy is the
-/// corpus: CDXTIME indexes 256 datetimes chosen so that roughly a third of them land on a set bit
-/// and the rest do not, and every stored key is compared against what this produces.
+/// The conversion has since been deciphered from keys Visual FoxPro wrote (ADR-78): the moment in
+/// seconds times the double nearest one 86400th. This bitmap is that formula sampled around 2000,
+/// exact there and one unit off on some seconds of other days, so a [c]T[/c] key no longer reads it.
+/// It stays, verbatim, for the CodeBase type 7, which Visual FoxPro has no conversion for and whose
+/// key is whatever the C library writes. What proves the copy is the corpus: CDXTIME's 256 datetimes
+/// land on both halves of it, and DTMILLI's 600 keys are rebuilt through it.
 ///
 /// Two trailing zero bytes are part of the table, not padding to ignore. Rounding a datetime up
 /// from the last half second of a day gives 86400 seconds, so the lookup asks for bit 86401, and

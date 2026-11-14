@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6, the VFP oracle run unattended, done; next 7a-7, a VFP-written `T` table)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 and 7a-7 done; next 7a-8, `Seek(decimal)` and `Seek(DateTime)`)
 
 ## Done so far
 
@@ -379,20 +379,49 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
         `VFPFUNC`'s `generated` date. Release 3011 passed (1 skipped) + 1429 golden, green.
       - **d.** `vfp/README.md` (running it; what the second run settled), `FOR-DEVELOPERS.md`,
         `net/corpus/README.md`, `STATE.md`.
-    - [ ] 7a-7 — a VFP-written `T` table: every second of one day plus a sample across the calendar,
-      ~1.5 MB accepted, to check `flags4dateTimeFlags` against VFP itself (`KEY-COLLATION.md` §9
-      item 1). Reinstated: the 2026-11-14 morning dropped it as too costly, and the unattended run
-      made it cheap.
-    - [ ] 7a-8 — CodeBase's `CBnnnnn` collations, supported.
-    - [ ] 7a-9 — VFP's GENERAL on other code pages, by weights recovered from VFP's keys; tried.
-    - [ ] the disk-loaded collation (`CB00004`) refused: an ADR and the documentation.
-  - Decided with the user, 2026-11-14, `DIVERGENCES.md` §1 and §3 (to be sequenced):
-    - ADR-53, ADR-61 kept; ADR-45/50 kept and to be documented for the user.
-    - [ ] `Seek(decimal)` and `Seek(DateTime)` added (ADR-58 kept otherwise).
-    - [ ] `MOD` by zero and `SQRT` of a negative raise an error, as VFP does (were 0).
-    - [ ] `PROPER` added, gated by `VFPFUNC.CDX`'s `T_PROPER`.
-    - [ ] collated Unicode keys supported. OLE-DB types: not supported. The non-compact FoxPro 2.x
-      index row removed — the reference refuses it too.
+    - [x] 7a-7 — a VFP-written `T` table (2026-11-14). The user decided, after (c) stopped: the
+      `T` key by VFP's formula, `GetDateTime` of a `T` field to the second.
+      - **a, b.** `vfptime.prg`, run by `run-in-vm.ps1` (`DATE()` refuses year 1, so the lowest day
+        is 0100-01-01): `VFPTIME.DBF` 904 127 + `.CDX` 649 216 bytes, 100 422 records, published.
+      - **c, the finding.** 5 349 of 100 422 VFP keys disagreed with the port's by one unit in the
+        last byte, both ways: none on 2000-01-01's 86 400 seconds, 7 and 3 on 1900-01-01 and
+        2026-11-14, ~1 450–1 610 below 2²¹ and ~1 120–1 160 above 2²². Testing formulas against every
+        key (Python, exact rational arithmetic) found VFP's: `fl(fl(day·86400 + s) × fl(1/86400))`.
+        It reproduces all 100 422, and all 256 of CodeBase's `CDXTIME`. And VFP stores
+        `DTOT(d) + n` as `n·1000 − 1` ms 43 136 times of 86 400.
+      - **c1.** `KeyTransform.FromDateTime`: the `T` path computes the formula; `'7'` keeps the
+        bitmap. Unit: the bitmap test now runs on the `'7'` path; new — `T` equals the bitmap on every
+        second of 2000-01-01, and differs from it on 0100, 1900 and 9999 (red before). Golden:
+        `VisualFoxProDateTimeGoldenTests` rebuilds all 100 422; `CDXTIME`, `DTMILLI` green.
+        Mutation: dividing instead of multiplying reddens VFPTIME (26 899 keys) and CDXTIME.
+      - **c2.** `FoxDateTime.ToDateTime(roundToSecond)`, counted in `long`; the decoder rounds `T`.
+        Unit (red first) and golden (every second of 2000-01-01 reads as itself). Mutation: keeping
+        the milliseconds reddens both layers (43 136 records).
+      - **d.** ADR-78, ADR-79; `KEY-COLLATION.md` §2.8, §8, §9 item 1 (closed); `EXPRESSIONS.md`
+        §9 and §14 item 3; `DBF-FORMAT.md` §6.10; `PORTING-PLAN.md` R7 retired; both corpus READMEs,
+        the generator README, `vfp/README.md`; XML docs of `KeyTransform.FromDateTime`,
+        `DateTimeKeyFlags`, `Table.GetDateTime`; `DIVERGENCES.md` §3.
+      - Release 3021 passed (1 skipped) + 1432 golden, green.
+      - **Tools.** `crap4csharp` over the five changed files: `ToDateTime` 7.0 (95.8%), the members
+        above 8.0 untouched and as before (`Table.SkipInTagOrder` 10.3, `Table.Skip` 9.0,
+        `FieldValueDecoder.Int32` 8.2). `mutate4csharp` on `FoxDateTime.cs`: 28 killed, 4 survived,
+        none in the new rounding — line 68's day-range guard (`||` to `&&`; no unit test has a Julian
+        day between 1 and 1 721 425, a date before AD 1, out of scope by ADR-33) and three in `ToText`
+        (lines 108, 127), all from earlier steps. The file restored and verified.
+    - [ ] 7a-8 — `Seek(decimal)` and `Seek(DateTime)` added (ADR-58 kept otherwise).
+    - [ ] 7a-9 — `MOD` by zero and `SQRT` of a negative raise an error, as VFP does (were 0).
+    - [ ] 7a-10 — `PROPER` added, gated by `VFPFUNC.CDX`'s `T_PROPER`.
+    - [ ] 7a-11 — CodeBase's `CBnnnnn` collations, supported.
+    - [ ] 7a-12 — collated Unicode keys supported (after 7a-11: the Unicode arrays derive from the
+      character ones).
+    - [ ] 7a-13 — VFP's GENERAL on other code pages, by weights recovered from VFP's keys; tried.
+    - [ ] 7a-14 — the documentation pass: the disk-loaded collation (`CB00004`) refused, with an
+      ADR; "Differences from CodeBase" and XML docs for ADR-43, 45/50, 58, 61, 63–66, 69, 71; §2's
+      scans.
+    - Order 7a-7 to 7a-14 is the user's, 2026-11-14.
+  - Also decided with the user, 2026-11-14, `DIVERGENCES.md` §1 and §3: ADR-53, ADR-61 kept;
+    ADR-45/50 kept and to be documented; OLE-DB types not supported; the non-compact FoxPro 2.x
+    index row removed — the reference refuses it too.
     - §2, where the optimizer scans: kept as it is; the five further ways to answer a term by a tag
       recorded for later in `PORTING-PLAN.md` §2.3.
 - [ ] step 8 — close

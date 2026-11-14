@@ -104,8 +104,8 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - Additional VFP collations beyond GENERAL (DUTCH, NORDAN, croatian/spanish/avaya tables) — the
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself. **Decided 2026-11-14:** CodeBase's `CBnnnnn` tables
-  to be supported (013, 7a-8); VFP's GENERAL on other code pages to be tried through the VFP oracle
-  (013, 7a-9).
+  to be supported (013, 7a-11); VFP's GENERAL on other code pages to be tried through the VFP oracle
+  (013, 7a-13).
 - Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs). **Decided 2026-11-14:
   refused** — no such tables exist outside a CodeBase user's own disk.
 - **Collated tags in the query optimizer, for equality.** ADR-54/59 refuse a collated tag in both
@@ -222,8 +222,9 @@ the exact bytes VFP/CodeBase writes, not an equivalent ordering. Per `KEY-COLLAT
   dependent and never matches the head-block+tail-block, zero-padded-to-2×len GENERAL layout.
 - The GENERAL tables are frozen 1990s FoxPro tables: case-insensitive primaries, accent weights
   placed *after* the whole primary block, hard-coded expansions (œ→OE, ß→SS, þ→TH).
-- Numeric/date/datetime keys embed the empirical `flags4dateTimeFlags` ULP-correction bitset (10 802
-  bytes) that no general-purpose library reproduces.
+- Datetime keys follow Visual FoxPro's multiply-by-reciprocal conversion, deciphered in step 013
+  (ADR-78); the empirical `flags4dateTimeFlags` bitset (10 802 bytes) that approximates it is kept
+  for CodeBase's `'7'` type.
 
 **Mandate:** port `COLL4ARR.C`'s 8 translation arrays + 2 compress arrays and the
 `flags4dateTimeFlags` table as `static readonly byte[]` verbatim. Implement the transforms of
@@ -795,7 +796,7 @@ something different. Never use it for keys, indexes, or memos.
 | R4 | **FPT block reuse / monotonic growth** — S4FOX keeps no free chain; wrong allocation orphans or overwrites blocks | Memo corruption; files grow unbounded | Medium | Port allocation-at-EOF + `nextBlock` header semantics exactly (`FPT-MEMO.md` §3.7); implement `d4memoCompress` equivalent; corruption-guard checks; `WRITE` memo round-trip gate |
 | R5 | **Expression quirks leaking into index keys** — `STR()`/`DTOS()`/`TTOC()` text formatting, rounding, `*`-overflow; prefix `=`; divide-by-zero→0; blank-date propagation | Keys differ by a byte → silent seek failures | Medium | Port §7 of `EXPRESSIONS.md` bit-exactly; `c4dtoa45` behavior recovered empirically from generated output; `EXPR` expression + re-derived-key gate |
 | R6 | **Torn reads under I/O optimization** — read caching on unlocked files can mix old/new bytes; write caching unsafe without record lock | Wrong data returned to app | Medium | Preserve flush-before-unlock / invalidate-after-lock ordering (`LOCKING-TRANSACTIONS.md` §3.7); default to no unsafe read-opt on shared files; document the hazard. **Designed 2026-08-19**: the cache is optional on the reference's own three-valued policy, defaulting to `WhenExclusive` — which caches only files opened excluding other writers and therefore caches *nothing* until `LOCKING` exists. `WRITE`, `LOCKING` and `TRANS` each owe it something concrete: **§5's cross-capability obligation table** |
-| R7 | **`flags4dateTimeFlags` ULP bitset** transcription error | datetime keys off by 1 ULP → seek equality breaks silently | Medium | Copy the 10 802-byte table verbatim; `COLLATION` gate covers many seconds-of-day; unit test the bit-extraction against generated key bytes |
+| ~~R7~~ **retired 2026-11-14** | **`flags4dateTimeFlags` ULP bitset** transcription error | datetime keys off by 1 ULP → seek equality breaks silently | — | Retired by step 013's VFP oracle `VFPTIME`: 100 422 keys VFP wrote, which found the bitset itself one unit off away from 2000 — not a transcription error but the reference's approximation. `'T'` now keys by VFP's formula (ADR-78) |
 | R8 | **Missing C bodies** (`c4dtoa45`, `c4ltoa45`, `c4atod`, `c4atoCurrency`, `code4initLow` defaults, `code4logOpen`) absent from the source drop | Numeric/currency text + defaults + log format guessed wrong | Medium | Recover behavior empirically from generated output; adopt documented Sequiter defaults; treat as `[UNVERIFIED]` and gate against corpus bytes. **Partly closed 2026-08-28**: `STR`'s rounding and `*` overflow are witnessed (`EXPRESSIONS.md` §7.1). The residue — whether VFP agrees — is what the **VFP oracle** (ADR-44) is pointed at |
 | R9 | **0x31 → 0x30 version normalization / skip-byte-0 header rewrite** done naively | 0x31 files silently downgraded; extensions lost | Low | Replicate the "never rewrite byte 0" write windows (`DBF-FORMAT.md` §2.5); round-trip test on 0x31 files |
 | R10 | **CDX shared-write root-swap (`tfile4swap`) & version-counter races** | Multi-writer index corruption | Low (v1 can restrict to exclusive) | Implement retry-from-root on inconsistency; consider exclusive-only CDX writes in v1; `LOCKING` gate |

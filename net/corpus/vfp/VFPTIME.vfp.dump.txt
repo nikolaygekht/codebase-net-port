@@ -1,0 +1,28 @@
+# CodeBase.NET corpus VFP datetime-key oracle
+# Written by test-files-generator/vfp/vfptime.prg in Visual FoxPro 9.
+# Do not edit by hand; re-run the script in the VM instead.
+# VFPTIME.DBF and its .cdx are the oracle; this is provenance.
+table        VFPTIME.DBF
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1251
+collate      MACHINE
+century      ON
+rollover     29
+dateFormat   ANSI
+hours        24
+null         OFF
+stride       37
+numRecs      100422
+
+[days]
+  20000101  86400  ; inside  -- every second
+  01000101   2337  ; below 2^21
+  10000101   2337  ; below 2^21
+  19000101   2337  ; inside
+  20261114   2337  ; inside
+  70000101   2337  ; above 2^22
+  99991231   2337  ; above 2^22
+
+[tags]
+# keyLen is in the .cdx tag header, which is the authority.
+  TS         expr="TS" keyType='T'

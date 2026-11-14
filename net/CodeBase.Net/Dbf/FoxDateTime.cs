@@ -39,15 +39,30 @@ internal static class FoxDateTime
     /// Converts a stored datetime to a date and time.
     /// </summary>
     /// <param name="bytes">The field's bytes. Only the first eight are read.</param>
+    /// <param name="roundToSecond">
+    /// True to round the milliseconds half up to a whole second, as a [c]T[/c] field is read (ADR-79):
+    /// Visual FoxPro writes [c]DTOT(d) + n[/c] one millisecond short about half the time, and means
+    /// the second. False keeps them, as the CodeBase type 7 is read.
+    /// </param>
     /// <returns>
-    /// The moment, with its milliseconds kept, or null where the field is blank. Blank is a Julian
-    /// day of zero or less, which is how the C library's own rendering decides the same thing.
+    /// The moment, or null where the field is blank. Blank is a Julian day of zero or less, which is
+    /// how the C library's own rendering decides the same thing.
     /// </returns>
-    public static DateTime? ToDateTime(ReadOnlySpan<byte> bytes)
+    public static DateTime? ToDateTime(ReadOnlySpan<byte> bytes, bool roundToSecond = false)
     {
-        (int julian, int milliseconds) = ToParts(bytes);
+        (int julian, int stored) = ToParts(bytes);
         if (julian <= 0)
             return null;
+
+        // Long, so that rounding up the largest count the field can hold cannot wrap.
+        long milliseconds = stored;
+        if (roundToSecond)
+        {
+            long extra = milliseconds % 1000;
+            milliseconds -= extra;
+            if (extra >= 500)
+                milliseconds += 1000;
+        }
 
         int dayNumber = julian - DayNumberOffset;
         if (dayNumber < 0 || dayNumber > DateOnly.MaxValue.DayNumber)
@@ -63,7 +78,7 @@ internal static class FoxDateTime
         {
             throw new CodeBaseException(
                 ErrorCode.Data,
-                $"A datetime field holds {milliseconds} milliseconds past {midnight:yyyy-MM-dd}, " +
+                $"A datetime field holds {stored} milliseconds past {midnight:yyyy-MM-dd}, " +
                 "which is not a moment this calendar reaches.");
         }
 

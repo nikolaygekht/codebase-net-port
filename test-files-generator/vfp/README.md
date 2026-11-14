@@ -55,6 +55,7 @@ script is checked in for provenance and so the next run is the same run.
 | `VFPFUNC.DBF` + `.cdx` | 16 records, **18 tags** — one per VFP-only function, plus four shared-name probes. The tag headers carry VFP's own **key length** and the leaves its own **key bytes** |
 | `VFPFVAL.DBF` | one record per constant expression, the result stored in a field **of its own type** |
 | `VFPFUNC.vfp.dump.txt`, `VFPFVAL.vfp.dump.txt` | what VFP says about both, for review and diff |
+| `VFPTIME.DBF` + `.cdx`, `VFPTIME.vfp.dump.txt` | from `vfptime.prg`: 100 422 datetimes and the tag VFP keyed them into; the dump is provenance only (settings, per-day counts, the tag) and carries no run date |
 
 **The `.DBF`/`.cdx` files are the oracle, not the text dumps.** A double written to a `B` field is
 the bits VFP computed; printing it as decimal text would hide the low bits the key transform depends
@@ -123,6 +124,23 @@ Run on 2026-11-14, the first through `run-in-vm.ps1`. `VFPFUNC.DBF` and `VFPFUNC
 run. They now straddle the pinned `ROLLOVER 29`, so one dump proves the rule that took two runs to
 see: `CTOD("01/15/28")` is **2028**, `CTOD("01/15/29")` is **1929** — below the rollover the next
 century, at it this one, the boundary inclusive (`specs/EXPRESSIONS.md` §7.3).
+
+## What `vfptime.prg` settled
+
+Run on 2026-11-14 through `run-in-vm.ps1`; output `VFPTIME.DBF` + `.CDX` (step 013, 7a-7). One `T`
+field, one ascending tag, 100 422 records: every second of 2000-01-01, and every 37th second plus
+the last of six days chosen so all three binades of the Julian day are sampled (VFP's `DATE()`
+refuses year 1, so the lowest is 0100). The durable form is `specs/KEY-COLLATION.md` §2.8.
+
+**VFP's datetime key, deciphered.** `fl(fl(day × 86400 + s) × fl(1/86400))`: the moment in seconds
+times the double nearest 1/86400. It reproduces all 100 422 keys, and every key of CodeBase's own
+`CDXTIME`. CodeBase's `flags4dateTimeFlags` bitmap is this formula sampled around 2000: exact on
+2000-01-01, one unit off on 7 and 3 of the sampled seconds of 1900 and 2026, and on about half of
+them below 2²¹ and above 2²². The port now keys `T` by the formula (ADR-78).
+
+**VFP stores a datetime one millisecond short** about half the time — `DTOT(d) + n` is computed as a
+double of days and truncated into the field. 43 136 of the 86 400 seconds of 2000-01-01 read
+`…999`. The port reads a `T` field to the second (ADR-79).
 
 ## Determinism, and the two ways these files differ from the C corpus
 

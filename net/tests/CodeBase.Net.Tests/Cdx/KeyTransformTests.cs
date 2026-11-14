@@ -261,12 +261,12 @@ public sealed class KeyTransformTests
     [InlineData(2415021)] // 1900-01-01
     [InlineData(Day2000)]
     [InlineData(2488070)] // 2100-01-01
-    public void DateTime_AFlaggedSecondIsTheDoubleOneStepDown_AndEveryOtherIsTheDoubleItself(int day)
+    public void DateTime_KeepingMilliseconds_AFlaggedSecondIsTheDoubleOneStepDown_AndEveryOtherIsTheDoubleItself(int day)
     {
-        // KEY-COLLATION.md section 2.8: the day and the second become one double, and a second the
-        // empirical bitmap flags is nudged down by one in its lowest byte before the double
-        // transform. Across a real day's seconds that is exactly the next double down, which is the
-        // expectation here; every second of the day is checked, so both arms are met many times.
+        // KEY-COLLATION.md section 2.8, now the CodeBase '7' type's alone (ADR-78): the day and the
+        // second become one double, and a second the empirical bitmap flags is nudged down by one in
+        // its lowest byte before the double transform. Across a real day's seconds that is exactly
+        // the next double down; every second of the day is checked, so both arms are met many times.
         int flagged = 0;
         List<int> wrong = [];
 
@@ -277,12 +277,48 @@ public sealed class KeyTransformTests
             if (nudged)
                 flagged++;
 
-            if (!DateTime(day, second * 1000).AsSpan().SequenceEqual(Double(nudged ? Math.BitDecrement(value) : value)))
+            if (!DateTimeKeepingMilliseconds(day, second * 1000).AsSpan().SequenceEqual(Double(nudged ? Math.BitDecrement(value) : value)))
                 wrong.Add(second);
         }
 
         wrong.Should().BeEmpty($"every second of day {day} keys as its double, one step down where flagged");
         flagged.Should().BePositive("a day with no flagged second would not reach the decrement");
+    }
+
+    [Fact]
+    public void DateTime_OnTheDayTheBitmapDescribes_ATimestampKeysAsTheBitmapSays()
+    {
+        // The bitmap is Visual FoxPro's conversion sampled around 2000 (ADR-78): on 2000-01-01 the
+        // two agree on every second, which VFPTIME witnesses. So there the T key, which no longer
+        // reads the bitmap, must equal the '7' key, which still does.
+        List<int> wrong = [];
+
+        for (int second = 0; second < 86400; second++)
+        {
+            if (!DateTime(Day2000, second * 1000).AsSpan().SequenceEqual(DateTimeKeepingMilliseconds(Day2000, second * 1000)))
+                wrong.Add(second);
+        }
+
+        wrong.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(1757585)] // 0100-01-01, below 2^21
+    [InlineData(2415021)] // 1900-01-01
+    [InlineData(5373484)] // 9999-12-31, above 2^22
+    public void DateTime_AwayFromThatDay_ATimestampKeyDoesNotFollowTheBitmap(int day)
+    {
+        // VFPTIME shows Visual FoxPro's key leaving the bitmap on each of these days, by one unit in
+        // the last byte; a T key that still consulted the bitmap would equal the '7' key on all of them.
+        int differ = 0;
+
+        for (int second = 0; second < 86400; second++)
+        {
+            if (!DateTime(day, second * 1000).AsSpan().SequenceEqual(DateTimeKeepingMilliseconds(day, second * 1000)))
+                differ++;
+        }
+
+        differ.Should().BePositive();
     }
 
     [Fact]

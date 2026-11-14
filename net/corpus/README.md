@@ -70,12 +70,14 @@ measurement rather than free to tidy: change them and its numbers stop being a b
 
 **Two files landed on 2026-08-29**, from the first script; the rest of this section is the
 convention they follow. A second run of the same script on 2026-11-14 changed `VFPFVAL.DBF` in its
-three `CTOD` rows only, rewritten after the first run to straddle the pinned rollover.
+three `CTOD` rows only, rewritten after the first run to straddle the pinned rollover. `VFPTIME`,
+from a second script, landed the same day.
 
 | Files | Covers |
 |---|---|
 | `VFPFUNC.DBF` + `.CDX` | 16 records and **18 tag groups, of which 17 are live tags** — one per function CodeBase refuses (ADR-43), plus `TRIM`, `STR` and `PROPER` as divergence probes and `UPPER` as a control. The tag headers carry VFP's own **key lengths**, which is what the case exists for; the eighteenth group is a tag whose build failed and whose blocks VFP left behind |
 | `VFPFVAL.DBF` | 77 constant expressions, each result stored in a field **of its own type**, so a numeric answer is the bits VFP computed rather than a formatting of them. `RESLEN` carries a character result's true length, because the `C(80)` field pads; `CBNOTE` carries CodeBase's answer beside VFP's |
+| `VFPTIME.DBF` + `.CDX` | **100 422 datetimes VFP keyed itself**, one `T` field and one ascending tag: every second of 2000-01-01, and every 37th second plus the last of six days chosen by binade of the Julian day (0100, 1000, 1900, 2026, 7000, 9999). 904 127 + 649 216 bytes. It deciphered VFP's datetime-key conversion and showed CodeBase's bitmap one unit off away from 2000 (ADR-78); about half its values are stored one millisecond short of the second (ADR-79) |
 
 What they settled is in
 [`test-files-generator/vfp/README.md`](../../test-files-generator/vfp/README.md); the durable form is

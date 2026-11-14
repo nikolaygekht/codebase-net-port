@@ -485,7 +485,7 @@ swap), the key-level seeks, a seek by each record's own text, the queries.
 ## 7a-6 — the VFP oracle, run unattended *(added 2026-11-14, at the user's call)*
 
 Until now a VFP oracle run needed the user: start the VM, `DO` the script by hand, copy `out\` back.
-That made every VFP question cost a round trip, and it is why 7a-7 (a `T` table) and 7a-9 (GENERAL
+That made every VFP question cost a round trip, and it is why 7a-7 (a `T` table) and 7a-13 (GENERAL
 weights) were not on the table before. VMware Workstation's `vmrun` can do all of it from the host.
 
 ### What changes, in short
@@ -522,3 +522,82 @@ A missing one is named, not guessed.
    reviewing. The oracle scripts stay runnable by hand exactly as before.
 3. **`out\` on the host is emptied before the copy**, so a file left by another script's run cannot
    be published by `copy-vfp-corpus.bat` under this one's name.
+
+## 7a-7 — a VFP-written `T` table *(added 2026-11-14, at the user's call)*
+
+`KEY-COLLATION.md` §9 item 1 asks for it: `flags4dateTimeFlags` is "an empirical patch" — Sequiter's
+comment says FoxPro's conversion "could not be deciphered" (i4conv.c:1509-1512) — and so far it has
+only ever been checked against **CodeBase's own keys** (`CDXTIME`, 256 values; `DTMILLI`, 600). The
+port copies the table verbatim, so it agrees with CodeBase by construction. Whether **CodeBase agrees
+with Visual FoxPro**, which is the compatibility target, nothing has witnessed. 7a-6 made asking VFP
+cheap.
+
+### What decides the sample
+
+The key is `t4dblToFox(day + ms / 86400000.0)`, with the decrement where the bitmap says so
+(`KEY-COLLATION.md` §2.8). Adding a whole day to a fraction rounds the fraction to the grid of the
+sum's binade, and within one binade that grid does not depend on the day — so CodeBase's table, one
+bit per second, is self-consistent only if VFP's own conversion also depends on the second alone.
+That is exactly the assumption a VFP oracle can test, and it can only fail **across binades**. The
+Julian days of 0001–9999 span three: below 2²¹ (before about 1029), 2²¹–2²² (about 1029–6771, every
+date anyone stores), and above 2²² (after about 6771).
+
+### What changes, in short
+
+- **New oracle script `test-files-generator/vfp/vfptime.prg`**, run by `run-in-vm.ps1`. One table,
+  `VFPTIME.DBF` (`0x30`), one field `TS T`, one ascending tag `TS` on it, written by VFP 9:
+  - **every second of 2000-01-01** — 86 400 records, the whole bitmap, in the binade that matters;
+  - **every 37th second, plus the day's first and last,** of six more days: 0100-01-01 and
+    1000-01-01 (below 2²¹; VFP's `DATE()` refuses year 1, so 0100 is the lowest it builds), 1900-01-01 and 2026-11-14 (inside), 7000-01-01 and 9999-12-31 (above
+    2²²) — about 2 336 each, 37 being prime so the sample walks across the bitmap's bytes.
+  About 100 400 records: ~0.9 MB of DBF, the CDX estimated at ~0.7 MB — inside the 1.5 MB the user
+  accepted give or take; measured after the first run, and the stride widened if it is not.
+  Values are built as `DTOT(DATE(y, m, d)) + n`, so no `SET` changes a stored value; the script pins
+  and records the usual ones anyway (ADR-44), and freezes the header stamp as `vfpfunc.prg` does.
+  `VFPTIME.vfp.dump.txt` is provenance only: settings, per-day record counts, the tag's header.
+- **New golden class `VisualFoxProDateTimeGoldenTests`**, the `CaseMapGoldenTests` pattern: walk the
+  tag with the port's own cursor and rebuild each stored key from the record it names, through the
+  library's path (`SeekConverter` + `RecordKey.WriteValue`).
+- **No library change is expected.** If a key disagrees, that is the finding: the step stops and the
+  user decides between CodeBase's keys and VFP's (`DIVERGENCES.md`), with the disagreeing seconds
+  and days listed by binade.
+
+### Gates
+
+1. Every key VFP stored is rebuilt byte for byte.
+2. The oracle still holds what the gate rests on: the record count, every second of 2000-01-01
+   present exactly once, all seven days present, and both halves of the bitmap exercised in every
+   binade — so a reader that found nothing, or a sample that missed a binade, fails rather than
+   passes.
+
+### Decisions
+
+1. **A separate script, not more rows in `vfpfunc.prg`**: ADR-44's rule, one run, one case — and a
+   100 000-record table would bury the function oracle's sixteen.
+2. **Ascending only.** `CDXTIME` already shows a descending tag stores the same keys (CDX-FORMAT.md
+   §7); a second tag would double the file for nothing.
+3. **Whole seconds only.** A VFP `T` field holds seconds; the millisecond path is CodeBase's `'7'`,
+   which VFP cannot write and `DTMILLI` covers.
+
+### 7a-7, after the run: what VFP said, and what changes *(2026-11-14, the user's call)*
+
+**VFP's `T` key is `t4dblToFox(fl(fl(day × 86400 + s) × fl(1/86400)))`**, `s` the second rounded
+half up — the moment in seconds multiplied by the **rounded reciprocal** of 86 400. Found by
+testing candidate formulas against every key in `VFPTIME`: it reproduces all 100 422, and all 256 of
+`CDXTIME`'s, which CodeBase wrote. CodeBase's bitmap is this formula sampled around 2000: it agrees
+on every second of 2000-01-01 and disagrees by one unit in the last byte on 7 and 3 of the sampled
+seconds of 1900-01-01 and 2026-11-14, and on about half of them below 2²¹ and above 2²². A seek by
+value into a VFP-written tag would miss on exactly those seconds.
+
+And VFP **writes** a datetime by truncating a double of days: `DTOT(d) + n` lands as `n·1000 − 1`
+ms about half the time. The key and the text form round it away; `GetDateTime` did not.
+
+| Class | Change |
+|---|---|
+| `KeyTransform.FromDateTime` | the `'T'` path (`keepMilliseconds: false`) computes VFP's formula and no longer consults the bitmap; the `'7'` path is unchanged — a CodeBase type, keyed as CodeBase keys it |
+| `DateTimeKeyFlags` | documented as the `'7'` key's alone |
+| `FoxDateTime.ToDateTime` | a `roundToSecond` argument, half up, as the text form rounds |
+| `FieldValueDecoder.DateTime` | rounds a `'T'` field, keeps a `'7'` field's milliseconds |
+
+Decisions: **ADR-78**, the `T` key follows VFP's conversion (the bitmap kept for `'7'`); **ADR-79**,
+`GetDateTime` returns a `T` field to the second. Both the user's, 2026-11-14.

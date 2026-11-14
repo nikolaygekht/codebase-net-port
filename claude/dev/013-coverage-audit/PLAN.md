@@ -233,3 +233,43 @@ Design: `DESIGN.md` §7a-6. No library code and no .NET test: the tool is verifi
   `.ps1`'s, around the `vmrun` process, and the kill goes through `vmrun killProcessInGuest`.
 - **The guest user name may not be ASCII** (it is not on the user's VM); it is passed from the
   environment as a string, never through a code-page conversion of the script's own text.
+
+## 7a-7 — a VFP-written `T` table
+
+Design: `DESIGN.md` §7a-7.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 4 Golden | `VisualFoxProDateTimeGoldenTests`: every stored key rebuilt from its record; the oracle's shape (count, every second of the base day once, seven days, both bitmap halves in each binade) |
+
+No layer 1–3 test: nothing in the library changes unless the oracle disagrees, and then the step
+stops for the user's decision before any code.
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | `vfptime.prg`; run by `run-in-vm.ps1` | `done.txt` OK; sizes measured — over ~2 MB widens the stride and reruns |
+| b | Publish: `copy-vfp-corpus.bat` | `git status net/corpus` shows the three new files only |
+| c | Golden: `VisualFoxProDateTimeGoldenTests` | green; flipping one bit of the port's bitmap copy reddens the rebuild test, and so does dropping the half-second rounding |
+| d | Records: `vfp/README.md` (what the run settled), `net/corpus/README.md`, `KEY-COLLATION.md` §2.8 and §9 item 1 (witnessed or not), `DIVERGENCES.md` if a key disagreed, this step's `STATE.md` | — |
+
+### Risks
+
+- **The CDX is bigger than estimated**: measured at (a), the stride is the knob.
+- **VFP disagrees.** Not a failure of the step but its point; it changes (c) into a decision first.
+
+### 7a-7, after the run (2026-11-14): the library changes
+
+| Layer | Tests |
+|---|---|
+| 1 Unit | `KeyTransform`: a `T` key on every second of 2000-01-01 equals the bitmap path (the empirical fact the oracle found), the bitmap test kept for `'7'`, chronological order kept; `FoxDateTime.ToDateTime` rounds half up when asked and keeps milliseconds when not |
+| 4 Golden | `VFPTIME`: every key rebuilt; `GetDateTime` a whole second on every record; `CDXTIME` and `DTMILLI` unchanged |
+
+| # | Step | Verify by |
+|---|---|---|
+| c1 | `FromDateTime`'s `T` path; unit tests adjusted first (red on the bitmap test's other days) | VFPTIME rebuild green; CDXTIME, DTMILLI green; dividing instead of multiplying, or keeping the bitmap, reddens VFPTIME |
+| c2 | `GetDateTime` rounds `T` | unit red then green; golden on VFPTIME; keeping milliseconds reddens it |
+| d | Records as planned, plus ADR-78, ADR-79, `KEY-COLLATION.md` §2.8 and §9 item 1 rewritten, `DBF-FORMAT.md` on VFP's `.999` | — |

@@ -208,7 +208,7 @@ internal static class FieldValueDecoder
             "read as a date and time",
             "only a datetime field holds one (F4FIELD.C:1925-1929)");
 
-        return FoxDateTime.ToDateTime(Bytes(record, field));
+        return FoxDateTime.ToDateTime(Bytes(record, field), roundToSecond: field.Type == 'T');
     }
 
     /// <summary>

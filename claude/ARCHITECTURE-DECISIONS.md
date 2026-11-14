@@ -2704,3 +2704,56 @@ is still one .NET maps to `?`.
 **Rejected — the host's code page, as the reference.** A key built from it would change with the
 machine that reads the index. **Rejected — refusing `STR(W)`.** It is the only comparison a filter can
 make over a wide field.
+
+## ADR-78 — A `'T'` key follows Visual FoxPro's conversion; the reference's bitmap is kept for `'7'` alone · accepted
+
+**Date.** 2026-11-14. Decided by the user during step 013, sub-step 7a-7.
+
+**Context.** The reference keys a datetime as `day + seconds / 86400` nudged down one unit in its
+last byte wherever an 86 400-bit table says so (`t4dateTimeToFox`, i4conv.c:2209-2287), and its own
+comment calls FoxPro's conversion undeciphered. The port copied the table and matched every key the
+reference wrote, which proves the copy and nothing about Visual FoxPro. The VFP oracle (ADR-44, case
+`VFPTIME`) asked VFP 9 itself: every second of 2000-01-01 and every 37th second of six days across
+the three binades of the Julian day, 100 422 keys. **5 349 disagreed**, each by one unit in the last
+byte, in both directions: none on 2000-01-01, 7 and 3 of 2 337 on 1900-01-01 and 2026-11-14, about
+half below 2²¹ and above 2²². Testing candidate formulas against every key found the one that
+reproduces all of them — `fl(fl(day × 86400 + s) × fl(1/86400))`, the moment in seconds times the
+rounded reciprocal — and it also reproduces all 256 of the reference's own `CDXTIME` keys. The
+reciprocal's error grows with the day, so the bitmap, which depends on the second alone, is the
+formula sampled around 2000 (`KEY-COLLATION.md` §2.8).
+
+**Decision.** A `'T'` key is computed by Visual FoxPro's formula and does not consult the bitmap.
+The CodeBase `'7'` type keeps the reference's transform, bitmap included: Visual FoxPro has no such
+type, so its key is whatever CodeBase writes (ADR-75).
+
+**Consequence.** Every key Visual FoxPro writes, on every day, is rebuilt; a seek by value into a
+VFP-written tag finds what VFP would. Against an index the reference wrote, the port differs only on
+the seconds where the reference itself differs from VFP — none in the corpus — and there a seek
+misses exactly as VFP's own would. The future writer (`WRITE`) inherits the formula, so what it writes
+is what VFP writes. `KEY-COLLATION.md` §9 item 1 is closed.
+
+**Rejected — the bitmap, as the reference.** It is right near 2000 and wrong by one unit elsewhere,
+and a key one unit off is a seek that misses a record that is there: the wrong-record-set failure in
+its plainest form, against the engine this library exists to be compatible with.
+**Rejected — both, trying the other key on a miss.** Two keys for one value is a contract no caller
+can reason about, and it would still write one of them.
+
+## ADR-79 — `GetDateTime` reads a `'T'` field to the second · accepted
+
+**Date.** 2026-11-14. Decided by the user during step 013, sub-step 7a-7.
+
+**Context.** Visual FoxPro computes a datetime as a double of days and truncates it into the field's
+milliseconds, so `DTOT(d) + n` lands as `n·1000 − 1` about half the time — 43 136 of `VFPTIME`'s
+86 400 seconds of 2000-01-01. It shows each as the second it means, and so do the reference's text
+form (F4FIELD.C:1868-1873) and every key, which round half up. `GetDateTime` returned the stored
+count, so 10:00:00 written by VFP read as 09:59:59.999.
+
+**Decision.** `GetDateTime` rounds a `'T'` field's milliseconds half up to the whole second. The
+CodeBase `'7'` type keeps its milliseconds, which are its reason to exist (ADR-75).
+
+**Consequence.** A `'T'` value reads as VFP shows it, and agrees with the key and the text a tag and
+an expression build from it. A `'T'` field the reference wrote with a fraction — its own API can
+store one — loses the fraction on reading, as it already did in every key and every rendering.
+
+**Rejected — the stored count.** It is an artifact of VFP's arithmetic that no other path of either
+engine treats as meaningful.

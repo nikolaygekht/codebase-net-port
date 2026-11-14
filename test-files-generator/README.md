@@ -102,7 +102,8 @@ needs no edit.
 
 **`vfp/` is a second generator, and not this one.** Everything above is CodeBase. The scripts in
 [`vfp/`](vfp/README.md) run in a **Visual FoxPro 9 VM** and produce the files CodeBase cannot write —
-starting with an index whose tags use the thirteen functions CodeBase refuses — into `net/corpus/vfp/`,
+starting with an index whose tags use the thirteen functions CodeBase refuses, then a datetime index
+VFP keyed itself — into `net/corpus/vfp/`,
 which the data-driven golden tests do not sweep. It shares nothing with this build but the escaping
 rules and the frozen date stamp, both reproduced there so the two dumps can be diffed. See ADR-44.
 

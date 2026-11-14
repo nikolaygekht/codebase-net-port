@@ -22,13 +22,14 @@ Here a user hits an error.
 | CodeBase's own collations, `sortSeq` `"CBnnnnn"`: croatian and croatianUpper (cp1250), spanish (cp1252, cp850), avaya1252 | reads and writes them | **Decided 2026-11-14 (7a): to be supported**, user's call — weights copied verbatim from `COLL4ARR.C`, a corpus case by the C generator. Planned as 7a-8 |
 | A collation loaded from disk: `"CB00004"`, `collate4test`, read from `coll4inf`/`collate4`/`compres4` tables in the current directory (u4util.c:2572-2700) | reads it | **Decided 2026-11-14 (7a): refused**, user's call — the format is understood, but no such tables ship anywhere: the slot is a hook a CodeBase user fills by hand. ADR and documentation to follow |
 | GENERAL on a code page other than 1252/437/850, and VFP's named collations | refuses cp1250 (E84907); on other pages no branch matches (i4init.c:378-405) | **Decided 2026-11-14 (7a): to be tried**, user's call — VFP's weights recovered from keys VFP writes, through the VFP oracle. Planned as 7a-9. Not a divergence from CodeBase but VFP compatibility beyond it |
-| A non-compact FoxPro 2.x index | refuses it too | — |
 | ~~The `W` and `O` UTF-16 fields~~ | reads them | **Resolved 2026-11-12 (7a-5): supported**, user's call (ADR-76): read, machine-ordered keys and seeks, `STR()` by the table's code page (ADR-77), gated by `WSTR`; `W` on a `0x32` table refused as VFP 9's Blob |
-| Keys of the OLE-DB types; collated Unicode keys | supports them | `PORTING-PLAN.md` §2.2 / §2.3 |
+| Keys of the OLE-DB types | supports them | **Decided 2026-11-14 (7a): not supported**, user's call — out of scope, `PORTING-PLAN.md` §2.2 |
+| Collated Unicode keys (a `W` tag under a collation) | supports them, the Unicode arrays derived from the character ones (`collate4setupUnicodeFromChar`, u4util.c) | **Decided 2026-11-14 (7a): to be supported**, user's call |
 
 ## 2. Where the optimizer answers by a scan instead of a tag
 
-The answer is right, only slower.
+The answer is right, only slower. **Kept as it is, 2026-11-14, user's call;** five ways to answer more
+terms by a tag are recorded for later in `PORTING-PLAN.md` §2.3, beside the collated-equality item.
 
 - **Collated tags — never** (ADR-54, ADR-59). The reference uses them and answers wrongly. Using one
   for equality as an untrusted candidate set is future work (`PORTING-PLAN.md` §2.3).
@@ -40,12 +41,13 @@ The answer is right, only slower.
 ## 3. Where the port's answer differs from the reference's, by decision
 
 - **ADR-53** — two reference defects not replicated: a range bound inverted on a reflected
-  comparison, and the residual check reading the wrong positions.
-- **ADR-61** — the null that sticks between records is not replicated.
+  comparison, and the residual check reading the wrong positions. **Kept 2026-11-14, user's call.**
+- **ADR-61** — the null that sticks between records is not replicated. **Kept 2026-11-14, user's call.**
 - **ADR-69** (**user's call**) — a `Bottom` that finds nothing sets `Eof` in every path; the
   reference returns `r4eof` in all three but leaves `relate4eof` false in two.
 - **ADR-58** — `Seek(string)` only on a character tag; the reference silently converts text to a
-  number.
+  number. **Kept 2026-11-14, user's call, and `Seek(decimal)` and `Seek(DateTime)` to be added** so
+  currency and datetime tags can be sought by value.
 - **ADR-64** (**user's call**) — a `DESCEND` tag is sought through the tag's transform.
 - **ADR-65** (**user's call**) — `UPPER`/`LOWER` by the table's code page; the reference uses the
   host's.
@@ -53,9 +55,12 @@ The answer is right, only slower.
 - **ADR-71** (**user's call**) — a date picture with four `Y` and no `C` (the Swedish and Finnish
   builds' `YYYY-MM-DD`) writes the whole year; the reference writes two digits and the letters `YY`.
 - **ADR-63** (**user's call**) — the future index writer without `i4tagAdd`'s omissions.
-- **ADR-45, ADR-50** — for prefix `=` and division by zero, CodeBase was chosen over VFP.
+- **ADR-45, ADR-50** — for prefix `=` and division by zero, CodeBase was chosen over VFP. **Kept
+  2026-11-14, user's call; to be documented** for the user.
 - **Owed from 010** — `MOD` by zero and `SQRT` of a negative answer 0 where VFP raises; VFP's
-  `PROPER` is not in the port.
+  `PROPER` is not in the port. **Decided 2026-11-14, user's call:** `MOD` by zero and `SQRT` of a
+  negative **raise an error, as VFP does** (they are VFP's functions, CodeBase has neither); `PROPER`
+  **to be added**, gated by `VFPFUNC.CDX`'s `T_PROPER` keys.
 
 ## 4. Out of scope altogether
 

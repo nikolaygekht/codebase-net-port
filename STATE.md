@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-6 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed, and the tree is clean; 7a-6 is not pushed. The collation row is decided and split into 7a-7 to 7a-9. Next: `DIVERGENCES.md` §2–§3 with the user, then 7a-7, a VFP-written `T` table, and 8, the close.**
+**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-6 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed, and the tree is clean; 7a-6 is not pushed. Every row of `DIVERGENCES.md` is now decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-7, a VFP-written `T` table, then the rest of 7a, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -1083,9 +1083,13 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
     `CB00004`'s refusal recorded (ADR, documentation).
   - **A non-compact FoxPro 2.x index** — not a divergence (the reference refuses it too); remove.
   - **OLE-DB keys, collated Unicode keys** — record as deferred (the user: no to OLE-DB).
-  Then §2–§3 with the user: confirm ADR-53, 61, 58, 45/50 and step 010's debt (`MOD`/`SQRT` by
-  VFP, `PROPER`); then the documentation pass — "Differences from CodeBase" entries and XML docs for
-  ADR-43, 56 (done), 58, 61, 63, 64, 65, 66, 69, 71, and §2's scans.
+  **§2–§3 decided with the user (2026-11-14):** ADR-53, 61, 45/50 kept; ADR-58 kept and
+  `Seek(decimal)`/`Seek(DateTime)` to be added; `MOD` by zero and `SQRT` of a negative to raise as
+  VFP does; `PROPER` to be added; collated Unicode keys to be supported, OLE-DB types not; where the
+  optimizer scans kept as it is, five improvements recorded in `PORTING-PLAN.md` §2.3. Left of 7a,
+  each designed and planned first: those four, 7a-7 to 7a-9, and the documentation pass —
+  `CB00004`'s refusal, "Differences from CodeBase" entries and XML docs for ADR-43, 45/50, 56 (done),
+  58, 61, 63, 64, 65, 66, 69, 71, and §2's scans.
 - **8, the close.** `crap4csharp` over the library against `baseline.txt`; `mutate4csharp` on
   `QueryDecomposer.cs`, `QueryExecutor.cs`, `Query.cs` and `TableTagCursor.cs`; `SUMMARY.md`,
   `claude/dev/README.md`, this file. Push once the user says so.

@@ -386,6 +386,15 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
     - [ ] 7a-8 — CodeBase's `CBnnnnn` collations, supported.
     - [ ] 7a-9 — VFP's GENERAL on other code pages, by weights recovered from VFP's keys; tried.
     - [ ] the disk-loaded collation (`CB00004`) refused: an ADR and the documentation.
+  - Decided with the user, 2026-11-14, `DIVERGENCES.md` §1 and §3 (to be sequenced):
+    - ADR-53, ADR-61 kept; ADR-45/50 kept and to be documented for the user.
+    - [ ] `Seek(decimal)` and `Seek(DateTime)` added (ADR-58 kept otherwise).
+    - [ ] `MOD` by zero and `SQRT` of a negative raise an error, as VFP does (were 0).
+    - [ ] `PROPER` added, gated by `VFPFUNC.CDX`'s `T_PROPER`.
+    - [ ] collated Unicode keys supported. OLE-DB types: not supported. The non-compact FoxPro 2.x
+      index row removed — the reference refuses it too.
+    - §2, where the optimizer scans: kept as it is; the five further ways to answer a term by a tag
+      recorded for later in `PORTING-PLAN.md` §2.3.
 - [ ] step 8 — close
 
 ## Notes for the next session

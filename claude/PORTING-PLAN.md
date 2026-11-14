@@ -100,10 +100,14 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - **Multi-table relations** (`relate4createSlave` and the join/skip machinery in `r4relate.c`).
   The *optimizer itself* is now IN scope (§2.1, `QUERY`); only joins are deferred.
 - Unicode (`r5wstr`/`r5wstrLen`) collated index keys (CodeBase extension; VFP has none).
+  **Decided 2026-11-14: to be supported** (step 013, 7a).
 - Additional VFP collations beyond GENERAL (DUTCH, NORDAN, croatian/spanish/avaya tables) — the
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
-  would have to be captured from VFP itself.
-- Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs).
+  would have to be captured from VFP itself. **Decided 2026-11-14:** CodeBase's `CBnnnnn` tables
+  to be supported (013, 7a-8); VFP's GENERAL on other code pages to be tried through the VFP oracle
+  (013, 7a-9).
+- Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs). **Decided 2026-11-14:
+  refused** — no such tables exist outside a CodeBase user's own disk.
 - **Collated tags in the query optimizer, for equality.** ADR-54/59 refuse a collated tag in both
   scopes because a filter compares in byte order and the tag is in weight order — a range seek
   substitutes one for the other and loses records. For **equality and prefix equality** the relation
@@ -113,6 +117,24 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
   equivalence gate over `CDXCOLL`/`QRYGATE`. Recorded 2026-10-31 at the user's call, during step 013.
   `TagProbe.KeyFor`'s collated branch, dead until then, builds a full-width value's key from raw bytes
   rather than weights and must be fixed when this is taken up.
+- **More terms answered by a tag** — five further ways, listed 2026-11-14 during step 013 and left
+  for later at the user's call. The rule that keeps each correct is the one above: a tag may only
+  ever yield a **superset**, which the residual filter narrows. Where a term goes to the per-record
+  check today is `QueryDecomposer`/`TagEligibility`; `DIVERGENCES.md` §2 of step 013 lists it.
+  - **`AllSeekable` as the default scope.** Integer and currency tags would answer terms without the
+    caller asking. Gate A already runs both scopes; `Compatible` stays for comparing work with the
+    reference (step 015).
+  - **A datetime literal** — VFP's `{^2026-01-01 10:00:00}`, or `CTOT()`. No constant of the type
+    exists in the expression language, so a datetime tag answers nothing **even under
+    `AllSeekable`**. A VFP extension to the grammar; its oracle is the VFP VM.
+  - **Constant folding.** `UPPER("sm")` or `1 + 1` is not a constant today — only literals and
+    `STOD`/`CTOD` of a literal are — so a term comparing a tag's expression with one is scanned. Safe
+    for a deterministic function over no field and no clock, evaluated once at plan time.
+  - **Rewriting** a bare logical term `K_LOG` as `K_LOG = .T.`, and `.NOT.(K_NUM = 5)` as
+    `K_NUM # 5`. The second needs its null behaviour proved equal first: `.NOT.` of a null is false
+    and null (ADR-61).
+  - **A filtered tag** where the query's filter provably implies the tag's `FOR`. Narrow, and the
+    implication is the hard part.
 - Full VFP9 varchar/varbinary null-bit semantics. (`V`/`Q`/`W` were parked on there being no live
   VFP; ADR-44 removes that obstacle — a table with those fields is item 4 of its run order. Still
   LATER: the obstacle was never the only reason.)

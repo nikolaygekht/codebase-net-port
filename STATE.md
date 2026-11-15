@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-14 · **step 013 (`013-coverage-audit`) is in progress: its plan, sub-steps 1–7 and 7a-1 to 7a-8 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed and pushed, and the tree is clean. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). **7a-8:** `Seek(decimal)` and `Seek(DateTime)` with their positional siblings (ADR-80). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-9, `MOD` and `SQRT` raising as VFP does, then the rest of 7a, and 8, the close.**
+**Updated:** 2026-11-15 · **step 013 (`013-coverage-audit`) is in progress. 7a-9 is done and committed, not pushed; the tree is clean: `MOD` by zero and `SQRT` below zero raise as VFP does (ADR-81), with VFP's laziness in `IIF`/`AND`/`OR` so its guards hold, and the VFP band answers null for a null operand, closing a wrong record set (ADR-82) — witnessed by `vfpband.prg`, new case `VFPBAND`. Before it, its plan, sub-steps 1–7 and 7a-1 to 7a-8 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed and pushed, and the tree is clean. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). **7a-8:** `Seek(decimal)` and `Seek(DateTime)` with their positional siblings (ADR-80). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-10, `PROPER`, then the rest of 7a, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -108,14 +108,17 @@ its indexes rather than reading them, which is what the whole port exists for �
 can be read whole, its records read in an index tag's order, and the read path is cached.
 `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4470 tests**,
-1438 of them golden (3032 unit, 1 skipped).
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4531 tests**,
+1440 of them golden (3091 unit, 1 skipped).
 
 **Since 2026-11-12 it also reads** CodeBase's long-field-name layout (ADR-72), tags over `RECNO()`
 (ADR-73), the `'7'` datetime with milliseconds (ADR-75), and the `'W'`/`'O'` UTF-16 fields with
 machine-ordered tags, text seeks and `STR()` (ADR-76, ADR-77) — each gated by a new corpus case
 (`LONGNAME`, `FLAGS30`, `RECNOTAG`, `DTMILLI`, `WSTR`). A tag keyed through the date picture is refused
-until the picture is chosen (ADR-74), closing a wrong record set.
+until the picture is chosen (ADR-74), closing a wrong record set. Since 2026-11-15 `MOD` by zero and
+`SQRT` below zero raise `ExpressionEvaluationException` as VFP does, an expression evaluates only what
+VFP evaluates — the chosen `IIF` branch, `.AND.`/`.OR.` left to right up to the deciding operand — and
+the VFP-only functions answer null for a null operand (ADR-81, ADR-82; case `VFPBAND`).
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -326,7 +329,23 @@ nothing at all is between the brackets**, and a field name over ten characters i
 
 ---
 
-## 2. This session (2026-11-14), the ones before it, and the four before those
+## 2. This session (2026-11-15), the ones before it, and the four before those
+
+**Step 013, sub-step 7a-9: `MOD` and `SQRT` raise as VFP does — and two findings on the way.** VFP's
+raising had never been witnessed, so a new oracle script, `vfpband.prg`, ran in the VM before any
+design: error 1307 for a zero divisor, 61 below zero. It also showed VFP **lazy** — `IIF` evaluates
+only the chosen branch, `AND`/`OR` stop at the deciding operand, left to right — while the port
+evaluated every operand and checked a conjunction's residual terms right to left, so the guards VFP
+users write would have raised. The user chose a lazy tree walk and a derived exception carrying VFP's
+number (`ExpressionEvaluationException`, `ErrorCode.Result`, ADR-81); the residual now checks terms
+in written order, which bounds it: **the port raises only where a VFP scan would**. And the thirteen
+VFP-only functions dropped a null operand's marking — `ABS(K_NNUM) = 0` admitted the null records, a
+wrong record set — now null as in VFP, gated by VFP's own null keys in the new case `VFPBAND`
+(ADR-82). No golden value moved, and a residual query costs the same. Process: on a sub-step only
+hand-placed mutations, `mutate4csharp` at a step's close (the user). Tests: 3090 unit (1 skipped),
+1440 golden. Committed, not pushed.
+
+### Before it (2026-11-14)
 
 **Step 013, sub-step 7a: the collation row decided, and the VFP oracle no longer needs the user.**
 The row split three ways (`DIVERGENCES.md` §1): CodeBase's `CBnnnnn` collations to be supported
@@ -1086,10 +1105,10 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   documented). **The collation row is decided** (2026-11-14) and split three ways in
   `DIVERGENCES.md`: CodeBase's `CBnnnnn` collations supported; the disk-loaded one (`CB00004`)
   refused, since no such tables exist anywhere; VFP's GENERAL on other code pages tried, by weights
-  recovered from VFP's keys. **7a-6 is done, uncommitted:** the VFP VM runs unattended through
-  `test-files-generator/vfp/run-in-vm.ps1` (`vmrun`, credentials from the environment), and the
-  second `vfpfunc.prg` run is in the corpus — changed only in the three `CTOD` rows. Next, in this
-  order, each designed and planned first:
+  recovered from VFP's keys. **7a-6 is done:** the VFP VM runs unattended through
+  `test-files-generator/vfp/run-in-vm.ps1` (`vmrun`, credentials from the environment; the VM must
+  be running with its user logged in), and the second `vfpfunc.prg` run is in the corpus — changed
+  only in the three `CTOD` rows. Next, in this order, each designed and planned first:
   - **7a-11** — CodeBase's `CBnnnnn` collations; **7a-13** — VFP's GENERAL on other code pages; and
     `CB00004`'s refusal recorded (ADR, documentation).
   - **A non-compact FoxPro 2.x index** — not a divergence (the reference refuses it too); remove.
@@ -1099,7 +1118,9 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   VFP does; `PROPER` to be added; collated Unicode keys to be supported, OLE-DB types not; where the
   optimizer scans kept as it is, five improvements recorded in `PORTING-PLAN.md` §2.3. Left of 7a,
   each designed and planned first, in this order (the user's, 2026-11-14): **7a-7** the `T` table,
-  ~~**7a-8** `Seek(decimal)`/`Seek(DateTime)`~~ (done), **7a-9** `MOD`/`SQRT` raising, **7a-10** `PROPER`,
+  ~~**7a-8** `Seek(decimal)`/`Seek(DateTime)`~~ (done), ~~**7a-9** `MOD`/`SQRT` raising~~ (done,
+  with VFP's laziness and null through the band), **7a-10** `PROPER` (it joins the band, so ADR-82's
+  null rule applies to it from the start),
   **7a-11** the `CBnnnnn` collations, **7a-12** collated Unicode keys, **7a-13** VFP's GENERAL on
   other code pages, **7a-14** the documentation pass —
   `CB00004`'s refusal, "Differences from CodeBase" entries and XML docs for ADR-43, 45/50, 56 (done),

@@ -2784,3 +2784,57 @@ falls in; in a `'7'` tag it is told to truncate first.
 and a positional seek would then report `Found` for a value no key equals. **Rejected — refusing a `T`
 moment with milliseconds.** Every other path treats it as the second it rounds to, so a refusal would
 make the seek the one place that disagrees, and `DateTime.Now` unusable.
+
+## ADR-81 — `MOD` by zero and `SQRT` of a negative raise as Visual FoxPro does, and an expression evaluates only what VFP evaluates · accepted
+
+**Date.** 2026-11-15. Step 013, sub-step 7a-9. Raising decided by the user on 2026-11-14; the
+mechanism and the exception on 2026-11-15.
+
+**Context.** Step 010 made `MOD` by zero and `SQRT` of a negative answer 0 and recorded, unwitnessed,
+that VFP raises. `vfpband.prg` witnessed it (`VFPBAND.vfp.dump.txt`): error 1307 for any zero
+divisor, error 61 for anything below zero, `SQRT(-0)` is 0. It also witnessed that VFP is **lazy**:
+`IIF` evaluates only the branch it chose, `AND`/`OR` stop at the first operand that decides, left to
+right, and `COUNT FOR K >= 0 AND SQRT(K) > 1` counts where `COUNT FOR SQRT(K) > 1` raises. The port's
+evaluator walked the postfix array, computing every operand, and `ResidualFilter` checked a
+conjunction's terms right to left — so the guards VFP users write would have raised. Neither
+CodeBase function exists in CodeBase, so the reference has no error code for either.
+
+**Decision.** `MOD` raises on a divisor that is zero and present; `SQRT` on an operand below zero and
+present. The exception is a new public `ExpressionEvaluationException : CodeBaseException`, `Code` a
+new `ErrorCode.Result` (−950, the reference's `e4result`, d4defs.h:2046), with a `VisualFoxProError`
+property carrying 1307 or 61 and VFP's message. The evaluator **walks the tree**: `IIF` evaluates its
+condition and then the chosen branch, `.AND.`/`.OR.` evaluate left to right and stop at the first
+operand that decides under the rule they already applied; every other node evaluates all its
+operands, left to right. `ResidualFilter` checks a conjunction's terms in written order.
+
+**Consequence.** Every expression that does not raise answers exactly as before — the whole golden
+suite is unchanged, and a `PERF10K` residual query costs the same (3.71–3.78 ms median, both). **The
+port raises only where a VFP scan of the same filter would:** candidates satisfy every term a tag
+answered, and the residual then evaluates the rest left to right, stopping at the first false, so
+every (record, term) pair it evaluates a scan evaluates too. The converse is deliberately not so — a
+tag can answer the guard and the raising term is never reached, as with VFP's Rushmore. A raise
+surfaces from `Query`'s movement and `Count`, and from a tag's synchronisation only on a file VFP could
+not have written (`INDEX ON` an expression that raises leaves no tag).
+
+**Rejected — a deferred error value** that raises only on reaching the root: every kernel would have
+to forward it, where the walk is one change in one place and evaluates exactly what VFP does.
+**Rejected — raising eagerly** in the postfix walk: it turns VFP's guards into errors, a new
+divergence. **Rejected — `ErrorCode.Overflow`** (`e4overflow`, "overflow while evaluating"): in this
+port it already means the parse stack.
+
+## ADR-82 — a null operand makes each of the functions Visual FoxPro adds answer null · accepted
+
+**Date.** 2026-11-15. Step 013, sub-step 7a-9; the user's call, on a finding of its design.
+
+**Context.** The thirteen functions of ADR-43 dropped a null operand's marking, so `ABS(K_NNUM) = 0`
+held on a null record — read as zero — where VFP answers `.NULL.` and leaves the record out: a wrong
+record set. `vfpband.prg` witnessed VFP's rule for every function and every argument position, and
+`VFPBAND.CDX` holds the keys VFP writes for those nulls; the port rebuilt 24 of them wrong.
+
+**Decision.** For every row of the VFP band, an absent operand makes the answer absent, zero or blank
+of the function's type beneath, as the reference's own arithmetic does (e4functi.c:331-340). The one
+witnessed exception: `MOD` tests its divisor first, so a present zero divisor raises (ADR-81) even
+over an absent dividend.
+
+**Consequence.** `VFPBAND`'s every key rebuilds from its record; a filter over one of these functions
+leaves a null record out as VFP does. `PROPER`, joining the band in 7a-10, gets the rule with it.

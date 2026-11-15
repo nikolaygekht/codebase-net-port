@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-8 done; next 7a-9, `MOD` and `SQRT` raising as VFP does)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-9 done; next 7a-10, `PROPER`)
 
 ## Done so far
 
@@ -426,7 +426,40 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
         the new code** — `WideSearch`'s pad loop (line 220) and the step and landing paths (417-538),
         which the golden layer covers and the tool does not run; the file restored and verified.
       - Release 3032 passed (1 skipped) + 1438 golden, green.
-    - [ ] 7a-9 — `MOD` by zero and `SQRT` of a negative raise an error, as VFP does (were 0).
+    - [x] 7a-9 — `MOD` by zero and `SQRT` of a negative raise as VFP does; VFP's laziness; null
+      through the VFP band (2026-11-15), ADR-81, ADR-82.
+      - **Witness first.** VFP's raising had never been witnessed (010 wrapped `SQRT` in `ABS`), so
+        `vfpband.prg` ran in the VM before the design: errors 1307 and 61; `IIF`/`AND`/`OR` lazy,
+        left to right; a typed null answers null in every argument of all thirteen — except `MOD`'s
+        zero divisor, tested first; an `INDEX ON` that raises leaves no tag. Two findings beyond the
+        row, both decided by the user: the port's postfix walk evaluated every operand, so VFP's
+        guards would have raised (→ a lazy tree walk, not a deferred error value); and the band
+        dropped null marking, a wrong record set (`ABS(K_NNUM) = 0` admitted nulls) — folded into
+        7a-9. Exception: `ExpressionEvaluationException` with `ErrorCode.Result` (−950, `e4result`)
+        and `VisualFoxProError` (the user's call).
+      - **a.** `VFPBAND.DBF` + `.CDX` + dump published; `git status net/corpus` showed the three only.
+      - **b.** Red: `LazyEvaluationTests` (new), `VisualFoxProFunctionTests` (raising, null band),
+        `VisualFoxProBandQueryTests` (new, component, over `VFPBAND`), `VisualFoxProBandGoldenTests`
+        (new) — 24 null keys rebuilt wrong, `T_MIN` passing by accident (`MIN(null, 1)` chose the null
+        operand itself). Two test errors fixed on the way: the syntax has no `1E-300`, and `IIF` pads
+        a short branch with `0x00`. `REPLICATE("a", I_)` dropped: the count is a parse-time constant.
+      - **c–e, done as one change, not three** — the deviation from the plan: the walk and its
+        laziness landed together, verified by the whole suite green with `MOD`/`SQRT` still answering
+        0 (golden 1440 unchanged, `VFPBAND` green with the null rule), then the raising added.
+      - **f.** `ResidualFilter.Terms` in written order; the four order tests went green.
+      - **Mutations, hand-placed** (the user, 2026-11-15: no `mutate4csharp` on a sub-step): both
+        `IIF` branches evaluated → 3 unit red; `AND`/`OR` not stopping → 7 unit, 35 golden red; null
+        tested before `MOD`'s zero divisor → 1 red; the band's null rule dropped → 19 unit, 1 golden
+        red; the residual walked backwards → 4 red. Each file restored from a copy, checksum verified.
+      - **Cost.** `Query.Count` over `PERF10K`, a three-term residual with an `IIF`, HEAD's library
+        against this one, two rounds each, 5 s warm-up by clock: 3.71/3.78 ms against 3.75/3.74 ms
+        median — no difference.
+      - **g.** ADR-81, ADR-82; `EXPRESSIONS.md` §5.2; `DIVERGENCES.md` §3; `vfp/README.md`,
+        `net/corpus/README.md`, the generator README; XML docs of the exception, `ErrorCode.Result`,
+        `Query`'s class, `Count` and its five movements. `crap4csharp` on the five changed library
+        files: `EvaluateInto` 12.0 at 100%, every other new or changed member 5.0 or below at 100%;
+        `Apply` 112.6 (96.5%) as before — the tool exits 255 on it.
+      - Release 3090 passed (1 skipped) + 1440 golden, green.
     - [ ] 7a-10 — `PROPER` added, gated by `VFPFUNC.CDX`'s `T_PROPER`.
     - [ ] 7a-11 — CodeBase's `CBnnnnn` collations, supported.
     - [ ] 7a-12 — collated Unicode keys supported (after 7a-11: the Unicode arrays derive from the

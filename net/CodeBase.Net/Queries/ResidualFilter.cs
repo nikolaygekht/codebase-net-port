@@ -82,11 +82,18 @@ internal sealed class ResidualFilter
     /// What remains conservative is a fully optimized connective sitting inside a filter that is
     /// [i]not[/i] fully mapped: it is re-evaluated. That costs time and never records, because
     /// evaluating a term the bitmap already answered can only agree with it.
+    ///
+    /// The terms are checked in the order they are written, as Visual FoxPro's [c]AND[/c] evaluates
+    /// them, stopping at the first false (ADR-81). Once a term can raise, the order is part of the
+    /// answer: [c]N >= 0 .AND. SQRT(N) > 1[/c] must not take the root of a negative. A term a tag
+    /// answered holds on every candidate, so skipping it never lets a later term be reached where a
+    /// scan would have stopped first -- the port raises only where a scan by Visual FoxPro would.
     /// </value>
-    private IEnumerable<int> Terms()
+    private List<int> Terms()
     {
+        List<int> remaining = [];
         if (plan.FullyMapped)
-            yield break;
+            return remaining;
 
         IReadOnlyList<ExpressionNode> nodes = filter.Nodes;
         int root = nodes.Count - 1;
@@ -98,14 +105,16 @@ internal sealed class ResidualFilter
             root--;
         }
 
-        // Backwards, because the operands of a node sit before it and the last one is nearest. Which
-        // order a conjunction is checked in changes nothing but how soon a false one is found.
+        // Found backwards, because the operands of a node sit before it and the last one is nearest.
         for (int term = 0; term < count; term++)
         {
             if (!plan.Answers(root))
-                yield return root;
+                remaining.Add(root);
 
             root -= nodes[root].SubtreeSize;
         }
+
+        remaining.Reverse();
+        return remaining;
     }
 }

@@ -292,3 +292,37 @@ Design: `DESIGN.md` §7a-8.
 | a | Component and golden tests, red | they fail to compile, then fail |
 | b | `SearchForCurrency`, `SearchForDateTime`, the six overloads, `TypedSeekFor` | green; mutations: dropping the `'7'` branch, dropping the fifth-decimal refusal, rounding `T` down — each reddens a test |
 | c | Records: ADR-80; `README.md` and `STATE.md` §1 where they list the overloads; XML docs | `crap4csharp` on the changed files; `mutate4csharp` on `TableTagCursor.cs` |
+
+## 7a-9 — VFP's own functions where they have no ordinary answer
+
+Design: `DESIGN.md` §7a-9. Every expectation below is a row of `VFPBAND.vfp.dump.txt` or a key in
+`VFPBAND.CDX`; a test cites the row it restates.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 1 Unit (`VisualFoxProFunctionTests`, and a new `LazyEvaluationTests`) | `MOD` by `0`, `0.0` and `-0` raises `ExpressionEvaluationException` with `Code` `Result` and `VisualFoxProError` 1307; `MOD(5, 1E-300)` does not; `SQRT` of `-1` and `-1E-300` raises with 61, `SQRT(-0)` is 0; every `[guard]` row in the port's syntax (`.AND.`, `.OR.`, `.NOT.`) — the unchosen `IIF` branch and the operand after a deciding one are not evaluated, a raising left operand raises, `MIN` evaluates all; over a record whose nullable fields are null, each of the thirteen in each argument position answers null with the zero or blank value, and `MOD(N_, 0)` raises; an `.AND.` of three evaluates left to right |
+| 2 Component (`ResidualFilter`, a table image with a negative, a zero and a null) | `K >= 0 .AND. SQRT(K) > 1` and `K <> 0 .AND. MOD(10, K) = 0` count 2 and 0 with no tag; written the other way round they raise; `IIF(K < 0, 0, SQRT(K)) > 1` counts 2; the exception reaches the caller of `Query.Count` and `Query.Top` unwrapped |
+| 4 Golden (new `VisualFoxProBandGoldenTests`) | every key of `VFPBAND`'s thirteen tags rebuilt from its record through the library's path; the oracle's shape — six records, thirteen live tags, a null in each field — so a reader that found nothing fails |
+| 4 Golden (all) | the whole suite unchanged: the lazy walk must not move a single value |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Publish the oracle: `copy-vfp-corpus.bat`; `vfpband.prg` checked in | `git status net/corpus` shows `VFPBAND.DBF`, `.CDX`, `.vfp.dump.txt` only |
+| b | Tests above, red | they fail to compile, then fail — the golden on exactly the null records |
+| c | The recursive walk, still evaluating every operand | the whole suite green, unchanged — the refactor alone |
+| d | Laziness in `IIF`, `.AND.`, `.OR.`; `MOD` and `SQRT` raise; `ExpressionEvaluationException`, `ErrorCode.Result` | layer 1 green; mutations: evaluating both branches, or not stopping in `.AND.`, reddens the guard tests; testing null before `MOD`'s zero reddens `MOD(N_, 0)` |
+| e | Null through the thirteen | `VFPBAND` golden green; dropping the null test from any one function reddens its tag |
+| f | `ResidualFilter` in source order | layer 2 green; walking backwards reddens it |
+| g | Records: ADR-81, ADR-82; `EXPRESSIONS.md` (evaluation order, the raising pair, null in the band); `DIVERGENCES.md` row closed; `vfp/README.md` (what `vfpband.prg` settled), `net/corpus/README.md`; XML docs (docgen rules) on the exception, `ErrorCode.Result`, `Query`'s movement and `Count`; this step's `STATE.md` | `crap4csharp` on the changed files. No `mutate4csharp` here — the hand-placed mutations of d–f are the check on a sub-step; the tool runs at the step's close (8), as `DEV_APPROACH.md` §4 has it (the user, 2026-11-15) |
+
+### Risks
+
+- **The walk costs time per record.** A recursion where there was a loop, on the path every residual
+  check takes. Measured with `CodeBase.Net.Profiling` on a `PERF10K` filter no tag answers, before c
+  and after d; recorded in `STATE.md`. A loss beyond noise goes to the user before f.
+- **Operand order is not source order somewhere.** The decomposer visits operands backwards
+  (`QUERY-OPTIMIZER.md` §3); evaluation must not. The `.AND.`-of-three test pins it.

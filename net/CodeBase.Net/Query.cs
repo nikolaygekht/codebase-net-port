@@ -18,6 +18,12 @@ namespace CodeBase.Net;
 ///
 /// A query moves the table's cursor, so it obeys the same rule every other operation on a table does:
 /// one at a time, from one thread.
+///
+/// A term no tag answered is checked on each candidate, in the order the terms are written and stopping
+/// at the first false, as Visual FoxPro checks them. Where one of the functions Visual FoxPro adds has no
+/// answer for a record -- [c]MOD[/c] by zero, [c]SQRT[/c] below zero -- moving or counting raises
+/// [clink=CodeBase.Net.ExpressionEvaluationException]ExpressionEvaluationException[/clink], as Visual
+/// FoxPro does; a guard written before such a term keeps it from being reached.
 /// </summary>
 public sealed class Query
 {
@@ -72,6 +78,7 @@ public sealed class Query
     /// reads only the candidates.
     /// </value>
     /// <exception cref="CodeBaseException">The filter is not a valid logical expression.</exception>
+    /// <exception cref="ExpressionEvaluationException">A record the filter is checked on has no answer for it.</exception>
     public int Count
     {
         get
@@ -98,6 +105,7 @@ public sealed class Query
     /// </summary>
     /// <returns>Ok with the query on it, or NoRecord when nothing matches.</returns>
     /// <exception cref="CodeBaseException">The filter is not a valid logical expression.</exception>
+    /// <exception cref="ExpressionEvaluationException">A record the filter is checked on has no answer for it.</exception>
     public GoResult Top()
     {
         Prepare();
@@ -112,6 +120,7 @@ public sealed class Query
     /// </summary>
     /// <returns>Ok with the query on it, or NoRecord when nothing matches.</returns>
     /// <exception cref="CodeBaseException">The filter is not a valid logical expression.</exception>
+    /// <exception cref="ExpressionEvaluationException">A record the filter is checked on has no answer for it.</exception>
     public GoResult Bottom()
     {
         Prepare();
@@ -125,12 +134,14 @@ public sealed class Query
     /// Moves to the next record that matches.
     /// </summary>
     /// <returns>Ok with the query on it, or NoRecord when there is none.</returns>
+    /// <exception cref="ExpressionEvaluationException">A record the filter is checked on has no answer for it.</exception>
     public GoResult Next() => Move(forwards: true);
 
     /// <summary>
     /// Moves to the previous record that matches.
     /// </summary>
     /// <returns>Ok with the query on it, or NoRecord when there is none.</returns>
+    /// <exception cref="ExpressionEvaluationException">A record the filter is checked on has no answer for it.</exception>
     public GoResult Previous() => Move(forwards: false);
 
     /// <summary>
@@ -138,6 +149,7 @@ public sealed class Query
     /// </summary>
     /// <param name="count">How far to move. Negative moves backwards; zero stays put.</param>
     /// <returns>Whether it moved that far, and which end it stopped at if it did not.</returns>
+    /// <exception cref="ExpressionEvaluationException">A record the filter is checked on has no answer for it.</exception>
     public SkipResult Skip(int count)
     {
         if (count == 0)

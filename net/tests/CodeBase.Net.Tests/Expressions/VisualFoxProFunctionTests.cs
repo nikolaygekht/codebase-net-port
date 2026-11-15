@@ -1,5 +1,6 @@
 using System.Text;
 using AwesomeAssertions;
+using CodeBase.Net.Dbf;
 using CodeBase.Net.Expressions;
 using Xunit;
 
@@ -75,6 +76,99 @@ public sealed class VisualFoxProFunctionTests
     [InlineData("MOD(5.5,2)", 1.5)]
     public void TheRemainderTakesItsSignFromTheDivisor(string expression, double expected) =>
         Value(expression).Number.Should().Be(expected);
+
+    [Theory]
+    // VFPBAND.vfp.dump.txt, section const: a zero divisor raises whatever its sign or spelling, and a
+    // tiny one does not; below zero raises however close to it, and a negative zero is not below it.
+    // VFP's probes use 1E-300, which this syntax cannot spell; the smallest decimal stands in.
+    [InlineData("MOD(5,0)", 1307)]
+    [InlineData("MOD(0,0)", 1307)]
+    [InlineData("MOD(-5,0)", 1307)]
+    [InlineData("MOD(5.5,0)", 1307)]
+    [InlineData("MOD(5,0.0)", 1307)]
+    [InlineData("MOD(5,-0)", 1307)]
+    [InlineData("SQRT(-1)", 61)]
+    [InlineData("SQRT(-0.5)", 61)]
+    [InlineData("SQRT(-0.0000000001)", 61)]
+    public void ARemainderByZeroAndTheRootOfANegativeRaiseAsVisualFoxProDoes(string expression, int error)
+    {
+        Action act = () => Value(expression);
+
+        ExpressionEvaluationException raised = act.Should().Throw<ExpressionEvaluationException>().Which;
+        raised.Code.Should().Be(ErrorCode.Result);
+        raised.VisualFoxProError.Should().Be(error);
+    }
+
+    [Theory]
+    [InlineData("MOD(5,0.0000000001)")]
+    [InlineData("SQRT(-0)")]
+    [InlineData("SQRT(0)")]
+    public void NearlyNoAnswerIsStillAnAnswer(string expression) =>
+        Value(expression).Number.Should().BeApproximately(0, 1e-9);
+
+    [Theory]
+    // VFPBAND.vfp.dump.txt, section null-band: a null in any argument of any of the thirteen makes
+    // the answer null, of the function's own type.
+    [InlineData("ABS(N_)")]
+    [InlineData("INT(N_)")]
+    [InlineData("ROUND(N_,2)")]
+    [InlineData("ROUND(5.25,I_)")]
+    [InlineData("MOD(N_,3)")]
+    [InlineData("MOD(5,N_)")]
+    [InlineData("MIN(N_,1)")]
+    [InlineData("MIN(1,N_)")]
+    [InlineData("MIN(1,2,N_)")]
+    [InlineData("MAX(N_,1)")]
+    [InlineData("MAX(1,N_)")]
+    [InlineData("SQRT(N_)")]
+    [InlineData("SIGN(N_)")]
+    [InlineData("LEN(C_)")]
+    [InlineData("AT(C_,\"abc\")")]
+    [InlineData("AT(\"a\",C_)")]
+    [InlineData("AT(\"a\",\"abc\",I_)")]
+    [InlineData("ASC(C_)")]
+    public void ANullOperandMakesANumericAnswerNullAndZero(string expression)
+    {
+        ExpressionValue value = OverNulls(expression);
+
+        value.IsNull.Should().BeTrue();
+        value.Number.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("MIN(C_,\"a\")")]
+    [InlineData("MAX(\"a\",C_)")]
+    [InlineData("LOWER(C_)")]
+    [InlineData("REPLICATE(C_,2)")]
+    // REPLICATE("a",I_) has no row here: the count sizes the result, so it must be written out, and a
+    // field there is refused when the expression is read (ADR-43).
+    public void AndATextAnswerNullAndBlank(string expression)
+    {
+        ExpressionValue value = OverNulls(expression);
+
+        value.IsNull.Should().BeTrue();
+        value.Type.Should().Be(ExpressionType.Character);
+        value.Bytes.ToArray().Should().AllSatisfy(b => b.Should().Be((byte)' '));
+    }
+
+    [Fact]
+    public void AZeroDivisorRaisesBeforeANullDividendIsLookedAt()
+    {
+        // VFP checks the divisor first: MOD(N_,0) raises over a null N_, where MOD(5,N_) is null.
+        Action act = () => OverNulls("MOD(N_,0)");
+
+        act.Should().Throw<ExpressionEvaluationException>().Which.VisualFoxProError.Should().Be(1307);
+    }
+
+    [Fact]
+    public void ANullComparedIsNotEqualToZero()
+    {
+        // The wrong record set this closes: ABS of a null read as zero, so ABS(N_) = 0 held.
+        ExpressionValue value = OverNulls("ABS(N_) = 0");
+
+        value.IsNull.Should().BeTrue();
+        value.Logical.Should().BeFalse();
+    }
 
     [Theory]
     [InlineData("MIN(1,2)", 1)]
@@ -183,4 +277,38 @@ public sealed class VisualFoxProFunctionTests
     }
 
     private static byte[] Bytes(string expression) => Value(expression).Bytes.ToArray();
+
+    // N_ N(8,2) at 1, C_ C(10) at 9, I_ I at 19, the null flags at 23: VFPBAND's fields, plus the
+    // integer its null-band probes take a null count or place from.
+    private static readonly FieldDefinition NullFlags =
+        new("_NullFlags", '0', '0', 1, 0, 23, false, false, false, false, null);
+
+    private static readonly IFieldMetadata Nullable = new TableFieldMetadata(
+        [
+            new FieldDefinition("N_", 'N', 'N', 8, 2, 1, false, false, false, false, 0),
+            new FieldDefinition("C_", 'C', 'C', 10, 0, 9, false, false, false, false, 1),
+            new FieldDefinition("I_", 'I', 'I', 4, 0, 19, false, false, false, false, 2),
+            NullFlags,
+        ],
+        "T", longFieldNames: false);
+
+    /// <summary>
+    /// Evaluates over a record whose three fields are all null, and hold zero and blanks beneath.
+    /// </summary>
+    /// <value>
+    /// Zero beneath the null on purpose: a null divisor read as its stored zero would raise, and the
+    /// answer has to be null instead.
+    /// </value>
+    private static ExpressionValue OverNulls(string expression)
+    {
+        RecordBuffer record = new(24);
+        Span<byte> raw = record.Raw;
+        raw.Fill((byte)' ');
+        Encoding.ASCII.GetBytes("    0.00").CopyTo(raw[1..]);
+        raw[19..23].Clear();
+        raw[23] = 0b111;
+
+        return new ExpressionEvaluator(TypeResolver.Resolve(ExpressionParser.Parse(expression, Nullable)))
+            .Evaluate(new EvaluationContext { Record = record, NullFlags = NullFlags });
+    }
 }

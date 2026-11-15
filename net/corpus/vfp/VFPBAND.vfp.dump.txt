@@ -1,0 +1,118 @@
+# CodeBase.NET VFP oracle: VFP's own functions where they have no ordinary answer
+# Written by test-files-generator/vfp/vfpband.prg in Visual FoxPro 9.
+# Do not edit by hand; re-run the script in the VM instead.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1251
+null         OFF
+decimals     2
+# A value is STR(x, 25, 12) and VARTYPE; an error is its number and message.
+
+[const]
+  MOD(5,3)                         -> 2.000000000000 (N)   ; control
+  MOD(5,0)                         raises 1307 Cannot divide by 0.
+  MOD(0,0)                         raises 1307 Cannot divide by 0.
+  MOD(-5,0)                        raises 1307 Cannot divide by 0.
+  MOD(5.5,0)                       raises 1307 Cannot divide by 0.
+  MOD(5,0.0)                       raises 1307 Cannot divide by 0.
+  MOD(5,-0)                        raises 1307 Cannot divide by 0.   ; negative zero, if the literal is one
+  MOD(5,1E-300)                    -> 0.000000000000 (N)   ; tiny but not zero
+  5 % 0                            raises 1307 Cannot divide by 0.   ; the operator form
+  SQRT(4)                          -> 2.000000000000 (N)   ; control
+  SQRT(-1)                         raises 61 SQRT() argument cannot be negative.
+  SQRT(-0.5)                       raises 61 SQRT() argument cannot be negative.
+  SQRT(-1E-300)                    raises 61 SQRT() argument cannot be negative.   ; tiny negative
+  SQRT(-0)                         -> 0.000000000000 (N)   ; negative zero: -0 < 0 is false
+  ATN2(SQRT(-0),-1)                -> 3.141592653590 (N)   ; pi if SQRT(-0) is +0, -pi if -0
+  ATN2(-0,-1)                      -> 3.141592653590 (N)   ; control for the line above
+  1/0                              -> ************************* (N)   ; provenance for ADR-50, which kept CodeBase's 0
+  0/0                              -> ************************* (N)   ; provenance for ADR-50
+
+[null]
+  MOD(.NULL.,3)                    -> .NULL. (L)
+  MOD(5,.NULL.)                    -> .NULL. (L)
+  MOD(.NULL.,0)                    -> .NULL. (L)   ; null dividend, zero divisor
+  SQRT(.NULL.)                     -> .NULL. (L)
+
+[guard]
+  IIF(.T., 1, SQRT(-1))            -> 1.000000000000 (N)   ; unselected branch raises?
+  IIF(.F., SQRT(-1), 1)            -> 1.000000000000 (N)   ; unselected branch raises?
+  IIF(.T., SQRT(-1), 1)            raises 61 SQRT() argument cannot be negative.   ; selected branch
+  IIF(.F., 1, MOD(5,0))            raises 1307 Cannot divide by 0.   ; selected branch
+  .F. AND SQRT(-1) > 0             -> .F. (L)   ; AND short-circuits?
+  SQRT(-1) > 0 AND .F.             raises 61 SQRT() argument cannot be negative.   ; left operand raises first?
+  .T. OR SQRT(-1) > 0              -> .T. (L)   ; OR short-circuits?
+  SQRT(-1) > 0 OR .T.              raises 61 SQRT() argument cannot be negative.   ; left operand raises first?
+  .T. AND MOD(5,0) = 0             raises 1307 Cannot divide by 0.   ; AND evaluates the right operand
+  NOT (.F. AND SQRT(-1) > 0)       -> .T. (L)   ; short-circuit under NOT
+  MIN(1, SQRT(-1))                 raises 61 SQRT() argument cannot be negative.   ; no laziness expected
+
+[records]
+# K_NUM by record: 1: 4  2: -4  3: 0  4: .NULL.  5: 9
+  SQRT(K_NUM)                      -> 2.000000000000 (N)   ; record 1
+  MOD(10,K_NUM)                    -> 2.000000000000 (N)   ; record 1
+  SQRT(K_NUM)                      raises 61 SQRT() argument cannot be negative.   ; record 2
+  MOD(10,K_NUM)                    -> -2.000000000000 (N)   ; record 2
+  SQRT(K_NUM)                      -> 0.000000000000 (N)   ; record 3
+  MOD(10,K_NUM)                    raises 1307 Cannot divide by 0.   ; record 3
+  SQRT(K_NUM)                      -> .NULL. (N)   ; record 4
+  MOD(10,K_NUM)                    -> .NULL. (N)   ; record 4
+  SQRT(K_NUM)                      -> 3.000000000000 (N)   ; record 5
+  MOD(10,K_NUM)                    -> 1.000000000000 (N)   ; record 5
+
+[count]
+  SQRT(K_NUM) > 1                          raises 61 SQRT() argument cannot be negative. at record 2
+  MOD(10,K_NUM) = 0                        raises 1307 Cannot divide by 0. at record 3
+  K_NUM >= 0 AND SQRT(K_NUM) > 1           -> 2
+  K_NUM <> 0 AND MOD(10,K_NUM) = 0         -> 0
+  IIF(K_NUM < 0, 0, SQRT(K_NUM)) > 1       -> 2
+
+[index]
+  T_SQRT   SQRT(K_NUM)                      raises 61 SQRT() argument cannot be negative. at record 2; tag absent
+  T_MOD    MOD(10,K_NUM)                    raises 1307 Cannot divide by 0. at record 3; tag absent
+  T_GUARD  IIF(K_NUM < 0, 0, SQRT(K_NUM))   built; tag present
+
+[null-band]
+# N_ N(8,2), I_ I, C_ C(10), L_ L -- all .NULL.
+  ABS(N_)                          -> .NULL. (N)
+  INT(N_)                          -> .NULL. (N)
+  ROUND(N_,2)                      -> .NULL. (N)
+  ROUND(5.25,I_)                   -> .NULL. (N)   ; null places
+  MOD(N_,3)                        -> .NULL. (N)
+  MOD(5,N_)                        -> .NULL. (N)
+  MOD(N_,0)                        raises 1307 Cannot divide by 0.   ; null dividend, zero divisor
+  MIN(N_,1)                        -> .NULL. (N)
+  MIN(1,N_)                        -> .NULL. (N)
+  MIN(1,2,N_)                      -> .NULL. (N)   ; variadic, null last
+  MAX(N_,1)                        -> .NULL. (N)
+  MAX(1,N_)                        -> .NULL. (N)
+  MIN(C_,'a')                      -> .NULL. (C)   ; the string overload
+  MAX('a',C_)                      -> .NULL. (C)   ; the string overload
+  SQRT(N_)                         -> .NULL. (N)
+  SIGN(N_)                         -> .NULL. (N)
+  LEN(C_)                          -> .NULL. (N)
+  AT(C_,'abc')                     -> .NULL. (N)
+  AT('a',C_)                       -> .NULL. (N)
+  AT('a','abc',I_)                 -> .NULL. (N)   ; null occurrence
+  ASC(C_)                          -> .NULL. (N)
+  LOWER(C_)                        -> .NULL. (C)
+  REPLICATE(C_,2)                  -> .NULL. (C)
+  REPLICATE('a',I_)                -> .NULL. (C)   ; null count
+  IIF(L_,1,2)                      -> 2.000000000000 (N)   ; control: a null condition
+  ABS(N_) = 0                      -> .NULL. (L)   ; the wrong-record-set case: .NULL. or .F.?
+
+[table]
+# VFPBAND.DBF and its .cdx are the oracle; this is provenance.
+# ID: N_, C_ -- 1: 4, Abc  2: -2.5, .NULL.  3: .NULL., xbYz  4: 0, blank  5: .NULL., .NULL.  6: 7.75, bob
+  T_ABS      expr="ABS(N_)" keyType='N'
+  T_INT      expr="INT(N_)" keyType='N'
+  T_ROUND    expr="ROUND(N_,0)" keyType='N'
+  T_MOD      expr="MOD(N_,3)" keyType='N'
+  T_MIN      expr="MIN(N_,1)" keyType='N'
+  T_MAX      expr="MAX(N_,1)" keyType='N'
+  T_SQRT     expr="SQRT(ABS(N_))" keyType='N'
+  T_SIGN     expr="SIGN(N_)" keyType='N'
+  T_LEN      expr="LEN(C_)" keyType='N'
+  T_AT       expr="AT("b",C_)" keyType='N'
+  T_ASC      expr="ASC(C_)" keyType='N'
+  T_LOWER    expr="LOWER(C_)" keyType='C'
+  T_REPL     expr="REPLICATE(C_,2)" keyType='C'

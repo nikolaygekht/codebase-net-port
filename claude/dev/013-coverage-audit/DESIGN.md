@@ -646,3 +646,95 @@ A currency outside the field's range is refused by `FromCurrency` already (`Data
    seeks a datetime tag only, not a date one.
 2. **No `SeekAtOrAfter(int)`/`SeekAtOrBefore(int)`** here, though `Seek(int)` lacks them: not asked.
 3. **ADR-80** records the rounding and refusal rules above.
+
+## 7a-9 — VFP's own functions where they have no ordinary answer *(added 2026-11-15, at the user's call)*
+
+Step 010 made `MOD` by zero and `SQRT` of a negative answer 0 and recorded, unwitnessed, that VFP
+raises; the user decided on 2026-11-14 that the port raises as VFP does. Designing it found two more
+things, both decided by the user on 2026-11-15: the port's evaluator computes **every** operand, so
+the guards VFP users write would raise where VFP does not; and the thirteen functions VFP has and
+CodeBase does not (ADR-43) **drop a null operand's marking**, so `ABS(K_NNUM) = 0` admits a null
+record VFP leaves out — a wrong record set.
+
+### What VFP does
+
+Witnessed by a new oracle script, `test-files-generator/vfp/vfpband.prg`, run through
+`run-in-vm.ps1`; its dump `VFPBAND.vfp.dump.txt` is the record.
+
+| Probe | VFP 9 |
+|---|---|
+| `MOD(x, 0)` — any `x`, `0.0`, `-0`, and `5 % 0` | error **1307** "Cannot divide by 0." `MOD(5, 1E-300)` does not raise |
+| `SQRT` of anything below zero, `-1E-300` included | error **61** "SQRT() argument cannot be negative." `SQRT(-0)` is 0 |
+| a typed null in any argument of any of the thirteen | `.NULL.` of the function's type, raising nothing — **except** a null dividend over a zero divisor: `MOD(N_, 0)` raises 1307. The divisor is checked first |
+| `IIF` | evaluates the condition, then **only the chosen branch**; a null condition chooses the second |
+| `AND`, `OR` | left to right, stopping at the first operand that decides; a raising left operand raises |
+| `MIN(1, SQRT(-1))` | raises: an ordinary function evaluates every argument |
+| `COUNT FOR` | raises at the first record whose evaluation raises; the guarded forms count normally |
+| `INDEX ON SQRT(K_NUM)`, `MOD(10, K_NUM)` | raises, **no tag is left**; the `IIF`-guarded tag builds |
+| `1/0` | no error — numeric overflow, shown as asterisks (provenance for ADR-50, which stands) |
+
+So **no tag VFP writes can hold a key whose evaluation raises**, and reading files is untouched.
+
+### What changes, in short
+
+- **The evaluator walks the tree, lazily where VFP is lazy.** `IIF` evaluates its condition, then
+  the branch it chose; `.AND.` and `.OR.` evaluate their operands left to right and stop at the first
+  one that decides under the rule they already apply (`AllOf`: the first not true; `AnyOf`: the first
+  true). Every other node evaluates all its operands, left to right. Nothing else about a value
+  changes, and evaluation has no side effects, so **every expression that does not raise answers
+  exactly what it answers now** — the whole golden suite is the regression gate.
+- **`MOD` raises on a divisor that is zero and not null**, whatever the dividend; **`SQRT` raises on
+  an operand below zero and not null** (`-0.0 < 0` is false, as in VFP). The exception is a new public
+  `ExpressionEvaluationException`, derived from `CodeBaseException`, with `Code` a new
+  `ErrorCode.Result` (−950, the reference's `e4result`, d4defs.h:2046) and a `VisualFoxProError`
+  property carrying VFP's own number, 1307 or 61; the message is VFP's text.
+- **A null operand makes each of the thirteen answer null**, value zero or blank of its type, as
+  `Arithmetic` already does for the reference's own operators (e4functi.c:331-340). `MOD`'s zero
+  divisor is tested before the null.
+- **`ResidualFilter` checks the terms of a conjunction left to right**, as VFP's `AND` does. It
+  walked them backwards — "which order changes nothing but how soon a false one is found", which
+  stops being true once a term can raise.
+
+### Where a raise can surface, and the property that bounds it
+
+`Query`'s movement and `Count`, through `ResidualFilter`; and a tag's synchronisation after moving by
+record number (`RecordKey`), only on a file VFP could not have written. Never in decomposition: the
+constants it evaluates are literals and date conversions (`IsConstant`).
+
+**The port raises only where a VFP scan of the same filter would.** A plan's candidates satisfy
+every term a tag answered, exactly; the residual then evaluates the remaining terms on those
+candidates, left to right, stopping at the first false. Every (record, term) pair it evaluates, a
+left-to-right scan evaluates too. The converse does not hold, and is not meant to: a tag can answer
+the guard so the raising term is never reached on the records that would raise — which is also what
+VFP's Rushmore does.
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `ExpressionEvaluator` | the postfix loop becomes a recursive walk over the node array: a node's operand roots are found backwards by `SubtreeSize`, its operands evaluated left to right into a frame of the shared stack above its own slot, so a scan still allocates nothing per record. `Choose`, `AllOf`, `AnyOf` become the lazy forms; `Modulus` and the `SQRT` row raise; the thirteen propagate null |
+| `ExpressionEvaluationException` | new, public, `sealed` |
+| `ErrorCode` | `Result = -950` |
+| `ResidualFilter` | `Terms()` in source order |
+
+### Corpus case — `VFPBAND`, written by VFP
+
+`VFPBAND.DBF` + `.CDX` (`0x30`): `ID I`, `N_ N(8,2) NULL`, `C_ C(10) NULL`, six records with nulls in
+each field and in both; thirteen tags, one per function, over the nullable fields (`SQRT` over `ABS`).
+VFP's keys for the null records are the expectation the port's evaluator has to rebuild, byte for
+byte — no hand-written bytes, and red today on every null record.
+
+### Decisions
+
+1. **A lazy walk, not a deferred error value** (the user's call). A value that raises only when it
+   reaches the root needs every kernel to forward it; the walk needs one change, in one place, and
+   evaluates exactly what VFP evaluates. Rejected too: raising eagerly, which turns VFP's guards into
+   errors.
+2. **A derived exception carrying VFP's number** (the user's call), so a caller can tell a division
+   by zero from a negative root without reading text. `ErrorCode` keeps to the reference's `e4`
+   constants: `e4result` is the closest, and `e4overflow` already means the parse stack in this port.
+3. **Null before value, except `MOD`'s zero divisor** — as witnessed. Only typed nulls matter: the
+   port has no `.NULL.` literal, and VFP's untyped one behaves differently (`MOD(.NULL., 0)` is
+   `.NULL.`).
+4. **ADR-81** records the raising, the exception and the lazy walk; **ADR-82** the null rule for the
+   thirteen.

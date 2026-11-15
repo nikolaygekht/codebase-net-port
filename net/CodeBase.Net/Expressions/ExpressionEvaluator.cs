@@ -67,26 +67,74 @@ internal sealed class ExpressionEvaluator
     /// </value>
     public ExpressionValue Evaluate(int node, EvaluationContext context)
     {
+        EvaluateInto(node, 0, context);
+        return stack[0];
+    }
+
+    /// <summary>
+    /// Evaluates the subtree rooted at one node into one slot of the stack.
+    /// </summary>
+    /// <value>
+    /// A walk of the tree rather than of the array, because Visual FoxPro does not evaluate every
+    /// operand: an [c]IIF[/c] evaluates the branch it chose, and [c].AND.[/c] and [c].OR.[/c] stop at
+    /// the first operand that decides, left to right (ADR-81). With no side effects that was invisible
+    /// until a function could raise; now a guard has to keep the guarded operand from being evaluated
+    /// at all. Every other node evaluates all its operands, left to right.
+    ///
+    /// A node's operands are the subtrees just before it, the last nearest, so their roots are found
+    /// backwards by subtree size and kept beside their slots. Each operand is evaluated above the
+    /// node's own frame and moved down into it, so the frame is never overwritten by a deeper one and
+    /// the walk allocates nothing. Along any path the frames hold distinct nodes, so the stack needs
+    /// no more slots than the expression has nodes.
+    /// </value>
+    private void EvaluateInto(int node, int slot, EvaluationContext context)
+    {
         IReadOnlyList<ExpressionNode> nodes = expression.Nodes;
-        int first = node - nodes[node].SubtreeSize + 1;
-        int top = 0;
+        ExpressionNode current = nodes[node];
+        int count = current.ParameterCount;
+        int above = slot + count;
 
-        for (int index = first; index <= node; index++)
+        int root = node - 1;
+        for (int operand = count - 1; operand >= 0; operand--)
         {
-            ExpressionNode current = nodes[index];
-            top -= current.ParameterCount;
-            ExpressionValue value = Apply(
-                current,
-                stack.AsSpan(top, current.ParameterCount),
-                sources.AsSpan(top, current.ParameterCount),
-                context);
-
-            stack[top] = value;
-            sources[top] = index;
-            top++;
+            sources[slot + operand] = root;
+            root -= nodes[root].SubtreeSize;
         }
 
-        return stack[0];
+        switch (current.Row)
+        {
+            case >= FunctionRows.Conditional and <= FunctionRows.Conditional + 3:
+                EvaluateInto(sources[slot], above, context);
+                EvaluateInto(sources[slot + (stack[above].Logical ? 1 : 2)], above, context);
+                stack[slot] = Choose(current, stack[above]);
+                return;
+
+            case FunctionRows.And or FunctionRows.Or:
+                bool stopAt = current.Row == FunctionRows.Or;
+                for (int operand = 0; operand < count; operand++)
+                {
+                    EvaluateInto(sources[slot + operand], above, context);
+                    if (stack[above].Logical == stopAt)
+                    {
+                        stack[slot] = ExpressionValue.Logic(stopAt);
+                        return;
+                    }
+                }
+
+                stack[slot] = ExpressionValue.Logic(!stopAt);
+                return;
+        }
+
+        for (int operand = 0; operand < count; operand++)
+        {
+            EvaluateInto(sources[slot + operand], above, context);
+            stack[slot + operand] = stack[above];
+        }
+
+        ReadOnlySpan<ExpressionValue> operands = stack.AsSpan(slot, count);
+        stack[slot] = FunctionTable.IsVisualFoxPro(current.Row) && AnyAbsent(operands)
+            ? AbsentAnswer(current, operands)
+            : Apply(current, operands, sources.AsSpan(slot, count), context);
     }
 
     /// <summary>
@@ -155,8 +203,6 @@ internal sealed class ExpressionEvaluator
         FunctionRows.FirstLogicalWord or FunctionRows.FirstLogicalWord + 1 => ExpressionValue.Logic(true),
         FunctionRows.FirstLogicalWord + 2 or FunctionRows.FirstLogicalWord + 3 => ExpressionValue.Logic(false),
         FunctionRows.FirstLogicalWord + 4 or FunctionRows.LastLogicalWord => Negate(operands[0]),
-        FunctionRows.Or => AnyOf(operands),
-        FunctionRows.And => AllOf(operands),
 
         // ---- strings joined ------------------------------------------------
         FunctionRows.Concatenate => Join(node, operands),
@@ -196,7 +242,6 @@ internal sealed class ExpressionEvaluator
         FunctionRows.AllTrim => TrimEnd(TrimStart(operands[0])),
         FunctionRows.PadLeft => Pad(node, operands[0], atStart: true),
         FunctionRows.PadRight => Pad(node, operands[0], atStart: false),
-        >= FunctionRows.Conditional and <= FunctionRows.Conditional + 3 => Choose(node, operands),
 
         // ---- dates and the record ------------------------------------------
         FunctionRows.Str => FormatNumber(node, operands[0], zeroFill: false),
@@ -232,8 +277,7 @@ internal sealed class ExpressionEvaluator
             Positive(Modulus(operands[0].Number, operands[1].Number))),
         FunctionRows.Smallest or FunctionRows.Smallest + 1 => Extreme(operands, smallest: true),
         FunctionRows.Largest or FunctionRows.Largest + 1 => Extreme(operands, smallest: false),
-        FunctionRows.SquareRoot => ExpressionValue.Numeric(
-            operands[0].Number < 0 ? 0 : Math.Sqrt(operands[0].Number)),
+        FunctionRows.SquareRoot => ExpressionValue.Numeric(SquareRoot(operands[0].Number)),
         FunctionRows.Sign => ExpressionValue.Numeric(Math.Sign(operands[0].Number)),
         FunctionRows.Length => ExpressionValue.Numeric(operands[0].TrimmedLength),
         FunctionRows.PositionOf => ExpressionValue.Numeric(PositionOf(operands)),
@@ -339,28 +383,6 @@ internal sealed class ExpressionEvaluator
     }
 
     // ------------------------------------------------------------------ logic
-
-    private static ExpressionValue AllOf(ReadOnlySpan<ExpressionValue> operands)
-    {
-        foreach (ExpressionValue operand in operands)
-        {
-            if (!operand.Logical)
-                return ExpressionValue.Logic(false);
-        }
-
-        return ExpressionValue.Logic(true);
-    }
-
-    private static ExpressionValue AnyOf(ReadOnlySpan<ExpressionValue> operands)
-    {
-        foreach (ExpressionValue operand in operands)
-        {
-            if (operand.Logical)
-                return ExpressionValue.Logic(true);
-        }
-
-        return ExpressionValue.Logic(false);
-    }
 
     /// <summary>
     /// Negates a logical value, unless it is absent.
@@ -734,10 +756,12 @@ internal sealed class ExpressionEvaluator
     /// <summary>
     /// Chooses one of two values, laid into the width of the longer.
     /// </summary>
-    private static ExpressionValue Choose(ExpressionNode node, ReadOnlySpan<ExpressionValue> operands)
+    /// <value>
+    /// Only the chosen branch was evaluated (ADR-81); a condition that is null or false chooses the
+    /// second.
+    /// </value>
+    private static ExpressionValue Choose(ExpressionNode node, ExpressionValue chosen)
     {
-        ExpressionValue chosen = operands[0].Logical ? operands[1] : operands[2];
-
         if (chosen.Type is not T.Character)
             return chosen;
 
@@ -846,11 +870,61 @@ internal sealed class ExpressionEvaluator
     /// <value>
     /// Floored rather than truncated, which is where it differs from the remainder operator of most
     /// languages: five modulo minus three is minus one, not two. Visual FoxPro's answers for all four
-    /// sign combinations are in the oracle, which is what settles it. A zero divisor answers zero,
-    /// like division does, and Visual FoxPro raises there instead -- unwitnessed and recorded as such.
+    /// sign combinations are in the oracle, which is what settles it. A zero divisor raises, as Visual
+    /// FoxPro does (ADR-81) -- unlike division, which answers zero as the reference does (ADR-50).
     /// </value>
     private static double Modulus(double value, double divisor) =>
-        divisor == 0 ? 0 : value - (divisor * Math.Floor(value / divisor));
+        divisor == 0 ? throw DivisionByZero() : value - (divisor * Math.Floor(value / divisor));
+
+    /// <summary>
+    /// The error Visual FoxPro raises for a remainder by zero, with its number and its words (ADR-81).
+    /// </summary>
+    private static ExpressionEvaluationException DivisionByZero() =>
+        new(ExpressionEvaluationException.DivisionByZero, "Cannot divide by 0.");
+
+    /// <summary>
+    /// The square root, raising where Visual FoxPro raises.
+    /// </summary>
+    /// <value>
+    /// Below zero raises (ADR-81); a negative zero is not below zero, and its root is zero.
+    /// </value>
+    private static double SquareRoot(double value) =>
+        value < 0
+            ? throw new ExpressionEvaluationException(
+                ExpressionEvaluationException.NegativeSquareRoot, "SQRT() argument cannot be negative.")
+            : Math.Sqrt(value);
+
+    // ------------------------------------------------------------ absent operands
+
+    private static bool AnyAbsent(ReadOnlySpan<ExpressionValue> operands)
+    {
+        foreach (ExpressionValue operand in operands)
+        {
+            if (operand.IsNull)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// What one of the functions Visual FoxPro adds answers when an operand is absent.
+    /// </summary>
+    /// <value>
+    /// Absent, whichever operand it was, and zero or blank beneath, as the reference's own arithmetic
+    /// answers (e4functi.c:331-340) and as Visual FoxPro answers every one of them (ADR-82). One
+    /// exception, witnessed: Visual FoxPro looks at a remainder's divisor first, so a zero divisor
+    /// that is present raises even over an absent dividend.
+    /// </value>
+    private static ExpressionValue AbsentAnswer(ExpressionNode node, ReadOnlySpan<ExpressionValue> operands)
+    {
+        if (node.Row == FunctionRows.Modulo && !operands[1].IsNull && operands[1].Number == 0)
+            throw DivisionByZero();
+
+        return node.Type == T.Character
+            ? ExpressionValue.Text(Filled(node.Length, (byte)' ')).AsNull()
+            : ExpressionValue.Numeric(0).AsNull();
+    }
 
     /// <summary>
     /// The smallest or largest of a variadic call's operands.

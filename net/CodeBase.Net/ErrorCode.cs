@@ -165,6 +165,16 @@ public enum ErrorCode
     Info = -910,
 
     /// <summary>
+    /// An expression has no answer for the record it was evaluated over.
+    /// </summary>
+    /// <value>
+    /// The C library's [c]e4result[/c] (d4defs.h:2046), which it raises for an unexpected result.
+    /// Raised here as an [clink=CodeBase.Net.ExpressionEvaluationException]ExpressionEvaluationException[/clink],
+    /// where one of the functions Visual FoxPro adds is given an argument it cannot answer.
+    /// </value>
+    Result = -950,
+
+    /// <summary>
     /// The file uses a feature this library does not implement.
     /// </summary>
     NotSupported = -1090,

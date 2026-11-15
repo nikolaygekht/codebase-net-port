@@ -56,6 +56,7 @@ script is checked in for provenance and so the next run is the same run.
 | `VFPFVAL.DBF` | one record per constant expression, the result stored in a field **of its own type** |
 | `VFPFUNC.vfp.dump.txt`, `VFPFVAL.vfp.dump.txt` | what VFP says about both, for review and diff |
 | `VFPTIME.DBF` + `.cdx`, `VFPTIME.vfp.dump.txt` | from `vfptime.prg`: 100 422 datetimes and the tag VFP keyed them into; the dump is provenance only (settings, per-day counts, the tag) and carries no run date |
+| `VFPBAND.DBF` + `.CDX`, `VFPBAND.vfp.dump.txt` | from `vfpband.prg`: six records with nulls in a nullable `N` and `C` field, and one tag per VFP-only function over them — VFP's keys for null results. The dump **is** the oracle for what has no bytes: which probes raise, with VFP's error number and message, what a null operand answers, and which operands `IIF`/`AND`/`OR` evaluate |
 
 **The `.DBF`/`.cdx` files are the oracle, not the text dumps.** A double written to a `B` field is
 the bits VFP computed; printing it as decimal text would hide the low bits the key transform depends
@@ -141,6 +142,26 @@ them below 2²¹ and above 2²². The port now keys `T` by the formula (ADR-78).
 **VFP stores a datetime one millisecond short** about half the time — `DTOT(d) + n` is computed as a
 double of days and truncated into the field. 43 136 of the 86 400 seconds of 2000-01-01 read
 `…999`. The port reads a `T` field to the second (ADR-79).
+
+## What `vfpband.prg` settled
+
+Run on 2026-11-15 through `run-in-vm.ps1` (step 013, 7a-9). The durable form is `specs/EXPRESSIONS.md`
+§5.2; the decisions are ADR-81 and ADR-82.
+
+**`MOD` by zero and `SQRT` below zero raise** — errors 1307 and 61 — which step 010 had recorded
+without a witness. `1/0` does not raise: VFP overflows, and the port keeps CodeBase's zero (ADR-50).
+
+**VFP is lazy where the port was not.** `IIF` evaluates only the branch it chose; `AND`/`OR` stop at
+the first operand that decides, left to right. So `COUNT FOR K >= 0 AND SQRT(K) > 1` counts, and
+`INDEX ON IIF(K < 0, 0, SQRT(K))` builds, where the unguarded forms raise — and an unguarded
+`INDEX ON` leaves **no tag at all**.
+
+**A null operand makes every one of the thirteen answer null**, in every argument position — except
+that `MOD` tests its divisor first, so `MOD(N_, 0)` raises over a null `N_`. VFP's untyped `.NULL.`
+literal differs (`MOD(.NULL., 0)` is `.NULL.`), which is why the probes use typed nulls from fields.
+
+Two probes in the dump answer nothing: `ATN2(SQRT(-0), -1)` shows that VFP's `-0` literal is a
+positive zero, so the sign of `SQRT(-0)` stays unknown; and `1/0`'s value prints as asterisks.
 
 ## Determinism, and the two ways these files differ from the C corpus
 

@@ -515,6 +515,29 @@ constant, as `SPACE`'s is in the reference, or the key cannot be sized.
 **`LOWER` follows the same rule as `UPPER`** (§7.5, ADR-65). The oracle's one case above 0x7F is on
 a code-page-1251 table where 0xC9 lowers to 0xE9, and the port now answers it.
 
+**Where they have no ordinary answer** — witnessed by `vfpband.prg`, recorded in
+`corpus/vfp/VFPBAND.vfp.dump.txt`, its null keys in `corpus/vfp/VFPBAND.CDX` (ADR-81, ADR-82):
+
+* **`MOD` by zero raises** error 1307, "Cannot divide by 0." — any dividend, `0.0` and `-0` alike;
+  a tiny divisor does not. **`SQRT` below zero raises** error 61, "SQRT() argument cannot be
+  negative." — however close to zero; `SQRT(-0)` is 0. Division by zero does *not* raise in VFP (it
+  overflows), and the port keeps the reference's zero for it (ADR-50).
+* **A typed null in any argument makes the answer null**, of the function's type, for all thirteen
+  and both string forms of `MIN`/`MAX` — including `ROUND`'s places and `AT`'s occurrence. One
+  exception: **`MOD` tests its divisor first**, so `MOD(N, 0)` raises over a null `N` while
+  `MOD(5, N)` is null. VFP's untyped `.NULL.` literal behaves otherwise (`MOD(.NULL., 0)` is
+  `.NULL.`); the port has no such literal. A null `REPLICATE` count cannot arise: the count is a
+  constant.
+* **Evaluation order is VFP's**: `IIF` evaluates only the branch it chose; `AND` and `OR` go left to
+  right and stop at the first operand that decides, so a raising left operand raises and one after a
+  deciding operand is never reached; every other function evaluates all its arguments. `COUNT FOR`
+  raises at the first record that raises, and `INDEX ON` an expression that raises on some record
+  leaves **no tag** — so no VFP-written tag holds a key whose evaluation raises.
+
+The reference evaluates every postfix node in order (`expr4vary`), which no CodeBase function could
+observe. The port walks the tree instead, lazily where VFP is lazy — the same values for every
+expression that does not raise.
+
 ---
 
 ## 6. Type system, overload resolution and implicit conversions

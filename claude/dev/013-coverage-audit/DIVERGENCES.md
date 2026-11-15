@@ -66,7 +66,10 @@ terms by a tag are recorded for later in `PORTING-PLAN.md` §2.3, beside the col
 - **Owed from 010** — `MOD` by zero and `SQRT` of a negative answer 0 where VFP raises; VFP's
   `PROPER` is not in the port. **Decided 2026-11-14, user's call:** `MOD` by zero and `SQRT` of a
   negative **raise an error, as VFP does** (they are VFP's functions, CodeBase has neither); `PROPER`
-  **to be added**, gated by `VFPFUNC.CDX`'s `T_PROPER` keys.
+  **to be added**, gated by `VFPFUNC.CDX`'s `T_PROPER` keys. **`MOD`/`SQRT` done (7a-9, ADR-81),**
+  witnessed by `vfpband.prg`, with VFP's laziness in `IIF`/`AND`/`OR` so its guards hold; and a
+  finding of that design, also done: the thirteen dropped a null operand's marking, a wrong record
+  set (`ABS(K_NNUM) = 0` admitted nulls) — now null as in VFP (ADR-82, the user's call 2026-11-15).
 
 ## 4. Out of scope altogether
 

@@ -24,7 +24,7 @@ public sealed class RecordGoldenTests
     {
         // Part of the gate rather than commentary: a data-driven suite that discovers nothing
         // reports success having proved nothing.
-        AllTables().Should().HaveCount(23);
+        AllTables().Should().HaveCount(26);
     }
 
     [Theory]

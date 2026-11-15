@@ -39,6 +39,7 @@ int caseFlags30( CODE4 *cb, const char *outDir );   /* FLAGS30.DBF  — 0x30 + F
 int caseRecnoTag( CODE4 *cb, const char *outDir );  /* RECNOTAG.DBF — 0x30 + CDX, tags over RECNO() */
 int caseDtMilli( CODE4 *cb, const char *outDir );   /* DTMILLI.DBF  — 0x30 + CDX, the '7' datetime with milliseconds */
 int caseWstr( CODE4 *cb, const char *outDir );      /* WSTR.DBF     — 0x30 + CDX, cp1251, the W and O wide strings */
+int caseCbColl( CODE4 *cb, const char *outDir );    /* CBCP1250/CBCP1252/CBCP850.DBF — 0x30 + CDX, CodeBase's CBnnnnn collations */
 
 /* The one benchmark case: a workload, not an expectation. It writes into a
  * `benchmark` subdirectory of the output and has no dump, because nothing

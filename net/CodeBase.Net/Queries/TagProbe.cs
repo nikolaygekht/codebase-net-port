@@ -64,11 +64,7 @@ internal sealed class TagProbe : ITagProbe
         if (converter.Kind == KeyKind.CollatedCharacter && value.Length < converter.Compiled.Length)
         {
             int weighed = CollatedKey.WriteSearch(
-                value.Bytes,
-                CollationWeights.TableFor(converter.Collation, converter.CodePage),
-                CollationWeights.ExpansionsFor(converter.Collation, converter.CodePage),
-                converter.KeyLength,
-                buffer);
+                value.Bytes, converter.Collation, converter.CodePage, converter.KeyLength, buffer);
 
             return KeySearch.Into(buffer, weighed, converter.KeyLength, converter.PadByte);
         }

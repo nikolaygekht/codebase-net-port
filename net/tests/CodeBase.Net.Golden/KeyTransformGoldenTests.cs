@@ -28,6 +28,9 @@ public sealed class KeyTransformGoldenTests
     /// <summary>Every indexed corpus table, with the index file beside it.</summary>
     public static TheoryData<string, string> IndexedTables() => new()
     {
+        { "CBCP1250", "CBCP1250.cdx" },
+        { "CBCP1252", "CBCP1252.cdx" },
+        { "CBCP850", "CBCP850.cdx" },
         { "CDXBASE", "CDXBASE.cdx" },
         { "CDXCOLL", "CDXCOLL.cdx" },
         { "CDXDEEP", "CDXDEEP.cdx" },
@@ -97,6 +100,10 @@ public sealed class KeyTransformGoldenTests
     /// </value>
     private static readonly Dictionary<string, int> KeysPerTable = new()
     {
+        // Every byte 1-255 alone plus the words, under the machine tag and each CodeBase collation.
+        ["CBCP1250"] = 269 * 3,
+        ["CBCP1252"] = 267 * 5,
+        ["CBCP850"] = 262 * 3,
         ["CDXBASE"] = 283,
         ["CDXCOLL"] = 68,
         ["CDXDEEP"] = 2400,

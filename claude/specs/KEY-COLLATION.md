@@ -313,11 +313,11 @@ exactly 256 `{head,tail}` entries, one per byte value; sizes below):
 | `cp437generalCompressArray` | COLL4ARR.C:579 | alias of the cp1252 compress array |
 | `cp850generalCollationArray` | COLL4ARR.C:583-843 | 256 × 2 |
 | `cp850generalCompressArray` | COLL4ARR.C:847-855 | "OE","AE","SS","UE"+`done4` |
-| `cp1250croatianCollationArray` | COLL4ARR.C:859-1121 | 256 × 2 (tails unused) |
-| `cp1250croatianUpperCollationArray` | COLL4ARR.C:1123-1383 | 256 × 2 |
-| `avaya1252CollationArray` | COLL4ARR.C:1385-1645 | 256 × 2 |
-| `spanishCp1252CollationArray` | COLL4ARR.C:1647-1906 | 256 × 2 |
-| `spanishCp850CollationArray` | COLL4ARR.C:1908-2167 | 256 × 2 |
+| `cp1250croatianCollationArray` | COLL4ARR.C:859-1118 | 256 × 2 (tails unused) |
+| `cp1250croatianUpperCollationArray` | COLL4ARR.C:1123-1382 | 256 × 2 (tails unused) |
+| `avaya1252CollationArray` | COLL4ARR.C:1385-1644 | 256 × 2 |
+| `spanishCp1252CollationArray` | COLL4ARR.C:1647-1906 | 256 × 2 (tails unused) |
+| `spanishCp850CollationArray` | COLL4ARR.C:1908-2167 | 256 × 2 (tails unused) |
 | `avaya1252CompressArray` | COLL4ARR.C:2169 | alias of cp1252 compress array |
 
 Semantics of an entry, using cp1252 GENERAL as example:
@@ -372,8 +372,17 @@ u4util.c:2242-2247).
 ### 3.5 simple collation transform — `t4convertSimpleChar` (u4util.c:2366-2425)
 
 1:1 mapping: `result[i] = translateArray[input[i]].headChar`, `*lenOut = lenIn`. Trailing
-blanks are **not** stripped (deliberately, u4util.c:2380-2383); remainder zero-padding logic
-(u4util.c:2419-2424) is a no-op since head count == lenIn.
+blanks are **not** stripped (deliberately, u4util.c:2411-2413); remainder zero-padding logic
+(u4util.c:2421-2424) is a no-op since head count == lenIn.
+
+The heads of a simple table are plain weights, not the GENERAL conventions: Croatian `ž` (cp1250
+0x9E) weighs **255**, which GENERAL would read as an expansion marker, and the Spanish tables give the
+control bytes 0x00–0x08 and 0x0E–0x14 weights **0–15**, where GENERAL's partial seek looks for the end
+of the heads. So the partial seek skips both for a simple mapping (`collate4simpleMapping`, a key size
+that adds nothing per character; D4SEEK.C:25-36, 104-140): the search is the value's bytes translated,
+as long as the value. **Witnessed against real bytes** by `net/corpus/CBCP1250`, `CBCP1252`,
+`CBCP850` (step 013, 7a-11): every byte 1–255 alone under each of `CB00002`, 3, 5–10, every key
+rebuilt and found by value and by prefix.
 
 ### 3.6 Unicode (`r5wstr` — CodeBase extension, not VFP)
 
@@ -436,7 +445,7 @@ Mapping of `sortSeq` (i4init.c:372-418):
 |---|---|
 | `"\0"…` (empty) | `collate4machine` (i4init.c:372-376) |
 | `"GENERAL"` | by DBF code page: cp1252 or cp0 → `collate4generalCp1252`; cp437 → `collate4generalCp437`; cp850 → `collate4generalCp850`; cp1250/cp0004 → **error e4index** (i4init.c:378-405) |
-| `"CBnnnnn"` | ordinal `nnnnn` = `Collate4name`; > 10 → error (i4init.c:407-416) |
+| `"CBnnnnn"` | ordinal `nnnnn` = `Collate4name`, **whatever the code page**; > 10 → error (i4init.c:407-416). The port reads 1 as machine, 2–3 and 5–10 as their collations, refuses 4, the disk-loaded one (ADR-84) |
 | anything else | error e4index (i4init.c:417-418) |
 
 The **code page** is the raw byte at DBF header offset 29 (`DATA4HEADER_FULL.codePage`,

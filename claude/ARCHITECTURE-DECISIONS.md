@@ -2865,3 +2865,35 @@ machine.
 **Rejected — .NET's `char.IsWhiteSpace`:** it takes in U+0085 and the U+2000 spaces, which VFP's
 witness does not, and would tie the rule to a .NET table instead of the oracle. **Rejected — the
 host's code page:** ADR-65.
+
+## ADR-84 — CodeBase's `CBnnnnn` collations are read and sought, weighed by their ordinal; `CB00004` is refused · accepted
+
+**Date.** 2026-11-15. Step 013, sub-step 7a-11; support and the refusal decided by the user on
+2026-11-14 (`DIVERGENCES.md` §1).
+
+**Context.** A tag header's collation name can be `CB` and five digits, CodeBase's own collations
+(i4init.c:407-416), which the port refused at open. The digits are the `Collate4name` ordinal: 1
+machine, 2/3/7 GENERAL cp1252/cp437/cp850 by name, 4 the collation read from three DBF tables on the
+user's disk, 5/6 Croatian cp1250 (case-sensitive / not), 8 Avaya cp1252, 9/10 Spanish cp1252/cp850.
+Four of them (5, 6, 9, 10) are **simple** one-for-one mappings (`t4convertSimpleChar`): the key is
+the field's width, trailing blanks weighed, no tails, and a weight of 255 or below 16 is an ordinary
+weight. CodeBase writes them for `sort4croatian`, `sort4croatianUpper`, `sort4spanish`, and for any
+collation asked for by name that is not the table's GENERAL.
+
+**Decision.** The port reads all but 4. **The weights follow the ordinal, not the table's code
+page** — a `CB00009` tag is weighed with the cp1252 Spanish table on any table, because that is what
+its keys hold; only `GENERAL` is chosen by the code page. The five tables are copied verbatim from
+`COLL4ARR.C`, extracted by script. A simple collation is keyed one for one and sought by its prefix
+translated as it stands, with neither GENERAL's tail suppression nor its scan for where the heads end
+(D4SEEK.C:104-140). `CB00001` reads as machine order. `CB00004` is refused with `NotSupported`,
+naming the disk tables; any other number, as the reference, with `Index`. No Unicode key under these
+collations yet (7a-12). The query optimizer refuses them as it refuses every collated tag (ADR-54).
+
+**Consequence.** Gated by the C generator's case `CBCOLL` — three tables, every byte 1–255 alone
+under every ordinal but 1 and 4 — whose every key rebuilds and is found by its value and by a prefix.
+A user who built `CB00004` tables can no longer open such an index here; they could not have with any
+other reader either.
+
+**Rejected — weighing a named collation by the table's code page,** as GENERAL is: it is not what the
+reference does, and its keys would not rebuild. **Rejected — reading the disk tables:** the format is
+understood (u4util.c:2570-2700), but nothing ships them, so nothing could gate a reader.

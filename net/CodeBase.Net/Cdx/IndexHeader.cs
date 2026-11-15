@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Globalization;
 using System.Text;
 
 namespace CodeBase.Net.Cdx;
@@ -255,12 +256,47 @@ internal sealed class IndexHeader
         if (name == "GENERAL")
             return (CollationName.General, name);
 
-        // A CBnnnnn collation is CodeBase-only and its weights live in a separate file, so there is
-        // no way to read one correctly and no way to test that we did.
-        throw new CodeBaseException(
-            ErrorCode.NotSupported,
-            $"The header of {what} names collation '{name}'. This library reads machine order and " +
-            $"GENERAL; a CBnnnnn collation is loaded from a file the index does not carry.");
+        return (CodeBaseCollation(name, what), name);
+    }
+
+    /// <summary>
+    /// Reads a [c]CBnnnnn[/c] name: CodeBase's own collations, by their ordinal.
+    /// </summary>
+    /// <value>
+    /// The five digits are the reference's [c]Collate4name[/c] (d4data.h:91-117, i4init.c:407-416),
+    /// and they name the weights outright, whatever the table's code page (ADR-84). Ordinal four is
+    /// the collation CodeBase reads from three tables on its user's own disk, which no index carries,
+    /// and is refused by decision; a number past the ten known, or not a number, the reference
+    /// refuses as a damaged index and so does this.
+    /// </value>
+    private static CollationName CodeBaseCollation(string name, string what)
+    {
+        int ordinal = name.Length == 7 && name.StartsWith("CB", StringComparison.Ordinal)
+            && int.TryParse(name.AsSpan(2), NumberStyles.None, CultureInfo.InvariantCulture, out int parsed)
+                ? parsed
+                : -1;
+
+        return ordinal switch
+        {
+            1 => CollationName.Machine,
+            2 => CollationName.GeneralCp1252,
+            3 => CollationName.GeneralCp437,
+            4 => throw new CodeBaseException(
+                ErrorCode.NotSupported,
+                $"The header of {what} names collation 'CB00004', the one CodeBase reads from the " +
+                "coll4inf, collate4 and compres4 tables on its user's disk. No index carries them, " +
+                "and this library does not read them."),
+            5 => CollationName.CroatianCp1250,
+            6 => CollationName.CroatianUpperCp1250,
+            7 => CollationName.GeneralCp850,
+            8 => CollationName.Avaya1252,
+            9 => CollationName.SpanishCp1252,
+            10 => CollationName.SpanishCp850,
+            _ => throw new CodeBaseException(
+                ErrorCode.Index,
+                $"The header of {what} names collation '{name}', which is no collation the reference " +
+                "has: machine order, GENERAL and CB00001 to CB00010."),
+        };
     }
 
     private static byte[] ReadText(ReadOnlySpan<byte> bytes, int offset, int declaredLength, string what, string which)

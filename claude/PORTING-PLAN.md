@@ -104,10 +104,10 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - Additional VFP collations beyond GENERAL (DUTCH, NORDAN, croatian/spanish/avaya tables) — the
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself. **Decided 2026-11-14:** CodeBase's `CBnnnnn` tables
-  to be supported (013, 7a-11); VFP's GENERAL on other code pages to be tried through the VFP oracle
-  (013, 7a-13).
-- Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs). **Decided 2026-11-14:
-  refused** — no such tables exist outside a CodeBase user's own disk.
+  to be supported — **done 2026-11-15** (013, 7a-11, ADR-84, cases `CBCP1250`/`CBCP1252`/`CBCP850`);
+  VFP's GENERAL on other code pages to be tried through the VFP oracle (013, 7a-13).
+- Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs, `CB00004`). **Decided
+  2026-11-14: refused** — no such tables exist outside a CodeBase user's own disk (ADR-84).
 - **Collated tags in the query optimizer, for equality.** ADR-54/59 refuse a collated tag in both
   scopes because a filter compares in byte order and the tag is in weight order — a range seek
   substitutes one for the other and loses records. For **equality and prefix equality** the relation

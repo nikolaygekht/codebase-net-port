@@ -18,6 +18,67 @@ namespace CodeBase.Net.Cdx;
 internal static class CollatedKey
 {
     /// <summary>
+    /// Writes the key a collation stores for a string, choosing the transform the collation names.
+    /// </summary>
+    /// <param name="value">The characters to convert, as stored bytes.</param>
+    /// <param name="collation">The tag's collation.</param>
+    /// <param name="codePage">The table's code page, which chooses GENERAL's weights.</param>
+    /// <param name="includeTails">Whether tail weights are written; a simple collation has none.</param>
+    /// <param name="destination">Where to write, at least as long as the key.</param>
+    /// <returns>How many bytes were written: the value's length for a simple collation, twice it otherwise.</returns>
+    public static int Write(
+        ReadOnlySpan<byte> value, CollationName collation, int codePage, bool includeTails, Span<byte> destination) =>
+        CollationWeights.IsSimple(collation)
+            ? WriteSimple(value, CollationWeights.TableFor(collation, codePage), destination)
+            : Write(
+                value,
+                CollationWeights.TableFor(collation, codePage),
+                CollationWeights.ExpansionsFor(collation, codePage),
+                includeTails,
+                destination);
+
+    /// <summary>
+    /// Writes the key to search a collated tag for a value, choosing the transform the collation names.
+    /// </summary>
+    /// <param name="value">The characters to look for.</param>
+    /// <param name="collation">The tag's collation.</param>
+    /// <param name="codePage">The table's code page, which chooses GENERAL's weights.</param>
+    /// <param name="keyLength">The tag's key length.</param>
+    /// <param name="destination">Where to write, at least as long as the key.</param>
+    /// <returns>How many bytes of the destination the search covers.</returns>
+    /// <value>
+    /// A simple collation's search is the value translated, short or not: the reference skips
+    /// GENERAL's tail suppression and its scan for where the heads end when the mapping is simple
+    /// (D4SEEK.C:104-140), because one byte in is one byte out.
+    /// </value>
+    public static int WriteSearch(
+        ReadOnlySpan<byte> value, CollationName collation, int codePage, int keyLength, Span<byte> destination) =>
+        CollationWeights.IsSimple(collation)
+            ? WriteSimple(value, CollationWeights.TableFor(collation, codePage), destination)
+            : WriteSearch(
+                value,
+                CollationWeights.TableFor(collation, codePage),
+                CollationWeights.ExpansionsFor(collation, codePage),
+                keyLength,
+                destination);
+
+    /// <summary>
+    /// Writes a simple collation's key: each byte replaced by its head weight.
+    /// </summary>
+    /// <value>
+    /// [c]t4convertSimpleChar[/c] (u4util.c:2366-2425). Trailing blanks are weighed like any other
+    /// byte -- the reference stopped stripping them for simple mappings (u4util.c:2411-2413) -- and
+    /// the key is exactly as long as the value.
+    /// </value>
+    private static int WriteSimple(ReadOnlySpan<byte> value, ReadOnlySpan<byte> table, Span<byte> destination)
+    {
+        for (int i = 0; i < value.Length; i++)
+            destination[i] = CollationTables.Weigh(table, value[i]).Head;
+
+        return value.Length;
+    }
+
+    /// <summary>
     /// Writes the collated key to search a tag for a value, which is not always the key it stores.
     /// </summary>
     /// <param name="value">The characters to look for.</param>

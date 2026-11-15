@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-10 done; next 7a-11, CodeBase's `CBnnnnn` collations)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-11 done; next 7a-12, collated Unicode keys)
 
 ## Done so far
 
@@ -487,7 +487,30 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
       - **And a process trap:** the mutation restore kept the backup's old write time, so the
         incremental Release build kept the last mutant ("the rest not lowered") while the source was
         right — `DEV_APPROACH.md` §4 now says to touch a restored file.
-    - [ ] 7a-11 — CodeBase's `CBnnnnn` collations, supported.
+    - [x] 7a-11 — CodeBase's `CBnnnnn` collations, supported (2026-11-15), ADR-84.
+      - **a.** Generator case `case-cbcoll.cpp`: `CBCP1250` (cp1250, `CB00005`/`CB00006`),
+        `CBCP1252` (cp1252, `CB00009`, 8, 3, 7) and `CBCP850` (cp850, `CB00010`, 2), each with a
+        machine control tag and every byte 1–255 alone plus words. Built and run on Windows/MSVC;
+        every existing corpus file byte-identical, a second run identical.
+      - **b.** Red: the data-driven golden suite refused all three tables at open; the unit tests did
+        not compile.
+      - **c.** `CollationName` (eight members), `IndexHeader` (`CB` by ordinal; 1 machine, 4
+        refused `NotSupported`, unknown refused `Index`), `CollationTables` (five arrays extracted
+        from `COLL4ARR.C` by a script, 256 pairs each), `CollationWeights` (by ordinal; `IsSimple`,
+        `PerCharacterAdd`), `CollatedKey` (the simple transform and search, dispatched), six call
+        sites and `TagContext`. Two of my structural guesses were wrong and the tests now state the
+        facts: a simple table's heads are plain weights (Croatian `ž` weighs 255, Spanish control
+        bytes 0–15), which is why GENERAL's expansion marker and partial-seek scan must not apply.
+        Every key of the 11 new tags rebuilds; each is found by value and by prefix. Mutations: a
+        named collation weighed by the code page, trailing blanks dropped in the simple transform,
+        GENERAL's partial search on a simple tag — each reddens unit and golden; restored, checksum
+        verified, touched (one attempt was an invalid regex that emptied the file — restored, and
+        rerun by exact replacement).
+      - **d.** ADR-84; `KEY-COLLATION.md` §3.3 (the line ranges corrected), §3.5, §4.1; `README.md`
+        "Differences from CodeBase" (`CB00004`); `PORTING-PLAN.md` §2.2; `DIVERGENCES.md` §1;
+        `net/corpus/README.md`, the generator README. `crap4csharp`: `IndexHeader.CodeBaseCollation`
+        15.0, `CollationWeights.TableFor` 13.0, `CollatedKey.Write` 12.0, all at 100%;
+        `ExpansionsFor` was 9.1 (90.9%), its simple branch now tested.
     - [ ] 7a-12 — collated Unicode keys supported (after 7a-11: the Unicode arrays derive from the
       character ones).
     - [ ] 7a-13 — VFP's GENERAL on other code pages, by weights recovered from VFP's keys; tried.

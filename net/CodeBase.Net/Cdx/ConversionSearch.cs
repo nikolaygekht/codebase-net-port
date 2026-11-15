@@ -57,16 +57,13 @@ internal static class ConversionSearch
     private static int Collated(
         SeekConverter converter, ReadOnlySpan<byte> text, int width, bool prefix, Span<byte> destination)
     {
-        ReadOnlySpan<byte> table = CollationWeights.TableFor(converter.Collation, converter.CodePage);
-        ReadOnlySpan<byte> expansions = CollationWeights.ExpansionsFor(converter.Collation, converter.CodePage);
-
         if (prefix)
-            return CollatedKey.WriteSearch(text, table, expansions, converter.KeyLength, destination);
+            return CollatedKey.WriteSearch(text, converter.Collation, converter.CodePage, converter.KeyLength, destination);
 
         Span<byte> padded = stackalloc byte[width];
         padded.Fill((byte)' ');
         text.CopyTo(padded);
 
-        return CollatedKey.Write(padded, table, expansions, includeTails: true, destination);
+        return CollatedKey.Write(padded, converter.Collation, converter.CodePage, includeTails: true, destination);
     }
 }

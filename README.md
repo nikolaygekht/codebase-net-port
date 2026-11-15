@@ -77,6 +77,10 @@ it in [the decision record](claude/ARCHITECTURE-DECISIONS.md):
   converts the UTF-16 text with Windows' ANSI code page, so its answer — and every key built from it —
   depends on the computer. This library uses the code page the table's text is in and reproduces
   Windows' best-fit mapping, so the two agree on a Windows machine whose ANSI code page is the table's.
+- **A tag collated `CB00004` is refused when the index is opened** (ADR-84). That is the collation
+  CodeBase reads from three tables (`coll4inf`, `collate4`, `compres4`) on its user's own disk; no
+  index carries them. CodeBase's other collations — Croatian, Spanish, Avaya, and GENERAL by name,
+  `CB00002` to `CB00010` — are read and sought.
 - **A `W` field on a Visual FoxPro 9 table (`0x32`) is refused** (ADR-76). There it is VFP 9's Blob;
   CodeBase reads it as its own UTF-16 string and gets it wrong. Elsewhere `W` and `O` are read, and
   their unassigned tail is U+2000, which is what CodeBase writes there — not a space.

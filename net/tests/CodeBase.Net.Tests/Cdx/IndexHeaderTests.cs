@@ -176,9 +176,42 @@ public sealed class IndexHeaderTests
         IndexHeader.Parse(image, "an image").PadByte.Should().BeNull();
     }
 
-    [Fact]
-    public void Parse_ACodeBaseCollationIsRefusedBecauseItsTablesAreElsewhere()
+    [Theory]
+    // CB and the Collate4name ordinal (d4data.h:91-117, i4init.c:407-416). The ordinal, not the
+    // table's code page, decides the weights (ADR-84).
+    [InlineData("CB00002", "GeneralCp1252")]
+    [InlineData("CB00003", "GeneralCp437")]
+    [InlineData("CB00005", "CroatianCp1250")]
+    [InlineData("CB00006", "CroatianUpperCp1250")]
+    [InlineData("CB00007", "GeneralCp850")]
+    [InlineData("CB00008", "Avaya1252")]
+    [InlineData("CB00009", "SpanishCp1252")]
+    [InlineData("CB00010", "SpanishCp850")]
+    public void Parse_ACodeBaseCollationIsReadByItsOrdinal(string name, string expected)
     {
+        byte[] image = IndexImage.SingleTag(keyLength: 20, root: 2048, collation: name).Build();
+
+        IndexHeader header = IndexHeader.Parse(image, "an image");
+
+        header.Collation.Should().Be(Enum.Parse<CollationName>(expected));
+        header.CollationText.Should().Be(name);
+        header.PadByte.Should().Be(KeyPadding.Nul);
+    }
+
+    [Fact]
+    public void Parse_CodeBaseCollationOneIsMachineOrder()
+    {
+        // Never written -- machine writes eight zeros -- but the reference reads it as machine.
+        byte[] image = IndexImage.SingleTag(keyLength: 20, root: 2048, collation: "CB00001").Build();
+
+        IndexHeader.Parse(image, "an image").Collation.Should().Be(CollationName.Machine);
+    }
+
+    [Fact]
+    public void Parse_TheCollationReadFromDiskIsRefused()
+    {
+        // CB00004 is the slot CodeBase fills from three tables on the user's own disk (u4util.c:2570);
+        // no index carries them (ADR-84).
         byte[] image = IndexImage.SingleTag(keyLength: 20, root: 2048, collation: "CB00004").Build();
 
         Action act = () => IndexHeader.Parse(image, "an image");
@@ -186,6 +219,19 @@ public sealed class IndexHeaderTests
         act.Should().Throw<CodeBaseException>()
             .Where(e => e.Code == ErrorCode.NotSupported)
             .WithMessage("*CB00004*");
+    }
+
+    [Theory]
+    [InlineData("CB00000")]
+    [InlineData("CB00011")]
+    [InlineData("CB0000X")]
+    public void Parse_AnOrdinalNoCollationHasIsRefusedAsTheReferenceRefusesIt(string name)
+    {
+        byte[] image = IndexImage.SingleTag(keyLength: 20, root: 2048, collation: name).Build();
+
+        Action act = () => IndexHeader.Parse(image, "an image");
+
+        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.Index);
     }
 
     [Fact]

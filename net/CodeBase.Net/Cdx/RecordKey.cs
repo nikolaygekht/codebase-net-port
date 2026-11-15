@@ -123,12 +123,7 @@ internal static class RecordKey
 
         if (converter.Kind == KeyKind.CollatedCharacter)
         {
-            return CollatedKey.Write(
-                value.Bytes,
-                CollationWeights.TableFor(converter.Collation, converter.CodePage),
-                CollationWeights.ExpansionsFor(converter.Collation, converter.CodePage),
-                includeTails: true,
-                key);
+            return CollatedKey.Write(value.Bytes, converter.Collation, converter.CodePage, includeTails: true, key);
         }
 
         return ExpressionKey.Write(

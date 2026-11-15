@@ -835,12 +835,7 @@ internal sealed class ExpressionEvaluator
         value.Fill((byte)' ');
         operand[..Math.Min(operand.Length, value.Length)].CopyTo(value);
 
-        CollatedKey.Write(
-            value,
-            CollationWeights.TableFor(tag.Collation, tag.CodePage),
-            CollationWeights.ExpansionsFor(tag.Collation, tag.CodePage),
-            includeTails: true,
-            result);
+        CollatedKey.Write(value, tag.Collation, tag.CodePage, includeTails: true, result);
     }
 
     /// <summary>

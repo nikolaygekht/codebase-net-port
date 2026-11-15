@@ -141,4 +141,69 @@ public sealed class CollatedKeyTests
         // key in the tag rather than every key.
         Search("").Length.Should().Be(0);
     }
+
+    // ---------------------------------------------------- the simple collations
+
+    [Fact]
+    public void Simple_EachByteBecomesItsHeadAndTheKeyKeepsTheWidth()
+    {
+        // t4convertSimpleChar (u4util.c:2366-2425): one head per byte, no tails, the input's length.
+        byte[] value = Encoding.Latin1.GetBytes("ab  ");
+        byte[] key = new byte[value.Length];
+
+        CollatedKey.Write(value, CollationName.SpanishCp1252, 1252, includeTails: true, key).Should().Be(value.Length);
+
+        byte[] table = CollationTables.SpanishCp1252.ToArray();
+        key.Should().Equal(value.Select(b => CollationTables.Weigh(table, b).Head));
+    }
+
+    [Fact]
+    public void Simple_TrailingBlanksAreWeighedLikeAnyOtherByte()
+    {
+        // The reference stopped stripping them for simple mappings (u4util.c:2411-2413), so a blank's
+        // own head stands at the end of the key, not a zero.
+        byte[] key = new byte[3];
+        CollatedKey.Write("a  "u8, CollationName.CroatianCp1250, 1250, includeTails: true, key);
+
+        key[2].Should().Be(CollationTables.Weigh(CollationTables.Cp1250Croatian, (byte)' ').Head).And.NotBe(0);
+    }
+
+    [Fact]
+    public void Simple_APartialSearchIsThePrefixTranslatedAndNothingScanned()
+    {
+        // D4SEEK.C:104-140 skips GENERAL's scan for where the heads end when the mapping is simple:
+        // the search is the value's own bytes, translated, whatever their weights.
+        byte[] key = new byte[4];
+        int length = CollatedKey.WriteSearch("ab"u8, CollationName.CroatianCp1250, 1250, keyLength: 12, key);
+
+        length.Should().Be(2);
+        key[..2].Should().Equal(
+            CollationTables.Weigh(CollationTables.Cp1250Croatian, (byte)'a').Head,
+            CollationTables.Weigh(CollationTables.Cp1250Croatian, (byte)'b').Head);
+    }
+
+    [Fact]
+    public void Simple_AFullWidthSearchIsTheStoredKey()
+    {
+        byte[] value = Encoding.Latin1.GetBytes("abc         ");
+        byte[] stored = new byte[12];
+        byte[] search = new byte[12];
+
+        CollatedKey.Write(value, CollationName.SpanishCp850, 850, includeTails: true, stored);
+        CollatedKey.WriteSearch(value, CollationName.SpanishCp850, 850, keyLength: 12, search).Should().Be(12);
+
+        search.Should().Equal(stored);
+    }
+
+    [Fact]
+    public void ByName_AGeneralCollationStillWritesHeadsThenTails()
+    {
+        // The dispatch sends GENERAL and Avaya to the head-and-tail transform as before.
+        byte[] byTables = Stored("café");
+        byte[] byName = new byte[KeyLength];
+
+        CollatedKey.Write(Padded("café"), CollationName.General, 1252, includeTails: true, byName);
+
+        byName.Should().Equal(byTables);
+    }
 }

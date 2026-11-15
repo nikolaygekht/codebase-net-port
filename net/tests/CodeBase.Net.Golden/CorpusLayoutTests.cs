@@ -18,6 +18,7 @@ public sealed class CorpusLayoutTests
     /// <summary>The cases the corpus is documented to hold (net/corpus/README.md).</summary>
     private static readonly string[] ExpectedTables =
     [
+        "CBCP1250", "CBCP1252", "CBCP850",
         "CDXBASE", "CDXCOLL", "CDXDEEP", "CDXEXPR", "CDXTIME", "CMPMEMO", "CP1251", "CP936",
         "DB3TYPE", "DTMILLI", "F2XMEMO", "FLAGS30", "IDXONE", "LONGNAME", "QRYGATE", "RECNOTAG", "TAGBAD", "TAGCTX", "TAGGEN", "VFPMEMO", "VFPNULL", "VFPTYPE", "WSTR",
     ];
@@ -25,6 +26,9 @@ public sealed class CorpusLayoutTests
     /// <summary>The index files the corpus is documented to hold, with the table each belongs to.</summary>
     public static TheoryData<string, string> IndexFiles() => new()
     {
+        { "CBCP1250", "CBCP1250.cdx" },
+        { "CBCP1252", "CBCP1252.cdx" },
+        { "CBCP850", "CBCP850.cdx" },
         { "CDXBASE", "CDXBASE.cdx" },
         { "CDXCOLL", "CDXCOLL.cdx" },
         { "CDXDEEP", "CDXDEEP.cdx" },

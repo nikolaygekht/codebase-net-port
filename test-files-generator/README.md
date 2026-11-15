@@ -205,6 +205,7 @@ and its own subdirectory.
 | `RECNOTAG.DBF` | `0x30` | tags over `RECNO()`: `R_RECNO` over `RECNO()`, `R_NAMENO` over `NAME + STR(RECNO(), 4)`, both by `i4create`; ten records with names repeating, and three filters |
 | `DTMILLI.DBF` | `0x30` | the `'7'` datetime with milliseconds, assigned as `CCYYMMDDHH:MM:SS.MMM`: 300 moments over four days, one blank; ascending and descending tags. `dump.cpp` prints `r4dateTimeMilli` through `f4dateTime` as it does `r4dateTime` |
 | `WSTR.DBF` | `0x30` | the `'W'` and `'O'` UTF-16 fields, cp1251: 26 strings spelled as code units, four tags (two over `K_W`, one over `K_O`, one over `STR(K_W)`), an expression dump and six filters. **Needs the host's ANSI code page to be 1251** — `STR` of a wide field narrows by it — and stops with an error otherwise |
+| `CBCP1250.DBF`, `CBCP1252.DBF`, `CBCP850.DBF` | `0x30` | case `CBCOLL` (`case-cbcoll.cpp`), CodeBase's `CBnnnnn` collations: one table per code page, a `C(12)` field with every byte 1–255 alone and some words, a machine tag by `i4create`, then each collated tag by `i4tagAdd` with `sort4croatian`, `sort4croatianUpper`, `sort4spanish`, or `CODE4.collateName` set around the call — `CB00002`, 3, 5–10, every ordinal but machine and the disk-loaded one |
 
 One case is not a corpus case at all:
 

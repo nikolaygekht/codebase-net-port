@@ -18,14 +18,70 @@ namespace CodeBase.Net.Tests.Cdx;
 [Trait("Layer", "Unit")]
 public sealed class CollationTablesTests
 {
-    public static TheoryData<string> AllTables => new("cp1252", "cp437", "cp850");
+    public static TheoryData<string> AllTables =>
+        new("cp1252", "cp437", "cp850", "croatian", "croatianUpper", "avaya", "spanish1252", "spanish850");
+
+    public static TheoryData<string> SimpleTables => new("croatian", "croatianUpper", "spanish1252", "spanish850");
+
+    public static TheoryData<string> HeadAndTailTables => new("cp1252", "cp437", "cp850", "avaya");
 
     private static ReadOnlySpan<byte> Table(string name) => name switch
     {
         "cp1252" => CollationTables.Cp1252General,
         "cp437" => CollationTables.Cp437General,
-        _ => CollationTables.Cp850General,
+        "cp850" => CollationTables.Cp850General,
+        "croatian" => CollationTables.Cp1250Croatian,
+        "croatianUpper" => CollationTables.Cp1250CroatianUpper,
+        "avaya" => CollationTables.Avaya1252,
+        "spanish1252" => CollationTables.SpanishCp1252,
+        _ => CollationTables.SpanishCp850,
     };
+
+    [Theory]
+    [MemberData(nameof(SimpleTables))]
+    public void ASimpleTableCarriesNoTails(string name)
+    {
+        // t4convertSimpleChar reads heads only (u4util.c:2415-2419), and the tables say so: every tail
+        // is NO4TAIL_BYTES.
+        ReadOnlySpan<byte> table = Table(name);
+
+        for (int value = 0; value < 256; value++)
+            CollationTables.Weigh(table, (byte)value).Tail.Should().Be(CollationTables.NoTail, $"byte {value} of {name}");
+    }
+
+    [Fact]
+    public void InASimpleTableTheWeightsAreJustWeights()
+    {
+        // Why the simple transform cannot reuse GENERAL's: Croatian z-caron (0x9E) weighs 255, which
+        // GENERAL would read as an expansion marker, and Spanish gives the control bytes weights
+        // below sixteen, where GENERAL's partial seek would think the heads had ended.
+        CollationTables.Weigh(CollationTables.Cp1250Croatian, 0x9E).Head.Should().Be(255);
+        CollationTables.Weigh(CollationTables.SpanishCp1252, 0x01).Head.Should().Be(1);
+        CollationTables.Weigh(CollationTables.SpanishCp850, 0x14).Head.Should().Be(15);
+    }
+
+    [Fact]
+    public void AvayaExpandsTheCharactersCp1252Expands()
+    {
+        // Avaya borrows cp1252's expansion table (COLL4ARR.C:2169) and marks oe, AE, thorn and sharp s
+        // in it, by the same four indexes.
+        CollationTables.Weigh(CollationTables.Avaya1252, 0x9C).Should().Be((CollationTables.Expands, (byte)0));
+        CollationTables.Weigh(CollationTables.Avaya1252, 0xC6).Should().Be((CollationTables.Expands, (byte)1));
+        CollationTables.Weigh(CollationTables.Avaya1252, 0xFE).Should().Be((CollationTables.Expands, (byte)2));
+        CollationTables.Weigh(CollationTables.Avaya1252, 0xDF).Should().Be((CollationTables.Expands, (byte)3));
+    }
+
+    [Fact]
+    public void TheEightTablesAreNotCopiesOfEachOther()
+    {
+        string[] names = ["cp1252", "cp437", "cp850", "croatian", "croatianUpper", "avaya", "spanish1252", "spanish850"];
+
+        foreach (string first in names)
+        {
+            foreach (string second in names.Where(n => string.CompareOrdinal(n, first) > 0))
+                Table(first).SequenceEqual(Table(second)).Should().BeFalse($"{first} and {second}");
+        }
+    }
 
     [Theory]
     [MemberData(nameof(AllTables))]
@@ -37,12 +93,13 @@ public sealed class CollationTablesTests
     }
 
     [Theory]
-    [MemberData(nameof(AllTables))]
-    public void EveryTable_KeepsItsHeadsAtSixteenOrAbove(string name)
+    [MemberData(nameof(HeadAndTailTables))]
+    public void EveryHeadAndTailTable_KeepsItsHeadsAtSixteenOrAbove(string name)
     {
         // The property the seek logic relies on: head weights below sixteen never occur, which is
         // what lets values under ten be read as tail markers (D4SEEK.C:117,134). Checking it across
-        // all 256 entries catches a shifted row anywhere in the table, which spot values cannot.
+        // all 256 entries catches a shifted row anywhere in the table, which spot values cannot. The
+        // simple tables do not have it and do not need it: their partial seek scans nothing.
         ReadOnlySpan<byte> table = Table(name);
 
         for (int value = 0; value < 256; value++)

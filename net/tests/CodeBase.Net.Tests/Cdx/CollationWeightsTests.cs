@@ -49,6 +49,59 @@ public sealed class CollationWeightsTests
         expansions.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.NotSupported);
     }
 
+    [Theory]
+    // A CodeBase collation names its own table, so the table's code page changes nothing (ADR-84).
+    [InlineData(1252)]
+    [InlineData(850)]
+    [InlineData(1251)]
+    public void ANamedCollationIgnoresTheTablesCodePage(int codePage)
+    {
+        CollationWeights.Supports(CollationName.SpanishCp1252, codePage).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.SpanishCp1252, codePage).SequenceEqual(CollationTables.SpanishCp1252).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.SpanishCp850, codePage).SequenceEqual(CollationTables.SpanishCp850).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.CroatianCp1250, codePage).SequenceEqual(CollationTables.Cp1250Croatian).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.CroatianUpperCp1250, codePage).SequenceEqual(CollationTables.Cp1250CroatianUpper).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.Avaya1252, codePage).SequenceEqual(CollationTables.Avaya1252).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.GeneralCp1252, codePage).SequenceEqual(CollationTables.Cp1252General).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.GeneralCp437, codePage).SequenceEqual(CollationTables.Cp437General).Should().BeTrue();
+        CollationWeights.TableFor(CollationName.GeneralCp850, codePage).SequenceEqual(CollationTables.Cp850General).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ASimpleCollationHasNoExpansions()
+    {
+        // Its transform reads heads alone (u4util.c:2415-2419); there is nothing to expand into.
+        CollationWeights.ExpansionsFor(CollationName.CroatianCp1250, 1250).Length.Should().Be(0);
+        CollationWeights.ExpansionsFor(CollationName.SpanishCp850, 850).Length.Should().Be(0);
+    }
+
+    [Fact]
+    public void AvayaAndTheNamedGeneralsTakeTheirExpansionsFromTheirOwnTable()
+    {
+        // avaya1252CompressArray is an alias of cp1252's (COLL4ARR.C:2169).
+        CollationWeights.ExpansionsFor(CollationName.Avaya1252, 850).SequenceEqual(CollationTables.Cp1252Expansions).Should().BeTrue();
+        CollationWeights.ExpansionsFor(CollationName.GeneralCp437, 850).SequenceEqual(CollationTables.Cp1252Expansions).Should().BeTrue();
+        CollationWeights.ExpansionsFor(CollationName.GeneralCp850, 1252).SequenceEqual(CollationTables.Cp850Expansions).Should().BeTrue();
+    }
+
+    [Theory]
+    // keySizeCharPerCharAdd (i4conv.c:314-480): nothing for the four simple ones, one for the rest.
+    [InlineData("CroatianCp1250", true, 0)]
+    [InlineData("CroatianUpperCp1250", true, 0)]
+    [InlineData("SpanishCp1252", true, 0)]
+    [InlineData("SpanishCp850", true, 0)]
+    [InlineData("Avaya1252", false, 1)]
+    [InlineData("General", false, 1)]
+    [InlineData("GeneralCp437", false, 1)]
+    [InlineData("Machine", false, 0)]
+    public void TheSimpleCollationsMapOneForOne(string name, bool simple, int perCharacterAdd)
+    {
+        CollationName collation = Enum.Parse<CollationName>(name);
+
+        CollationWeights.IsSimple(collation).Should().Be(simple);
+        CollationWeights.PerCharacterAdd(collation).Should().Be(perCharacterAdd);
+    }
+
     [Fact]
     public void MachineOrderIsSupportedEverywhere_ButHasNoWeightsToHandOut()
     {

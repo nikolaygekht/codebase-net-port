@@ -349,3 +349,26 @@ Design: `DESIGN.md` §7a-10. Expectations are `VFPPROP.CDX`'s keys and rows of
 | b | Tests above, red | they fail — `PROPER` is refused as an unknown function |
 | c | The row, its width, `CaseMap.ToProper`, the evaluator arm | green; hand-placed mutations: `0xA0` dropped from white space, a word begun after any non-letter, the rest not lowered — each reddens the golden |
 | d | Records: ADR-83; `EXPRESSIONS.md` §5.2 and §9.1; `DIVERGENCES.md` §3; `vfp/README.md`, `net/corpus/README.md`, the generator README; this step's `STATE.md` | `crap4csharp` on the changed files |
+
+## 7a-11 — CodeBase's `CBnnnnn` collations
+
+Design: `DESIGN.md` §7a-11.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 1 Unit (`CollationTablesTests`) | the five new arrays: 256 entries each, distinct from each other and from the generals; the simple ones carry no expansion marker; Avaya's expansions are cp1252's |
+| 1 Unit (`IndexHeaderTests`) | `CB00001` reads as machine, `CB00002`–`CB00010` as their members, `CB00004` refused `NotSupported`, `CB00000` and `CB00011` refused `Index` |
+| 1 Unit (`CollatedKeyTests`) | the simple transform keeps the width and weighs trailing blanks; its partial search is the prefix translated, nothing scanned |
+| 1 Unit (`CollationWeightsTests`) | a named collation ignores the code page; `General` still follows it; `PerCharacterAdd` 0 for simple, 1 otherwise |
+| 4 Golden | `CBCP1250`, `CBCP1252`, `CBCP850` added to `KeyTransformGoldenTests` with their key counts; the data-driven open, walk, seek and synchronise gates pick them up from the corpus root |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Generator case `case-cbcoll.cpp`; build, run, `copy-corpus.bat` | every existing corpus file byte-identical (`git status net/corpus` lists only the new ones); the dumps show `CB00002`, 3, 5–10 in the headers |
+| b | Tests above, red | the golden ones fail at open on `CBnnnnn`; the unit ones do not compile |
+| c | `CollationName`, `IndexHeader`, `CollationTables`, `CollationWeights`, `CollatedKey`, the call sites | green; hand-placed mutations: a named collation weighed by the code page, trailing blanks dropped in the simple transform, the GENERAL partial scan applied to a simple tag — each reddens a test |
+| d | Records: ADR-84; `KEY-COLLATION.md` §3.3 (line ranges), §3.5, §4.1; `DIVERGENCES.md` §1; `README.md` "Differences from CodeBase" (`CB00004`); `net/corpus/README.md`, generator README; `STATE.md` files | `crap4csharp` on the changed files |

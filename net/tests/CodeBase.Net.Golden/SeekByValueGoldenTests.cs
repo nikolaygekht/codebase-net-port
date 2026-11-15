@@ -22,6 +22,17 @@ public sealed class SeekByValueGoldenTests
     /// <summary>Every character tag in the corpus, with its table and the field behind it.</summary>
     public static TheoryData<string, string, string> CharacterTags() => new()
     {
+        { "CBCP1250", "C_MACH", "K_TEXT" },
+        { "CBCP1250", "C_HR", "K_TEXT" },
+        { "CBCP1250", "C_HRU", "K_TEXT" },
+        { "CBCP1252", "C_MACH", "K_TEXT" },
+        { "CBCP1252", "C_ES", "K_TEXT" },
+        { "CBCP1252", "C_AVAYA", "K_TEXT" },
+        { "CBCP1252", "C_G437", "K_TEXT" },
+        { "CBCP1252", "C_G850", "K_TEXT" },
+        { "CBCP850", "C_MACH", "K_TEXT" },
+        { "CBCP850", "C_ES", "K_TEXT" },
+        { "CBCP850", "C_G1252", "K_TEXT" },
         { "CDXBASE", "T_TEXT", "K_C" },
         { "CDXBASE", "T_TEXTD", "K_C" },
         { "CDXCOLL", "C_MACH", "K_TEXT" },
@@ -42,7 +53,7 @@ public sealed class SeekByValueGoldenTests
     {
         // A data-driven suite that discovered nothing would report success having proved nothing.
         // The last four are sought through their tag's ASCEND or DESCEND, by the plain value (ADR-64).
-        CharacterTags().Should().HaveCount(13);
+        CharacterTags().Should().HaveCount(24);
     }
 
     [Theory]

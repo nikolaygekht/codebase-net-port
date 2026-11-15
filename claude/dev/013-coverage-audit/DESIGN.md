@@ -791,3 +791,82 @@ nullable `C(30)` over 36 named probes and then `"a" + CHR(b) + "b"` for every by
    U+2000 block) and would make the rule depend on a .NET table rather than on the witness; and the
    host's code page, which ADR-65 already rejected for casing.
 2. **No change to `UPPER`/`LOWER`.**
+
+## 7a-11 — CodeBase's `CBnnnnn` collations *(added 2026-11-15, at the user's call of 2026-11-14)*
+
+A tag header's eight-byte collation name is empty (machine), `GENERAL`, or **`CB` and five digits**:
+CodeBase's own collations, which the port refuses at open. The user decided to support them, the
+weights copied verbatim from `COLL4ARR.C` and gated by a corpus case from the C generator; and to
+refuse `CB00004`, the slot CodeBase fills from tables on the user's disk (`DIVERGENCES.md` §1).
+
+### What the reference does
+
+- **Open** (i4init.c:407-416): the digits are the `Collate4name` ordinal (d4data.h:91-117); one past
+  the ten known is refused (`e4index`). Unlike `GENERAL`, **the weights follow the ordinal, not the
+  table's code page**.
+
+  | `CB` | Collation | Kind | Key | |
+  |---|---|---|---|---|
+  | 00001 | machine | machine order | width | never written: machine writes eight zeros |
+  | 00002, 00003, 00007 | GENERAL cp1252, cp437, cp850 | subSortCompress | 2 × width | written when the general asked for is not the table's code page's |
+  | 00004 | test | read from disk | — | refused (the user) |
+  | 00005, 00006 | Croatian cp1250, case-sensitive / -insensitive | **simple** | width | |
+  | 00008 | Avaya cp1252 | subSortCompress, cp1252's expansions | 2 × width | |
+  | 00009, 00010 | Spanish cp1252 / cp850 | **simple** | width | |
+
+- **The simple transform** (`t4convertSimpleChar`, u4util.c:2366-2425): each byte becomes its head
+  weight, one for one; **trailing blanks are weighed too** (u4util.c:2411-2413), the key is the
+  field's width (`keySizeCharPerCharAdd` 0). The pad byte is NUL, as for every collation other than
+  machine (i4init.c:600-602).
+- **Partial seek on a simple collation** (D4SEEK.C:104-140): the value's own bytes, translated, and
+  nothing after — no tail suppression and no scan for where the heads end, which is GENERAL's.
+- **Unicode under a simple collation** is not implemented (i4init.c:659): a `W` tag stays refused;
+  Unicode under Avaya is 7a-12's.
+- **A memo** under a simple collation is not halved (i4init.c:466-482), since nothing is added per
+  character.
+- **Create** (i4tag.c:2887-3064): `sort4croatian`/`sort4croatianUpper` give 5/6; `sort4spanish` gives
+  9 on cp1252 or cp0, 10 on cp850; any of the ten by `CODE4.collateName` (i4create.c:979-1007).
+
+### What changes, in short
+
+- **`CollationName`** gains the eight named members; `General` stays the code-page-chosen one.
+- **`IndexHeader`** reads `CBnnnnn`: 00001 as machine; 00002–00010 to their members; 00004
+  refused (`NotSupported`, naming the disk tables); any other number refused (`Index`), as the
+  reference refuses it.
+- **`CollationTables`** gains the five arrays, extracted from `COLL4ARR.C` by a script and checked
+  as the three already there are.
+- **`CollationWeights`** answers, for a collation and a code page, a set of weights: the table, the
+  expansions, and whether the transform is simple or subSortCompress — `General` by the code page as
+  today, a named collation by itself. `PerCharacterAdd` comes from it (0 or 1).
+- **`CollatedKey`** dispatches on the kind: the simple transform beside the existing one, and the
+  simple partial search. The seven call sites pass the weights rather than two tables.
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `CollationName` | eight members |
+| `IndexHeader` | `ReadCollation` parses `CB` |
+| `CollationTables` | five arrays |
+| `CollationWeights` | `For(collation, codePage)`, `Supports`, `PerCharacterAdd` |
+| `CollatedKey` | the simple transform and search, dispatched by kind |
+| `TagContext` | `PerCharacterAdd` from the weights |
+| `SeekConverter`, `ConversionSearch`, `RecordKey`, `TableTagCursor`, `TagProbe`, `ExpressionEvaluator` | pass the weights |
+
+### Corpus case — `CBCOLL`, by the C generator
+
+Three tables, because each collation means a code page: `CBCP1250` (cp1250: tags by `sort4croatian`
+and `sort4croatianUpper`), `CBCP1252` (cp1252: `sort4spanish`, and Avaya, GENERAL cp437 and cp850 by
+name) and `CBCP850` (cp850: `sort4spanish`, and GENERAL cp1252 by name) — every ordinal but 1 and 4
+written once. Each holds one `C(12)` field: every byte 1–255 alone in a row, so each tag's keys check
+every entry of its table, then words in the page's own letters (Croatian č ć đ š ž and their
+capitals; Spanish ñ, á, ú; Avaya's ligatures). The machine tag of each is the control. The C library's
+own dumps carry the keys; `KeyTransformGoldenTests` rebuilds every one, and the data-driven golden
+tests open, walk, seek and synchronise every tag.
+
+### Decisions
+
+1. **The weights by ordinal, as the reference** — a `CB00009` tag on a cp850 table is weighed with
+   the cp1252 Spanish table, because that is what its keys hold.
+2. **`CB00004` refused** (the user, 2026-11-14) and recorded with the rest as **ADR-84**.
+3. **No Unicode** under these collations yet (7a-12).

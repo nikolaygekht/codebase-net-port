@@ -20,10 +20,10 @@ internal readonly record struct TagContext(CollationName Collation, int CodePage
     /// Gets how many bytes the tag's collation adds to each character of a key.
     /// </summary>
     /// <value>
-    /// None for machine order, one for GENERAL, whose keys hold a primary and a secondary weight per
-    /// character.
+    /// None for machine order and for CodeBase's simple collations, one for GENERAL and Avaya, whose
+    /// keys hold a primary and a secondary weight per character.
     /// </value>
-    public int PerCharacterAdd => Collation == CollationName.General ? 1 : 0;
+    public int PerCharacterAdd => CollationWeights.PerCharacterAdd(Collation);
 
     /// <summary>
     /// Gets a value indicating whether the tag's keys are weighed through a collation rather than kept in byte order.

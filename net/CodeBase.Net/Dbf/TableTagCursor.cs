@@ -150,11 +150,7 @@ internal sealed class TableTagCursor
 
             case KeyKind.CollatedCharacter when prefix:
                 length = CollatedKey.WriteSearch(
-                    value,
-                    CollationWeights.TableFor(resolved.Collation, resolved.CodePage),
-                    CollationWeights.ExpansionsFor(resolved.Collation, resolved.CodePage),
-                    resolved.KeyLength,
-                    into);
+                    value, resolved.Collation, resolved.CodePage, resolved.KeyLength, into);
                 break;
 
             case KeyKind.CollatedCharacter:
@@ -167,11 +163,7 @@ internal sealed class TableTagCursor
                 padded.Fill((byte)' ');
                 value[..Math.Min(value.Length, padded.Length)].CopyTo(padded);
                 length = CollatedKey.Write(
-                    padded,
-                    CollationWeights.TableFor(resolved.Collation, resolved.CodePage),
-                    CollationWeights.ExpansionsFor(resolved.Collation, resolved.CodePage),
-                    includeTails: true,
-                    into);
+                    padded, resolved.Collation, resolved.CodePage, includeTails: true, into);
                 break;
 
             default:

@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-15 · **step 013 (`013-coverage-audit`) is in progress. 7a-10 is done and committed, not pushed; the tree is clean: `PROPER` added, a word beginning after white space only, as VFP's keys over every byte show (ADR-83, new case `VFPPROP`). 7a-9 is committed, not pushed: `MOD` by zero and `SQRT` below zero raise as VFP does (ADR-81), with VFP's laziness in `IIF`/`AND`/`OR` so its guards hold, and the VFP band answers null for a null operand, closing a wrong record set (ADR-82) — witnessed by `vfpband.prg`, new case `VFPBAND`. Before them, its plan, sub-steps 1–7 and 7a-1 to 7a-8 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed and pushed, and the tree is clean. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). **7a-8:** `Seek(decimal)` and `Seek(DateTime)` with their positional siblings (ADR-80). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-11, CodeBase's `CBnnnnn` collations, then the rest of 7a, and 8, the close.**
+**Updated:** 2026-11-15 · **step 013 (`013-coverage-audit`) is in progress. 7a-11 is done and committed, not pushed; the tree is clean: CodeBase's own `CBnnnnn` collations — Croatian, Spanish, Avaya, GENERAL by name — read and sought, weighed by their ordinal, `CB00004` refused (ADR-84, new C-generated case `CBCOLL`: `CBCP1250`, `CBCP1252`, `CBCP850`). 7a-10 is committed, not pushed: `PROPER` added, a word beginning after white space only, as VFP's keys over every byte show (ADR-83, new case `VFPPROP`). 7a-9 is committed, not pushed: `MOD` by zero and `SQRT` below zero raise as VFP does (ADR-81), with VFP's laziness in `IIF`/`AND`/`OR` so its guards hold, and the VFP band answers null for a null operand, closing a wrong record set (ADR-82) — witnessed by `vfpband.prg`, new case `VFPBAND`. Before them, its plan, sub-steps 1–7 and 7a-1 to 7a-8 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed and pushed, and the tree is clean. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). **7a-8:** `Seek(decimal)` and `Seek(DateTime)` with their positional siblings (ADR-80). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-12, collated Unicode keys, then the rest of 7a, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -108,8 +108,8 @@ its indexes rather than reading them, which is what the whole port exists for �
 can be read whole, its records read in an index tag's order, and the read path is cached.
 `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4560 tests**,
-1442 of them golden (3118 unit, 1 skipped).
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4711 tests**,
+1550 of them golden (3161 unit, 1 skipped).
 
 **Since 2026-11-12 it also reads** CodeBase's long-field-name layout (ADR-72), tags over `RECNO()`
 (ADR-73), the `'7'` datetime with milliseconds (ADR-75), and the `'W'`/`'O'` UTF-16 fields with
@@ -119,7 +119,10 @@ until the picture is chosen (ADR-74), closing a wrong record set. Since 2026-11-
 `SQRT` below zero raise `ExpressionEvaluationException` as VFP does, an expression evaluates only what
 VFP evaluates — the chosen `IIF` branch, `.AND.`/`.OR.` left to right up to the deciding operand — and
 the VFP-only functions answer null for a null operand (ADR-81, ADR-82; case `VFPBAND`). `PROPER`
-is the fourteenth of them (ADR-83; case `VFPPROP`).
+is the fourteenth of them (ADR-83; case `VFPPROP`). And an index collated by one of CodeBase's own
+`CBnnnnn` collations opens and is sought — Croatian and Spanish (simple, one-for-one), Avaya, and
+GENERAL by name — except `CB00004`, read from disk tables no index carries (ADR-84; cases `CBCP1250`,
+`CBCP1252`, `CBCP850`).
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -355,6 +358,17 @@ then killed by the watchdog in a full run; it runs alone now, in a new non-paral
 `ThreadStressCollection` (the user's call). And a mutation restore that kept an old write time left
 a mutant in the Release binaries — `DEV_APPROACH.md` §4 now says to touch a restored file. Tests:
 3117 unit (1 skipped), 1442 golden, ten full runs green. Committed, not pushed.
+
+**Then 7a-11: CodeBase's `CBnnnnn` collations.** A tag header's `CB` and five digits is the
+reference's collation ordinal, and it names the weights outright, whatever the table's code page —
+unlike `GENERAL`. A new C-generator case writes three tables (cp1250, cp1252, cp850) with every byte
+alone under each of `CB00002`, 3 and 5–10; the existing corpus regenerated byte-identical. The five
+missing weight tables were extracted from `COLL4ARR.C` by script. Four of the collations are
+**simple** — one weight per byte, the field's width, trailing blanks weighed — and their weights break
+both GENERAL conventions (Croatian `ž` weighs 255, Spanish control bytes 0–15), so the simple
+transform and its prefix search are their own. Every key of the 11 new tags rebuilds and is found by
+value and by prefix; `CB00004`, CodeBase's disk-loaded slot, is refused (ADR-84). Tests: 3160 unit
+(1 skipped), 1550 golden. Committed, not pushed.
 
 ### Before it (2026-11-14)
 
@@ -1131,6 +1145,7 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   each designed and planned first, in this order (the user's, 2026-11-14): **7a-7** the `T` table,
   ~~**7a-8** `Seek(decimal)`/`Seek(DateTime)`~~ (done), ~~**7a-9** `MOD`/`SQRT` raising~~ (done,
   with VFP's laziness and null through the band), ~~**7a-10** `PROPER`~~ (done, ADR-83),
+  ~~**7a-11** the `CBnnnnn` collations~~ (done, ADR-84, with `CB00004`'s refusal),
   **7a-11** the `CBnnnnn` collations, **7a-12** collated Unicode keys, **7a-13** VFP's GENERAL on
   other code pages, **7a-14** the documentation pass —
   `CB00004`'s refusal, "Differences from CodeBase" entries and XML docs for ADR-43, 45/50, 56 (done),

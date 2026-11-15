@@ -198,6 +198,33 @@ public sealed class IndexHeaderTests
         header.PadByte.Should().Be(KeyPadding.Nul);
     }
 
+    [Theory]
+    [InlineData("RUSSIAN", "Russian")]
+    [InlineData("CZECH", "Czech")]
+    [InlineData("DUTCH", "Dutch")]
+    [InlineData("GERMAN", "German")]
+    [InlineData("GREEK", "Greek")]
+    [InlineData("HUNGARY", "Hungary")]
+    [InlineData("ICELAND", "Iceland")]
+    [InlineData("NORDAN", "Nordan")]
+    [InlineData("POLISH", "Polish")]
+    [InlineData("SLOVAK", "Slovak")]
+    [InlineData("SPANISH", "Spanish")]
+    [InlineData("SWEFIN", "Swefin")]
+    [InlineData("TURKISH", "Turkish")]
+    [InlineData("UNIQWT", "Uniqwt")]
+    public void Parse_VisualFoxProsNamedCollationsAreReadByName(string name, string expected)
+    {
+        // VFP writes a named collation where GENERAL's name goes (ADR-87, ADR-88).
+        byte[] image = IndexImage.SingleTag(keyLength: 20, root: 2048, collation: name).Build();
+
+        IndexHeader header = IndexHeader.Parse(image, "an image");
+
+        header.Collation.Should().Be(Enum.Parse<CollationName>(expected));
+        header.CollationText.Should().Be(name);
+        header.PadByte.Should().Be(KeyPadding.Nul);
+    }
+
     [Fact]
     public void Parse_CodeBaseCollationOneIsMachineOrder()
     {
@@ -205,6 +232,21 @@ public sealed class IndexHeaderTests
         byte[] image = IndexImage.SingleTag(keyLength: 20, root: 2048, collation: "CB00001").Build();
 
         IndexHeader.Parse(image, "an image").Collation.Should().Be(CollationName.Machine);
+    }
+
+    [Theory]
+    [InlineData("FRENCH")]
+    [InlineData("XYZ")]
+    public void Parse_ANameNeitherVisualFoxProNorCodeBaseHasIsRefused(string name)
+    {
+        // Not a damaged index -- a collation this library does not have -- so NotSupported, by name.
+        byte[] image = IndexImage.SingleTag(keyLength: 20, root: 2048, collation: name).Build();
+
+        Action act = () => IndexHeader.Parse(image, "an image");
+
+        act.Should().Throw<CodeBaseException>()
+            .Where(e => e.Code == ErrorCode.NotSupported)
+            .WithMessage($"*'{name}'*");
     }
 
     [Fact]

@@ -82,6 +82,16 @@ public sealed class SeekConverterKindTests
         Converter(expression, keyLength, collation).Kind.Should().Be(KeyKind.CollatedWideCharacter);
     }
 
+    [Fact]
+    public void AWideTagUnderRussianIsRefused()
+    {
+        // VFP's collation, and VFP has no wide field to have keyed one with (ADR-87).
+        Action act = () => Converter("K_W", 40, "RUSSIAN");
+
+        act.Should().Throw<CodeBaseException>()
+            .Where(e => e.Code == ErrorCode.NotSupported && e.Message.Contains("RUSSIAN"));
+    }
+
     [Theory]
     [InlineData("CB00005")]
     [InlineData("CB00009")]

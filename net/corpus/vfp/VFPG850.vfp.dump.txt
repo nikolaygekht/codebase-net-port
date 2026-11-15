@@ -1,0 +1,9 @@
+# CodeBase.NET VFP oracle: GENERAL on code page 850
+# Written by test-files-generator/vfp/vfpgen.prg in Visual FoxPro 9.
+# VFPG850.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     850
+cpdbf        850
+partners     A0 B5
+records      787
+tag G        collate=GENERAL keyType='C'

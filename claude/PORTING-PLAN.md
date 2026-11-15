@@ -106,7 +106,10 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself. **Decided 2026-11-14:** CodeBase's `CBnnnnn` tables
   to be supported — **done 2026-11-15** (013, 7a-11, ADR-84, cases `CBCP1250`/`CBCP1252`/`CBCP850`);
-  VFP's GENERAL on other code pages to be tried through the VFP oracle (013, 7a-13).
+  VFP's GENERAL on other code pages to be tried through the VFP oracle — **done 2026-11-15** (013,
+  7a-13, ADR-86): the thirteen pages VFP has GENERAL on, weights recovered from VFP's keys; VFP's
+  named collations — **done 2026-11-15** (013, 7a-15, ADR-87, ADR-88): all fourteen names on the 51
+  (collation, code page) pairs VFP builds, recovered the same way, contractions included.
 - Disk-loaded custom collations (`coll4inf`/`collate4`/`compres4` DBFs, `CB00004`). **Decided
   2026-11-14: refused** — no such tables exist outside a CodeBase user's own disk (ADR-84).
 - **Collated tags in the query optimizer, for equality.** ADR-54/59 refuse a collated tag in both

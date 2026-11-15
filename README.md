@@ -81,6 +81,15 @@ it in [the decision record](claude/ARCHITECTURE-DECISIONS.md):
   CodeBase reads from three tables (`coll4inf`, `collate4`, `compres4`) on its user's own disk; no
   index carries them. CodeBase's other collations — Croatian, Spanish, Avaya, and GENERAL by name,
   `CB00002` to `CB00010` — are read and sought.
+- **A `GENERAL` index is weighed as Visual FoxPro weighs it** (ADR-86), on every code page VFP has
+  GENERAL on — 437, 620, 850, 852, 857, 861, 865, 895, 1250, 1252, 1254, 10000 and 10029. CodeBase
+  has it on three of them and refuses cp1250. On **cp850** the two disagree about thorn (`þ`, `Þ`),
+  which VFP expands to TH: a `GENERAL` cp850 index that CodeBase wrote can miss a seek for a value
+  with thorn in it.
+- **Visual FoxPro's named collations are read** — CZECH, DUTCH, GERMAN, GREEK, HUNGARY, ICELAND,
+  NORDAN, POLISH, RUSSIAN, SLOVAK, SPANISH, SWEFIN, TURKISH, UNIQWT — on each code page VFP builds
+  them on (ADR-87, ADR-88), contractions such as Czech CH and Hungarian DZS included. CodeBase refuses
+  every one. A name on a code page VFP itself refuses is refused here too.
 - **`SeekPrefix` on a collated `W` or `O` tag finds what begins with the prefix** (ADR-85). CodeBase,
   given a value shorter than the key, searches zero bytes and lands on the tag's first key. Whole
   values, and every key, are CodeBase's.

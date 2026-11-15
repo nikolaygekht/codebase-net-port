@@ -59,4 +59,46 @@ internal enum CollationName
 
     /// <summary>Spanish on cp850, [c]CB00010[/c]: a simple mapping.</summary>
     SpanishCp850,
+
+    /// <summary>Visual FoxPro's RUSSIAN, on cp1251, cp866 and cp10007: heads and tails, its weights recovered from VFP's keys (ADR-87).</summary>
+    Russian,
+
+    /// <summary>Visual FoxPro's CZECH.</summary>
+    Czech,
+
+    /// <summary>Visual FoxPro's DUTCH.</summary>
+    Dutch,
+
+    /// <summary>Visual FoxPro's GERMAN.</summary>
+    German,
+
+    /// <summary>Visual FoxPro's GREEK.</summary>
+    Greek,
+
+    /// <summary>Visual FoxPro's HUNGARY.</summary>
+    Hungary,
+
+    /// <summary>Visual FoxPro's ICELAND.</summary>
+    Iceland,
+
+    /// <summary>Visual FoxPro's NORDAN.</summary>
+    Nordan,
+
+    /// <summary>Visual FoxPro's POLISH.</summary>
+    Polish,
+
+    /// <summary>Visual FoxPro's SLOVAK.</summary>
+    Slovak,
+
+    /// <summary>Visual FoxPro's SPANISH, which is not CodeBase's CB00009 or CB00010.</summary>
+    Spanish,
+
+    /// <summary>Visual FoxPro's SWEFIN.</summary>
+    Swefin,
+
+    /// <summary>Visual FoxPro's TURKISH.</summary>
+    Turkish,
+
+    /// <summary>Visual FoxPro's UNIQWT.</summary>
+    Uniqwt,
 }

@@ -30,10 +30,11 @@ internal static class CollatedKey
         ReadOnlySpan<byte> value, CollationName collation, int codePage, bool includeTails, Span<byte> destination) =>
         CollationWeights.IsSimple(collation)
             ? WriteSimple(value, CollationWeights.TableFor(collation, codePage), destination)
-            : Write(
+            : WriteWeighed(
                 value,
                 CollationWeights.TableFor(collation, codePage),
                 CollationWeights.ExpansionsFor(collation, codePage),
+                CollationWeights.SequencesFor(collation, codePage),
                 includeTails,
                 destination);
 
@@ -59,6 +60,7 @@ internal static class CollatedKey
                 value,
                 CollationWeights.TableFor(collation, codePage),
                 CollationWeights.ExpansionsFor(collation, codePage),
+                CollationWeights.SequencesFor(collation, codePage),
                 keyLength,
                 destination);
 
@@ -218,10 +220,19 @@ internal static class CollatedKey
         ReadOnlySpan<byte> table,
         ReadOnlySpan<byte> expansions,
         int keyLength,
+        Span<byte> destination) =>
+        WriteSearch(value, table, expansions, [], keyLength, destination);
+
+    private static int WriteSearch(
+        ReadOnlySpan<byte> value,
+        ReadOnlySpan<byte> table,
+        ReadOnlySpan<byte> expansions,
+        ReadOnlySpan<byte> sequences,
+        int keyLength,
         Span<byte> destination)
     {
         bool partial = keyLength > 2 * value.Length;
-        int written = Write(value, table, expansions, includeTails: !partial, destination);
+        int written = WriteWeighed(value, table, expansions, sequences, includeTails: !partial, destination);
 
         if (!partial)
             return written;
@@ -264,6 +275,29 @@ internal static class CollatedKey
         ReadOnlySpan<byte> table,
         ReadOnlySpan<byte> expansions,
         bool includeTails,
+        Span<byte> destination) =>
+        WriteWeighed(value, table, expansions, [], includeTails, destination);
+
+    /// <summary>
+    /// The head-and-tail transform, with a collation's weighed sequences.
+    /// </summary>
+    /// <value>
+    /// A sequence is one to three bytes keyed as given heads and tails, which only Visual FoxPro's
+    /// named collations have and CodeBase's table form cannot hold. Two or three bytes with one head
+    /// are a contraction -- Czech CH, Hungarian DZS -- which CodeBase never coded ([c]compress4[/c]
+    /// is "not coded yet", u4util.c:2314-2319); one byte with two heads is an expansion no pair of
+    /// characters spells, such as SWEFIN's AE ligature, which has one tail where A and E have two.
+    /// At each position the longest sequence that matches is taken first, so DDZS weighs as D and
+    /// then DZS, as VFP's keys show (ADR-88). Each entry is eight bytes: the length, three bytes
+    /// (zero past the length), two heads and two tails, 0xFF for one that is not there. Its tails
+    /// take no count guard: there are never more than two a byte, which the key's room holds.
+    /// </value>
+    private static int WriteWeighed(
+        ReadOnlySpan<byte> value,
+        ReadOnlySpan<byte> table,
+        ReadOnlySpan<byte> expansions,
+        ReadOnlySpan<byte> sequences,
+        bool includeTails,
         Span<byte> destination)
     {
         int length = value.Length;
@@ -282,6 +316,28 @@ internal static class CollatedKey
 
         for (int i = 0; i < content; i++)
         {
+            int matched = Sequence(value[i..content], sequences, out ReadOnlySpan<byte> weights);
+            if (matched > 0)
+            {
+                // Two heads at most and two tails at most, so a key of sequences still fits the
+                // twice-the-width it is given.
+                i += matched - 1;
+
+                foreach (byte sequenceHead in weights[..2])
+                {
+                    if (sequenceHead != CollationTables.NoTail)
+                        destination[head++] = sequenceHead;
+                }
+
+                foreach (byte sequenceTail in weights[2..])
+                {
+                    if (includeTails && sequenceTail != CollationTables.NoTail)
+                        tails[tail++] = sequenceTail;
+                }
+
+                continue;
+            }
+
             (byte headWeight, byte tailWeight) = CollationTables.Weigh(table, value[i]);
 
             if (headWeight != CollationTables.Expands)
@@ -326,5 +382,30 @@ internal static class CollatedKey
         destination.Slice(head + copied, room - copied).Clear();
 
         return written;
+    }
+
+    /// <summary>The bytes one sequence entry takes: its length, three bytes, two heads and two tails.</summary>
+    private const int SequenceEntry = 8;
+
+    /// <summary>
+    /// Finds the longest sequence the text begins with.
+    /// </summary>
+    /// <returns>How many bytes it spans, or zero where none matches.</returns>
+    private static int Sequence(ReadOnlySpan<byte> text, ReadOnlySpan<byte> sequences, out ReadOnlySpan<byte> weights)
+    {
+        int best = 0;
+        weights = [];
+
+        for (int entry = 0; entry + SequenceEntry <= sequences.Length; entry += SequenceEntry)
+        {
+            int length = sequences[entry];
+            if (length <= best || length > text.Length || !text[..length].SequenceEqual(sequences.Slice(entry + 1, length)))
+                continue;
+
+            best = length;
+            weights = sequences.Slice(entry + 4, 4);
+        }
+
+        return best;
     }
 }

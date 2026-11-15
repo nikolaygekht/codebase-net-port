@@ -4,6 +4,7 @@
 
       run-in-vm.ps1                              vfpfunc.prg, 600 s
       run-in-vm.ps1 -Script other.prg -TimeoutSeconds 120
+      run-in-vm.ps1 -Script vfpgen.prg -CodePage 1250 -ScriptArgs '"E9"'
 
   The VM must already be running with its user logged in: VFP is a GUI
   program and vmrun -interactive runs it in that user's session. This script
@@ -27,7 +28,13 @@
 #>
 param(
     [string] $Script = "vfpfunc.prg",
-    [int] $TimeoutSeconds = 600
+    [int] $TimeoutSeconds = 600,
+    # VFP's current code page for the run, through a config.fpw CODEPAGE line;
+    # 0 leaves the VM's own (step 013, 7a-13).
+    [int] $CodePage = 0,
+    # Further arguments to the script, as VFP expressions after the output
+    # directory: -ScriptArgs '"E9 C9"' passes one string.
+    [string] $ScriptArgs = ""
 )
 
 $GuestJob = "C:\vfpjob"
@@ -108,7 +115,7 @@ $wrapper = @(
     "SET ALTERNATE TO ""$GuestJob\console.txt""",
     "SET ALTERNATE ON",
     "TRY",
-    "   DO ""$GuestJob\$Script"" WITH ""$GuestOut""",
+    "   DO ""$GuestJob\$Script"" WITH ""$GuestOut""$(if ($ScriptArgs) { ", $ScriptArgs" })",
     "CATCH TO loEx",
     "   lcErr = TRANSFORM(loEx.ErrorNo) + "" "" + loEx.Message + "" | "" + loEx.Procedure + "" line "" + TRANSFORM(loEx.LineNo)",
     "ENDTRY",
@@ -122,11 +129,23 @@ $local = Join-Path $hostOut "runjob.prg"
 Guest @("CopyFileFromHostToGuest", $vmx, $local, "$GuestJob\runjob.prg") | Out-Null
 Remove-Item -LiteralPath $local
 
+$exeArgs = @("-t")
+if ($CodePage -ne 0) {
+    $config = Join-Path $hostOut "config.fpw"
+    # A config.fpw of our own replaces the one VFP would find, and without _STARTUP
+    # cleared VFP starts its Task Pane, whose "Locate / Create Task Pane Manager
+    # Folders" dialog waits for a click nobody gives.
+    [IO.File]::WriteAllText($config, "CODEPAGE=$CodePage`r`n_STARTUP=`"`"`r`nRESOURCE=OFF`r`n", [Text.Encoding]::ASCII)
+    Guest @("CopyFileFromHostToGuest", $vmx, $config, "$GuestJob\config.fpw") | Out-Null
+    Remove-Item -LiteralPath $config
+    $exeArgs = @("-c$GuestJob\config.fpw", "-t")
+}
+
 # 4. Run, bounded by the timeout. vmrun blocks while the program runs, so the
 #    bound is on the vmrun process.
 Write-Host "[run-in-vm] $Script in the guest (timeout $TimeoutSeconds s)"
 $arguments = @("-T", "ws", "-gu", $user, "-gp", $pass, "runProgramInGuest", $vmx,
-               "-interactive", $exe, "-t", "$GuestJob\runjob.prg") | ForEach-Object { Quote $_ }
+               "-interactive", $exe) + $exeArgs + @("$GuestJob\runjob.prg") | ForEach-Object { Quote $_ }
 $process = Start-Process -FilePath $vmrun -ArgumentList $arguments -NoNewWindow -PassThru
 $null = $process.Handle   # keeps ExitCode readable after the process ends (Windows PowerShell)
 if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {

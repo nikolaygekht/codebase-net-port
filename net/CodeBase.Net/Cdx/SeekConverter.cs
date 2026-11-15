@@ -354,6 +354,10 @@ internal sealed class SeekConverter
                 collation == CollationName.Machine ? KeyKind.Character : KeyKind.CollatedCharacter,
             ExpressionType.WideString or ExpressionType.WideStringWithLength =>
                 collation == CollationName.Machine ? KeyKind.WideCharacter
+                : collation >= CollationName.Russian ? throw new CodeBaseException(
+                    ErrorCode.NotSupported,
+                    $"The key expression '{expression}' is a wide string collated {collation.ToString().ToUpperInvariant()}. " +
+                    "Visual FoxPro, whose collation that is, has no wide field, so no such key has ever been witnessed.")
                 : !CollationWeights.IsSimple(collation) ? KeyKind.CollatedWideCharacter
                 : throw new CodeBaseException(
                     ErrorCode.NotSupported,

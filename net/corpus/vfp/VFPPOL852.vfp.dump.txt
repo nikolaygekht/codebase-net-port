@@ -1,0 +1,9 @@
+# CodeBase.NET VFP oracle: POLISH on code page 852
+# Written by test-files-generator/vfp/vfpgen.prg in Visual FoxPro 9.
+# VFPPOL852.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     852
+cpdbf        852
+partners     80 81
+records      787
+tag G        collate=POLISH keyType='C'

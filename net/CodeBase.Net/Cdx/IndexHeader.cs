@@ -256,8 +256,32 @@ internal sealed class IndexHeader
         if (name == "GENERAL")
             return (CollationName.General, name);
 
+        // Visual FoxPro writes its named collations' names in the same place (ADR-87). The reference
+        // refuses every one of them; the port reads them, and weighs those whose tables it has.
+        if (VisualFoxProNames.TryGetValue(name, out CollationName named))
+            return (named, name);
+
         return (CodeBaseCollation(name, what), name);
     }
+
+    /// <summary>The names of Visual FoxPro's named collations as its tag headers hold them.</summary>
+    private static readonly Dictionary<string, CollationName> VisualFoxProNames = new(StringComparer.Ordinal)
+    {
+        ["CZECH"] = CollationName.Czech,
+        ["DUTCH"] = CollationName.Dutch,
+        ["GERMAN"] = CollationName.German,
+        ["GREEK"] = CollationName.Greek,
+        ["HUNGARY"] = CollationName.Hungary,
+        ["ICELAND"] = CollationName.Iceland,
+        ["NORDAN"] = CollationName.Nordan,
+        ["POLISH"] = CollationName.Polish,
+        ["RUSSIAN"] = CollationName.Russian,
+        ["SLOVAK"] = CollationName.Slovak,
+        ["SPANISH"] = CollationName.Spanish,
+        ["SWEFIN"] = CollationName.Swefin,
+        ["TURKISH"] = CollationName.Turkish,
+        ["UNIQWT"] = CollationName.Uniqwt,
+    };
 
     /// <summary>
     /// Reads a [c]CBnnnnn[/c] name: CodeBase's own collations, by their ordinal.
@@ -271,7 +295,16 @@ internal sealed class IndexHeader
     /// </value>
     private static CollationName CodeBaseCollation(string name, string what)
     {
-        int ordinal = name.Length == 7 && name.StartsWith("CB", StringComparison.Ordinal)
+        if (!name.StartsWith("CB", StringComparison.Ordinal))
+        {
+            throw new CodeBaseException(
+                ErrorCode.NotSupported,
+                $"The header of {what} names collation '{name}', which neither Visual FoxPro nor " +
+                "CodeBase has. This library reads machine order, GENERAL, Visual FoxPro's named " +
+                "collations and CodeBase's CB00001 to CB00010.");
+        }
+
+        int ordinal = name.Length == 7
             && int.TryParse(name.AsSpan(2), NumberStyles.None, CultureInfo.InvariantCulture, out int parsed)
                 ? parsed
                 : -1;

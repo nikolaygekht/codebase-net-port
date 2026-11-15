@@ -922,3 +922,128 @@ surrogate pair, U+FFFF. Tags: `W_MACH` (machine, the control), `W_GEN` and `W_GD
 2. **The prefix seek is the meaningful one**, not the reference's zero-length search — recorded in
    **ADR-85** with the rest. The whole-value seek and every key are the reference's.
 3. **No `ASCEND`/`DESCEND` of a wide value** under any collation: still refused (ADR-76).
+
+## 7a-13 — VFP's GENERAL on other code pages *(added 2026-11-15, at the user's call of 2026-11-14)*
+
+CodeBase has GENERAL's weights for cp1252, cp437 and cp850, refuses it on cp1250, and on any other
+code page matches no branch (i4init.c:378-405). The port refuses all but the three. The user decided
+to try VFP's own: weights recovered from keys Visual FoxPro writes.
+
+### What VFP does
+
+A new oracle script, `vfpgen.prg`, run by `run-in-vm.ps1` under each code page in turn (a new
+`-CodePage` writes a `config.fpw` with `CODEPAGE=`, and `_STARTUP=""` so the Task Pane's dialog does
+not wait for a click; a new `-ScriptArgs` passes it the partners below):
+
+- **GENERAL exists on ten code pages beyond CodeBase's three**: 620, 852, 857, 861, 865, 895, 1250,
+  1254, 10000, 10029. On 737, 866, 874, 1251, 1253, 10006 and 10007 VFP refuses it (error 1915,
+  "Collating sequence 'GENERAL' is not found"); 1255 and 1256 it will not run under at all.
+- The key is CodeBase's layout (KEY-COLLATION.md §3.4): heads of sixteen and up, an expanding
+  character two of them, then the tails packed, then zeros.
+
+### How the weights are recovered
+
+`VFPG<cp>.DBF` holds every byte alone, every byte followed by each of two **partners** — bytes whose
+own key shows a nonzero tail, chosen from a first run without them — and runs of twelve consecutive
+bytes, under one GENERAL tag. From a byte's pair with a partner the recovery reads its heads (the
+leading bytes of sixteen and up, the partner's last) and its tails (what precedes the partner's
+tail); that tells a tail of zero from none, which a key alone cannot, and reads the blank, whose key
+alone is empty. The two partners must agree, and the byte's own key must be what they say. An
+expanding byte is written as CodeBase writes one, the index of a pair of bytes whose weights are its
+halves — so the recovered table is **CodeBase's two-table form** and goes through the transform the
+port already has.
+
+### What changes, in short
+
+- **`CollationTables`**: ten GENERAL tables and their expansions, generated from the corpus by the
+  recovery, not typed.
+- **`CollationWeights`**: GENERAL on those ten code pages. 437, 850 and 1252 keep CodeBase's tables,
+  which VFP's own keys on those pages must rebuild — the control.
+- **Gates**: every key of every `VFPG` table rebuilt by the port; the library's tables equal to what
+  the recovery reads from the corpus, so neither can drift.
+
+### Decisions
+
+1. **The ten pages VFP has, and no others.** Where VFP refuses GENERAL there is nothing to recover.
+2. **cp1250 follows VFP**, where CodeBase refuses GENERAL on it (E84907) and writes Croatian instead.
+3. **VFP's named collations** (RUSSIAN, GREEK, CZECH and the rest) are not part of this; recorded
+   as not tried.
+4. **ADR-86** records the support and its source.
+
+## 7a-15 — VFP's named collations, RUSSIAN first *(added 2026-11-15, at the user's call)*
+
+The user asked what kept VFP's named collations out of 7a-13, and to start with RUSSIAN.
+
+### What VFP does
+
+`vfpgen.prg` gained the collation's name and an optional every-letter-beside-every-letter block, the
+only place a collation weighing two letters as one would show. RUSSIAN, witnessed on cp1251 and
+cp866:
+
+- The tag header names it, `RUSSIAN\0`, where GENERAL's name goes.
+- The key is GENERAL's layout, twice the field's width. Case is folded (`А` = `а`); `Ё` has a head
+  of its own after `Е`, not a tail.
+- **No expansions** on either page. **Tails only on cp1251's `Ґ`/`ґ`** (head of `Г`, tail 1); none on
+  cp866 — where no byte has a nonzero tail, a tail of zero and none key alike, so no partner is
+  needed there.
+- Contractions: whether any letter pair keys otherwise than its two letters is what the rebuild of
+  the letter pairs answers.
+
+### What changes, in short
+
+- **`CollationName.Russian`**, read from the header's `RUSSIAN`.
+- **The recovery** takes a table without partners (cp866), reading the blank's head from the first
+  run, where it leads.
+- **`CollationTables`**: RUSSIAN for cp1251 and cp866, recovered. **`CollationWeights`**: RUSSIAN on
+  those two, a head-and-tail collation (one byte added per character); refused elsewhere.
+- **Gate**: `VisualFoxProGeneralGoldenTests` becomes a test over (collation, code page), the two
+  RUSSIAN tables beside the thirteen GENERAL ones — every key rebuilt, letter pairs included, and the
+  tables equal to a fresh recovery.
+
+### Decisions
+
+1. **RUSSIAN only, for now**; the other named collations follow the same path, one at a time.
+2. **No wide tags under it**: VFP has no wide field, so nothing could witness one.
+3. Recorded in **ADR-87**.
+
+### Extended to every named collation *(2026-11-15, at the user's call)*
+
+The user asked for the rest while waiting. `vfpcoll.prg` asks VFP for each of its fifteen names on
+every code page it runs under: it builds a named collation on **51** (collation, code page) pairs and
+refuses the rest -- CZECH, SLOVAK and POLISH on the Central European pages, DUTCH, GERMAN, ICELAND,
+NORDAN, SPANISH, SWEFIN and UNIQWT on the Western ones, GREEK on 737, 1253 and 10006, HUNGARY on 852
+and 1250, RUSSIAN on 1251, 866 and 10007, TURKISH on 857 and 1254. A first pass with letter pairs
+found two kinds of weighing the table form cannot hold; the final pass, over the 49 not yet done, trades the letter pairs (some
+800 KB a table) for two partners and rows aimed at what the first pass found, about 1 MB in all.
+
+- **Contractions**: CZECH and SLOVAK CH; SPANISH CH and LL; NORDAN AA; HUNGARY CS, DZ, GY, LY, NY,
+  SZ, TY, ZS and the three-letter DZS -- every mix of case. Each keys as one head with its own tail.
+  At each position the longest match is taken, left to right: CCS is C then CS, DDZS is D then DZS.
+- **Expansions no two characters spell**: SWEFIN `æ`/`Æ` (cp437, 850, 865, 1252) keys as the heads
+  of A and E with a single tail where A and E have one each; DUTCH `ÿ` on cp10000 as I and J with two
+  tails where I and J have one; UNIQWT `ß` on cp850 as a head no byte has, twice.
+- UNIQWT has no tails at all, so it is recovered without partners, as cp866 RUSSIAN is; RUSSIAN on
+  cp10007 has one tail-bearing byte and so one partner.
+
+**What changes**
+
+- **`CollationName`** gains the other thirteen names; **`IndexHeader`** reads them.
+- **Weighed sequences** beside the table and its expansions: one to three bytes that key as given
+  heads and tails. Eight bytes an entry -- the length, three bytes, two heads, two tails, 0xFF for a
+  head or tail that is not there. A contraction is two or three bytes with one head; an expansion no
+  pair of characters spells is its one byte with two heads, and its table entry is `0xFF, 0xFF`.
+  `CollatedKey` looks for the longest sequence at each position before it weighs the byte.
+- **`CollationTables`**: every pair's table, expansions and sequences, generated by the recovery.
+- **The recovery** reads the sequences: a contraction from its row alone and its row with the first
+  partner; a byte with two heads that no two single-head bytes rebuild becomes a sequence of one.
+- **The gate** reads its list of oracles from the dumps' first lines, and counts them: thirteen
+  GENERAL, fifty-one named. One missing would otherwise just not be tested.
+
+**Decisions**
+
+4. **All of them, in one sub-step**, since the path is the one RUSSIAN laid (supersedes decision 1).
+5. **The table form is kept where it fits**; only what it cannot hold goes into sequences. Recasting
+   every expansion as weights would rewrite CodeBase's tables, which are ported verbatim.
+6. **Contractions are searched for in a partial seek too**: a seek for `CH` finds Czech `CH` as VFP
+   keyed it. A seek ending in `C` cannot know a stored `H` follows, and finds what keys with C's head.
+7. Recorded in **ADR-88**.

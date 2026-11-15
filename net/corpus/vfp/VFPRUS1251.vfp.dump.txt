@@ -1,0 +1,9 @@
+# CodeBase.NET VFP oracle: RUSSIAN on code page 1251
+# Written by test-files-generator/vfp/vfpgen.prg in Visual FoxPro 9.
+# VFPRUS1251.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1251
+cpdbf        1251
+partners     A5 B4
+records      787
+tag G        collate=RUSSIAN keyType='C'

@@ -1,0 +1,10 @@
+# CodeBase.NET VFP oracle: SPANISH on code page 1252
+# Written by test-files-generator/vfp/vfpgen.prg in Visual FoxPro 9.
+# VFPSPA1252.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1252
+cpdbf        1252
+partners     8A 9A
+extra        4348 43488A 43489A 43484348 434348 4368 43688A 43689A 43684368 434368 4C4C 4C4C8A 4C4C9A 4C4C4C4C 4C4C4C 4C6C 4C6C8A 4C6C9A 4C6C4C6C 4C4C6C 6348 63488A 63489A 63486348 636348 6368 63688A 63689A 63686368 636368 6C4C 6C4C8A 6C4C9A 6C4C6C4C 6C6C4C 6C6C 6C6C8A 6C6C9A 6C6C6C6C 6C6C6C
+records      827
+tag G        collate=SPANISH keyType='C'

@@ -1,0 +1,10 @@
+# CodeBase.NET VFP oracle: NORDAN on code page 1252
+# Written by test-files-generator/vfp/vfpgen.prg in Visual FoxPro 9.
+# VFPNOR1252.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1252
+cpdbf        1252
+partners     8A 9A
+extra        4141 41418A 41419A 41414141 414141 4161 41618A 41619A 41614161 414161 6141 61418A 61419A 61416141 616141 6161 61618A 61619A 61616161 616161
+records      807
+tag G        collate=NORDAN keyType='C'

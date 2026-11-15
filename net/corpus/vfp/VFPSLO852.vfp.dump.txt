@@ -1,0 +1,10 @@
+# CodeBase.NET VFP oracle: SLOVAK on code page 852
+# Written by test-files-generator/vfp/vfpgen.prg in Visual FoxPro 9.
+# VFPSLO852.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     852
+cpdbf        852
+partners     80 81
+extra        4348 434880 434881 43484348 434348 4368 436880 436881 43684368 434368 6348 634880 634881 63486348 636348 6368 636880 636881 63686368 636368
+records      807
+tag G        collate=SLOVAK keyType='C'

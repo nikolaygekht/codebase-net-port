@@ -1,0 +1,10 @@
+# CodeBase.NET VFP oracle: CZECH on code page 1250
+# Written by test-files-generator/vfp/vfpgen.prg in Visual FoxPro 9.
+# VFPCZE1250.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1250
+cpdbf        1250
+partners     8C 8D
+extra        4348 43488C 43488D 43484348 434348 4368 43688C 43688D 43684368 434368 6348 63488C 63488D 63486348 636348 6368 63688C 63688D 63686368 636368
+records      807
+tag G        collate=CZECH keyType='C'

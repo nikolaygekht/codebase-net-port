@@ -16,6 +16,7 @@ namespace CodeBase.Net.Tests.IO;
 /// was checked by removing the lock and watching it fail.
 /// </summary>
 [Trait("Layer", "Component")]
+[Collection(nameof(ThreadStressCollection))]
 public sealed class EngineTableListConcurrencyTests
 {
     private const int Threads = 8;

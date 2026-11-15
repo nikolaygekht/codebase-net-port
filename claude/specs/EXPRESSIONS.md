@@ -515,6 +515,14 @@ constant, as `SPACE`'s is in the reference, or the key cannot be sized.
 **`LOWER` follows the same rule as `UPPER`** (§7.5, ADR-65). The oracle's one case above 0x7F is on
 a code-page-1251 table where 0xC9 lowers to 0xE9, and the port now answers it.
 
+**`PROPER`, a fourteenth** (step 013, 7a-10, ADR-83), witnessed by `corpus/vfp/VFPPROP.CDX`: each
+word's first character upper-cased, every other one lowered, at the operand's width. **A word begins
+at the start and after white space only** — on code page 1251 exactly `0x09`–`0x0D`, `0x20` and
+`0xA0` of the 256 bytes; an apostrophe, hyphen, full stop, digit, bracket or zero byte begins
+nothing, so `o'neil` is `O'neil`, `mary-jane` `Mary-jane`, `1st place` `1st Place`, `McDonald`
+`Mcdonald`. The port tells white space by the character (U+0009–U+000D, U+0020, U+00A0) through the
+table's code page, as it cases.
+
 **Where they have no ordinary answer** — witnessed by `vfpband.prg`, recorded in
 `corpus/vfp/VFPBAND.vfp.dump.txt`, its null keys in `corpus/vfp/VFPBAND.CDX` (ADR-81, ADR-82):
 

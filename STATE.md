@@ -1,6 +1,6 @@
 # Project state
 
-**Updated:** 2026-11-15 · **step 013 (`013-coverage-audit`) is in progress. 7a-9 is done and committed, not pushed; the tree is clean: `MOD` by zero and `SQRT` below zero raise as VFP does (ADR-81), with VFP's laziness in `IIF`/`AND`/`OR` so its guards hold, and the VFP band answers null for a null operand, closing a wrong record set (ADR-82) — witnessed by `vfpband.prg`, new case `VFPBAND`. Before it, its plan, sub-steps 1–7 and 7a-1 to 7a-8 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed and pushed, and the tree is clean. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). **7a-8:** `Seek(decimal)` and `Seek(DateTime)` with their positional siblings (ADR-80). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-10, `PROPER`, then the rest of 7a, and 8, the close.**
+**Updated:** 2026-11-15 · **step 013 (`013-coverage-audit`) is in progress. 7a-10 is done and committed, not pushed; the tree is clean: `PROPER` added, a word beginning after white space only, as VFP's keys over every byte show (ADR-83, new case `VFPPROP`). 7a-9 is committed, not pushed: `MOD` by zero and `SQRT` below zero raise as VFP does (ADR-81), with VFP's laziness in `IIF`/`AND`/`OR` so its guards hold, and the VFP band answers null for a null operand, closing a wrong record set (ADR-82) — witnessed by `vfpband.prg`, new case `VFPBAND`. Before them, its plan, sub-steps 1–7 and 7a-1 to 7a-8 (long field names read, ADR-72; `RECNO()` tags, ADR-73, with a seek defect fixed on the way; the date-picture refusal ADR-42 promised, a wrong record set closed, ADR-74; CodeBase's `'7'` datetime with milliseconds read and keyed, ADR-75; the `'W'`/`'O'` UTF-16 fields read, keyed and sought, ADR-76/77; 7a-6, the VFP oracle run unattended from the host and its second run in the corpus) and ADR-56 kept and documented are committed and pushed, and the tree is clean. **7a-7:** a VFP-written `T` table deciphered VFP's datetime-key conversion, which CodeBase's bitmap only approximates near 2000, and `T` keys now follow it (ADR-78); `GetDateTime` reads a `T` field to the second (ADR-79). **7a-8:** `Seek(decimal)` and `Seek(DateTime)` with their positional siblings (ADR-80). Every row of `DIVERGENCES.md` is decided by the user (2026-11-14); what they leave to do is listed in §3 below. Next: 7a-11, CodeBase's `CBnnnnn` collations, then the rest of 7a, and 8, the close.**
 The last session changed the process, not the library: `ub-mode`'s rules adapted into
 `DEV_APPROACH.md` (ADR-60), and `tools/` fetching Microsoft's `crap4csharp` and `mutate4csharp`,
 run after each sub-step and before a step closes (`DEV_APPROACH.md` §4). Their first run audited
@@ -108,8 +108,8 @@ its indexes rather than reading them, which is what the whole port exists for �
 can be read whole, its records read in an index tag's order, and the read path is cached.
 `net/CodeBase.Net.sln` builds six projects — `CodeBase.Net` (**no NuGet dependencies** by design,
 ADR-17), `CodeBase.Net.Tests`, `CodeBase.Net.Golden`, `CodeBase.Net.TestUtils`,
-`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4531 tests**,
-1440 of them golden (3091 unit, 1 skipped).
+`CodeBase.Net.Benchmarks` and `CodeBase.Net.Profiling` — and `dotnet test -c Release` is green on **4560 tests**,
+1442 of them golden (3118 unit, 1 skipped).
 
 **Since 2026-11-12 it also reads** CodeBase's long-field-name layout (ADR-72), tags over `RECNO()`
 (ADR-73), the `'7'` datetime with milliseconds (ADR-75), and the `'W'`/`'O'` UTF-16 fields with
@@ -118,7 +118,8 @@ machine-ordered tags, text seeks and `STR()` (ADR-76, ADR-77) — each gated by 
 until the picture is chosen (ADR-74), closing a wrong record set. Since 2026-11-15 `MOD` by zero and
 `SQRT` below zero raise `ExpressionEvaluationException` as VFP does, an expression evaluates only what
 VFP evaluates — the chosen `IIF` branch, `.AND.`/`.OR.` left to right up to the deciding operand — and
-the VFP-only functions answer null for a null operand (ADR-81, ADR-82; case `VFPBAND`).
+the VFP-only functions answer null for a null operand (ADR-81, ADR-82; case `VFPBAND`). `PROPER`
+is the fourteenth of them (ADR-83; case `VFPPROP`).
 
 ```csharp
 using var engine = new CodeBaseEngine();
@@ -342,8 +343,18 @@ in written order, which bounds it: **the port raises only where a VFP scan would
 VFP-only functions dropped a null operand's marking — `ABS(K_NNUM) = 0` admitted the null records, a
 wrong record set — now null as in VFP, gated by VFP's own null keys in the new case `VFPBAND`
 (ADR-82). No golden value moved, and a residual query costs the same. Process: on a sub-step only
-hand-placed mutations, `mutate4csharp` at a step's close (the user). Tests: 3090 unit (1 skipped),
-1440 golden. Committed, not pushed.
+hand-placed mutations, `mutate4csharp` at a step's close (the user). Committed, not pushed.
+
+**Then 7a-10: `PROPER`.** A second new oracle script, `vfpprop.prg`, asked VFP what a word is — 36
+named probes and every byte between two letters, under a `PROPER(K)` tag. On 1251 exactly
+`0x09`–`0x0D`, `0x20` and `0xA0` begin one; an apostrophe, a hyphen, a digit or a full stop do not
+(`O'neil`, `Mary-jane`, `1st Place`, `Mcdonald`). The port tells white space by the character through
+the table's code page, as ADR-65 cases (ADR-83); all 292 keys of the new case `VFPPROP` rebuild, and
+`VFPFUNC`'s `T_PROPER` is no longer skipped. On the way: a step-012 thread-stress test was now and
+then killed by the watchdog in a full run; it runs alone now, in a new non-parallel
+`ThreadStressCollection` (the user's call). And a mutation restore that kept an old write time left
+a mutant in the Release binaries — `DEV_APPROACH.md` §4 now says to touch a restored file. Tests:
+3117 unit (1 skipped), 1442 golden, ten full runs green. Committed, not pushed.
 
 ### Before it (2026-11-14)
 
@@ -1119,8 +1130,7 @@ Sub-steps 1–7 are done, and 7a-1 to 7a-5; the record is the step's
   optimizer scans kept as it is, five improvements recorded in `PORTING-PLAN.md` §2.3. Left of 7a,
   each designed and planned first, in this order (the user's, 2026-11-14): **7a-7** the `T` table,
   ~~**7a-8** `Seek(decimal)`/`Seek(DateTime)`~~ (done), ~~**7a-9** `MOD`/`SQRT` raising~~ (done,
-  with VFP's laziness and null through the band), **7a-10** `PROPER` (it joins the band, so ADR-82's
-  null rule applies to it from the start),
+  with VFP's laziness and null through the band), ~~**7a-10** `PROPER`~~ (done, ADR-83),
   **7a-11** the `CBnnnnn` collations, **7a-12** collated Unicode keys, **7a-13** VFP's GENERAL on
   other code pages, **7a-14** the documentation pass —
   `CB00004`'s refusal, "Differences from CodeBase" entries and XML docs for ADR-43, 45/50, 56 (done),

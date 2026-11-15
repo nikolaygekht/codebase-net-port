@@ -1,0 +1,305 @@
+# CodeBase.NET VFP oracle: what PROPER takes for a word
+# Written by test-files-generator/vfp/vfpprop.prg in Visual FoxPro 9.
+# Do not edit by hand; re-run the script in the VM instead.
+# VFPPROP.DBF and its .cdx are the oracle; this is provenance.
+producer     "Visual FoxPro 09.00.0000.5815 for Windows [Oct 15 2007 09:11:06] Product ID 76683-335-9735121-18548"
+codePage     1251
+collate      MACHINE
+
+[probes]
+# ID  K -> PROPER(K), both trimmed and escaped; ; note
+    1  "john smith" -> "John Smith"   ; control
+    2  "JOHN SMITH" -> "John Smith"   ; the rest lowered
+    3  "jOHN sMITH" -> "John Smith"
+    4  "  leading blanks" -> "  Leading Blanks"   ; a word after leading blanks
+    5  "multiple   spaces" -> "Multiple   Spaces"
+    6  "o'neil" -> "O'neil"   ; apostrophe
+    7  "it's" -> "It's"   ; apostrophe inside a word
+    8  "mary-jane" -> "Mary-jane"   ; hyphen
+    9  "mr.smith" -> "Mr.smith"   ; full stop
+   10  "a.b.c" -> "A.b.c"
+   11  "1st place" -> "1st Place"   ; digit first
+   12  "x1y2z3" -> "X1y2z3"   ; letters after digits
+   13  "3d" -> "3d"
+   14  "under_score word" -> "Under_score Word"   ; underscore
+   15  "slash/word" -> "Slash/word"   ; slash
+   16  "comma,word" -> "Comma,word"   ; comma
+   17  "(paren) word" -> "(paren) Word"   ; bracket first
+   18  "!bang" -> "!bang"   ; punctuation first
+   19  "tab\x09word" -> "Tab\x09Word"   ; tab
+   20  "line\x0Dbreak" -> "Line\x0DBreak"   ; carriage return
+   21  "nbsp\xA0word" -> "Nbsp\xA0Word"   ; no-break space, 0xA0
+   22  "McDonald" -> "Mcdonald"
+   23  "a" -> "A"   ; one letter
+   24  "" -> ""   ; empty
+   25  "\xE8\xE2\xE0\xED \xEF\xE5\xF2\xF0\xEE\xE2" -> "\xC8\xE2\xE0\xED \xCF\xE5\xF2\xF0\xEE\xE2"   ; Cyrillic, lower
+   26  "\xC8\xC2\xC0\xCD \xCF\xC5\xD2\xD0\xCE\xC2" -> "\xC8\xE2\xE0\xED \xCF\xE5\xF2\xF0\xEE\xE2"   ; Cyrillic, upper
+   27  "\xB8lka" -> "\xA8lka"   ; 0xB8, the small io, first
+   28  "abc\xA8" -> "Abc\xB8"   ; 0xA8, the capital io, inside
+   29  "ab\x96cd" -> "Ab\x96cd"   ; 0x96, an en dash
+   30  "a  b" -> "A  B"
+   31  "ABCDEFGHIJKLMNOPQRSTUVWXYZABCD" -> "Abcdefghijklmnopqrstuvwxyzabcd"   ; the whole width
+   32  "x\x00y" -> "X\x00y"   ; a zero byte
+   33  "@home #tag" -> "@home #tag"
+   34  "a\xABb\xBBc" -> "A\xABb\xBBc"   ; 0xAB and 0xBB, guillemets
+   35  "dot. space" -> "Dot. Space"
+   36  .NULL. -> .NULL.   ; null
+   37  "a\x00b" -> "A\x00b"   ; between, 0x00
+   38  "a\x01b" -> "A\x01b"   ; between, 0x01
+   39  "a\x02b" -> "A\x02b"   ; between, 0x02
+   40  "a\x03b" -> "A\x03b"   ; between, 0x03
+   41  "a\x04b" -> "A\x04b"   ; between, 0x04
+   42  "a\x05b" -> "A\x05b"   ; between, 0x05
+   43  "a\x06b" -> "A\x06b"   ; between, 0x06
+   44  "a\x07b" -> "A\x07b"   ; between, 0x07
+   45  "a\x08b" -> "A\x08b"   ; between, 0x08
+   46  "a\x09b" -> "A\x09B"   ; between, 0x09
+   47  "a\x0Ab" -> "A\x0AB"   ; between, 0x0A
+   48  "a\x0Bb" -> "A\x0BB"   ; between, 0x0B
+   49  "a\x0Cb" -> "A\x0CB"   ; between, 0x0C
+   50  "a\x0Db" -> "A\x0DB"   ; between, 0x0D
+   51  "a\x0Eb" -> "A\x0Eb"   ; between, 0x0E
+   52  "a\x0Fb" -> "A\x0Fb"   ; between, 0x0F
+   53  "a\x10b" -> "A\x10b"   ; between, 0x10
+   54  "a\x11b" -> "A\x11b"   ; between, 0x11
+   55  "a\x12b" -> "A\x12b"   ; between, 0x12
+   56  "a\x13b" -> "A\x13b"   ; between, 0x13
+   57  "a\x14b" -> "A\x14b"   ; between, 0x14
+   58  "a\x15b" -> "A\x15b"   ; between, 0x15
+   59  "a\x16b" -> "A\x16b"   ; between, 0x16
+   60  "a\x17b" -> "A\x17b"   ; between, 0x17
+   61  "a\x18b" -> "A\x18b"   ; between, 0x18
+   62  "a\x19b" -> "A\x19b"   ; between, 0x19
+   63  "a\x1Ab" -> "A\x1Ab"   ; between, 0x1A
+   64  "a\x1Bb" -> "A\x1Bb"   ; between, 0x1B
+   65  "a\x1Cb" -> "A\x1Cb"   ; between, 0x1C
+   66  "a\x1Db" -> "A\x1Db"   ; between, 0x1D
+   67  "a\x1Eb" -> "A\x1Eb"   ; between, 0x1E
+   68  "a\x1Fb" -> "A\x1Fb"   ; between, 0x1F
+   69  "a b" -> "A B"   ; between, 0x20
+   70  "a!b" -> "A!b"   ; between, 0x21
+   71  "a\"b" -> "A\"b"   ; between, 0x22
+   72  "a#b" -> "A#b"   ; between, 0x23
+   73  "a$b" -> "A$b"   ; between, 0x24
+   74  "a%b" -> "A%b"   ; between, 0x25
+   75  "a&b" -> "A&b"   ; between, 0x26
+   76  "a'b" -> "A'b"   ; between, 0x27
+   77  "a(b" -> "A(b"   ; between, 0x28
+   78  "a)b" -> "A)b"   ; between, 0x29
+   79  "a*b" -> "A*b"   ; between, 0x2A
+   80  "a+b" -> "A+b"   ; between, 0x2B
+   81  "a,b" -> "A,b"   ; between, 0x2C
+   82  "a-b" -> "A-b"   ; between, 0x2D
+   83  "a.b" -> "A.b"   ; between, 0x2E
+   84  "a/b" -> "A/b"   ; between, 0x2F
+   85  "a0b" -> "A0b"   ; between, 0x30
+   86  "a1b" -> "A1b"   ; between, 0x31
+   87  "a2b" -> "A2b"   ; between, 0x32
+   88  "a3b" -> "A3b"   ; between, 0x33
+   89  "a4b" -> "A4b"   ; between, 0x34
+   90  "a5b" -> "A5b"   ; between, 0x35
+   91  "a6b" -> "A6b"   ; between, 0x36
+   92  "a7b" -> "A7b"   ; between, 0x37
+   93  "a8b" -> "A8b"   ; between, 0x38
+   94  "a9b" -> "A9b"   ; between, 0x39
+   95  "a:b" -> "A:b"   ; between, 0x3A
+   96  "a;b" -> "A;b"   ; between, 0x3B
+   97  "a<b" -> "A<b"   ; between, 0x3C
+   98  "a=b" -> "A=b"   ; between, 0x3D
+   99  "a>b" -> "A>b"   ; between, 0x3E
+  100  "a?b" -> "A?b"   ; between, 0x3F
+  101  "a@b" -> "A@b"   ; between, 0x40
+  102  "aAb" -> "Aab"   ; between, 0x41
+  103  "aBb" -> "Abb"   ; between, 0x42
+  104  "aCb" -> "Acb"   ; between, 0x43
+  105  "aDb" -> "Adb"   ; between, 0x44
+  106  "aEb" -> "Aeb"   ; between, 0x45
+  107  "aFb" -> "Afb"   ; between, 0x46
+  108  "aGb" -> "Agb"   ; between, 0x47
+  109  "aHb" -> "Ahb"   ; between, 0x48
+  110  "aIb" -> "Aib"   ; between, 0x49
+  111  "aJb" -> "Ajb"   ; between, 0x4A
+  112  "aKb" -> "Akb"   ; between, 0x4B
+  113  "aLb" -> "Alb"   ; between, 0x4C
+  114  "aMb" -> "Amb"   ; between, 0x4D
+  115  "aNb" -> "Anb"   ; between, 0x4E
+  116  "aOb" -> "Aob"   ; between, 0x4F
+  117  "aPb" -> "Apb"   ; between, 0x50
+  118  "aQb" -> "Aqb"   ; between, 0x51
+  119  "aRb" -> "Arb"   ; between, 0x52
+  120  "aSb" -> "Asb"   ; between, 0x53
+  121  "aTb" -> "Atb"   ; between, 0x54
+  122  "aUb" -> "Aub"   ; between, 0x55
+  123  "aVb" -> "Avb"   ; between, 0x56
+  124  "aWb" -> "Awb"   ; between, 0x57
+  125  "aXb" -> "Axb"   ; between, 0x58
+  126  "aYb" -> "Ayb"   ; between, 0x59
+  127  "aZb" -> "Azb"   ; between, 0x5A
+  128  "a[b" -> "A[b"   ; between, 0x5B
+  129  "a\\b" -> "A\\b"   ; between, 0x5C
+  130  "a]b" -> "A]b"   ; between, 0x5D
+  131  "a^b" -> "A^b"   ; between, 0x5E
+  132  "a_b" -> "A_b"   ; between, 0x5F
+  133  "a`b" -> "A`b"   ; between, 0x60
+  134  "aab" -> "Aab"   ; between, 0x61
+  135  "abb" -> "Abb"   ; between, 0x62
+  136  "acb" -> "Acb"   ; between, 0x63
+  137  "adb" -> "Adb"   ; between, 0x64
+  138  "aeb" -> "Aeb"   ; between, 0x65
+  139  "afb" -> "Afb"   ; between, 0x66
+  140  "agb" -> "Agb"   ; between, 0x67
+  141  "ahb" -> "Ahb"   ; between, 0x68
+  142  "aib" -> "Aib"   ; between, 0x69
+  143  "ajb" -> "Ajb"   ; between, 0x6A
+  144  "akb" -> "Akb"   ; between, 0x6B
+  145  "alb" -> "Alb"   ; between, 0x6C
+  146  "amb" -> "Amb"   ; between, 0x6D
+  147  "anb" -> "Anb"   ; between, 0x6E
+  148  "aob" -> "Aob"   ; between, 0x6F
+  149  "apb" -> "Apb"   ; between, 0x70
+  150  "aqb" -> "Aqb"   ; between, 0x71
+  151  "arb" -> "Arb"   ; between, 0x72
+  152  "asb" -> "Asb"   ; between, 0x73
+  153  "atb" -> "Atb"   ; between, 0x74
+  154  "aub" -> "Aub"   ; between, 0x75
+  155  "avb" -> "Avb"   ; between, 0x76
+  156  "awb" -> "Awb"   ; between, 0x77
+  157  "axb" -> "Axb"   ; between, 0x78
+  158  "ayb" -> "Ayb"   ; between, 0x79
+  159  "azb" -> "Azb"   ; between, 0x7A
+  160  "a{b" -> "A{b"   ; between, 0x7B
+  161  "a|b" -> "A|b"   ; between, 0x7C
+  162  "a}b" -> "A}b"   ; between, 0x7D
+  163  "a~b" -> "A~b"   ; between, 0x7E
+  164  "a\x7Fb" -> "A\x7Fb"   ; between, 0x7F
+  165  "a\x80b" -> "A\x90b"   ; between, 0x80
+  166  "a\x81b" -> "A\x83b"   ; between, 0x81
+  167  "a\x82b" -> "A\x82b"   ; between, 0x82
+  168  "a\x83b" -> "A\x83b"   ; between, 0x83
+  169  "a\x84b" -> "A\x84b"   ; between, 0x84
+  170  "a\x85b" -> "A\x85b"   ; between, 0x85
+  171  "a\x86b" -> "A\x86b"   ; between, 0x86
+  172  "a\x87b" -> "A\x87b"   ; between, 0x87
+  173  "a\x88b" -> "A\x88b"   ; between, 0x88
+  174  "a\x89b" -> "A\x89b"   ; between, 0x89
+  175  "a\x8Ab" -> "A\x9Ab"   ; between, 0x8A
+  176  "a\x8Bb" -> "A\x8Bb"   ; between, 0x8B
+  177  "a\x8Cb" -> "A\x9Cb"   ; between, 0x8C
+  178  "a\x8Db" -> "A\x9Db"   ; between, 0x8D
+  179  "a\x8Eb" -> "A\x9Eb"   ; between, 0x8E
+  180  "a\x8Fb" -> "A\x9Fb"   ; between, 0x8F
+  181  "a\x90b" -> "A\x90b"   ; between, 0x90
+  182  "a\x91b" -> "A\x91b"   ; between, 0x91
+  183  "a\x92b" -> "A\x92b"   ; between, 0x92
+  184  "a\x93b" -> "A\x93b"   ; between, 0x93
+  185  "a\x94b" -> "A\x94b"   ; between, 0x94
+  186  "a\x95b" -> "A\x95b"   ; between, 0x95
+  187  "a\x96b" -> "A\x96b"   ; between, 0x96
+  188  "a\x97b" -> "A\x97b"   ; between, 0x97
+  189  "a\x98b" -> "A\x98b"   ; between, 0x98
+  190  "a\x99b" -> "A\x99b"   ; between, 0x99
+  191  "a\x9Ab" -> "A\x9Ab"   ; between, 0x9A
+  192  "a\x9Bb" -> "A\x9Bb"   ; between, 0x9B
+  193  "a\x9Cb" -> "A\x9Cb"   ; between, 0x9C
+  194  "a\x9Db" -> "A\x9Db"   ; between, 0x9D
+  195  "a\x9Eb" -> "A\x9Eb"   ; between, 0x9E
+  196  "a\x9Fb" -> "A\x9Fb"   ; between, 0x9F
+  197  "a\xA0b" -> "A\xA0B"   ; between, 0xA0
+  198  "a\xA1b" -> "A\xA2b"   ; between, 0xA1
+  199  "a\xA2b" -> "A\xA2b"   ; between, 0xA2
+  200  "a\xA3b" -> "A\xBCb"   ; between, 0xA3
+  201  "a\xA4b" -> "A\xA4b"   ; between, 0xA4
+  202  "a\xA5b" -> "A\xB4b"   ; between, 0xA5
+  203  "a\xA6b" -> "A\xA6b"   ; between, 0xA6
+  204  "a\xA7b" -> "A\xA7b"   ; between, 0xA7
+  205  "a\xA8b" -> "A\xB8b"   ; between, 0xA8
+  206  "a\xA9b" -> "A\xA9b"   ; between, 0xA9
+  207  "a\xAAb" -> "A\xBAb"   ; between, 0xAA
+  208  "a\xABb" -> "A\xABb"   ; between, 0xAB
+  209  "a\xACb" -> "A\xACb"   ; between, 0xAC
+  210  "a\xADb" -> "A\xADb"   ; between, 0xAD
+  211  "a\xAEb" -> "A\xAEb"   ; between, 0xAE
+  212  "a\xAFb" -> "A\xBFb"   ; between, 0xAF
+  213  "a\xB0b" -> "A\xB0b"   ; between, 0xB0
+  214  "a\xB1b" -> "A\xB1b"   ; between, 0xB1
+  215  "a\xB2b" -> "A\xB3b"   ; between, 0xB2
+  216  "a\xB3b" -> "A\xB3b"   ; between, 0xB3
+  217  "a\xB4b" -> "A\xB4b"   ; between, 0xB4
+  218  "a\xB5b" -> "A\xB5b"   ; between, 0xB5
+  219  "a\xB6b" -> "A\xB6b"   ; between, 0xB6
+  220  "a\xB7b" -> "A\xB7b"   ; between, 0xB7
+  221  "a\xB8b" -> "A\xB8b"   ; between, 0xB8
+  222  "a\xB9b" -> "A\xB9b"   ; between, 0xB9
+  223  "a\xBAb" -> "A\xBAb"   ; between, 0xBA
+  224  "a\xBBb" -> "A\xBBb"   ; between, 0xBB
+  225  "a\xBCb" -> "A\xBCb"   ; between, 0xBC
+  226  "a\xBDb" -> "A\xBEb"   ; between, 0xBD
+  227  "a\xBEb" -> "A\xBEb"   ; between, 0xBE
+  228  "a\xBFb" -> "A\xBFb"   ; between, 0xBF
+  229  "a\xC0b" -> "A\xE0b"   ; between, 0xC0
+  230  "a\xC1b" -> "A\xE1b"   ; between, 0xC1
+  231  "a\xC2b" -> "A\xE2b"   ; between, 0xC2
+  232  "a\xC3b" -> "A\xE3b"   ; between, 0xC3
+  233  "a\xC4b" -> "A\xE4b"   ; between, 0xC4
+  234  "a\xC5b" -> "A\xE5b"   ; between, 0xC5
+  235  "a\xC6b" -> "A\xE6b"   ; between, 0xC6
+  236  "a\xC7b" -> "A\xE7b"   ; between, 0xC7
+  237  "a\xC8b" -> "A\xE8b"   ; between, 0xC8
+  238  "a\xC9b" -> "A\xE9b"   ; between, 0xC9
+  239  "a\xCAb" -> "A\xEAb"   ; between, 0xCA
+  240  "a\xCBb" -> "A\xEBb"   ; between, 0xCB
+  241  "a\xCCb" -> "A\xECb"   ; between, 0xCC
+  242  "a\xCDb" -> "A\xEDb"   ; between, 0xCD
+  243  "a\xCEb" -> "A\xEEb"   ; between, 0xCE
+  244  "a\xCFb" -> "A\xEFb"   ; between, 0xCF
+  245  "a\xD0b" -> "A\xF0b"   ; between, 0xD0
+  246  "a\xD1b" -> "A\xF1b"   ; between, 0xD1
+  247  "a\xD2b" -> "A\xF2b"   ; between, 0xD2
+  248  "a\xD3b" -> "A\xF3b"   ; between, 0xD3
+  249  "a\xD4b" -> "A\xF4b"   ; between, 0xD4
+  250  "a\xD5b" -> "A\xF5b"   ; between, 0xD5
+  251  "a\xD6b" -> "A\xF6b"   ; between, 0xD6
+  252  "a\xD7b" -> "A\xF7b"   ; between, 0xD7
+  253  "a\xD8b" -> "A\xF8b"   ; between, 0xD8
+  254  "a\xD9b" -> "A\xF9b"   ; between, 0xD9
+  255  "a\xDAb" -> "A\xFAb"   ; between, 0xDA
+  256  "a\xDBb" -> "A\xFBb"   ; between, 0xDB
+  257  "a\xDCb" -> "A\xFCb"   ; between, 0xDC
+  258  "a\xDDb" -> "A\xFDb"   ; between, 0xDD
+  259  "a\xDEb" -> "A\xFEb"   ; between, 0xDE
+  260  "a\xDFb" -> "A\xFFb"   ; between, 0xDF
+  261  "a\xE0b" -> "A\xE0b"   ; between, 0xE0
+  262  "a\xE1b" -> "A\xE1b"   ; between, 0xE1
+  263  "a\xE2b" -> "A\xE2b"   ; between, 0xE2
+  264  "a\xE3b" -> "A\xE3b"   ; between, 0xE3
+  265  "a\xE4b" -> "A\xE4b"   ; between, 0xE4
+  266  "a\xE5b" -> "A\xE5b"   ; between, 0xE5
+  267  "a\xE6b" -> "A\xE6b"   ; between, 0xE6
+  268  "a\xE7b" -> "A\xE7b"   ; between, 0xE7
+  269  "a\xE8b" -> "A\xE8b"   ; between, 0xE8
+  270  "a\xE9b" -> "A\xE9b"   ; between, 0xE9
+  271  "a\xEAb" -> "A\xEAb"   ; between, 0xEA
+  272  "a\xEBb" -> "A\xEBb"   ; between, 0xEB
+  273  "a\xECb" -> "A\xECb"   ; between, 0xEC
+  274  "a\xEDb" -> "A\xEDb"   ; between, 0xED
+  275  "a\xEEb" -> "A\xEEb"   ; between, 0xEE
+  276  "a\xEFb" -> "A\xEFb"   ; between, 0xEF
+  277  "a\xF0b" -> "A\xF0b"   ; between, 0xF0
+  278  "a\xF1b" -> "A\xF1b"   ; between, 0xF1
+  279  "a\xF2b" -> "A\xF2b"   ; between, 0xF2
+  280  "a\xF3b" -> "A\xF3b"   ; between, 0xF3
+  281  "a\xF4b" -> "A\xF4b"   ; between, 0xF4
+  282  "a\xF5b" -> "A\xF5b"   ; between, 0xF5
+  283  "a\xF6b" -> "A\xF6b"   ; between, 0xF6
+  284  "a\xF7b" -> "A\xF7b"   ; between, 0xF7
+  285  "a\xF8b" -> "A\xF8b"   ; between, 0xF8
+  286  "a\xF9b" -> "A\xF9b"   ; between, 0xF9
+  287  "a\xFAb" -> "A\xFAb"   ; between, 0xFA
+  288  "a\xFBb" -> "A\xFBb"   ; between, 0xFB
+  289  "a\xFCb" -> "A\xFCb"   ; between, 0xFC
+  290  "a\xFDb" -> "A\xFDb"   ; between, 0xFD
+  291  "a\xFEb" -> "A\xFEb"   ; between, 0xFE
+  292  "a\xFFb" -> "A\xFFb"   ; between, 0xFF
+
+[tags]
+  T_PROPER   expr="PROPER(K)" keyType='C'

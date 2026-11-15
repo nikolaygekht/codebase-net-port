@@ -70,6 +70,7 @@ terms by a tag are recorded for later in `PORTING-PLAN.md` §2.3, beside the col
   witnessed by `vfpband.prg`, with VFP's laziness in `IIF`/`AND`/`OR` so its guards hold; and a
   finding of that design, also done: the thirteen dropped a null operand's marking, a wrong record
   set (`ABS(K_NNUM) = 0` admitted nulls) — now null as in VFP (ADR-82, the user's call 2026-11-15).
+  **`PROPER` done (7a-10, ADR-83)**, its word rule witnessed by `vfpprop.prg` over every byte.
 
 ## 4. Out of scope altogether
 

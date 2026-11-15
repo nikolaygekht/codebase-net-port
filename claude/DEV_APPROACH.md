@@ -273,6 +273,13 @@ way, and step 008 lost it again in a session that had already used the copy-asid
 on other files. The habit does not transfer by itself, so the rule is per-restore and not per-session:
 if a file changed, it comes back from a checksummed copy, never from `git`.
 
+**Then make the build see the restore.** A copy keeps the copy's own write time — `cp -p`, and
+PowerShell's `Copy-Item` always — which is older than the binaries the last mutant built, so an
+incremental build skips the file and the binaries **keep the mutant** while the source and its
+checksum are right. Step 013's 7a-10 lost an afternoon's suite runs to this: green under
+`crap4csharp`'s fresh Debug build, red in Release. Touch the restored file (or build with
+`--no-incremental`) and run the suite once before going on.
+
 ### Measuring it: `tools/`
 
 Two tools put numbers on what this section asks for by hand; [`tools/README.md`](../tools/README.md)

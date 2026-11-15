@@ -738,3 +738,56 @@ byte — no hand-written bytes, and red today on every null record.
    `.NULL.`).
 4. **ADR-81** records the raising, the exception and the lazy walk; **ADR-82** the null rule for the
    thirteen.
+
+## 7a-10 — `PROPER` *(added 2026-11-15, at the user's call of 2026-11-14)*
+
+Visual FoxPro's `PROPER` capitalizes the first letter of each word and lowers the rest; the port
+refuses it as an unknown function, so a VFP tag over it cannot be sought or synchronised, and
+`VFPFUNC.CDX`'s `T_PROPER` is skipped by name in the key-length gate. What VFP takes for a **word**
+its documentation does not say, and `T_PROPER`'s sixteen values do not decide it.
+
+### What VFP does
+
+Witnessed by a new oracle script, `test-files-generator/vfp/vfpprop.prg`: `VFPPROP.DBF` + `.CDX`, a
+nullable `C(30)` over 36 named probes and then `"a" + CHR(b) + "b"` for every byte, one tag
+`PROPER(K)`; `VFPPROP.vfp.dump.txt` for review. On the VM's code page, 1251:
+
+- **A character begins a word when it is the first, or the one before it is white space** — and
+  white space is exactly **`0x09`–`0x0D`, `0x20` and `0xA0`** of the 256 bytes: the C library's
+  `isspace` plus the code page's no-break space. An apostrophe, a hyphen, a full stop, a digit, `_`,
+  `/`, `,`, `(`, `!`, `0x00`, the dashes and the guillemets begin nothing: `O'neil`, `Mary-jane`,
+  `Mr.smith`, `1st Place`, `(paren) Word`, `Mcdonald`.
+- A word's first character is upper-cased, **every other character lower-cased** — `JOHN SMITH` is
+  `John Smith` — by the code page: `ИВАН` is `Иван`, `ё` first is `Ё`, `Ё` inside is `ё`, and so on
+  through the whole of 1251's letters (`Ђ`→`ђ`, `Ј`→`ј`, `Ґ`→`ґ`, `Ѕ`→`ѕ`…).
+- The key keeps the operand's width (`C(30)` keys to 30), and a null operand keys as a null.
+
+### What changes, in short
+
+- **A fourteenth row in the VFP band**, `PROPER`, character in and out, at the operand's width as
+  `UPPER` and `LOWER` are. Being in the band it follows ADR-82's null rule with no code of its own.
+- **`CaseMap.ToProper`**, beside `ToUpper` and `ToLower`, over the same tables: a character is
+  upper-cased where a word begins and lower-cased elsewhere, a whole character at a time in a
+  multi-byte code page as the other two are.
+- **White space is decided by the character, through the table's code page** — U+0009 to U+000D,
+  U+0020 and U+00A0. VFP decides by the byte, through the host's code page; ADR-65 already made the
+  port's casing the table's and not the machine's, and deciding white space the same way keeps the
+  two halves of `PROPER` on one code page. On 1251 the two agree byte for byte, which is what the
+  gate checks. An unmarked table with no host encoding (`CaseMap.Ascii`) has only the ASCII six.
+
+### Classes
+
+| Class | Change |
+|---|---|
+| `FunctionTable`, `FunctionRows` | the `PROPER` row, 208 |
+| `TypeResolver` | `PROPER` keeps the operand's width, with `UPPER` and `LOWER` |
+| `CaseMap` | `ToProper`; the single-byte build gains a 256-entry white-space table, the multi-byte walk a word-start flag |
+| `ExpressionEvaluator` | the `PROPER` row, through `CaseMapped` |
+
+### Decisions
+
+1. **The witnessed white space, by character, on the table's code page** — as above; recorded as
+   **ADR-83**. Rejected: .NET's `char.IsWhiteSpace`, which takes in more than VFP does (U+0085, the
+   U+2000 block) and would make the rule depend on a .NET table rather than on the witness; and the
+   host's code page, which ADR-65 already rejected for casing.
+2. **No change to `UPPER`/`LOWER`.**

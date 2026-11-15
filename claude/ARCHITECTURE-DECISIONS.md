@@ -2838,3 +2838,30 @@ over an absent dividend.
 
 **Consequence.** `VFPBAND`'s every key rebuilds from its record; a filter over one of these functions
 leaves a null record out as VFP does. `PROPER`, joining the band in 7a-10, gets the rule with it.
+
+## ADR-83 — `PROPER`: a word begins after white space only, told by the character on the table's code page · accepted
+
+**Date.** 2026-11-15. Step 013, sub-step 7a-10; adding `PROPER` was the user's call of 2026-11-14.
+
+**Context.** Visual FoxPro's `PROPER` upper-cases each word's first letter and lowers the rest; the
+port refused it, so a VFP tag over it could not be used. What VFP takes for a word is not
+documented. `vfpprop.prg` asked it (`VFPPROP.DBF` + `.CDX`, 292 values, every byte between two
+letters): on its host's code page, 1251, **exactly `0x09`–`0x0D`, `0x20` and `0xA0` begin a word**,
+and nothing else does — not an apostrophe, a hyphen, a full stop, a digit, a bracket or a zero byte
+(`O'neil`, `Mary-jane`, `1st Place`, `Mcdonald`). Every other character is lowered by the code page.
+VFP decides by the **byte**, through the **host's** code page, as it cases.
+
+**Decision.** `PROPER` is a row of the VFP band, at the operand's width. A character begins a word
+when it is the first, or the character before it is one of **U+0009–U+000D, U+0020, U+00A0** —
+decoded through the **table's** code page, as ADR-65 already cases through it. The ASCII map, for an
+unmarked table with no host encoding, has the six ASCII ones. ADR-82's null rule applies.
+
+**Consequence.** All 292 of `VFPPROP`'s keys rebuild, and `VFPFUNC`'s `T_PROPER` is compared with
+the other sixteen tags. On a code page other than the host's, the port and VFP can disagree about a
+byte that is white space in one and a letter in the other (`0xA0` is `á` in cp437) — the same
+disagreement ADR-65 accepted for casing, and for the same reason: the answer must not depend on the
+machine.
+
+**Rejected — .NET's `char.IsWhiteSpace`:** it takes in U+0085 and the U+2000 spaces, which VFP's
+witness does not, and would tie the rule to a .NET table instead of the oracle. **Rejected — the
+host's code page:** ADR-65.

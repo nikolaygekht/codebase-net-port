@@ -98,11 +98,6 @@ public sealed class VisualFoxProFunctionGoldenTests
             }
             catch (CodeBaseException error)
             {
-                // PROPER is Visual FoxPro's and is not in this port; the tag is in the oracle for the
-                // per-function length rule and is named here rather than skipped silently.
-                if (tag.Expression.Contains("PROPER", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
                 failures.Add($"{tag.Name} '{tag.Expression}': refused with {(int)error.Code}");
                 continue;
             }
@@ -115,10 +110,10 @@ public sealed class VisualFoxProFunctionGoldenTests
         }
 
         string.Join(Environment.NewLine, failures).Should().BeEmpty();
-        // Sixteen: the tag directory lists seventeen, because Visual FoxPro attempted eighteen and
-        // STRTRAN's failed at build time on the first row whose result did not fit the width it had
-        // already written a header for. Of the seventeen, PROPER is the one this port does not have.
-        compared.Should().Be(16, "seventeen tags exist and PROPER is not one this port has");
+        // Seventeen: Visual FoxPro attempted eighteen and STRTRAN's failed at build time on the first
+        // row whose result did not fit the width it had already written a header for. PROPER, once
+        // skipped here by name, is in the port since step 013's 7a-10 (ADR-83).
+        compared.Should().Be(17, "every live tag is compared");
     }
 
     [Fact]

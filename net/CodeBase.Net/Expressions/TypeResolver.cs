@@ -498,9 +498,10 @@ internal sealed class TypeResolver
 
             case FunctionRows.Upper:
             case FunctionRows.Lower:
-                // Both keep the operand's width, which is what makes a tag over one of them key to
-                // the field's width -- witnessed in Visual FoxPro's own header for LOWER over a
-                // C(20), which is 20.
+            case FunctionRows.Proper:
+                // All three keep the operand's width, which is what makes a tag over one of them key
+                // to the field's width -- witnessed in Visual FoxPro's own headers for LOWER and
+                // PROPER over a C(20), which are 20.
                 return;
 
             case FunctionRows.Repeat:

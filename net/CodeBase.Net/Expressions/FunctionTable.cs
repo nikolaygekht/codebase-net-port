@@ -329,7 +329,8 @@ internal static class FunctionTable
     /// as well as numbers, and both forms are variadic. [c]AT[/c] takes its occurrence as a real
     /// third operand, which the parser supplies as a literal one when a caller leaves it out.
     /// [c]REPLICATE[/c] takes its count at parse time, because the result's length is the count times
-    /// the operand's and a key cannot be sized without it.
+    /// the operand's and a key cannot be sized without it. [c]PROPER[/c] came last, with its own
+    /// oracle, [c]VFPPROP[/c], for what Visual FoxPro takes for a word (ADR-83).
     /// </value>
     private static readonly FunctionRow[] VisualFoxProTableRows =
     [
@@ -348,6 +349,7 @@ internal static class FunctionTable
         new("ASC", 1100, 3, 0, T.NumericAsDouble, 1, T.Character),                          /* 205 */
         new("LOWER", 1110, 5, 0, T.Character, 1, T.Character),                              /* 206 */
         new("REPLICATE", 1120, 9, 0, T.Character, 1, T.Character),                          /* 207 */
+        new("PROPER", 1130, 6, 0, T.Character, 1, T.Character),                             /* 208 */
     ];
 
     /// <summary>

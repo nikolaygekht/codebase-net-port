@@ -130,6 +130,61 @@ public sealed class CaseMapTests
     }
 
     [Fact]
+    public void ProperCaseUppersAWordsFirstLetterAndLowersTheRestByTheCodePage()
+    {
+        // VFPPROP.vfp.dump.txt, probes 25 and 26: "иван петров", in either case, is "Иван Петров".
+        CaseMap map = CaseMap.For(() => Strict(1251));
+        byte[] lower = [0xE8, 0xE2, 0xE0, 0xED, 0x20, 0xEF, 0xE5, 0xF2, 0xF0, 0xEE, 0xE2];
+        byte[] upper = [0xC8, 0xC2, 0xC0, 0xCD, 0x20, 0xCF, 0xC5, 0xD2, 0xD0, 0xCE, 0xC2];
+        byte[] proper = [0xC8, 0xE2, 0xE0, 0xED, 0x20, 0xCF, 0xE5, 0xF2, 0xF0, 0xEE, 0xE2];
+
+        Proper(map, lower).Should().Equal(proper);
+        Proper(map, upper).Should().Equal(proper);
+    }
+
+    [Theory]
+    // VFPPROP.vfp.dump.txt, the bytes between two letters: on 1251 exactly 0x09-0x0D, 0x20 and the
+    // no-break space 0xA0 begin a word.
+    [InlineData(0x09, true)]
+    [InlineData(0x0A, true)]
+    [InlineData(0x0D, true)]
+    [InlineData(0x20, true)]
+    [InlineData(0xA0, true)]
+    [InlineData(0x00, false)]
+    [InlineData(0x1F, false)]
+    [InlineData(0x27, false)]
+    [InlineData(0x2D, false)]
+    [InlineData(0x31, false)]
+    [InlineData(0x85, false)]
+    [InlineData(0x96, false)]
+    public void OnTheCodePageAWordBeginsAfterWhiteSpaceAndNothingElse(int between, bool begins) =>
+        Proper(CaseMap.For(() => Strict(1251)), [(byte)'a', (byte)between, (byte)'b'])[2]
+            .Should().Be(begins ? (byte)'B' : (byte)'b');
+
+    [Fact]
+    public void TheAsciiMapHasTheAsciiWhiteSpaceOnly()
+    {
+        // An unmarked table with no encoding named: 0xA0 is no character at all there.
+        for (int b = 0; b < 256; b++)
+        {
+            bool begins = b is >= 0x09 and <= 0x0D or 0x20;
+            Proper(CaseMap.Ascii, [(byte)'a', (byte)b, (byte)'b'])[2]
+                .Should().Be(begins ? (byte)'B' : (byte)'b', "0x{0:X2} between", b);
+        }
+    }
+
+    [Fact]
+    public void ProperCaseWalksAMultiByteValueAWholeCharacterAtATime()
+    {
+        // Cyrillic a is 84 70 in Shift-JIS, 70 the ASCII p: the character is upper-cased whole, and
+        // the letter after it does not begin a word, however its bytes look.
+        Encoding shiftJis = Strict(932);
+        CaseMap map = CaseMap.For(() => shiftJis);
+
+        Proper(map, shiftJis.GetBytes("аP а")).Should().Equal(shiftJis.GetBytes("Аp А"));
+    }
+
+    [Fact]
     public void TheMapIsBuiltOnItsFirstUseAndNotBefore()
     {
         // A table whose encoding is unavailable still opens and selects its tags.
@@ -182,6 +237,13 @@ public sealed class CaseMapTests
     {
         byte[] result = new byte[value.Length];
         map.ToUpper(value, result);
+        return result;
+    }
+
+    private static byte[] Proper(CaseMap map, byte[] value)
+    {
+        byte[] result = new byte[value.Length];
+        map.ToProper(value, result);
         return result;
     }
 }

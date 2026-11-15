@@ -304,4 +304,7 @@ internal static class FunctionRows
 
     /// <summary>A string repeated a given number of times.</summary>
     public const int Repeat = 207;
+
+    /// <summary>A string with each word's first letter upper-cased and the rest lowered.</summary>
+    public const int Proper = 208;
 }

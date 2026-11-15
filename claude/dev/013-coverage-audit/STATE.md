@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-9 done; next 7a-10, `PROPER`)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-10 done; next 7a-11, CodeBase's `CBnnnnn` collations)
 
 ## Done so far
 
@@ -460,7 +460,33 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
         files: `EvaluateInto` 12.0 at 100%, every other new or changed member 5.0 or below at 100%;
         `Apply` 112.6 (96.5%) as before — the tool exits 255 on it.
       - Release 3090 passed (1 skipped) + 1440 golden, green.
-    - [ ] 7a-10 — `PROPER` added, gated by `VFPFUNC.CDX`'s `T_PROPER`.
+    - [x] 7a-10 — `PROPER` added (2026-11-15), ADR-83.
+      - **Witness first.** `T_PROPER`'s sixteen values could not say what VFP takes for a word, so
+        `vfpprop.prg` ran in the VM: 36 named probes, then every byte between two letters, under a
+        `PROPER(K)` tag. On 1251 a word begins after exactly `0x09`–`0x0D`, `0x20`, `0xA0`; nothing
+        else (`O'neil`, `Mary-jane`, `1st Place`, `Mcdonald`); the rest lowered by the code page.
+        Port's rule: those characters, decoded through the table's code page (ADR-65's choice).
+      - **a.** `VFPPROP.DBF` + `.CDX` + dump published; the three files only.
+      - **b.** Red: `VisualFoxProProperGoldenTests` (new), `T_PROPER` in the key-length gate (−470),
+        unit tests in `CaseMapTests` and `VisualFoxProFunctionTests` not compiling.
+      - **c.** The row (208), its width beside `UPPER`/`LOWER`, `CaseMap.ToProper` (a 256-entry
+        white-space table for a single-byte page, a word-start flag in the multi-byte walk), the
+        evaluator arm. `ExpressionResolutionGoldenTests`' band count 15 → 16. All 292 keys rebuild,
+        17 VFPFUNC tags compared. Mutations: `0xA0` not white space, a word begun after any byte
+        below `A`, the rest not lowered — each reddens unit and golden; restored, checksum verified.
+      - **d.** ADR-83; `EXPRESSIONS.md` §5.2; `DIVERGENCES.md` §3; `vfp/README.md`,
+        `net/corpus/README.md`, the generator README. `crap4csharp` on the five changed files: the new
+        members 8.0 and below at 100%; `Apply` 113.6 (96.5%), one arm more.
+      - Release 3117 passed (1 skipped) + 1442 golden, green.
+      - **Found on the way, fixed at the user's call:** run as a solution, the unit process was now
+        and then killed by the watchdog (ADR-70) on
+        `EngineTableListConcurrencyTests.OpeningAndClosingFromManyThreads_…` (step 012), whose eight
+        threads competed with the parallel suite. A `[MaxRunTime(2)]` did not hold; the class now
+        runs alone in a new `ThreadStressCollection`, as the timed tests do (ADR-57) — 10 of 10 full
+        runs green.
+      - **And a process trap:** the mutation restore kept the backup's old write time, so the
+        incremental Release build kept the last mutant ("the rest not lowered") while the source was
+        right — `DEV_APPROACH.md` §4 now says to touch a restored file.
     - [ ] 7a-11 — CodeBase's `CBnnnnn` collations, supported.
     - [ ] 7a-12 — collated Unicode keys supported (after 7a-11: the Unicode arrays derive from the
       character ones).

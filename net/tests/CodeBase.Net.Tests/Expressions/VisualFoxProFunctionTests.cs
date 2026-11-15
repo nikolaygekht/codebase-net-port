@@ -223,6 +223,42 @@ public sealed class VisualFoxProFunctionTests
     public void LoweringAndRepeating(string expression, string expected) =>
         Text(expression).Should().Be(expected);
 
+    [Theory]
+    // VFPPROP.vfp.dump.txt: a word begins at the start and after white space, and after nothing
+    // else -- not an apostrophe, a hyphen, a full stop, a digit or a bracket. The rest is lowered.
+    [InlineData("PROPER(\"john smith\")", "John Smith")]
+    [InlineData("PROPER(\"JOHN SMITH\")", "John Smith")]
+    [InlineData("PROPER(\"  leading blanks\")", "  Leading Blanks")]
+    [InlineData("PROPER(\"o'neil\")", "O'neil")]
+    [InlineData("PROPER(\"mary-jane\")", "Mary-jane")]
+    [InlineData("PROPER(\"mr.smith\")", "Mr.smith")]
+    [InlineData("PROPER(\"1st place\")", "1st Place")]
+    [InlineData("PROPER(\"(paren) word\")", "(paren) Word")]
+    [InlineData("PROPER(\"McDonald\")", "Mcdonald")]
+    [InlineData("PROPER(\"\")", "")]
+    public void ProperCaseBeginsAWordOnlyAfterWhiteSpace(string expression, string expected) =>
+        Text(expression).Should().Be(expected);
+
+    [Fact]
+    public void ProperCaseKeepsTheOperandsWidthAndReach()
+    {
+        // Visual FoxPro keys PROPER over a C(30) to 30, as UPPER and LOWER keep their operand's width.
+        Compile("PROPER(\"ab   \")").Length.Should().Be(5);
+        ExpressionValue value = Value("PROPER(TRIM(\"ab   \"))");
+
+        value.Bytes.Length.Should().Be(5);
+        value.TrimmedLength.Should().Be(2);
+    }
+
+    [Fact]
+    public void ProperCaseOfANullIsNull()
+    {
+        ExpressionValue value = OverNulls("PROPER(C_)");
+
+        value.IsNull.Should().BeTrue();
+        value.Type.Should().Be(ExpressionType.Character);
+    }
+
     [Fact]
     public void RepeatingSizesItsResultByTheCountTimesTheOperand()
     {
@@ -245,7 +281,7 @@ public sealed class VisualFoxProFunctionTests
     public void TheReferenceItselfHasNoneOfThemAndTheirRowsSaySo()
     {
         foreach (string name in (string[])["ABS", "INT", "ROUND", "MOD", "MIN", "MAX", "SQRT",
-            "SIGN", "LEN", "AT", "ASC", "LOWER", "REPLICATE"])
+            "SIGN", "LEN", "AT", "ASC", "LOWER", "REPLICATE", "PROPER"])
         {
             int row = FunctionTable.FindByName(name);
 

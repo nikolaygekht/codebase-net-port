@@ -285,6 +285,7 @@ internal sealed class ExpressionEvaluator
             operands[0].Bytes.Length == 0 ? 0 : operands[0].Bytes[0]),
         FunctionRows.Lower => CaseMapped(operands[0], context.CaseMap, upper: false),
         FunctionRows.Repeat => Repeat(node, operands[0]),
+        FunctionRows.Proper => ProperCased(operands[0], context.CaseMap),
 
         >= FunctionRows.Descend and < FunctionRows.Ascend => KeyForm(node, operands[0], complement: true),
         >= FunctionRows.Ascend and <= FunctionRows.LastAscend => KeyForm(node, operands[0], complement: false),
@@ -712,6 +713,21 @@ internal sealed class ExpressionEvaluator
             map.ToUpper(operand.Bytes, result);
         else
             map.ToLower(operand.Bytes, result);
+
+        return ExpressionValue.Text(result, operand.TrimmedLength);
+    }
+
+    /// <summary>
+    /// Upper-cases the first letter of each word and lowers the rest, keeping the length and the trimmed length.
+    /// </summary>
+    /// <value>
+    /// A word begins at the start and after white space only, as Visual FoxPro's own keys show
+    /// (ADR-83); the case changes through the same map as UPPER and LOWER.
+    /// </value>
+    private static ExpressionValue ProperCased(ExpressionValue operand, CaseMap map)
+    {
+        byte[] result = new byte[operand.Bytes.Length];
+        map.ToProper(operand.Bytes, result);
 
         return ExpressionValue.Text(result, operand.TrimmedLength);
     }

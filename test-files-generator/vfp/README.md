@@ -56,6 +56,7 @@ script is checked in for provenance and so the next run is the same run.
 | `VFPFVAL.DBF` | one record per constant expression, the result stored in a field **of its own type** |
 | `VFPFUNC.vfp.dump.txt`, `VFPFVAL.vfp.dump.txt` | what VFP says about both, for review and diff |
 | `VFPTIME.DBF` + `.cdx`, `VFPTIME.vfp.dump.txt` | from `vfptime.prg`: 100 422 datetimes and the tag VFP keyed them into; the dump is provenance only (settings, per-day counts, the tag) and carries no run date |
+| `VFPPROP.DBF` + `.CDX`, `VFPPROP.vfp.dump.txt` | from `vfpprop.prg`: 292 values of a nullable `C(30)` — 36 named probes, then a letter, each of the 256 bytes and a letter — under one tag, `PROPER(K)`. The keys are what VFP takes for a word |
 | `VFPBAND.DBF` + `.CDX`, `VFPBAND.vfp.dump.txt` | from `vfpband.prg`: six records with nulls in a nullable `N` and `C` field, and one tag per VFP-only function over them — VFP's keys for null results. The dump **is** the oracle for what has no bytes: which probes raise, with VFP's error number and message, what a null operand answers, and which operands `IIF`/`AND`/`OR` evaluate |
 
 **The `.DBF`/`.cdx` files are the oracle, not the text dumps.** A double written to a `B` field is
@@ -162,6 +163,17 @@ literal differs (`MOD(.NULL., 0)` is `.NULL.`), which is why the probes use type
 
 Two probes in the dump answer nothing: `ATN2(SQRT(-0), -1)` shows that VFP's `-0` literal is a
 positive zero, so the sign of `SQRT(-0)` stays unknown; and `1/0`'s value prints as asterisks.
+
+## What `vfpprop.prg` settled
+
+Run on 2026-11-15 (step 013, 7a-10); durable form `specs/EXPRESSIONS.md` §5.2, decision ADR-83.
+
+**`PROPER` begins a word after white space and nothing else.** Of the 256 bytes between two letters,
+on the VM's code page 1251, exactly `0x09`–`0x0D`, `0x20` and `0xA0` upper-case the letter after
+them: `isspace` plus the no-break space. Apostrophe, hyphen, full stop, digits, brackets, `_`, `/`,
+`0x00`, the dashes and the guillemets do not — `O'neil`, `Mary-jane`, `Mr.smith`, `1st Place`,
+`(paren) Word`, `Mcdonald`. Everything not upper-cased is lowered, through the whole of 1251
+(`ИВАН ПЕТРОВ` is `Иван Петров`; `Ђ`, `Ј`, `Ґ`, `Ѕ`, `Ё` lower too).
 
 ## Determinism, and the two ways these files differ from the C corpus
 

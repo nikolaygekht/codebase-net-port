@@ -326,3 +326,26 @@ Design: `DESIGN.md` §7a-9. Every expectation below is a row of `VFPBAND.vfp.dum
   and after d; recorded in `STATE.md`. A loss beyond noise goes to the user before f.
 - **Operand order is not source order somewhere.** The decomposer visits operands backwards
   (`QUERY-OPTIMIZER.md` §3); evaluation must not. The `.AND.`-of-three test pins it.
+
+## 7a-10 — `PROPER`
+
+Design: `DESIGN.md` §7a-10. Expectations are `VFPPROP.CDX`'s keys and rows of
+`VFPPROP.vfp.dump.txt`.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 1 Unit (`VisualFoxProFunctionTests`) | the named probes over ASCII, in the port's syntax: words begin after a blank and after nothing else listed; the rest is lowered; width and trimmed length kept; a null operand answers null; the row is in the VFP band |
+| 1 Unit (`CaseMapTests`) | `ToProper` on 1251: Cyrillic first and inside, `0xA0` begins a word, `0x96` does not; on a multi-byte page a trail byte equal to a letter is not cased and a letter after a double-byte character is not a word start; `CaseMap.Ascii` takes the six ASCII white spaces and not `0xA0` |
+| 4 Golden (new `VisualFoxProProperGoldenTests`) | every key of `VFPPROP.T_PROPER` rebuilt from its record — all 256 separators, the null; the oracle's shape (292 records, one null) |
+| 4 Golden (`VisualFoxProFunctionGoldenTests`) | `T_PROPER`'s key length compared with the rest: 17 tags, none skipped |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Publish `VFPPROP` (`copy-vfp-corpus.bat`); `vfpprop.prg` checked in | `git status net/corpus` shows the three files only |
+| b | Tests above, red | they fail — `PROPER` is refused as an unknown function |
+| c | The row, its width, `CaseMap.ToProper`, the evaluator arm | green; hand-placed mutations: `0xA0` dropped from white space, a word begun after any non-letter, the rest not lowered — each reddens the golden |
+| d | Records: ADR-83; `EXPRESSIONS.md` §5.2 and §9.1; `DIVERGENCES.md` §3; `vfp/README.md`, `net/corpus/README.md`, the generator README; this step's `STATE.md` | `crap4csharp` on the changed files |

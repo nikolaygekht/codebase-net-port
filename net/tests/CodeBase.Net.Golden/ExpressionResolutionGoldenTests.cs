@@ -163,7 +163,7 @@ public sealed class ExpressionResolutionGoldenTests
 
         gated.Should().HaveCount(144, "rows the reference's own dump gates");
         UnreachableRows.Should().HaveCount(49, "rows nothing can reach, each with a stated reason");
-        FunctionTable.VisualFoxProRows.Should().HaveCount(15,
+        FunctionTable.VisualFoxProRows.Should().HaveCount(16,
             "rows Visual FoxPro adds, which the reference has none of and which its own oracle gates");
 
         (gated.Count + UnreachableRows.Length).Should().Be(FunctionTable.Rows.Count);
@@ -183,6 +183,7 @@ public sealed class ExpressionResolutionGoldenTests
             "ABS(-1)", "INT(1.5)", "ROUND(1.5,0)", "MOD(5,3)", "MIN(1,2)", "MIN(\"A\",\"B\")",
             "MAX(1,2)", "MAX(\"A\",\"B\")", "SQRT(4)", "SIGN(-3)", "LEN(\"AB\")",
             "AT(\"B\",\"AB\")", "ASC(\"A\")", "LOWER(\"AB\")", "REPLICATE(\"A\",3)",
+            "PROPER(\"AB\")",
         ];
 
         HashSet<int> reached = [];

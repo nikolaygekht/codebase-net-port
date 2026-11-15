@@ -57,6 +57,56 @@ internal sealed class CaseMap
     /// <param name="destination">Where to write, at least as long as the value.</param>
     public void ToLower(ReadOnlySpan<byte> value, Span<byte> destination) => Map(value, destination, upper: false);
 
+    /// <summary>
+    /// Writes a value with each word's first character upper-cased and every other character lowered.
+    /// </summary>
+    /// <param name="value">The stored bytes.</param>
+    /// <param name="destination">Where to write, at least as long as the value.</param>
+    /// <value>
+    /// Visual FoxPro's PROPER. A word begins at the start of the value and after white space, and
+    /// after nothing else: its own keys, over every byte of code page 1251 between two letters, show
+    /// exactly tab, line feed, vertical tab, form feed, carriage return, space and the no-break space
+    /// (ADR-83). White space is told by the character the bytes decode to in the table's code page,
+    /// as the case is; the ASCII map has the six ASCII ones.
+    /// </value>
+    public void ToProper(ReadOnlySpan<byte> value, Span<byte> destination)
+    {
+        if (source is null)
+        {
+            bool begins = true;
+            for (int i = 0; i < value.Length; i++)
+            {
+                MapAscii(value.Slice(i, 1), destination.Slice(i, 1), upper: begins);
+                begins = value[i] < 0x80 && IsWordBreak((char)value[i]);
+            }
+
+            return;
+        }
+
+        Built tables = Tables();
+
+        if (tables.Bytes is { } bytes)
+        {
+            bool begins = true;
+            for (int i = 0; i < value.Length; i++)
+            {
+                destination[i] = (begins ? bytes.Upper : bytes.Lower)[value[i]];
+                begins = tables.WordBreaks![value[i]];
+            }
+        }
+        else
+        {
+            MapProperCharacters(value, destination, tables);
+        }
+    }
+
+    /// <summary>
+    /// Answers whether a character ends a word, so that the one after it begins the next.
+    /// </summary>
+    private static bool IsWordBreak(char c) => c is >= '\t' and <= '\r' or ' ' or (char)0xA0;
+
+    private Built Tables() => LazyInitializer.EnsureInitialized(ref built, () => Built.From(source!()));
+
     private void Map(ReadOnlySpan<byte> value, Span<byte> destination, bool upper)
     {
         if (source is null)
@@ -65,7 +115,7 @@ internal sealed class CaseMap
             return;
         }
 
-        Built tables = LazyInitializer.EnsureInitialized(ref built, () => Built.From(source()));
+        Built tables = Tables();
 
         if (tables.Bytes is { } bytes)
         {
@@ -124,14 +174,53 @@ internal sealed class CaseMap
     }
 
     /// <summary>
-    /// The tables built from one encoding: one pair of byte tables, or one pair of character maps.
+    /// Walks a multi-byte value a character at a time, upper-casing where a word begins and lowering elsewhere.
+    /// </summary>
+    /// <value>
+    /// The same walk as the other two, so a trail byte that equals an ASCII letter is never cased on
+    /// its own, and a character after a double-byte one does not begin a word unless that one was
+    /// white space.
+    /// </value>
+    private static void MapProperCharacters(ReadOnlySpan<byte> value, Span<byte> destination, Built tables)
+    {
+        value.CopyTo(destination);
+
+        var characters = tables.Characters!.Value;
+        Decoder decoder = tables.Decoding.GetDecoder();
+        Span<char> decoded = stackalloc char[4];
+        int start = 0;
+        bool begins = true;
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            int count = decoder.GetChars(value.Slice(i, 1), decoded, flush: false);
+            if (count == 0)
+                continue;
+
+            int length = i + 1 - start;
+            Dictionary<char, byte[]> mapping = begins ? characters.Upper : characters.Lower;
+            if (count == 1 && mapping.TryGetValue(decoded[0], out byte[]? mapped) && mapped.Length == length)
+                mapped.CopyTo(destination[start..]);
+
+            begins = count == 1 && IsWordBreak(decoded[0]);
+            start = i + 1;
+        }
+    }
+
+    /// <summary>
+    /// The tables built from one encoding: one pair of byte tables and the white space, or one pair of character maps.
     /// </summary>
     private sealed class Built
     {
-        private Built(Encoding decoding, (byte[] Upper, byte[] Lower)? bytes, (Dictionary<char, byte[]> Upper, Dictionary<char, byte[]> Lower)? characters)
+        private Built(
+            Encoding decoding,
+            (byte[] Upper, byte[] Lower)? bytes,
+            bool[]? wordBreaks,
+            (Dictionary<char, byte[]> Upper, Dictionary<char, byte[]> Lower)? characters)
         {
             Decoding = decoding;
             Bytes = bytes;
+            WordBreaks = wordBreaks;
             Characters = characters;
         }
 
@@ -140,6 +229,9 @@ internal sealed class CaseMap
 
         public (byte[] Upper, byte[] Lower)? Bytes { get; }
 
+        /// <summary>Gets, for a single-byte code page, whether each byte is white space a word begins after.</summary>
+        public bool[]? WordBreaks { get; }
+
         public (Dictionary<char, byte[]> Upper, Dictionary<char, byte[]> Lower)? Characters { get; }
 
         public static Built From(Encoding encoding)
@@ -147,9 +239,22 @@ internal sealed class CaseMap
             Codec codec = new(encoding);
 
             if (encoding.IsSingleByte)
-                return new Built(codec.Relaxed, (ByteTable(codec, upper: true), ByteTable(codec, upper: false)), null);
+            {
+                return new Built(
+                    codec.Relaxed, (ByteTable(codec, upper: true), ByteTable(codec, upper: false)), WordBreakTable(codec), null);
+            }
 
-            return new Built(codec.Relaxed, null, (CharacterMap(codec, upper: true), CharacterMap(codec, upper: false)));
+            return new Built(codec.Relaxed, null, null, (CharacterMap(codec, upper: true), CharacterMap(codec, upper: false)));
+        }
+
+        private static bool[] WordBreakTable(Codec codec)
+        {
+            bool[] table = new bool[256];
+
+            for (int b = 0; b < 256; b++)
+                table[b] = codec.Decode([(byte)b]) is { Length: 1 } text && IsWordBreak(text[0]);
+
+            return table;
         }
 
         private static byte[] ByteTable(Codec codec, bool upper)

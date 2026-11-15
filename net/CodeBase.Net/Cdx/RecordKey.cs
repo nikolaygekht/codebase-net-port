@@ -126,6 +126,11 @@ internal static class RecordKey
             return CollatedKey.Write(value.Bytes, converter.Collation, converter.CodePage, includeTails: true, key);
         }
 
+        if (converter.Kind == KeyKind.CollatedWideCharacter)
+        {
+            return CollatedKey.WriteWide(value.Bytes, converter.Collation, converter.CodePage, key);
+        }
+
         return ExpressionKey.Write(
             value, converter.Compiled.HasTrim, withIndicator: false, key)
             + (converter.HasNullIndicator ? 1 : 0);

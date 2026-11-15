@@ -195,6 +195,79 @@ public sealed class CollatedKeyTests
         search.Should().Equal(stored);
     }
 
+    // ---------------------------------------------------- the Unicode transform
+
+    /// <summary>Weighs UTF-16 code units under GENERAL on cp1252 into a key of twice their bytes.</summary>
+    private static byte[] Wide(params char[] units)
+    {
+        byte[] value = Encoding.Unicode.GetBytes(units);
+        byte[] key = new byte[2 * value.Length];
+
+        CollatedKey.WriteWide(value, CollationName.General, 1252, key).Should().Be(key.Length);
+        return key;
+    }
+
+    [Fact]
+    public void Wide_HeadsAreBigEndianThenTailsAsZeroAndTheTail()
+    {
+        // t4convertSubSortCompressUnicode (i4conv.c:484-583): A is head 96 tail 0, u-umlaut head 120
+        // tail 4 (COLL4ARR.C), each written as a 16-bit big-endian number.
+        Wide('A', 'ü').Should().Equal(0x00, 96, 0x00, 120, 0x00, 0, 0x00, 4);
+    }
+
+    [Fact]
+    public void Wide_AUnitFrom256UpWeighsAsItselfWithNoTail()
+    {
+        Wide('Ж', 'A').Should().Equal(0x04, 0x16, 0x00, 96, 0x00, 0, 0x00, 0x00);
+    }
+
+    [Fact]
+    public void Wide_OnlyTrailingSpacesAreDroppedAndTheBlankOfAWideFieldIsWeighed()
+    {
+        // U+0020 at the end is dropped (i4conv.c:517-524); U+2000, what CodeBase blanks a wide field
+        // with, is a unit from 256 up like any other.
+        Wide('A', ' ').Should().Equal(0x00, 96, 0x00, 0, 0x00, 0, 0x00, 0x00);
+        Wide('A', ' ').Should().Equal(0x00, 96, 0x20, 0x00, 0x00, 0, 0x00, 0x00);
+    }
+
+    [Fact]
+    public void Wide_AUnitBelow256IsWeighedAsTheByteOfThatNumber()
+    {
+        // collate4setupUnicodeFromChar (u4util.c:2733-2741) copies the byte table's first 256 entries:
+        // U+009C, a C1 control, is cp1252's byte 0x9C, oe, and expands; U+0153, the real oe, is a unit
+        // from 256 up and keys as itself.
+        // One unit keys to four bytes, which the two heads of its expansion fill: no room for tails.
+        Wide('\u009C').Should().Equal(0x00, 114, 0x00, 102);
+        Wide('œ').Should().Equal(0x01, 0x53, 0x00, 0x00);
+    }
+
+    [Fact]
+    public void Wide_ANamedCollationIgnoresTheCodePage()
+    {
+        byte[] value = Encoding.Unicode.GetBytes("é");
+        byte[] onCp1252 = new byte[4];
+        byte[] onCp850 = new byte[4];
+
+        CollatedKey.WriteWide(value, CollationName.GeneralCp850, 1252, onCp1252);
+        CollatedKey.WriteWide(value, CollationName.GeneralCp850, 850, onCp850);
+
+        onCp1252.Should().Equal(onCp850);
+    }
+
+    [Fact]
+    public void Wide_APartialSearchIsTheHeadsOfTheGivenUnits()
+    {
+        // Not the reference's: its partial seek scans for a byte below sixteen and every head here
+        // begins with one, so it searches zero bytes (D4SEEK.C:104-140). The heads alone are the
+        // prefix of every stored key that begins with these units (ADR-85).
+        byte[] key = new byte[8];
+
+        int length = CollatedKey.WriteWideSearch(Encoding.Unicode.GetBytes("Aü"), CollationName.General, 1252, key);
+
+        length.Should().Be(4);
+        key[..4].Should().Equal(0x00, 96, 0x00, 120);
+    }
+
     [Fact]
     public void ByName_AGeneralCollationStillWritesHeadsThenTails()
     {

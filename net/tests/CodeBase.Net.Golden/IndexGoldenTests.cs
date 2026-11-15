@@ -20,14 +20,14 @@ public sealed class IndexGoldenTests
 {
     /// <summary>Every index file the corpus holds, with the table it belongs to.</summary>
     public static TheoryData<string> AllIndexes() =>
-        ["CDXBASE.cdx", "CDXCOLL.cdx", "CDXDEEP.cdx", "CDXTIME.cdx", "DTMILLI.cdx", "IDXONE.cdx", "IDXONE.IDX", "LONGNAME.cdx", "RECNOTAG.cdx", "TAGCTX.cdx", "TAGGEN.cdx", "WSTR.cdx"];
+        ["CBCP1250.cdx", "CBCP1252.cdx", "CBCP850.cdx", "CDXBASE.cdx", "CDXCOLL.cdx", "CDXDEEP.cdx", "CDXTIME.cdx", "DTMILLI.cdx", "IDXONE.cdx", "IDXONE.IDX", "LONGNAME.cdx", "RECNOTAG.cdx", "TAGCTX.cdx", "TAGGEN.cdx", "WGEN.cdx", "WSTR.cdx"];
 
     [Fact]
     public void TheGateCoversEveryIndexInTheCorpus()
     {
         // Part of the gate rather than commentary: a data-driven suite that discovers nothing reports
         // success having proved nothing. Eleven files, and the two shapes of one tree among them.
-        AllIndexes().Should().HaveCount(12);
+        AllIndexes().Should().HaveCount(16);
     }
 
     [Theory]
@@ -329,7 +329,10 @@ public sealed class IndexGoldenTests
         // rather than assumed.
         Dictionary<(string, int), byte> padBytes = [];
 
-        foreach (DumpIndexTag tag in expected.RealTags)
+        // Only machine-collated tags ask: a collated tag's header settles its own pad, NUL (ADR-27). A
+        // simple collation keys at the field's width, as machine order does, so the two would collide
+        // on expression and width alone.
+        foreach (DumpIndexTag tag in expected.RealTags.Where(t => t.SortSequence.Length == 0))
         {
             (string, int) key = (Text(tag.ExpressionBytes), tag.KeyLength);
 

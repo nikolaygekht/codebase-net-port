@@ -398,6 +398,19 @@ rebuilt and found by value and by prefix.
   entries 0-255 copy the char heads (byte-swapped) and tails, entries 256-65535 map to
   themselves big-endian with no tail (`collate4setupUnicodeFromChar`, u4util.c:2700-2790;
   rationale comment d4data.h:104-107).
+* **What that means, witnessed** by `net/corpus/WGEN` (step 013, 7a-12, ADR-85): a unit below 256 is
+  weighed as the **byte of that number** in the collation's code page — U+009C, a C1 control, expands
+  to OE through cp1252's 0x9C while U+0153, the real œ, keys as `01 53`. Tails are written `00 tt`.
+  Only U+0020 is stripped, so the **U+2000** CodeBase blanks a wide field with is weighed (`20 00`):
+  "ABC" assigned and "ABC  " assigned key differently. No tail-count guard, unlike §3.4.
+* **Head-and-tail collations only.** A simple collation (§3.5) over Unicode is refused at open
+  ("not implemented yet", i4init.c:659), and at create the table builder errors (u4util.c:2756-2761).
+* **The setting at create** is `CODE4.collateNameUnicode` in `i4create` (i4create.c:981-988), but
+  `i4tagAdd` reads the character `collateName` for a wide tag, because `isUnicode` is not yet set
+  there (i4add.c:746-750).
+* **A shorter value sought by text** finds nothing useful in the reference: the partial-seek tail
+  (D4SEEK.C:129-137) ends the heads at the first byte below 16, which is the zero byte every head
+  begins with, so the search is zero bytes long. The port seeks the heads of the given units (ADR-85).
 
 ### 3.7 Machine collation for `r4str`
 

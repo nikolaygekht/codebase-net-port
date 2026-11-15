@@ -870,3 +870,55 @@ tests open, walk, seek and synchronise every tag.
    the cp1252 Spanish table, because that is what its keys hold.
 2. **`CB00004` refused** (the user, 2026-11-14) and recorded with the rest as **ADR-84**.
 3. **No Unicode** under these collations yet (7a-12).
+
+## 7a-12 — collated Unicode keys *(added 2026-11-15, at the user's call of 2026-11-14)*
+
+A tag over a `'W'` or `'O'` field with a collation — CodeBase's extension, VFP has no such field — is
+refused (ADR-76 read the machine-ordered ones only). The user decided to support it.
+
+### What the reference does
+
+- **Which collations** (i4init.c:621-666): the head-and-tail ones only — GENERAL by code page or by
+  name, and Avaya. A simple collation over Unicode is "not implemented yet": the open fails
+  (`e4notSupported`). The setting at create is `CODE4.collateNameUnicode`, apart from the character
+  one (i4create.c:979-1007); the header name is written by the same rules.
+- **The table** (`collate4setupUnicodeFromChar`, u4util.c:2700-2793) has 65 536 entries: **code
+  units 0–255 take the byte table's entry of the same number** — U+00E9 is weighed as byte `0xE9` of
+  the collation's code page, whatever character that byte is there — and every unit from 256 up
+  weighs as itself, with no tail. Heads are stored as 16-bit big-endian numbers; the expansion marker
+  and its index carry over, so U+009C expands to OE in cp1252 while U+0153, the real œ, does not.
+- **The transform** (`t4convertSubSortCompressUnicode`, i4conv.c:484-583): the key is twice the
+  value's bytes. Trailing **U+0020** are dropped — and only those, so the U+2000 CodeBase fills a
+  wide field's tail with is weighed like any character. Then a big-endian head per code unit (two for
+  an expanding one), then the tails, each as `00 tt`, as many as fit, then zeros. Unlike the
+  character transform there is no tail-count guard.
+- **Seeking a string** (D4SEEK.C:104-140) goes through the same partial-seek tail: on a key whose
+  every head begins with a `00` byte, the scan for "the first byte below 16" stops at once, so a
+  shorter value seeks **zero bytes** — the first key of the tag. A reference defect, not a rule.
+
+### What changes, in short
+
+- **`KeyKind.CollatedWideCharacter`**, chosen for a wide expression under a head-and-tail collation;
+  a simple one stays refused, naming the reason.
+- **`CollatedKey.WriteWide`**: the Unicode transform, from the byte table the collation already has
+  — no 65 536-entry table is built.
+- **Keys from records** (`RecordKey`), **the key-length check** (the per-character add applies) and
+  **seeks by text** (`TableTagCursor`, `Table.Search`): a whole search pads the value with U+2000 to
+  the field's width, as a stored value is, and weighs it; **a prefix search weighs the given code
+  units' heads, no tails** — the meaningful prefix of every stored key that begins so, where the
+  reference finds nothing useful.
+
+### Corpus case — `WGEN`, by the C generator
+
+cp1252, `K_W W(20)` and `K_O O(12)`. Each code unit 1–255 alone in a row, then words: case
+variants, accents, æ (U+00E6, expands), œ as U+0153 (does not) and as U+009C (does), ß, þ, Cyrillic
+and CJK (themselves), a blank and an empty value (U+2000), trailing real spaces, a U+2000 inside, a
+surrogate pair, U+FFFF. Tags: `W_MACH` (machine, the control), `W_GEN` and `W_GDESC` (GENERAL),
+`W_AVAYA` (`CB00008`), `W_G850` (`CB00007`, GENERAL cp850 by name on a cp1252 table), `O_GEN`.
+
+### Decisions
+
+1. **Supported where the reference supports it**, refused where it does not (simple collations).
+2. **The prefix seek is the meaningful one**, not the reference's zero-length search — recorded in
+   **ADR-85** with the rest. The whole-value seek and every key are the reference's.
+3. **No `ASCEND`/`DESCEND` of a wide value** under any collation: still refused (ADR-76).

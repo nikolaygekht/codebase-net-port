@@ -21,6 +21,9 @@ internal enum KeyKind
     /// <summary>CodeBase's UTF-16 text in machine order: each code unit's two bytes swapped.</summary>
     WideCharacter,
 
+    /// <summary>CodeBase's UTF-16 text weighed through a head-and-tail collation: 16-bit heads, then tails (ADR-85).</summary>
+    CollatedWideCharacter,
+
     /// <summary>An eight-byte double, which numeric, float and true double fields all become.</summary>
     Double,
 
@@ -199,7 +202,9 @@ internal sealed class SeekConverter
     private static void RefuseIfTheKeyLengthDisagrees(
         CompiledExpression compiled, KeyKind kind, bool candidate, IndexHeader header, string expression)
     {
-        int perCharacterAdd = kind == KeyKind.CollatedCharacter ? compiled.Tag!.Value.PerCharacterAdd : 0;
+        int perCharacterAdd = kind is KeyKind.CollatedCharacter or KeyKind.CollatedWideCharacter
+            ? compiled.Tag!.Value.PerCharacterAdd
+            : 0;
         int unreserved = candidate && ExpressionKey.CanBeAbsent(compiled) ? 1 : 0;
         int computed = ExpressionKey.Length(compiled, perCharacterAdd) - unreserved;
 
@@ -229,7 +234,8 @@ internal sealed class SeekConverter
         KeyKind kind = KindOf(compiled.ResultType, collation, expression);
         bool converts = compiled.Nodes.Any(n => n.Row is >= FunctionRows.Descend and <= FunctionRows.LastAscend);
 
-        if ((kind == KeyKind.CollatedCharacter || (converts && collation != CollationName.Machine))
+        if ((kind is KeyKind.CollatedCharacter or KeyKind.CollatedWideCharacter
+                || (converts && collation != CollationName.Machine))
             && !CollationWeights.Supports(collation, codePage))
         {
             throw new CodeBaseException(
@@ -347,11 +353,14 @@ internal sealed class SeekConverter
             ExpressionType.Character or ExpressionType.Memo or ExpressionType.General =>
                 collation == CollationName.Machine ? KeyKind.Character : KeyKind.CollatedCharacter,
             ExpressionType.WideString or ExpressionType.WideStringWithLength =>
-                collation == CollationName.Machine ? KeyKind.WideCharacter : throw new CodeBaseException(
+                collation == CollationName.Machine ? KeyKind.WideCharacter
+                : !CollationWeights.IsSimple(collation) ? KeyKind.CollatedWideCharacter
+                : throw new CodeBaseException(
                     ErrorCode.NotSupported,
-                    $"The key expression '{expression}' is a wide string collated {collation}, whose keys " +
-                    "come from CodeBase's Unicode weight tables, which this library does not have. Only " +
-                    "a machine-ordered wide tag is read."),
+                    $"The key expression '{expression}' is a wide string collated {collation}, a simple " +
+                    "collation, which CodeBase does not implement for Unicode either: it refuses to open " +
+                    "such a tag (i4init.c:659). A wide tag is read in machine order or under GENERAL or " +
+                    "Avaya."),
             ExpressionType.NumericAsText or ExpressionType.NumericAsDouble
                 or ExpressionType.DateAsDouble => KeyKind.Double,
             ExpressionType.DateAsText => KeyKind.Date,

@@ -81,6 +81,9 @@ it in [the decision record](claude/ARCHITECTURE-DECISIONS.md):
   CodeBase reads from three tables (`coll4inf`, `collate4`, `compres4`) on its user's own disk; no
   index carries them. CodeBase's other collations — Croatian, Spanish, Avaya, and GENERAL by name,
   `CB00002` to `CB00010` — are read and sought.
+- **`SeekPrefix` on a collated `W` or `O` tag finds what begins with the prefix** (ADR-85). CodeBase,
+  given a value shorter than the key, searches zero bytes and lands on the tag's first key. Whole
+  values, and every key, are CodeBase's.
 - **A `W` field on a Visual FoxPro 9 table (`0x32`) is refused** (ADR-76). There it is VFP 9's Blob;
   CodeBase reads it as its own UTF-16 string and gets it wrong. Elsewhere `W` and `O` are read, and
   their unassigned tail is U+2000, which is what CodeBase writes there — not a space.

@@ -206,6 +206,7 @@ and its own subdirectory.
 | `DTMILLI.DBF` | `0x30` | the `'7'` datetime with milliseconds, assigned as `CCYYMMDDHH:MM:SS.MMM`: 300 moments over four days, one blank; ascending and descending tags. `dump.cpp` prints `r4dateTimeMilli` through `f4dateTime` as it does `r4dateTime` |
 | `WSTR.DBF` | `0x30` | the `'W'` and `'O'` UTF-16 fields, cp1251: 26 strings spelled as code units, four tags (two over `K_W`, one over `K_O`, one over `STR(K_W)`), an expression dump and six filters. **Needs the host's ANSI code page to be 1251** — `STR` of a wide field narrows by it — and stops with an error otherwise |
 | `CBCP1250.DBF`, `CBCP1252.DBF`, `CBCP850.DBF` | `0x30` | case `CBCOLL` (`case-cbcoll.cpp`), CodeBase's `CBnnnnn` collations: one table per code page, a `C(12)` field with every byte 1–255 alone and some words, a machine tag by `i4create`, then each collated tag by `i4tagAdd` with `sort4croatian`, `sort4croatianUpper`, `sort4spanish`, or `CODE4.collateName` set around the call — `CB00002`, 3, 5–10, every ordinal but machine and the disk-loaded one |
+| `WGEN.DBF` | `0x30` | case `WGEN` (`case-wgen.cpp`), collated Unicode keys, cp1252: `W` and `O` fields, every code unit U+0001–U+00FF and some words, a machine tag by `i4create`, then `GENERAL`, Avaya and GENERAL cp850 tags by `i4tagAdd` — with the **character** `collateName` set around the call, because `i4tagAdd` reads that one for a wide tag (`i4add.c:746-750`). No descending collated tag: the reference dies with an access violation dumping one |
 
 One case is not a corpus case at all:
 

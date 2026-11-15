@@ -76,6 +76,7 @@ int main( int argc, char **argv )
    if ( rc == 0 ) rc = caseDtMilli( &cb, outDir );
    if ( rc == 0 ) rc = caseWstr( &cb, outDir );
    if ( rc == 0 ) rc = caseCbColl( &cb, outDir );
+   if ( rc == 0 ) rc = caseWgen( &cb, outDir );
 
    /* Last, and not part of the corpus proper: the benchmark table, into
     * <outDir>\benchmark, with no dump. */

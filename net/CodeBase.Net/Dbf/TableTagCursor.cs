@@ -148,6 +148,28 @@ internal sealed class TableTagCursor
                 length = WideSearch(value, prefix, into);
                 break;
 
+            case KeyKind.CollatedWideCharacter when prefix:
+                length = CollatedKey.WriteWideSearch(
+                    value[..(Math.Min(value.Length, resolved.Compiled.Length) & ~1)],
+                    resolved.Collation,
+                    resolved.CodePage,
+                    into);
+                break;
+
+            case KeyKind.CollatedWideCharacter:
+                // A whole search pads the text with U+2000 to the field's width, as CodeBase blanks a
+                // stored value, so it weighs to the key of the text that was assigned (ADR-85).
+                Span<byte> wide = stackalloc byte[resolved.Compiled.Length];
+                for (int i = 0; i + 1 < wide.Length; i += 2)
+                {
+                    wide[i] = 0x00;
+                    wide[i + 1] = 0x20;
+                }
+
+                value[..(Math.Min(value.Length, wide.Length) & ~1)].CopyTo(wide);
+                length = CollatedKey.WriteWide(wide, resolved.Collation, resolved.CodePage, into);
+                break;
+
             case KeyKind.CollatedCharacter when prefix:
                 length = CollatedKey.WriteSearch(
                     value, resolved.Collation, resolved.CodePage, resolved.KeyLength, into);

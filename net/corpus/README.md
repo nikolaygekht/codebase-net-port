@@ -44,6 +44,7 @@ turns out to be untested, add a generator case and regenerate.
 | `DTMILLI.DBF` + `.cdx` | `0x30` | **CodeBase's `'7'` datetime with milliseconds**, which VFP never writes. 300 moments: seconds by a stride of 7919 across the day, so both flagged and unflagged seconds of `flags4dateTime` are reached, with milliseconds 0, 1, 123, 250, 499, 500, 501, 876, 998, 999; the day's edges; a repeated moment; one blank record. Tags `M_ASC` and `M_DESC` over the field by `i4create`. Its keys are `t4dateTimeToFoxMilli`'s. ADR-75. |
 | `WSTR.DBF` + `.cdx` | `0x30` | **CodeBase's `'W'` and `'O'` UTF-16 fields**, code page `0xC9` (cp1251). 26 records: ASCII, Cyrillic, a value of exactly the width and one cut at it, an empty and a never-assigned one (U+2000 tails), code points Windows best-fits and .NET does not, ones cp1251 holds, one with no near character, a surrogate pair, an embedded U+2000, a repeat. Tags `W_ASC`, `W_DESC` over `K_W`, `O_ASC` over `K_O`, `S_ASC` over `STR(K_W)`, by `i4create`. Beside the usual dumps, `WSTR.expr.dump.txt` (the field expressions and `STR` forms, their values, three refusals) and six filters over `STR(K_W)`. **Generated on a host whose ANSI code page is 1251**, because the reference narrows `STR` by it; the case refuses to run elsewhere. ADR-76, ADR-77. |
 | `CBCP1250.DBF`, `CBCP1252.DBF`, `CBCP850.DBF`, each + `.cdx` | `0x30` | **CodeBase's `CBnnnnn` collations** (case `CBCOLL`), one table per code page — cp1250 (`0xC8`), cp1252 (`0x03`), cp850 (`0x02`) — each with one `C(12)` field holding every byte 1–255 alone and then words in the page's letters, under a machine tag `C_MACH` and the CodeBase collations: `C_HR` `CB00005` and `C_HRU` `CB00006` (Croatian, simple); `C_ES` `CB00009`/`CB00010` (Spanish, simple); `C_AVAYA` `CB00008`; `C_G437` `CB00003`, `C_G850` `CB00007` and `C_G1252` `CB00002` (GENERAL by name on a table of another code page). Simple keys are the field's width, the others twice it. 269, 267 and 262 records. ADR-84. |
+| `WGEN.DBF` + `.cdx` | `0x30` | **Collated Unicode keys** (case `WGEN`), cp1252: `K_W W(20)` and `K_O O(12)`, every code unit U+0001–U+00FF alone and then words — case and accent variants, æ, œ as U+0153 and as U+009C, ß, þ, Cyrillic, CJK, an empty and a blank value, real trailing spaces against the U+2000 tail, a surrogate pair, U+FFFF. Tags `W_MACH` (control), `W_GEN` and `O_GEN` (`GENERAL`), `W_AVAYA` (`CB00008`), `W_G850` (`CB00007`). No descending collated tag: the reference crashes dumping one. 279 records. ADR-85. |
 
 ## Benchmark data — `benchmark/`
 
@@ -117,7 +118,7 @@ The seven memo and type tables hold **32 records** each; rows 1-3 carry the edge
 minimum/maximum, blank/empty). The index tables hold 32, 600, 32 and 300 respectively — depth needs
 records, and a wide key needs fewer of them. `CMPMEMO` holds 8, one per payload length that matters,
 `QRYGATE` 24, `TAGCTX`, `TAGGEN` and `LONGNAME` 8 each, `RECNOTAG` 10, `DTMILLI` 300, `WSTR` 26,
-`TAGBAD` and `FLAGS30` 4, and `CBCP1250`, `CBCP1252`, `CBCP850` 269, 267 and 262.
+`TAGBAD` and `FLAGS30` 4, `CBCP1250`, `CBCP1252`, `CBCP850` 269, 267 and 262, and `WGEN` 279.
 
 ### What `CMPMEMO` pins down
 
@@ -134,7 +135,7 @@ record with no memo shows `block=0 type=0 stored=0`. Only this table has one.
 
 `CMPMEMO.fpt`'s compressed bytes are what zlib 1.3.1 produced; see the generator README.
 
-`CBCP1250`, `CBCP1252`, `CBCP850`, `CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `DTMILLI`, `IDXONE`, `LONGNAME`, `QRYGATE`, `RECNOTAG`, `TAGBAD`, `TAGCTX`, `TAGGEN` and `WSTR` are the tables whose header byte 28 carries the
+`CBCP1250`, `CBCP1252`, `CBCP850`, `CDXBASE`, `CDXDEEP`, `CDXCOLL`, `CDXTIME`, `DTMILLI`, `IDXONE`, `LONGNAME`, `QRYGATE`, `RECNOTAG`, `TAGBAD`, `TAGCTX`, `TAGGEN`, `WGEN` and `WSTR` are the tables whose header byte 28 carries the
 production-index bit (`0x01`), which `i4create` sets when the index file is the table's own
 (`i4create.c:1404-1418`).
 

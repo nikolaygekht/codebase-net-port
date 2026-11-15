@@ -24,7 +24,7 @@ Here a user hits an error.
 | GENERAL on a code page other than 1252/437/850, and VFP's named collations | refuses cp1250 (E84907); on other pages no branch matches (i4init.c:378-405) | **Decided 2026-11-14 (7a): to be tried**, user's call — VFP's weights recovered from keys VFP writes, through the VFP oracle. Planned as 7a-13. Not a divergence from CodeBase but VFP compatibility beyond it |
 | ~~The `W` and `O` UTF-16 fields~~ | reads them | **Resolved 2026-11-12 (7a-5): supported**, user's call (ADR-76): read, machine-ordered keys and seeks, `STR()` by the table's code page (ADR-77), gated by `WSTR`; `W` on a `0x32` table refused as VFP 9's Blob |
 | Keys of the OLE-DB types | supports them | **Decided 2026-11-14 (7a): not supported**, user's call — out of scope, `PORTING-PLAN.md` §2.2 |
-| Collated Unicode keys (a `W` tag under a collation) | supports them, the Unicode arrays derived from the character ones (`collate4setupUnicodeFromChar`, u4util.c) | **Decided 2026-11-14 (7a): to be supported**, user's call |
+| Collated Unicode keys (a `W` tag under a collation) | supports them, the Unicode arrays derived from the character ones (`collate4setupUnicodeFromChar`, u4util.c) | **Decided 2026-11-14 (7a): to be supported**, user's call. **Done 2026-11-15 (7a-12, ADR-85)**, case `WGEN`; the prefix seek is the meaningful one, not the reference's zero-length search |
 
 ## 2. Where the optimizer answers by a scan instead of a tag
 

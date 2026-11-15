@@ -100,7 +100,8 @@ server stack, a report writer, OLE-DB glue, and half a dozen platforms. We port 
 - **Multi-table relations** (`relate4createSlave` and the join/skip machinery in `r4relate.c`).
   The *optimizer itself* is now IN scope (§2.1, `QUERY`); only joins are deferred.
 - Unicode (`r5wstr`/`r5wstrLen`) collated index keys (CodeBase extension; VFP has none).
-  **Decided 2026-11-14: to be supported** (step 013, 7a).
+  **Decided 2026-11-14: to be supported** — **done 2026-11-15** for the head-and-tail collations
+  (013, 7a-12, ADR-85, case `WGEN`); the simple ones the reference refuses too.
 - Additional VFP collations beyond GENERAL (DUTCH, NORDAN, croatian/spanish/avaya tables) — the
   croatian/spanish/avaya tables exist in `COLL4ARR.C` and could be ported; VFP's own extra drivers
   would have to be captured from VFP itself. **Decided 2026-11-14:** CodeBase's `CBnnnnn` tables

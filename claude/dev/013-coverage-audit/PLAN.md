@@ -372,3 +372,24 @@ Design: `DESIGN.md` §7a-11.
 | b | Tests above, red | the golden ones fail at open on `CBnnnnn`; the unit ones do not compile |
 | c | `CollationName`, `IndexHeader`, `CollationTables`, `CollationWeights`, `CollatedKey`, the call sites | green; hand-placed mutations: a named collation weighed by the code page, trailing blanks dropped in the simple transform, the GENERAL partial scan applied to a simple tag — each reddens a test |
 | d | Records: ADR-84; `KEY-COLLATION.md` §3.3 (line ranges), §3.5, §4.1; `DIVERGENCES.md` §1; `README.md` "Differences from CodeBase" (`CB00004`); `net/corpus/README.md`, generator README; `STATE.md` files | `crap4csharp` on the changed files |
+
+## 7a-12 — collated Unicode keys
+
+Design: `DESIGN.md` §7a-12.
+
+### Tests
+
+| Layer | Tests |
+|---|---|
+| 1 Unit (`CollatedKeyTests`) | `WriteWide`: big-endian heads, `00 tt` tails, twice the bytes; only trailing U+0020 dropped, U+2000 weighed; a unit from 256 up weighs as itself with no tail; U+009C expands and U+0153 does not; a unit below 256 indexes the byte table by its number on any code page |
+| 1 Unit (`SeekConverterTests` or `KeyKindTests`) | a wide tag under GENERAL or Avaya is `CollatedWideCharacter`; under a simple collation it is refused naming the reason |
+| 4 Golden | `WGEN` in `KeyTransformGoldenTests` (every key of six tags rebuilt) and in the data-driven gates' lists; every record of each collated wide tag sought by its value through `Table.Seek`, and by a two-character prefix |
+
+### Sub-steps
+
+| # | Step | Verify by |
+|---|---|---|
+| a | Generator case `case-wgen.cpp`; build, run, `copy-corpus.bat` | every existing corpus file byte-identical; a second run identical; the headers show `GENERAL`, `CB00008`, `CB00007` |
+| b | Tests above, red | the golden ones fail at open (a collated wide tag refused); the unit ones do not compile |
+| c | `KeyKind`, `SeekConverter`, `CollatedKey.WriteWide`, `RecordKey`, `TableTagCursor`, `Table.Search` | green; hand-placed mutations: U+2000 stripped like U+0020, tails written little-endian, units from 256 given a tail, the prefix search with tails — each reddens a test |
+| d | Records: ADR-85; `KEY-COLLATION.md` §3.6; `DIVERGENCES.md` §3; `README.md` (the prefix seek); `net/corpus/README.md`, generator README; `STATE.md` files | `crap4csharp` on the changed files |

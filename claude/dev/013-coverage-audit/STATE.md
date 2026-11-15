@@ -5,7 +5,7 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
 [`ARCHITECTURE-DECISIONS.md`](../../ARCHITECTURE-DECISIONS.md), not here.
 
 **Status:** in progress — sub-steps 1–7 done
-**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-11 done; next 7a-12, collated Unicode keys)
+**Current sub-step:** PLAN.md step 7a (7a-1 to 7a-5 done; ADR-56 kept and documented 2026-11-12; the collation row decided 2026-11-14 and split three ways in `DIVERGENCES.md` §1; 7a-6 to 7a-12 done; next 7a-13, VFP's GENERAL on other code pages)
 
 ## Done so far
 
@@ -511,8 +511,35 @@ forever. Project-level state goes to the root [`STATE.md`](../../../STATE.md) an
         `net/corpus/README.md`, the generator README. `crap4csharp`: `IndexHeader.CodeBaseCollation`
         15.0, `CollationWeights.TableFor` 13.0, `CollatedKey.Write` 12.0, all at 100%;
         `ExpansionsFor` was 9.1 (90.9%), its simple branch now tested.
-    - [ ] 7a-12 — collated Unicode keys supported (after 7a-11: the Unicode arrays derive from the
-      character ones).
+      - **Corrected in 7a-12:** the claim that the data-driven gates picked the three tables up was
+        half true — `IndexGoldenTests` and `SeekGoldenTests` list their index files by hand and
+        lacked them. Added, they found no library defect but a harness one: the pad byte was keyed
+        by expression and width, where a simple collation and machine order share both; only
+        machine tags ask for it now. 191 more recorded seek cases and 27 seek-next runs pass.
+    - [x] 7a-12 — collated Unicode keys (2026-11-15), ADR-85.
+      - **a.** Generator case `case-wgen.cpp`, cp1252, `W(20)`/`O(12)`, every unit U+0001–U+00FF
+        and words; `W_MACH`, `W_GEN`, `O_GEN` (`GENERAL`), `W_AVAYA` (`CB00008`), `W_G850`
+        (`CB00007`). Two reference quirks met on the way: `i4tagAdd` reads the character
+        `collateName` for a wide tag (`isUnicode` not yet set, i4add.c:746-750), so the case sets that
+        one; and a descending collated wide tag crashes the reference's dump (access violation), so
+        there is none. Existing corpus byte-identical; a second run identical.
+      - **b.** Unit (`CollatedKeyTests` Unicode, `SeekConverterKindTests`) and golden
+        (`CollatedWideGoldenTests`, `WGEN` in the lists) written — **but not run red on their own**:
+        the implementation followed straight on. The mutations below stand in for it.
+      - **c.** `KeyKind.CollatedWideCharacter`; `SeekConverter` (head-and-tail collations only, a
+        simple one refused naming why; the per-character add in the length check);
+        `CollatedKey.WriteWide`/`WriteWideSearch` computed from the byte tables; `RecordKey`;
+        `TableTagCursor` (a whole value padded with U+2000, a prefix by its heads); `Table.Search`.
+        Every key of the five tags rebuilds; every record found by its text and by a prefix.
+        Mutations: U+2000 dropped like U+0020, tails little-endian, units from 256 read as bytes,
+        the prefix search with tails — each reddens unit and golden; restored, checksum, touched.
+      - **d.** ADR-85; `KEY-COLLATION.md` §3.6; `README.md` (the prefix seek); `PORTING-PLAN.md`
+        §2.2; `DIVERGENCES.md` §1; `net/corpus/README.md`, the generator README. `crap4csharp`:
+        the new members 9.0 and below at 100%; `TableTagCursor.SearchFor` was 24.9 (67.3%) — the
+        collated arms reached only by the golden layer — and is 16.0 at 100% with
+        `CollatedSeekTests` (component, over the corpus); `SeekConverter.KindOf` 21.5 (84.6%), its
+        uncovered arms older.
+      - Release 3174 passed (1 skipped) + 1643 golden, green.
     - [ ] 7a-13 — VFP's GENERAL on other code pages, by weights recovered from VFP's keys; tried.
     - [ ] 7a-14 — the documentation pass: the disk-loaded collation (`CB00004`) refused, with an
       ADR; "Differences from CodeBase" and XML docs for ADR-43, 45/50, 58, 61, 63–66, 69, 71; §2's

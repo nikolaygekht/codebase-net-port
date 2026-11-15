@@ -20,7 +20,7 @@ public sealed class CorpusLayoutTests
     [
         "CBCP1250", "CBCP1252", "CBCP850",
         "CDXBASE", "CDXCOLL", "CDXDEEP", "CDXEXPR", "CDXTIME", "CMPMEMO", "CP1251", "CP936",
-        "DB3TYPE", "DTMILLI", "F2XMEMO", "FLAGS30", "IDXONE", "LONGNAME", "QRYGATE", "RECNOTAG", "TAGBAD", "TAGCTX", "TAGGEN", "VFPMEMO", "VFPNULL", "VFPTYPE", "WSTR",
+        "DB3TYPE", "DTMILLI", "F2XMEMO", "FLAGS30", "IDXONE", "LONGNAME", "QRYGATE", "RECNOTAG", "TAGBAD", "TAGCTX", "TAGGEN", "VFPMEMO", "VFPNULL", "VFPTYPE", "WGEN", "WSTR",
     ];
 
     /// <summary>The index files the corpus is documented to hold, with the table each belongs to.</summary>
@@ -42,6 +42,7 @@ public sealed class CorpusLayoutTests
         { "RECNOTAG", "RECNOTAG.cdx" },
         { "TAGCTX", "TAGCTX.cdx" },
         { "TAGGEN", "TAGGEN.cdx" },
+        { "WGEN", "WGEN.cdx" },
         { "WSTR", "WSTR.cdx" },
     };
 

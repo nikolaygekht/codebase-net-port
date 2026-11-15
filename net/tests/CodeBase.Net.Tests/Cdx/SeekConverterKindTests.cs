@@ -71,15 +71,27 @@ public sealed class SeekConverterKindTests
     }
 
     [Theory]
-    [InlineData("K_W", 40)]
-    [InlineData("K_O", 24)]
-    public void AWideTagUnderACollationIsRefused(string expression, int keyLength)
+    // A head-and-tail collation over a wide field keys through the Unicode transform, at twice the
+    // value's bytes (i4init.c:621-666, ADR-85).
+    [InlineData("K_W", "GENERAL", 40)]
+    [InlineData("K_O", "GENERAL", 24)]
+    [InlineData("K_W", "CB00008", 40)]
+    [InlineData("K_W", "CB00007", 40)]
+    public void AWideTagUnderAHeadAndTailCollationIsCollatedWide(string expression, string collation, int keyLength)
     {
-        // Its keys would be the Unicode weight tables', which this library does not have
-        // (E4EXPR.C:684-710); only machine order is read (ADR-76).
-        Action act = () => Converter(expression, keyLength, "GENERAL");
+        Converter(expression, keyLength, collation).Kind.Should().Be(KeyKind.CollatedWideCharacter);
+    }
 
-        act.Should().Throw<CodeBaseException>().Which.Code.Should().Be(ErrorCode.NotSupported);
+    [Theory]
+    [InlineData("CB00005")]
+    [InlineData("CB00009")]
+    public void AWideTagUnderASimpleCollationIsRefused(string collation)
+    {
+        // "Not implemented yet" in the reference too (i4init.c:659): it refuses the open.
+        Action act = () => Converter("K_W", 20, collation);
+
+        act.Should().Throw<CodeBaseException>()
+            .Where(e => e.Code == ErrorCode.NotSupported && e.Message.Contains("simple"));
     }
 
     [Theory]

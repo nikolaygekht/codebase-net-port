@@ -63,6 +63,116 @@ internal static class CollatedKey
                 destination);
 
     /// <summary>
+    /// Writes the key a head-and-tail collation stores for UTF-16 text.
+    /// </summary>
+    /// <param name="value">The text, little-endian UTF-16, as a wide field stores it.</param>
+    /// <param name="collation">The tag's collation; not a simple one.</param>
+    /// <param name="codePage">The table's code page, which chooses GENERAL's weights.</param>
+    /// <param name="destination">Where to write, at least twice the value's length.</param>
+    /// <returns>How many bytes were written, which is always twice the value's length.</returns>
+    /// <value>
+    /// [c]t4convertSubSortCompressUnicode[/c] (i4conv.c:484-583) over the table
+    /// [c]collate4setupUnicodeFromChar[/c] builds (u4util.c:2700-2793), computed from the byte table
+    /// rather than built: a code unit below 256 is weighed as the byte of that number, whatever
+    /// character the byte is in the code page; a unit from 256 up weighs as itself with no tail.
+    /// Heads are 16-bit big-endian, tails are written as a zero and the tail, as many as fit after the
+    /// heads, then zeros. Only trailing U+0020 is dropped, so the U+2000 CodeBase blanks a wide field
+    /// with is weighed like any other character; and unlike the byte transform the tails have no
+    /// count guard (ADR-85).
+    /// </value>
+    public static int WriteWide(ReadOnlySpan<byte> value, CollationName collation, int codePage, Span<byte> destination) =>
+        Wide(value, collation, codePage, includeTails: true, destination);
+
+    /// <summary>
+    /// Writes the search for a prefix of UTF-16 text in a collated wide tag: the heads of the given code units.
+    /// </summary>
+    /// <param name="value">The text, little-endian UTF-16.</param>
+    /// <param name="collation">The tag's collation; not a simple one.</param>
+    /// <param name="codePage">The table's code page, which chooses GENERAL's weights.</param>
+    /// <param name="destination">Where to write, at least twice the value's length.</param>
+    /// <returns>How many bytes the search covers: the heads, two per unit and four per expanding one.</returns>
+    /// <value>
+    /// Not the reference's. Its partial seek looks for the end of the heads by the first byte below
+    /// sixteen, and every head of a Unicode key begins with a zero byte, so it searches nothing and
+    /// lands on the tag's first key (D4SEEK.C:104-140). The heads alone are what every stored key
+    /// beginning with these characters begins with (ADR-85).
+    /// </value>
+    public static int WriteWideSearch(ReadOnlySpan<byte> value, CollationName collation, int codePage, Span<byte> destination) =>
+        Wide(value, collation, codePage, includeTails: false, destination);
+
+    private static int Wide(
+        ReadOnlySpan<byte> value, CollationName collation, int codePage, bool includeTails, Span<byte> destination)
+    {
+        ReadOnlySpan<byte> table = CollationWeights.TableFor(collation, codePage);
+        ReadOnlySpan<byte> expansions = CollationWeights.ExpansionsFor(collation, codePage);
+
+        int units = value.Length / 2;
+        int written = 2 * value.Length;
+
+        // Only U+0020 comes off the end (i4conv.c:517-524).
+        int content = units;
+        while (content > 0 && Unit(value, content - 1) == ' ')
+            content--;
+
+        Span<byte> tails = written <= 512 ? stackalloc byte[512] : new byte[written];
+        int head = 0;
+        int tail = 0;
+
+        for (int i = 0; i < content; i++)
+        {
+            int unit = Unit(value, i);
+
+            if (unit >= 256)
+            {
+                destination[head++] = (byte)(unit >> 8);
+                destination[head++] = (byte)unit;
+                continue;
+            }
+
+            (byte headWeight, byte tailWeight) = CollationTables.Weigh(table, (byte)unit);
+
+            if (headWeight != CollationTables.Expands)
+            {
+                WideWeight(headWeight, tailWeight, destination, ref head, tails, ref tail);
+                continue;
+            }
+
+            (byte first, byte second) = CollationTables.Expand(expansions, tailWeight);
+
+            foreach (byte expanded in stackalloc[] { first, second })
+            {
+                (byte expandedHead, byte expandedTail) = CollationTables.Weigh(table, expanded);
+                WideWeight(expandedHead, expandedTail, destination, ref head, tails, ref tail);
+            }
+        }
+
+        if (!includeTails)
+            return head;
+
+        int room = written - head;
+        int copied = Math.Min(room, tail);
+
+        tails[..copied].CopyTo(destination[head..]);
+        destination.Slice(head + copied, room - copied).Clear();
+
+        return written;
+    }
+
+    private static int Unit(ReadOnlySpan<byte> value, int index) => value[2 * index] | (value[(2 * index) + 1] << 8);
+
+    private static void WideWeight(byte headWeight, byte tailWeight, Span<byte> heads, ref int head, Span<byte> tails, ref int tail)
+    {
+        heads[head++] = 0;
+        heads[head++] = headWeight;
+
+        if (tailWeight != CollationTables.NoTail && tail + 2 <= tails.Length)
+        {
+            tails[tail++] = 0;
+            tails[tail++] = tailWeight;
+        }
+    }
+
+    /// <summary>
     /// Writes a simple collation's key: each byte replaced by its head weight.
     /// </summary>
     /// <value>

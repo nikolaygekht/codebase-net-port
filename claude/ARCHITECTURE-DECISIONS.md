@@ -2897,3 +2897,36 @@ other reader either.
 **Rejected — weighing a named collation by the table's code page,** as GENERAL is: it is not what the
 reference does, and its keys would not rebuild. **Rejected — reading the disk tables:** the format is
 understood (u4util.c:2570-2700), but nothing ships them, so nothing could gate a reader.
+
+## ADR-85 — Collated Unicode keys are read and sought as the reference keys them; a prefix is sought by its heads · accepted
+
+**Date.** 2026-11-15. Step 013, sub-step 7a-12; support decided by the user on 2026-11-14.
+
+**Context.** A tag over CodeBase's `'W'` or `'O'` field can carry a collation; the port refused it
+(ADR-76 read machine order only). The reference keys it (i4init.c:621-666) for the head-and-tail
+collations only — a simple one over Unicode is "not implemented yet" and refused at open. Its table
+(`collate4setupUnicodeFromChar`) gives code units 0–255 the byte table's entry **of the same number**,
+whatever character that byte is in the code page, and every unit from 256 up its own value with no
+tail; so U+009C expands to OE in cp1252 while the real œ, U+0153, does not. The transform
+(`t4convertSubSortCompressUnicode`) writes 16-bit big-endian heads, then tails as `00 tt`, at twice
+the value's bytes, dropping only trailing **U+0020** — the U+2000 CodeBase blanks a wide field with
+is weighed. Seeking a shorter value goes through the partial-seek tail (D4SEEK.C:104-140), which ends
+the heads at the first byte below 16; every Unicode head begins with a zero byte, so the reference
+searches **zero bytes** and lands on the tag's first key.
+
+**Decision.** The port keys such a tag as the reference does, from the byte tables it already has —
+no 65 536-entry table is built — and refuses the simple collations as the reference does. A whole
+value is sought padded with U+2000 to the field's width, as it is stored. **A prefix is sought by the
+heads of its code units, without tails** — the meaningful prefix of every key that begins with those
+characters — not by the reference's zero-length search.
+
+**Consequence.** Gated by the C generator's case `WGEN` (cp1252; GENERAL, Avaya and GENERAL cp850 by
+name over `W` and `O`; every unit 1–255 alone): every key rebuilds, and every record is found by its
+assigned text and by a two-character prefix. `SeekPrefix` on such a tag answers what the caller
+asked, where CodeBase's `d4seek` of a short value lands on the first key. A descending collated wide
+tag is unwitnessed: the reference crashes dumping one (`case-wgen.cpp`), and the port reads it by the
+same rules as any descending tag.
+
+**Rejected — replicating the zero-length prefix search:** it answers nothing a caller could mean.
+**Rejected — building the reference's 65 536-entry table:** it is the byte table plus the identity,
+and computing it costs nothing.

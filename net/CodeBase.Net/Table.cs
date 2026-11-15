@@ -834,7 +834,7 @@ public sealed class Table : IDisposable
         TableTagCursor cursor = Seeking();
 
         // A wide tag holds UTF-16 whatever the table's code page is (ADR-76).
-        byte[] bytes = cursor.KeyKind == KeyKind.WideCharacter
+        byte[] bytes = cursor.KeyKind is KeyKind.WideCharacter or KeyKind.CollatedWideCharacter
             ? Encoding.Unicode.GetBytes(value)
             : TextEncoding.GetBytes(value);
 
